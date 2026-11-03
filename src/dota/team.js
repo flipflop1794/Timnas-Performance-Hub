@@ -22,11 +22,11 @@ export function teamFindings(pools, players, asOf) {
   const missing = [1, 2, 3, 4, 5].filter((k) => !posSet.has(k));
   F.push(finding({ title: missing.length ? `Positions not covered by club history: ${missing.join(', ')}` : 'All five positions covered by a player who plays that role for his club', kind: 'inferred', area: 'roles', lens: 'strategic', severity: missing.length ? -3 : 2, n: pools.reduce((a, p) => a + p.games, 0), sources: src, tags }));
   for (const p of pools) {
-    const ready = p.pool.filter((e) => e.tier === 'Ready');
+    const ready = p.pool.filter((e) => e.tier === 'Established');
     const recent = players[p.player].games.filter((g) => (asOf - g.start) / 86400 <= 45);
     const rw = recent.filter((g) => g.win).length;
     const ci = wilson(rw, recent.length);
-    F.push(finding({ title: `${p.player} (${p.posLabel}): ${ready.length} ready heroes — ${ready.slice(0, 4).map((e) => e.name).join(', ')}`, kind: 'inferred', area: 'pool', lens: 'strategic', severity: ready.length >= 6 ? 1 : ready.length <= 3 ? -2 : 0, n: p.games, sources: src, tags, data: { player: p.player } }));
+    F.push(finding({ title: `${p.player} (${p.posLabel}): ${ready.length} established heroes (club) — ${ready.slice(0, 4).map((e) => e.name).join(', ')}`, kind: 'inferred', area: 'pool', lens: 'strategic', severity: ready.length >= 6 ? 1 : ready.length <= 3 ? -2 : 0, n: p.games, sources: src, tags, data: { player: p.player } }));
     if (recent.length >= 8) {
       const delta = rw / recent.length - p.winRate;
       if (Math.abs(delta) >= 0.12) F.push(finding({ title: `${p.player}: ${rw}/${recent.length} wins in the last 45 days (${delta > 0 ? 'up' : 'down'} from ${(p.winRate * 100).toFixed(0)}% season)`, kind: 'inferred', area: 'form', lens: 'execution', severity: delta > 0 ? 1 : -1, n: recent.length, sources: src, tags: [...tags, 'form'], detail: `95% range ${(ci.lo * 100).toFixed(0)}–${(ci.hi * 100).toFixed(0)}%.` }));
@@ -35,9 +35,9 @@ export function teamFindings(pools, players, asOf) {
     const idle = Math.round((asOf - lastGame) / 86400);
     if (idle >= 30) F.push(finding({ title: `${p.player} has no tournament game in ${idle} days`, kind: 'observed', area: 'form', lens: 'risk', severity: -2, n: null, confidence: 'High', sources: src, tags: ['idle'], detail: 'Fact about tournament lobbies only: pubs, ranked and private scrims are not in this data — ask the player.' }));
     // Ban vulnerability: top-3 banned -> what is left.
-    const topReady = p.pool.filter((e) => e.tier === 'Ready').slice(0, 3).map((e) => e.hero);
+    const topReady = p.pool.filter((e) => e.tier === 'Established').slice(0, 3).map((e) => e.hero);
     const dep = banDepth(p, topReady);
-    if (topReady.length === 3 && dep.left <= 2) F.push(finding({ title: `If his top 3 are banned, ${p.player} has ${dep.left} ready hero${dep.left === 1 ? '' : 'es'} left`, kind: 'inferred', area: 'draft', lens: 'risk', severity: -2, n: p.games, sources: src, tags: [...tags, 'ban-vulnerable'], detail: `Lost: ${dep.lost.join(', ')}. Next: ${dep.fallback || 'none'}.`, data: { player: p.player, lost: dep.lost } }));
+    if (topReady.length === 3 && dep.left <= 2) F.push(finding({ title: `If his top 3 are banned, ${p.player} has ${dep.left} established hero${dep.left === 1 ? '' : 'es'} left`, kind: 'inferred', area: 'draft', lens: 'risk', severity: -2, n: p.games, sources: src, tags: [...tags, 'ban-vulnerable'], detail: `Lost: ${dep.lost.join(', ')}. Next: ${dep.fallback || 'none'}.`, data: { player: p.player, lost: dep.lost } }));
   }
   // Flex picks.
   const flex = flexPicks(pools).filter((f) => f.players.length >= 2);

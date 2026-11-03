@@ -3,7 +3,7 @@ Generated 2026-11-03 from the data shipped in /data. Dota 2 data is real (OpenDo
 
 ## 1. Dota 2 — Indonesia team overview (Workflow A)
 
-| Player | Position | Games | Win % | Top ready heroes |
+| Player | Position | Games | Win % | Most-played heroes, club (6+ games) |
 |---|---|---|---|---|
 | jikroy | Pos 1 Carry | 121 | 49% | Lone Druid (8), Tiny (17), Kez (12), Luna (10), Terrorblade (7) |
 | Mikoto | Pos 2 Mid | 142 | 57% | Puck (29), Earth Spirit (9), Ember Spirit (19), Storm Spirit (18), Monkey King (6) |
@@ -12,19 +12,19 @@ Generated 2026-11-03 from the data shipped in /data. Dota 2 data is real (OpenDo
 | Whitemon | Pos 5 Hard support | 167 | 47% | Ring Master (21), Techies (22), Winter Wyvern (9), Bane (14), Mirana (7) |
 
 - **[inferred · High · n=743]** All five positions covered by a player who plays that role for his club
-- **[inferred · High · n=121]** jikroy (Pos 1 Carry): 7 ready heroes — Lone Druid, Tiny, Kez, Luna
+- **[inferred · High · n=121]** jikroy (Pos 1 Carry): 7 established heroes (club) — Lone Druid, Tiny, Kez, Luna
 - **[observed · High]** jikroy has no tournament game in 51 days  
   _Fact about tournament lobbies only: pubs, ranked and private scrims are not in this data — ask the player._
-- **[inferred · High · n=142]** Mikoto (Pos 2 Mid): 8 ready heroes — Puck, Earth Spirit, Ember Spirit, Storm Spirit
-- **[inferred · High · n=147]** Fbz (Pos 3 Offlane): 9 ready heroes — Doom, Centaur Warrunner, Brewmaster, Timbersaw
+- **[inferred · High · n=142]** Mikoto (Pos 2 Mid): 8 established heroes (club) — Puck, Earth Spirit, Ember Spirit, Storm Spirit
+- **[inferred · High · n=147]** Fbz (Pos 3 Offlane): 9 established heroes (club) — Doom, Centaur Warrunner, Brewmaster, Timbersaw
 - **[inferred · High · n=43]** Fbz: 30/43 wins in the last 45 days (up from 53% season)  
   _95% range 55–81%._
-- **[inferred · High · n=166]** Jhocam (Pos 4 Soft support): 6 ready heroes — Clockwerk, Hoodwink, Tusk, Dark Willow
+- **[inferred · High · n=166]** Jhocam (Pos 4 Soft support): 6 established heroes (club) — Clockwerk, Hoodwink, Tusk, Dark Willow
 - **[inferred · High · n=24]** Jhocam: 10/24 wins in the last 45 days (down from 63% season)  
   _95% range 24–61%._
 - **[observed · High]** Jhocam has no tournament game in 32 days  
   _Fact about tournament lobbies only: pubs, ranked and private scrims are not in this data — ask the player._
-- **[inferred · High · n=167]** Whitemon (Pos 5 Hard support): 8 ready heroes — Ring Master, Techies, Winter Wyvern, Bane
+- **[inferred · High · n=167]** Whitemon (Pos 5 Hard support): 8 established heroes (club) — Ring Master, Techies, Winter Wyvern, Bane
 - **[inferred · Medium · n=11]** 11 flex heroes two of our players can take
 - **[observed · High · n=104]** Most games shared by two of the five: Fbz + jikroy (104); never all five together in these tournament games  
   _Max tracked players in one match: 3. Note these appearances include games on opposite sides. Team synergy has to be built in pelatnas scrims._
@@ -49,8 +49,8 @@ Generated 2026-11-03 from the data shipped in /data. Dota 2 data is real (OpenDo
 ### Three-coach read
 **Coach A — Strategic Analyst** — Game plan, draft strategy, objectives and opponent preparation.
 - (build-on) Build around it: All five positions covered by a player who plays that role for his club.
-- (build-on) Build around it: jikroy (Pos 1 Carry): 7 ready heroes — Lone Druid, Tiny, Kez, Luna.
-- (build-on) Build around it: Mikoto (Pos 2 Mid): 8 ready heroes — Puck, Earth Spirit, Ember Spirit, Storm Spirit.
+- (build-on) Build around it: jikroy (Pos 1 Carry): 7 established heroes (club) — Lone Druid, Tiny, Kez, Luna.
+- (build-on) Build around it: Mikoto (Pos 2 Mid): 8 established heroes (club) — Puck, Earth Spirit, Ember Spirit, Storm Spirit.
 - (fix) Address: jikroy has no tournament game in 51 days.
 - (fix) Address: Jhocam has no tournament game in 32 days.
 - (fix) Scrim volume before strategy: Most games shared by two of the five: Fbz + jikroy (104); never all five together in these tournament games.
@@ -62,7 +62,7 @@ Generated 2026-11-03 from the data shipped in /data. Dota 2 data is real (OpenDo
 **Coach C — Critical Challenger** — Sample size, club-vs-national context, alternative explanations, how the opponent exploits us.
 - (caution) Fbz: 30/43 wins in the last 45 days (up from 53% season): form swings this size are common in 20–40 game samples.
 - (caution) Jhocam: 10/24 wins in the last 45 days (down from 63% season): form swings this size are common in 20–40 game samples.
-- (caution) 6 of the points above come from one club match or club games, not the national five together — check whether they repeat in pelatnas scrims: All five positions covered by a player who plays that role for his club; jikroy (Pos 1 Carry): 7 ready heroes — Lone Druid, Tiny, Kez, Luna; Mikoto (Pos 2 Mid): 8 ready heroes — Puck, Earth Spirit, Ember Spirit, Storm Spirit…. Treat them as starting hypotheses for scrims.
+- (caution) 6 of the points above come from one club match or club games, not the national five together — check whether they repeat in pelatnas scrims: All five positions covered by a player who plays that role for his club; jikroy (Pos 1 Carry): 7 established heroes (club) — Lone Druid, Tiny, Kez, Luna; Mikoto (Pos 2 Mid): 8 established heroes (club) — Puck, Earth Spirit, Ember Spirit, Storm Spirit…. Treat them as starting hypotheses for scrims.
 - Exploit: An opponent can target the out-of-practice player's lane early.
 - Exploit: Opponents can play for long, structured games where our lack of shared comms shows.
 - Blind spot: No objective data in this view: Roshan and tower habits are unknown.
@@ -73,7 +73,7 @@ Generated 2026-11-03 from the data shipped in /data. Dota 2 data is real (OpenDo
 **Combined verdict**
 - Priorities: The five have not played tournament Dota together. | jikroy has no tournament game in 51 days | Jhocam has no tournament game in 32 days
 - Disputed: none
-- Coaching staff sign-off required before any change to drafts, roles or tournament plans.
+- These are proposals. The title coach accepts, modifies or rejects each one in the coaching cycle before it reaches practice.
 
 ## 2. Dota 2 post-match — 1win vs OG, match 9057681759 (PARI UNIVERSE by FISSURE)
 Tracked national players in this match: 2/5 (club match). Result: **lost** in 49:01.
@@ -146,7 +146,7 @@ Tracked national players in this match: 2/5 (club match). Result: **lost** in 49
 **Combined verdict**
 - Priorities: Map control collapses around Roshan. | Lane lost early: Pos 2 Mikoto lost the 10-minute gold race by 1119. | Pos 2 Mikoto: black king bar at 36:12, 15 min after the opposing pos 2
 - Disputed: none
-- Coaching staff sign-off required before any change to drafts, roles or tournament plans.
+- These are proposals. The title coach accepts, modifies or rejects each one in the coaching cycle before it reaches practice.
 
 ## 2. Dota 2 post-match — Aurora Gaming vs 1win, match 9035078952 (BLAST SLAM VIII)
 Tracked national players in this match: 1/5 (club match). Result: **won** in 54:04.
@@ -208,7 +208,7 @@ Tracked national players in this match: 1/5 (club match). Result: **won** in 54:
 **Combined verdict**
 - Priorities: Map control collapses around Roshan. | Pos 2 Mikoto: aghanims shard at 47:01, 20 min after the opposing pos 2
 - Disputed: none
-- Coaching staff sign-off required before any change to drafts, roles or tournament plans.
+- These are proposals. The title coach accepts, modifies or rejects each one in the coaching cycle before it reaches practice.
 
 ## 3. Dota 2 scouting report — Mongolia (coach Chimid Batsukh)
 
@@ -348,4 +348,4 @@ _Ranges come from past logged matches and the stated assumptions; lobby, circles
 **Combined verdict**
 - Priorities: Too many matches end before zone 3. | Low survival after zone 3. | Losing a contested drop: Erangel · Pochinki.
 - Disputed: none
-- Coaching staff sign-off required before any change to drafts, roles or tournament plans.
+- These are proposals. The title coach accepts, modifies or rejects each one in the coaching cycle before it reaches practice.

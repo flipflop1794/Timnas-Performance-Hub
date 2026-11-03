@@ -43,7 +43,7 @@ export function heroPool(player, heroes, { asOf, halfLife = 60, prior = 8 } = {}
     const sw = shrink(e.wins, e.games, base, prior);
     const ci = wilson(e.wins, e.games);
     const daysSince = (now - e.last) / 86400;
-    const tier = e.games >= 6 && daysSince <= 120 ? 'Ready' : e.games >= 3 ? 'Practising' : 'Risky';
+    const tier = e.games >= 6 && daysSince <= 120 ? 'Established' : e.games >= 3 ? 'Some' : 'Few';
     return {
       ...e, name: heroes[e.hero]?.name || `#${e.hero}`, shrunkWR: sw, ci,
       daysSince: Math.round(daysSince), stale: daysSince > 45,
@@ -75,7 +75,7 @@ export function flexPicks(pools) {
 // How deep is a player's pool once given heroes are banned?
 export function banDepth(poolObj, banned) {
   const set = new Set(banned);
-  const ready = poolObj.pool.filter((e) => e.tier === 'Ready');
+  const ready = poolObj.pool.filter((e) => e.tier === 'Established');
   const left = ready.filter((e) => !set.has(e.hero));
   return { ready: ready.length, left: left.length, lost: ready.filter((e) => set.has(e.hero)).map((e) => e.name), fallback: left[0]?.name || null };
 }

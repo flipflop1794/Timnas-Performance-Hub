@@ -78,7 +78,9 @@ export function verdict(findings, recs, a, b, c) {
   const disagreements = c.challenges.map((ch) => ({ ref: ch.ref, claim: ch.target, challenge: ch.text, verdict: ch.verdict }));
   const prio = (r) => r.priority * (1 + confRank(r.confidence)) - ((r.findings || []).some((id) => cautioned.has(id)) ? 1 : 0);
   const priorities = [...consensus].sort((x, y) => prio(y) - prio(x)).slice(0, 3);
-  return { consensus, disputed, disagreements, priorities, humanReview: 'Coaching staff sign-off required before any change to drafts, roles or tournament plans.' };
+  return { consensus, disputed, disagreements, priorities, missing: c.blindSpots,
+    independence: 'A, B and C are three rule sets reading the same evidence. When they agree, that is not independent confirmation.',
+    humanReview: 'These are proposals. The title coach accepts, modifies or rejects each one in the coaching cycle before it reaches practice.' };
 }
 
 export function runCoaches(findings, recs, adapter, context) {

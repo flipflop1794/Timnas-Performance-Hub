@@ -67,7 +67,7 @@ export function recommendations(findings) {
       evidence: bv.map((f) => `${f.title} (${f.detail})`),
       explanation: 'Rivals read the same public data. Three first-phase bans on one player would force a weak hero or a role swap, and a coach who sees this will plan for it.',
       drill: `Ban-stress mock drafts (2 per day, 20 min): each session bans out one player's top 3 (${worst.map((f) => `${f.data.player}: ${f.data.lost.join('/')}`).join('; ')}) and the five draft and scrim around it. Each listed player adds two fallback heroes agreed with the title coach.`,
-      success: 'Every listed player has 2 more heroes at "Ready" (6+ games in the last 120 days, scrims included) before the final camp week; ban-stress scrims won at ≥ the team\'s normal scrim rate.',
+      success: 'Every listed player has 2 more heroes with 6+ logged games in the last 120 days (scrims included) before the final camp week; ban-stress scrims won at ≥ the team\'s normal scrim rate.',
       confidence: bv.every((f) => f.confidence === 'High') ? 'Medium' : 'Low', findings: bv.map((f) => f.id) }));
   }
   for (const r of RULES) for (const f of findings) {

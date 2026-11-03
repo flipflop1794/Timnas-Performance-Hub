@@ -106,7 +106,7 @@ export function evaluateDraft({ ours, theirs = [], ourBans = [], theirBans = [] 
   for (const a of asg.map) if (a.comfort < 0.8) vulns.push(`${heroes[a.hero]?.name} goes to ${a.player} with little tournament history on it.`);
   const taken = new Set([...ours, ...theirs, ...ourBans, ...theirBans]);
   for (const op of oppPools) {
-    const top = op.pool.find((e) => e.tier === 'Ready' && !taken.has(e.hero));
+    const top = op.pool.find((e) => e.tier === 'Established' && !taken.has(e.hero));
     if (top && ours.length < 5) vulns.push(`${op.player}'s comfort pick ${top.name} (${top.games} games) is still open.`);
   }
   for (const i of issues) vulns.push(i.text);

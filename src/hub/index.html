@@ -153,13 +153,33 @@ textarea{font-family:var(--f-mono);font-size:12px;min-height:110px;resize:vertic
 .kv{display:grid;grid-template-columns:150px minmax(0,1fr);gap:6px 14px;font-size:13.5px}
 .kv dt{color:var(--muted);font-weight:600}.kv dd{margin:0;color:var(--ink-2)}
 ul.plain{margin:0;padding-left:18px;color:var(--ink-2);display:flex;flex-direction:column;gap:4px}
+.x-national{color:var(--good);background:var(--good-soft)}
+.x-mixed,.x-club{color:var(--info);background:var(--info-soft)}
+.x-demo{color:var(--warn);background:var(--warn-soft)}
+.s-proposed,.s-evidence-needed{color:var(--warn);background:var(--warn-soft)}
+.s-accepted,.s-modified{color:var(--good);background:var(--good-soft)}
+.s-rejected{color:var(--bad);background:var(--bad-soft)}
+.s-retired{color:var(--muted);background:var(--raised)}
+.titles button.mode{border-style:dashed}
+.titles button.mode.demo{background:var(--warn);border-color:var(--warn);color:var(--gold-ink)}
+html.demo .wrap main{outline:3px dashed var(--warn);outline-offset:8px;border-radius:6px}
+.obj{border:1px solid var(--line-2);border-radius:10px;padding:12px 14px;display:flex;flex-direction:column;gap:8px;min-width:0}
+.obj header{display:flex;justify-content:space-between;gap:10px;align-items:flex-start}
+.obj h3{font-size:16px;font-weight:700;color:var(--ink)}
+.obj details{display:flex;flex-direction:column;gap:8px}
+.obj details>summary{list-style:none;width:max-content}
+.obj details>summary::-webkit-details-marker{display:none}
+.obj details[open]>summary{margin-bottom:8px}
+.kv.small{font-size:12.5px;grid-template-columns:120px minmax(0,1fr)}
+tr.me td{background:var(--gold-soft)}
+ul.today{gap:12px}
 @media (max-width:640px){.panel{padding:14px}.rec dl,.kv{grid-template-columns:minmax(0,1fr)}.simrow{grid-template-columns:minmax(0,1fr)}}
 @media (prefers-reduced-motion:no-preference){.btn,.chip,nav.tabs a,.titles button{transition:background-color .12s,border-color .12s,color .12s}}
 </style>
 <header class="top"><div class="wrap">
   <div class="bar1">
     <div class="brand"><span class="flag" aria-hidden="true"><i></i><i></i></span>Timnas <span>Performance Hub</span></div>
-    <div class="edition">IESF WEC 2026 · V1</div>
+    <div class="edition">IESF WEC 2026 · V1.1</div>
     <div class="spacer"></div>
     <div class="titles" id="titles" role="group" aria-label="Title"></div>
   </div>

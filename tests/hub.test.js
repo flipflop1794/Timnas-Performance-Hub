@@ -171,7 +171,7 @@ test('coaches: three different outputs; C challenges single-match claims; verdic
   assert.ok(out.c.challenges.some((c) => /lane result depends|item timing|support deaths/.test(c.text)), 'specific alternative explanation expected');
   assert.ok(out.verdict.priorities.length >= 1, 'observed single-match facts still yield priorities');
   assert.ok(out.c.blindSpots.length >= 2);
-  assert.match(out.verdict.humanReview, /sign-off/);
+  assert.match(out.verdict.humanReview, /title coach accepts, modifies or rejects/); assert.match(out.verdict.independence, /not independent/);
   for (const r of recs) for (const k of ['problem', 'evidence', 'explanation', 'drill', 'success', 'confidence']) assert.ok(r[k]);
 });
 

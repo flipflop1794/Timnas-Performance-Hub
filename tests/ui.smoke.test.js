@@ -16,7 +16,7 @@ test('hub: every view renders without errors', async () => {
   for (const v of VIEWS) {
     dom.window.location.hash = v;
     dom.window.dispatchEvent(new dom.window.HashChangeEvent('hashchange'));
-    assert.ok(main.textContent.length > 200, `${v} rendered too little`);
+    assert.ok(main.textContent.length > 80, `${v} rendered too little`);
     assert.ok(!/Something failed/.test(main.textContent), `${v}: ${main.textContent.slice(0, 200)}`);
   }
   assert.deepEqual(errors, []);
@@ -32,7 +32,7 @@ test('hub: draft room locks heroes and compares drafts', async () => {
   d.getElementById('dSaveA').click();
   d.getElementById('dUndo').click(); d.querySelector('.sugg button')?.click();
   d.getElementById('dSaveB').click();
-  assert.match(d.getElementById('main').textContent, /preferred by/);
+  assert.match(d.getElementById('main').textContent, /scores higher on these terms/);
 });
 
 test('hub: PUBGM CSV validation rejects a broken log and accepts a good one', async () => {

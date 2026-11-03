@@ -30,7 +30,7 @@ let md = `# IESF Performance Hub V1 — sample reports\nGenerated ${new Date().t
 
 // Dota team overview
 const TF = teamFindings(pools, players, ASOF);
-md += `## 1. Dota 2 — Indonesia team overview (Workflow A)\n\n| Player | Position | Games | Win % | Top ready heroes |\n|---|---|---|---|---|\n${pools.map((p) => `| ${p.player} | ${p.posLabel} | ${p.games} | ${round(p.winRate * 100)}% | ${p.pool.filter((e) => e.tier === 'Ready').slice(0, 5).map((e) => `${e.name} (${e.games})`).join(', ')} |`).join('\n')}\n\n${fl(TF)}\n\n### Training recommendations\n${rl(dotaRecs(TF))}\n\n### Three-coach read\n${coachMd(runCoaches(TF, dotaRecs(TF), dotaAdapter, { clubData: true }))}\n\n`;
+md += `## 1. Dota 2 — Indonesia team overview (Workflow A)\n\n| Player | Position | Games | Win % | Most-played heroes, club (6+ games) |\n|---|---|---|---|---|\n${pools.map((p) => `| ${p.player} | ${p.posLabel} | ${p.games} | ${round(p.winRate * 100)}% | ${p.pool.filter((e) => e.tier === 'Established').slice(0, 5).map((e) => `${e.name} (${e.games})`).join(', ')} |`).join('\n')}\n\n${fl(TF)}\n\n### Training recommendations\n${rl(dotaRecs(TF))}\n\n### Three-coach read\n${coachMd(runCoaches(TF, dotaRecs(TF), dotaAdapter, { clubData: true }))}\n\n`;
 
 for (const m of matches) {
   const a = analyseMatch(m, INA, heroes);

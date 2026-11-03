@@ -12,7 +12,7 @@ export function poolsFromAggregate(agg, heroes) {
     const base = p.n ? p.w / p.n : 0.5;
     const pool = p.heroes.map(([hero, g, w]) => {
       const sw = shrink(w, g, base, 8);
-      return { hero, name: heroes[hero]?.name || `#${hero}`, games: g, wins: w, shrunkWR: sw, comfort: Math.log1p(g * 0.6) * (0.5 + sw), tier: g >= 6 ? 'Ready' : g >= 3 ? 'Practising' : 'Risky', daysSince: null, lanes: {} };
+      return { hero, name: heroes[hero]?.name || `#${hero}`, games: g, wins: w, shrunkWR: sw, comfort: Math.log1p(g * 0.6) * (0.5 + sw), tier: g >= 6 ? 'Established' : g >= 3 ? 'Some' : 'Few', daysSince: null, lanes: {} };
     }).sort((a, b) => b.comfort - a.comfort);
     const lane = +Object.entries(p.lanes).sort((a, b) => b[1] - a[1])[0][0];
     return { player: ign, games: p.n, winRate: base, pool, lane, avgDur: p.avgdur };
