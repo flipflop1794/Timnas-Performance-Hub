@@ -1,0 +1,26 @@
+{
+  "_note": "Scoring differs by tournament. Pick the profile that matches the event and check it against the official rulebook before using totals for decisions.",
+  "profiles": {
+    "wec26": {
+      "label": "IESF WEC 2026",
+      "status": "Blocked",
+      "verification": "Not published as of 2026-11-03. wec.iesf.org shows the 16 finalist nations only. Owner: PB ESI intl. relations.",
+      "placement": null,
+      "per_elim": null
+    },
+    "standard_10_6": {
+      "label": "Common PUBG Mobile esports table (10-6-5-4-3-2-1-1, 1 per elimination)",
+      "status": "Unverified",
+      "verification": "Widely used in PMGC/PMWC-era events, but no official rulebook page could be retrieved in this session (Liquipedia fetch failed; news pages list totals only). Use as a working assumption until the WEC rulebook is published.",
+      "placement": [10, 6, 5, 4, 3, 2, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0],
+      "per_elim": 1
+    },
+    "custom": {
+      "label": "Custom (edit in the hub)",
+      "status": "User-defined",
+      "verification": "Set by the coaching staff for scrims.",
+      "placement": [10, 6, 5, 4, 3, 2, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0],
+      "per_elim": 1
+    }
+  }
+}

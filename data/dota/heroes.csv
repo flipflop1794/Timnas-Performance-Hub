@@ -1,0 +1,128 @@
+id,name,attr,attack,roles
+1,Anti-Mage,agi,M,Car|Esc|Nuk
+2,Axe,str,M,Ini|Dur|Dis|Car
+3,Bane,all,R,Sup|Dis|Nuk|Dur
+4,Bloodseeker,agi,M,Car|Dis|Nuk|Ini
+5,Crystal Maiden,int,R,Sup|Dis|Nuk
+6,Drow Ranger,agi,R,Car|Dis|Pus
+7,Earthshaker,str,M,Sup|Ini|Dis|Nuk
+8,Juggernaut,agi,M,Car|Pus|Esc
+9,Mirana,agi,R,Car|Sup|Esc|Nuk|Dis
+10,Morphling,agi,R,Car|Esc|Dur|Nuk|Dis
+11,Shadow Fiend,agi,R,Car|Nuk
+12,Phantom Lancer,agi,M,Car|Esc|Pus|Nuk
+13,Puck,int,R,Ini|Dis|Esc|Nuk
+14,Pudge,str,M,Dis|Ini|Dur|Nuk
+15,Razor,agi,R,Car|Dur|Nuk|Pus
+16,Sand King,all,M,Ini|Dis|Sup|Nuk|Esc
+17,Storm Spirit,int,R,Car|Esc|Nuk|Ini|Dis
+18,Sven,str,M,Car|Dis|Ini|Dur|Nuk
+19,Tiny,str,M,Car|Nuk|Pus|Ini|Dur|Dis
+20,Vengeful Spirit,agi,R,Sup|Ini|Dis|Nuk|Esc
+21,Windranger,all,R,Car|Sup|Dis|Esc|Nuk
+22,Zeus,int,R,Nuk|Car
+23,Kunkka,str,M,Car|Sup|Dis|Ini|Dur|Nuk
+25,Lina,int,R,Sup|Car|Nuk|Dis
+26,Lion,int,R,Sup|Dis|Nuk|Ini
+27,Shadow Shaman,int,R,Sup|Pus|Dis|Nuk|Ini
+28,Slardar,str,M,Car|Dur|Ini|Dis|Esc
+29,Tidehunter,str,M,Ini|Dur|Dis|Nuk|Car
+30,Witch Doctor,int,R,Sup|Nuk|Dis
+31,Lich,int,R,Sup|Nuk
+32,Riki,agi,M,Car|Esc|Dis
+33,Enigma,all,R,Dis|Ini|Pus
+34,Tinker,int,R,Car|Nuk|Pus
+35,Sniper,agi,R,Car|Nuk
+36,Necrophos,int,R,Car|Nuk|Dur|Dis
+37,Warlock,int,R,Sup|Ini|Dis
+38,Beastmaster,all,M,Ini|Dis|Dur|Nuk
+39,Queen of Pain,int,R,Car|Nuk|Esc
+40,Venomancer,all,R,Sup|Nuk|Ini|Pus|Dis
+41,Faceless Void,agi,M,Car|Ini|Dis|Esc|Dur
+42,Wraith King,str,M,Car|Sup|Dur|Dis|Ini
+43,Death Prophet,all,R,Car|Pus|Nuk|Dis
+44,Phantom Assassin,agi,M,Car|Esc
+45,Pugna,int,R,Nuk|Pus
+46,Templar Assassin,agi,R,Car|Esc
+47,Viper,agi,R,Car|Dur|Ini|Dis
+48,Luna,agi,R,Car|Nuk|Pus
+49,Dragon Knight,str,M,Car|Pus|Dur|Dis|Ini|Nuk
+50,Dazzle,all,R,Sup|Nuk|Dis
+51,Clockwerk,str,M,Ini|Dis|Dur|Nuk
+52,Leshrac,int,R,Car|Sup|Nuk|Pus|Dis
+53,Nature's Prophet,all,R,Car|Pus|Esc|Nuk
+54,Lifestealer,str,M,Car|Dur|Esc|Dis
+55,Dark Seer,int,M,Ini|Esc|Dis
+56,Clinkz,agi,R,Car|Esc|Pus
+57,Omniknight,str,M,Sup|Dur|Nuk
+58,Enchantress,int,R,Sup|Pus|Dur|Dis
+59,Huskar,str,R,Car|Dur|Ini
+60,Night Stalker,str,M,Car|Ini|Dur|Dis|Nuk
+61,Broodmother,agi,M,Car|Pus|Esc|Nuk
+62,Bounty Hunter,agi,M,Esc|Nuk
+63,Weaver,agi,R,Car|Esc
+64,Jakiro,int,R,Sup|Nuk|Pus|Dis
+65,Batrider,all,R,Ini|Dis|Esc
+66,Chen,int,R,Sup|Pus
+67,Spectre,agi,M,Car|Dur|Esc
+68,Ancient Apparition,int,R,Sup|Dis|Nuk
+69,Doom,str,M,Car|Dis|Ini|Dur|Nuk
+70,Ursa,agi,M,Car|Dur|Dis
+71,Spirit Breaker,str,M,Car|Ini|Dis|Dur|Esc
+72,Gyrocopter,agi,R,Car|Nuk|Dis
+73,Alchemist,str,M,Car|Sup|Dur|Dis|Ini|Nuk
+74,Invoker,int,R,Car|Nuk|Dis|Esc|Pus
+75,Silencer,int,R,Car|Sup|Dis|Ini|Nuk
+76,Outworld Devourer,int,R,Car|Nuk|Dis
+77,Lycan,str,M,Car|Pus|Dur|Esc
+78,Brewmaster,all,M,Car|Ini|Dur|Dis|Nuk
+79,Shadow Demon,int,R,Sup|Dis|Ini|Nuk
+80,Lone Druid,agi,R,Car|Pus|Dur
+81,Chaos Knight,str,M,Car|Dis|Dur|Pus|Ini
+82,Meepo,agi,M,Car|Esc|Nuk|Dis|Ini|Pus
+83,Treant Protector,str,M,Sup|Ini|Dur|Dis|Esc
+84,Ogre Magi,str,M,Sup|Nuk|Dis|Dur|Ini
+85,Undying,str,M,Sup|Dur|Dis|Nuk
+86,Rubick,int,R,Sup|Dis|Nuk
+87,Disruptor,int,R,Sup|Dis|Nuk|Ini
+88,Nyx Assassin,all,M,Dis|Nuk|Ini|Esc
+89,Naga Siren,agi,M,Car|Sup|Pus|Dis|Ini|Esc
+90,Keeper of the Light,int,R,Sup|Nuk|Dis
+91,Io,all,R,Sup|Esc|Nuk
+92,Visage,all,R,Sup|Nuk|Dur|Dis|Pus
+93,Slark,agi,M,Car|Esc|Dis|Nuk
+94,Medusa,agi,R,Car|Dis|Dur
+95,Troll Warlord,agi,R,Car|Pus|Dis|Dur
+96,Centaur Warrunner,str,M,Dur|Ini|Dis|Nuk|Esc
+97,Magnus,all,M,Ini|Dis|Nuk|Esc
+98,Timbersaw,str,M,Nuk|Dur|Esc
+99,Bristleback,str,M,Car|Dur|Ini|Nuk
+100,Tusk,str,M,Ini|Dis|Nuk
+101,Skywrath Mage,int,R,Sup|Nuk|Dis
+102,Abaddon,all,M,Sup|Car|Dur
+103,Elder Titan,str,M,Ini|Dis|Nuk|Dur
+104,Legion Commander,str,M,Car|Dis|Ini|Dur|Nuk
+105,Techies,all,R,Nuk|Dis
+106,Ember Spirit,agi,M,Car|Esc|Nuk|Dis|Ini
+107,Earth Spirit,str,M,Nuk|Esc|Dis|Ini|Dur
+108,Underlord,str,M,Sup|Nuk|Dis|Dur|Esc
+109,Terrorblade,agi,M,Car|Pus|Nuk
+110,Phoenix,str,R,Sup|Nuk|Ini|Esc|Dis
+111,Oracle,int,R,Sup|Nuk|Dis|Esc
+112,Winter Wyvern,int,R,Sup|Dis|Nuk
+113,Arc Warden,all,R,Car|Esc|Nuk
+114,Monkey King,agi,M,Car|Esc|Dis|Ini
+119,Dark Willow,int,R,Sup|Nuk|Dis|Esc
+120,Pangolier,all,M,Car|Nuk|Dis|Dur|Esc|Ini
+121,Grimstroke,int,R,Sup|Nuk|Dis|Esc
+123,Hoodwink,agi,R,Sup|Nuk|Esc|Dis
+126,Void Spirit,all,M,Car|Esc|Nuk|Dis
+128,Snapfire,all,R,Sup|Nuk|Dis|Esc
+129,Mars,str,M,Car|Ini|Dis|Dur
+131,Ring Master,int,R,Sup|Nuk|Esc|Dis
+135,Dawnbreaker,str,M,Car|Dur
+136,Marci,all,M,Sup|Car|Ini|Dis|Esc
+137,Primal Beast,str,M,Ini|Dur|Dis
+138,Muerta,int,R,Car|Nuk|Dis
+145,Kez,agi,M,Car|Esc|Dis
+155,Largo,str,M,Dur|Dis|Sup

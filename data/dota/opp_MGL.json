@@ -1,0 +1,15 @@
+{"_source":"Roster: wec.iesf.org/editions/wec-2026/teams/MGL (read 2026-11-03). Accounts: OpenDota /api/proPlayers matched by exact name + country MN. Hero pools: OpenDota /api/players/{id}/matches?lobby_type=1, start_time >= patch 7.41 (2026-03-24). Pulled 2026-11-03.",
+"nation":"Mongolia","code":"MGL","coach":"Chimid Batsukh",
+"roster":[
+ {"ign":"Se","captain":true,"account":null,"match_status":"not found in OpenDota pro list"},
+ {"ign":"11","account":377594124,"match_status":"ambiguous: two MN pro accounts named '11' (377594124 IHC, 466093373); used the one active in Nov 2026. Only 13 tournament games since 7.41 — verify"},
+ {"ign":"423","account":458287006,"club":"Klim Sani4","match_status":"exact name + country"},
+ {"ign":"NARMAN","account":343084576,"club":"Team Nemesis","match_status":"exact name + country. Same club as Indonesia's Jhocam (Team Nemesis)"},
+ {"ign":"sanctity","account":392169957,"club":"Team Bald","match_status":"exact name + country"}],
+"players":{
+ "11":{"n":13,"w":7,"avgdur":2130,"lanes":{"3":13},"heroes":[[2,3,2],[69,2,1],[98,2,1],[108,2,0],[28,1,1],[33,1,0],[85,1,1],[155,1,1]],"first":1782810435,"last":1791348252},
+ "423":{"n":201,"w":112,"avgdur":2352,"lanes":{"1":199,"2":1,"3":1},"heroes":[[145,31,15],[53,25,15],[11,22,14],[109,21,13],[80,14,8],[19,13,7],[56,12,7],[54,10,6],[6,7,3],[48,6,2],[114,5,3],[73,4,3]],"first":1774953553,"last":1792663392},
+ "NARMAN":{"n":163,"w":104,"avgdur":2438,"lanes":{"1":143,"2":4,"3":16},"heroes":[[112,27,22],[3,16,11],[105,15,10],[110,15,10],[123,14,8],[91,10,9],[9,9,7],[83,8,4],[85,7,4],[58,6,2],[37,5,2],[30,4,2]],"first":1774417036,"last":1790950022},
+ "sanctity":{"n":86,"w":58,"avgdur":2348,"lanes":{"2":86},"heroes":[[13,18,14],[106,13,10],[107,13,8],[39,10,7],[19,6,4],[76,4,2],[49,3,1],[120,3,2],[22,2,1],[25,2,1],[47,2,2],[86,2,2]],"first":1781006986,"last":1792861804}},
+"shared_matches_2plus":18,
+"notes":"Heroes list = top 12 by games: [hero_id, games, wins]. 18 tournament matches had 2+ of these four accounts in them (same club or opposing sides; not separated). There is no Mongolia national-team draft data, so the scouting report is player-pool based."}
