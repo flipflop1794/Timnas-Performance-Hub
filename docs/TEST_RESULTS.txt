@@ -1,0 +1,166 @@
+TAP version 13
+# Subtest: stats: wilson, shrink, rng
+ok 1 - stats: wilson, shrink, rng
+  ---
+  duration_ms: 1.250639
+  type: 'test'
+  ...
+# Subtest: evidence: finding requires a lens; recommendation requires all five parts
+ok 2 - evidence: finding requires a lens; recommendation requires all five parts
+  ---
+  duration_ms: 0.464116
+  type: 'test'
+  ...
+# Subtest: measure: small or unfair windows are never reported as clean improvement
+ok 3 - measure: small or unfair windows are never reported as clean improvement
+  ---
+  duration_ms: 0.489731
+  type: 'test'
+  ...
+# Subtest: dota data: all five WEC players loaded with real accounts
+ok 4 - dota data: all five WEC players loaded with real accounts
+  ---
+  duration_ms: 1.058209
+  type: 'test'
+  ...
+# Subtest: dota data: shared match rows agree between players (cross-check)
+ok 5 - dota data: shared match rows agree between players (cross-check)
+  ---
+  duration_ms: 0.633484
+  type: 'test'
+  ...
+# Subtest: dota data: OpenDota full-match reducer handles a minimal record
+ok 6 - dota data: OpenDota full-match reducer handles a minimal record
+  ---
+  duration_ms: 0.355378
+  type: 'test'
+  ...
+# Subtest: dota pools: positions inferred from lanes and hero roles
+ok 7 - dota pools: positions inferred from lanes and hero roles
+  ---
+  duration_ms: 0.312262
+  type: 'test'
+  ...
+# Subtest: dota team findings: club context is tagged and synergy gap is flagged
+ok 8 - dota team findings: club context is tagged and synergy gap is flagged
+  ---
+  duration_ms: 3.602268
+  type: 'test'
+  ...
+# Subtest: dota draft: CM order matches both real tournament drafts
+ok 9 - dota draft: CM order matches both real tournament drafts
+  ---
+  duration_ms: 0.637891
+  type: 'test'
+  ...
+# Subtest: dota draft: evaluation separates terms and explains a comparison
+ok 10 - dota draft: evaluation separates terms and explains a comparison
+  ---
+  duration_ms: 1.971285
+  type: 'test'
+  ...
+# Subtest: dota draft: suggestions carry reasons and never repeat taken heroes
+ok 11 - dota draft: suggestions carry reasons and never repeat taken heroes
+  ---
+  duration_ms: 7.422613
+  type: 'test'
+  ...
+# Subtest: dota draft patterns: first actions and adaptation from real picks_bans
+ok 12 - dota draft patterns: first actions and adaptation from real picks_bans
+  ---
+  duration_ms: 0.500961
+  type: 'test'
+  ...
+# Subtest: dota match 9057681759: facts read correctly from the parsed record
+ok 13 - dota match 9057681759: facts read correctly from the parsed record
+  ---
+  duration_ms: 2.82832
+  type: 'test'
+  ...
+# Subtest: dota match 9035078952: same match seen from both Indonesian players' sides
+ok 14 - dota match 9035078952: same match seen from both Indonesian players' sides
+  ---
+  duration_ms: 0.925138
+  type: 'test'
+  ...
+# Subtest: dota scouting (Mongolia): coverage gaps are explicit and ban plan uses real counts
+ok 15 - dota scouting (Mongolia): coverage gaps are explicit and ban plan uses real counts
+  ---
+  duration_ms: 0.510419
+  type: 'test'
+  ...
+# Subtest: coaches: three different outputs; C challenges single-match claims; verdict needs human review
+ok 16 - coaches: three different outputs; C challenges single-match claims; verdict needs human review
+  ---
+  duration_ms: 2.520324
+  type: 'test'
+  ...
+# Subtest: pubgm: scoring profiles — WEC is blocked, default computes
+ok 17 - pubgm: scoring profiles — WEC is blocked, default computes
+  ---
+  duration_ms: 0.3135
+  type: 'test'
+  ...
+# Subtest: pubgm: demo log is valid and clearly synthetic
+ok 18 - pubgm: demo log is valid and clearly synthetic
+  ---
+  duration_ms: 5.147474
+  type: 'test'
+  ...
+# Subtest: pubgm: validator catches broken rows
+ok 19 - pubgm: validator catches broken rows
+  ---
+  duration_ms: 0.298327
+  type: 'test'
+  ...
+# Subtest: pubgm: engine finds the patterns planted in the synthetic log
+ok 20 - pubgm: engine finds the patterns planted in the synthetic log
+  ---
+  duration_ms: 3.310855
+  type: 'test'
+  ...
+# Subtest: pubgm: fight classification rules
+ok 21 - pubgm: fight classification rules
+  ---
+  duration_ms: 0.426033
+  type: 'test'
+  ...
+# Subtest: pubgm simulator: reproducible ranges with stated basis
+ok 22 - pubgm simulator: reproducible ranges with stated basis
+  ---
+  duration_ms: 15.779213
+  type: 'test'
+  ...
+# Subtest: pubgm coaches and recommendations
+ok 23 - pubgm coaches and recommendations
+  ---
+  duration_ms: 2.572811
+  type: 'test'
+  ...
+# Subtest: hub: every view renders without errors
+ok 24 - hub: every view renders without errors
+  ---
+  duration_ms: 590.568429
+  type: 'test'
+  ...
+# Subtest: hub: draft room locks heroes and compares drafts
+ok 25 - hub: draft room locks heroes and compares drafts
+  ---
+  duration_ms: 343.798391
+  type: 'test'
+  ...
+# Subtest: hub: PUBGM CSV validation rejects a broken log and accepts a good one
+ok 26 - hub: PUBGM CSV validation rejects a broken log and accepts a good one
+  ---
+  duration_ms: 190.045978
+  type: 'test'
+  ...
+1..26
+# tests 26
+# suites 0
+# pass 26
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 1702.773443
