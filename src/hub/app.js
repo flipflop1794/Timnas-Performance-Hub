@@ -1,4 +1,4 @@
-// Timnas Performance Hub V1.1 — page shell. Analysis lives in src/core, src/dota, src/pubgm;
+// Timnas Performance Hub V1.4 — page shell. Analysis lives in src/core, src/dota, src/pubgm;
 // evidence/demo boundaries in src/hub/pipeline.js; the coaching cycle in src/core/cycle.js.
 import { DATA } from './data.gen.js';
 import { parseHeroes, parsePlayerMatches, fromOpenDotaPlayerMatches } from '../dota/data.js';
@@ -21,6 +21,9 @@ import { STAFF, TITLES as WEC_TITLES, WELLBEING, owner, ownerNote, reviewersFor,
 import { staffObservation, recommendationRecord } from '../core/records.js';
 import { FIELDS, FIELD_SOURCE, TIERS, board as rivalBoard, rivalNote } from '../core/competitors.js';
 import { planScrim, completeScrim, summary as scrimSummary, FORMATS, KINDS as SCRIM_KINDS } from '../core/scrims.js';
+import { EVENT, defaultRunbook, tLabel, wecMatch, tick, setResult, gameNote, markApplied } from '../core/matchday.js';
+import { VOD_TAGS, vod, reviewVod, LEVELS, partner as partnerRec, partnerStats, AREAS, GOAL_STATUS, goal as goalRec, updateGoal, plan as newPlan } from '../core/library.js';
+import { weeklyBrief } from '../core/brief.js';
 import { checkin, session as loadSession, teamDay, ITEMS, ITEM_LABEL, THRESHOLDS, MIN_BASELINE_DAYS } from '../core/wellbeing.js';
 
 // ---------- state ----------
@@ -41,6 +44,7 @@ const S = {
   roster: { 'Dota 2': ['Whitemon', 'Fbz', 'Jhocam', 'jikroy', 'Mikoto'], 'PUBG Mobile': ['AKxSatarrrGOLD', 'AKxAmetzGOLD', 'AKxVinzGOLD', 'AKxZaoo7GOLD'],
     MLBB: ['Aran', 'Kevin', 'Drichel', 'Lyoni', 'Jull.'], 'MLBB Women': [], eFootball: ['ELGA'], CS2: [], 'CS2 Women': [] },
   rivals: [], tiers: {}, scrims: [],
+  runbooks: {}, wecMatches: [], tourTitle: 'Dota 2', tourMatch: null, vods: [], partners: [], plans: {}, planTitle: 'Dota 2', planPlayer: null, briefDate: new Date().toISOString().slice(0, 10),
   well: { checkins: [], loads: [] }, wellTitle: 'Dota 2', wellDate: new Date().toISOString().slice(0, 10),
   selMatch: 9057681759, selNation: 'MGL', selDay: null, freshPools: {}, importReport: null, lastFlag: null,
 };
@@ -143,6 +147,11 @@ async function initCaps() {
     db.collection('rivals').onSnapshot((snap) => { S.rivals = snap.docs.map((d) => d.data()).filter((x) => x?.origin === 'operational'); render(); }, () => {});
     db.collection('rival_tiers').onSnapshot((snap) => { S.tiers = Object.fromEntries(snap.docs.map((d) => { const x = d.data(); return [`${x.title}|${x.nation}`, x]; })); render(); }, () => {});
     db.collection('scrims').onSnapshot((snap) => { S.scrims = snap.docs.map((d) => d.data()).filter((x) => x?.origin === 'operational'); render(); }, () => {});
+    db.collection('wec_matches').onSnapshot((snap) => { S.wecMatches = snap.docs.map((d) => d.data()).filter((x) => x?.origin === 'operational'); render(); }, () => {});
+    db.doc('config/runbooks').onSnapshot((d) => { const x = d.data(); if (x?.runbooks) S.runbooks = x.runbooks; render(); }, () => {});
+    db.collection('vods').onSnapshot((snap) => { S.vods = snap.docs.map((d) => ({ ...d.data(), id: d.id })).filter((x) => x?.origin === 'operational'); render(); }, () => {});
+    db.collection('partners').onSnapshot((snap) => { S.partners = snap.docs.map((d) => ({ ...d.data(), id: d.id })).filter((x) => x?.origin === 'operational'); render(); }, () => {});
+    db.collection('player_plans').onSnapshot((snap) => { S.plans = Object.fromEntries(snap.docs.map((d) => [d.id, d.data()]).filter(([, x]) => x?.origin === 'operational')); render(); }, () => {});
     db.doc('config/roster').onSnapshot((d) => { const x = d.data(); if (x?.roster) S.roster = { ...S.roster, ...x.roster }; render(); }, () => {});
     // Wellbeing collections are readable and writable by editors only (declared in the page's db rules).
     db.collection('wellbeing_checkins').onSnapshot((snap) => { S.well.checkins = snap.docs.map((d) => d.data()).filter((x) => x?.origin === 'operational'); S.wellAccess = 'ok'; render(); }, () => { S.wellAccess = 'denied'; render(); });
@@ -184,11 +193,12 @@ const dotaTeam = () => dotaTeamPipeline(S.players, S.heroes, S.asOf, Object.keys
 
 // ---------- routing ----------
 const TITLES = [
-  { id: 'home', label: 'Today', tabs: [['today', 'My day'], ['board', 'Juara Umum board']] },
+  { id: 'home', label: 'Today', tabs: [['today', 'My day'], ['board', 'Juara Umum board'], ['brief', 'Weekly brief']] },
+  { id: 'tour', label: 'Tournament', tabs: [['tour-runbook', 'Match-day runbook'], ['tour-series', 'Between games']] },
   { id: 'dota', label: 'Dota 2', tabs: [['dota-team', 'Team'], ['dota-scrims', 'Scrims & practice'], ['dota-post', 'Post-match'], ['dota-scout', 'Competitors'], ['dota-draft', 'Draft room'], ['dota-review', 'Series review']] },
   { id: 'pubgm', label: 'PUBG Mobile', tabs: [['pubgm-team', 'Team'], ['pubgm-scrims', 'Scrims & practice'], ['pubgm-log', 'Log & import'], ['pubgm-rivals', 'Competitors'], ['pubgm-sim', 'Strategy sim'], ['pubgm-review', 'Match-day review']] },
   { id: 'mlbb', label: 'Other titles', tabs: [['mlbb', 'MLBB'], ['t-mlbbw', 'MLBB Women'], ['t-efootball', 'eFootball'], ['t-cs2', 'CS2'], ['t-cs2w', 'CS2 Women']] },
-  { id: 'well', label: 'Wellbeing', tabs: [['well-day', 'Daily check'], ['well-log', 'Log check-in & load']] },
+  { id: 'well', label: 'Players', tabs: [['players', 'Player plans'], ['well-day', 'Wellbeing check'], ['well-log', 'Log check-in & load']] },
   { id: 'staff', label: 'Staff', tabs: [['staff-cycle', 'Coaching cycle'], ['staff-measure', 'Is it working?'], ['staff-rules', 'Rules & decisions'], ['staff-sources', 'Sources & limits']] },
 ];
 const viewOf = () => { const h = location.hash.slice(1); return TITLES.some((t) => t.tabs.some(([id]) => id === h)) ? h : 'today'; };
@@ -311,7 +321,7 @@ function competitorsPanel(title) {
       <label class="field" for="rvT-${fid}">Note<input type="text" id="rvT-${fid}" placeholder="Roster, style, draft habits, recent results"></label>
       <div class="toolbar"><button class="btn primary" type="button" data-rival-note="${esc(title)}">Save note</button></div>
       <div class="form"><label class="field" for="tiT-${fid}">Tier<select id="tiT-${fid}">${TIERS.map((t) => `<option>${t}</option>`).join('')}</select></label><label class="field" for="tiW-${fid}">Why (required)<input type="text" id="tiW-${fid}"></label></div>
-      <div class="toolbar"><button class="btn" type="button" data-rival-tier="${esc(title)}">Set tier for selected nation</button><span class="msg" id="rvMsg-${fid}"></span></div></details>`}</div>`;
+      <div class="toolbar"><button class="btn" type="button" data-rival-tier="${esc(title)}">Set tier for selected nation</button><span class="msg" id="rvMsg-${fid}"></span></div></details>`}</div>${vodPanel(title)}`;
 }
 function scrimsPanel(title) {
   const Sm = scrimSummary(S.scrims, title);
@@ -335,7 +345,7 @@ function scrimsPanel(title) {
     <label class="field" for="spD-${fid}">Date<input type="date" id="spD-${fid}" value="${today()}"></label><label class="field" for="spTm-${fid}">Time<input type="text" id="spTm-${fid}" placeholder="19:00 WIB"></label>
     <label class="field" for="spK-${fid}">Kind<select id="spK-${fid}">${SCRIM_KINDS.map((k) => `<option>${k}</option>`).join('')}</select></label>
     <label class="field" for="spF-${fid}">Format<select id="spF-${fid}"><option value=""></option>${FORMATS.map((k) => `<option ${title === 'PUBG Mobile' && k === 'Lobby (BR)' ? 'selected' : ''}>${k}</option>`).join('')}</select></label>
-    <label class="field" for="spP-${fid}">Sparring partner<input type="text" id="spP-${fid}" placeholder="Team name"></label>
+    <label class="field" for="spP-${fid}">Sparring partner<input type="text" id="spP-${fid}" placeholder="Team name" list="pbList-${fid}"></label><datalist id="pbList-${fid}">${S.partners.filter((p) => p.title === title).map((p) => `<option value="${esc(p.name)}">${esc(p.level)}${p.resembles ? ` · like ${esc(p.resembles)}` : ''}</option>`).join('')}</datalist>
     <label class="field" for="spL-${fid}">Partner level<select id="spL-${fid}"><option value=""></option><option>Tier 1 international</option><option>Tier 1 domestic</option><option>Tier 2</option><option>Academy / amateur</option></select></label>
     <label class="field" for="spMi-${fid}">Stand-in for (WEC rival)<select id="spMi-${fid}"><option value=""></option>${(FIELDS[title] || []).map((n) => `<option>${esc(n)}</option>`).join('')}</select></label>
     <label class="field" for="spO-${fid}">Owner<input type="text" id="spO-${fid}" value="${esc(STAFF.find((x) => x.id === S.me)?.name || '')}"></label></div>
@@ -343,7 +353,7 @@ function scrimsPanel(title) {
     <div class="toolbar"><button class="btn primary" type="button" data-scrim-plan="${esc(title)}">Add to plan</button><span class="msg" id="spMsg-${fid}"></span></div></div>`}
   <div class="cols"><div class="panel"><h2>Upcoming${Sm.overdue.length ? ' and overdue' : ''}</h2>${[...Sm.overdue, ...Sm.upcoming].map(card).join('') || '<p class="empty">Nothing planned.</p>'}</div>
   <div class="panel"><h2>Done</h2>${Sm.done.slice(0, 12).map(card).join('') || '<p class="empty">No scrims logged yet.</p>'}
-    ${Object.keys(Sm.partners).length ? `<div class="h3">Sparring partners</div><ul class="plain">${Object.entries(Sm.partners).map(([k, v]) => `<li>${esc(k)} — ${v.length} scrim${v.length > 1 ? 's' : ''}</li>`).join('')}</ul>` : ''}</div></div>`;
+    ${Object.keys(Sm.partners).length ? `<div class="h3">Sparring partners</div><ul class="plain">${Object.entries(Sm.partners).map(([k, v]) => `<li>${esc(k)} — ${v.length} scrim${v.length > 1 ? 's' : ''}</li>`).join('')}</ul>` : ''}</div></div>${partnerPanel(title)}`;
 }
 const OBS_TITLES = ['MLBB', 'MLBB Women', 'eFootball', 'CS2', 'CS2 Women', 'Dota 2', 'PUBG Mobile'];
 function observationForm(defTitle) {
@@ -714,6 +724,168 @@ V['well-log'] = () => {
     <div class="toolbar"><button class="btn primary" type="button" id="slSave" ${roster.length ? '' : 'disabled'}>Save load</button><span class="msg" id="slMsg"></span></div></div>`;
 };
 
+// ---------- V1.4: tournament week, VOD library, partner bank, player plans, weekly brief ----------
+const meName = () => STAFF.find((x) => x.id === S.me)?.name || '';
+const titleSelect = (id, cur) => `<select id="${id}">${WEC_TITLES.map((x) => `<option ${x.id === cur ? 'selected' : ''}>${esc(x.id)}</option>`).join('')}</select>`;
+const runbookFor = (t) => S.runbooks[t] || defaultRunbook(t);
+async function saveRunbooks() { if (S.db) await S.db.doc('config/runbooks').set({ runbooks: S.runbooks }); }
+async function saveMatch(m) {
+  assertOperational([m], 'WEC match tracker');
+  const i = S.wecMatches.findIndex((x) => x.id === m.id); if (i >= 0) S.wecMatches[i] = m; else S.wecMatches.push(m);
+  if (S.db) await S.db.collection('wec_matches').doc(m.id).set(m);
+}
+const liveRuleBanner = () => { const r = rule('wec-live-coaching'); return r && r.status !== 'confirmed' ? banner('block', `<div><b>WEC coaching-contact rules: ${esc(r.status)}.</b> IESF has not published when coaches may talk to players (between games, pauses, draft). Use the between-games sheet only within what the rules allow; Fayad confirms the rule before 15 Dec (Staff → Rules).</div>`) : ''; };
+const SIDES = { 'Dota 2': ['Radiant', 'Dire'], MLBB: ['Blue', 'Red'], 'MLBB Women': ['Blue', 'Red'], CS2: ['CT start', 'T start'], 'CS2 Women': ['CT start', 'T start'], 'PUBG Mobile': ['Erangel', 'Miramar', 'Sanhok', 'Vikendi', 'Livik', 'Rondo'], eFootball: ['Home', 'Away'] };
+
+V['tour-runbook'] = () => {
+  if (S.mode === 'demo') return `<div class="panel">${DEMO_BANNER}<p class="empty">The match tracker uses operational records only.</p></div>`;
+  const t = S.tourTitle, rb = runbookFor(t);
+  const ms = S.wecMatches.filter((m) => m.title === t).sort((a, b) => `${a.date}${a.time}`.localeCompare(`${b.date}${b.time}`));
+  const card = (m) => {
+    const n = rb.filter((x) => m.done[x.id]).length;
+    return `<div class="obj"><header><div><span class="note">${esc(m.date)}${m.time ? ` ${esc(m.time)}` : ''}${m.stage ? ` · ${esc(m.stage)}` : ''}${m.format ? ` · ${esc(m.format)}` : ''}</span><h3>vs ${esc(m.opponent)}</h3></div>${m.result ? tag(m.result.result === 'won' ? 'c-High' : m.result.result === 'lost' ? 'c-Blocked' : 'c-Medium', `${m.result.result}${m.result.score ? ` ${m.result.score}` : ''}`) : tag('c-Low', `${n}/${rb.length} ready`)}</header>
+      <ul class="plain check">${rb.map((x) => `<li><button type="button" class="tick ${m.done[x.id] ? 'on' : ''}" data-tick="${esc(m.id)}|${esc(x.id)}" aria-pressed="${!!m.done[x.id]}">${m.done[x.id] ? '✓' : ''}</button> <span class="mono">${esc(tLabel(x.t))}</span> ${esc(x.item)} <span class="note">— ${esc(x.owner)}${m.done[x.id] ? ` · ticked by ${esc(m.done[x.id].by)}` : ''}</span></li>`).join('')}</ul>
+      ${m.result ? `<p class="note">Result recorded by ${esc(m.result.by)}.</p>` : `<div class="form"><label class="field" for="wrR-${m.id}">Result<select id="wrR-${m.id}"><option value="">—</option><option>won</option><option>lost</option><option>draw</option><option>placed</option></select></label><label class="field" for="wrS-${m.id}">Score / placement<input type="text" id="wrS-${m.id}" placeholder="2-1 or 3rd, 45 pts"></label></div>`}
+      <div class="toolbar">${m.result ? '' : `<button class="btn" type="button" data-wm-result="${esc(m.id)}">Save result</button>`}<button class="btn" type="button" data-series="${esc(m.id)}">Between-games sheet (${m.games.length})</button><span class="msg" id="wmMsg-${m.id}"></span></div></div>`;
+  };
+  return `<div class="panel"><div class="lead">Tournament <em>week</em></div>
+    <p>WEC finals: ${esc(EVENT.start)} to ${esc(EVENT.end)}, ${esc(EVENT.venue)}. One match-day runbook per title, then one card per WEC match with the checklist ticked by whoever did it.</p>
+    ${banner('block', '<div><b>Bracket, match times and format not published.</b> Enter each match when IESF announces it; nothing here is a schedule until then.</div>')}
+    <div class="form"><label class="field" for="tourT">Title${titleSelect('tourT', t)}</label></div></div>
+  <div class="cols"><div class="panel"><h2>Match-day runbook — ${esc(t)}</h2>
+    <p class="note">${S.runbooks[t] ? 'Edited by the staff.' : 'Starting template proposed by the hub, not yet agreed. Fayad and Donny to agree it; edit freely.'} Times are relative to match start.</p>
+    <div class="tw"><table><thead><tr><th>When</th><th>Item</th><th>Owner</th><th></th></tr></thead><tbody>${rb.map((x) => `<tr><td class="mono">${esc(tLabel(x.t))}</td><td>${esc(x.item)}</td><td class="note">${esc(x.owner)}</td><td>${x.t === 0 ? '' : `<button class="btn small" type="button" data-rb-del="${esc(x.id)}" aria-label="Remove ${esc(x.item)}">Remove</button>`}</td></tr>`).join('')}</tbody></table></div>
+    <details><summary class="btn">Add an item</summary><div class="form"><label class="field" for="rbT">Minutes before start<input type="number" id="rbT" min="0" max="2880" value="20"></label><label class="field" for="rbI">Item<input type="text" id="rbI"></label><label class="field" for="rbO">Owner<input type="text" id="rbO" value="${esc(meName())}"></label></div>
+      <div class="toolbar"><button class="btn primary" type="button" id="rbAdd">Add</button><button class="btn" type="button" id="rbReset">Reset to template</button><span class="msg" id="rbMsg"></span></div></details></div>
+  <div class="panel"><h2>Add a WEC match</h2><div class="form">
+    <label class="field" for="wmD">Date<input type="date" id="wmD" min="${EVENT.start}" max="${EVENT.end}" value="${EVENT.start}"></label><label class="field" for="wmTm">Time<input type="text" id="wmTm" placeholder="13:00 WIB"></label>
+    <label class="field" for="wmSt">Stage<input type="text" id="wmSt" placeholder="Group B, upper bracket R1…"></label>
+    <label class="field" for="wmO">Opponent<select id="wmO"><option>TBD</option>${(FIELDS[t] || []).map((n) => `<option>${esc(n)}</option>`).join('')}</select></label>
+    <label class="field" for="wmF">Format<select id="wmF"><option value=""></option>${FORMATS.map((k) => `<option>${k}</option>`).join('')}</select></label></div>
+    <div class="toolbar"><button class="btn primary" type="button" id="wmAdd">Add match</button><span class="msg" id="wmAddMsg"></span></div></div></div>
+  <div class="panel"><h2>WEC matches — ${esc(t)}</h2>${ms.map(card).join('') || '<p class="empty">No WEC match entered for this title yet.</p>'}</div>`;
+};
+
+V['tour-series'] = () => {
+  if (S.mode === 'demo') return `<div class="panel">${DEMO_BANNER}<p class="empty">Operational records only.</p></div>`;
+  const all = [...S.wecMatches].sort((a, b) => `${a.date}${a.time}`.localeCompare(`${b.date}${b.time}`));
+  const m = all.find((x) => x.id === S.tourMatch) || all.find((x) => !x.result) || all[0];
+  const head = `<div class="panel"><div class="lead">Between <em>games</em></div><p>One entry per game: what worked, what failed, the one adjustment for the next game, and at most one call per player. Short enough to fill in during a break.</p>${liveRuleBanner()}`;
+  if (!m) return `${head}<p class="empty">No WEC match yet. Add one in <a href="#tour-runbook">Match-day runbook</a>.</p></div>`;
+  const roster = S.roster[m.title] || [];
+  const applied = m.games.filter((g) => g.applied !== null);
+  const sides = SIDES[m.title] || [];
+  return `${head}<div class="form"><label class="field" for="tsM">Match<select id="tsM">${all.map((x) => `<option value="${esc(x.id)}" ${x.id === m.id ? 'selected' : ''}>${esc(x.date)} · ${esc(x.title)} vs ${esc(x.opponent)}${x.stage ? ` (${esc(x.stage)})` : ''}</option>`).join('')}</select></label></div>
+    ${applied.length ? `<p class="note">Adjustments used in the next game: ${applied.filter((g) => g.applied).length} of ${applied.length} marked.</p>` : ''}</div>
+  <div class="cols"><div class="panel"><h2>${esc(m.title)} vs ${esc(m.opponent)}</h2>${m.games.map((g) => `<div class="obj"><header><div><span class="note">Game ${g.game}${g.side ? ` · ${esc(g.side)}` : ''} · ${esc(g.by)}</span><h3>${esc(g.outcome || 'outcome not set')}</h3></div>${g.applied === null ? '' : tag(g.applied ? 'c-High' : 'c-Low', g.applied ? 'adjustment used' : 'not used')}</header>
+      ${g.worked ? `<p><b>Worked:</b> ${esc(g.worked)}</p>` : ''}${g.failed ? `<p><b>Failed:</b> ${esc(g.failed)}</p>` : ''}<p><b>Next game:</b> ${esc(g.adjust)}</p>
+      ${Object.keys(g.calls).length ? `<ul class="plain">${Object.entries(g.calls).map(([k, v]) => `<li><b>${esc(k)}</b>: ${esc(v)}</li>`).join('')}</ul>` : ''}
+      ${g.game < m.games.length + 1 && g.applied === null && m.games.some((x) => x.game === g.game + 1) ? `<div class="toolbar"><span class="note">Was it used in game ${g.game + 1}?</span><button class="btn small" type="button" data-applied="${esc(m.id)}|${g.game}|1">Yes</button><button class="btn small" type="button" data-applied="${esc(m.id)}|${g.game}|0">No</button></div>` : ''}</div>`).join('') || '<p class="empty">No game noted yet.</p>'}</div>
+  <div class="panel"><h2>Game ${m.games.length + 1} — note</h2><div class="form">
+    <label class="field" for="gnSide">${m.title === 'PUBG Mobile' ? 'Map' : 'Side'}<select id="gnSide"><option value=""></option>${sides.map((x) => `<option>${esc(x)}</option>`).join('')}</select></label>
+    <label class="field" for="gnOut">Outcome<select id="gnOut"><option value=""></option><option>won</option><option>lost</option><option>draw</option>${m.title === 'PUBG Mobile' ? '<option>top 4</option><option>outside top 4</option>' : ''}</select></label>
+    <label class="field" for="gnBy">By<input type="text" id="gnBy" value="${esc(meName())}"></label></div>
+    <label class="field" for="gnW">What worked<input type="text" id="gnW"></label><label class="field" for="gnF">What failed<input type="text" id="gnF"></label>
+    <label class="field" for="gnA">The one adjustment for the next game (required)<input type="text" id="gnA" placeholder="${m.title === 'Dota 2' || m.title.startsWith('MLBB') ? 'e.g. ban X first phase; we pick Y last' : m.title.startsWith('CS2') ? 'e.g. stack B on their eco' : 'e.g. rotate early on edge'}"></label>
+    ${roster.length ? `<fieldset class="objpick"><legend class="note">One call per player (optional)</legend>${roster.map((p, i) => `<label class="field" for="gnC-${i}">${esc(p)}<input type="text" id="gnC-${i}" data-player="${esc(p)}"></label>`).join('')}</fieldset>` : `<p class="note">No roster entered for ${esc(m.title)}; add it under Players → Wellbeing check to get one line per player.</p>`}
+    <div class="toolbar"><button class="btn primary" type="button" id="gnSave">Save game ${m.games.length + 1}</button><span class="msg" id="gnMsg"></span></div></div></div>`;
+};
+
+function vodPanel(title) {
+  const fid = sid(title);
+  const list = S.vods.filter((v) => v.title === title).sort((a, b) => a.nation.localeCompare(b.nation) || (b.date || '').localeCompare(a.date || ''));
+  return `<div class="panel"><h2>Rival VOD library — ${esc(title)}</h2>
+    <p class="note">Links to rival games, tagged so any coach can find them. A reviewed VOD can become a competitor note with the link as its source. The hub stores links only, not video.</p>
+    ${list.length ? `<div class="tw"><table><thead><tr><th>Nation</th><th>Event</th><th>Tags</th><th>Notes</th><th>Review</th></tr></thead><tbody>${list.map((v) => `<tr><td><b>${esc(v.nation)}</b>${v.players ? `<br><span class="note">${esc(v.players)}</span>` : ''}</td>
+      <td><a href="${esc(v.url)}" target="_blank" rel="noopener">${esc(v.event)}</a><br><span class="note">${esc(v.date)}${v.game ? ` · ${esc(v.game)}` : ''} · added by ${esc(v.by)}</span></td>
+      <td>${v.tags.map((x) => tag('k-observed', x)).join(' ')}</td><td>${esc(v.notes)}${v.reviewNote ? `<br><b>Review:</b> ${esc(v.reviewNote)}` : ''}</td>
+      <td>${v.reviewed ? `${tag('c-Verified', 'reviewed')}<br><span class="note">${esc(v.reviewedBy)}</span>${S.mode === 'demo' ? '' : `<br><button class="btn small" type="button" data-vod-note="${esc(v.id)}">Make competitor note</button>`}` : S.mode === 'demo' ? '' : `<input type="text" id="vrN-${esc(v.id)}" aria-label="Review note" placeholder="Key takeaway"><button class="btn small" type="button" data-vod-review="${esc(v.id)}">Mark reviewed</button>`}<span class="msg" id="vrMsg-${esc(v.id)}"></span></td></tr>`).join('')}</tbody></table></div>` : '<p class="empty">No VOD added for this title yet.</p>'}
+    ${S.mode === 'demo' ? '' : `<details><summary class="btn">Add a VOD</summary><div class="form">
+      <label class="field" for="vdN-${fid}">Nation<select id="vdN-${fid}">${(FIELDS[title] || []).map((n) => `<option>${esc(n)}</option>`).join('')}</select></label>
+      <label class="field" for="vdU-${fid}">Video link<input type="url" id="vdU-${fid}" placeholder="https://"></label>
+      <label class="field" for="vdE-${fid}">Event<input type="text" id="vdE-${fid}" placeholder="Qualifier, league, scrim"></label>
+      <label class="field" for="vdD-${fid}">Date played<input type="date" id="vdD-${fid}"></label>
+      <label class="field" for="vdG-${fid}">Game / map<input type="text" id="vdG-${fid}" placeholder="Game 2, Erangel…"></label>
+      <label class="field" for="vdP-${fid}">Players to watch<input type="text" id="vdP-${fid}"></label>
+      <label class="field" for="vdB-${fid}">Added by<input type="text" id="vdB-${fid}" value="${esc(meName())}"></label></div>
+      <fieldset class="objpick"><legend class="note">Tags</legend>${VOD_TAGS.map((x) => `<label><input type="checkbox" name="vdTag-${fid}" value="${esc(x)}"> ${esc(x)}</label>`).join('')}</fieldset>
+      <label class="field" for="vdX-${fid}">Notes<input type="text" id="vdX-${fid}"></label>
+      <div class="toolbar"><button class="btn primary" type="button" data-vod-add="${esc(title)}">Save VOD</button><span class="msg" id="vdMsg-${fid}"></span></div></details>`}</div>`;
+}
+
+function partnerPanel(title) {
+  const fid = sid(title);
+  const list = S.partners.filter((p) => p.title === title);
+  return `<div class="panel"><h2>Sparring partner bank — ${esc(title)}</h2>
+    <p class="note">Teams we can scrim, how strong they are, and which WEC rival they play like. Record which staff member holds the contact; no phone numbers or personal details here. Partners appear as suggestions when planning a scrim.</p>
+    ${list.length ? `<div class="tw"><table><thead><tr><th>Team</th><th>Level</th><th>Plays like</th><th>Availability</th><th>Contact held by</th><th class="n">Scrims done</th></tr></thead><tbody>${list.map((p) => { const st = partnerStats(p, S.scrims); return `<tr><td><b>${esc(p.name)}</b>${p.region ? `<br><span class="note">${esc(p.region)}</span>` : ''}</td><td>${esc(p.level)}</td><td>${p.resembles ? `${esc(p.resembles)}${p.why ? `<br><span class="note">${esc(p.why)}</span>` : ''}` : '—'}</td><td>${esc(p.availability || '—')}</td><td>${esc(p.contactOwner)}</td><td class="n">${st.scrims}${st.last ? `<br><span class="note">last ${esc(st.last)}</span>` : ''}</td></tr>`; }).join('')}</tbody></table></div>` : '<p class="empty">No partner in the bank yet.</p>'}
+    ${S.mode === 'demo' ? '' : `<details><summary class="btn">Add a partner</summary><div class="form">
+      <label class="field" for="ptN-${fid}">Team<input type="text" id="ptN-${fid}"></label>
+      <label class="field" for="ptL-${fid}">Level<select id="ptL-${fid}">${LEVELS.map((x) => `<option>${esc(x)}</option>`).join('')}</select></label>
+      <label class="field" for="ptR-${fid}">Region / server<input type="text" id="ptR-${fid}"></label>
+      <label class="field" for="ptM-${fid}">Plays like (WEC rival)<select id="ptM-${fid}"><option value=""></option>${(FIELDS[title] || []).map((n) => `<option>${esc(n)}</option>`).join('')}</select></label>
+      <label class="field" for="ptW-${fid}">Why they resemble that rival<input type="text" id="ptW-${fid}"></label>
+      <label class="field" for="ptA-${fid}">Availability<input type="text" id="ptA-${fid}" placeholder="Weeknights 19:00 WIB"></label>
+      <label class="field" for="ptC-${fid}">Contact held by (staff)<input type="text" id="ptC-${fid}" value="${esc(meName())}"></label></div>
+      <div class="toolbar"><button class="btn primary" type="button" data-partner-add="${esc(title)}">Save partner</button><span class="msg" id="ptMsg-${fid}"></span></div></details>`}</div>`;
+}
+
+const planKey = (t, p) => sid(`${t}_${p}`);
+V.players = () => {
+  if (S.mode === 'demo') return `<div class="panel">${DEMO_BANNER}<p class="empty">Player plans use operational records only.</p></div>`;
+  const t = S.planTitle, roster = S.roster[t] || [];
+  const p = roster.includes(S.planPlayer) ? S.planPlayer : roster[0];
+  const head = `<div class="panel"><div class="lead">Player <em>plans</em></div><p>Two or three goals per player, each with how it is measured and who owns it. Game goals belong to the title coach; physical and mental goals are agreed with Donny.</p>
+    ${banner('synth', '<div>Visible to everyone with access to this page. Write goals and measures only; no diagnoses, health details or check-in values (those stay in Wellbeing, editors only).</div>')}
+    <div class="form"><label class="field" for="plT">Title${titleSelect('plT', t)}</label>${roster.length ? `<label class="field" for="plP">Player<select id="plP">${roster.map((x) => `<option ${x === p ? 'selected' : ''}>${esc(x)}</option>`).join('')}</select></label>` : ''}</div></div>`;
+  if (!roster.length) return `${head}<div class="panel">${banner('block', `<div>No roster for ${esc(t)} yet. Add it under <a href="#well-day">Wellbeing check</a>.</div>`)}</div>`;
+  const pl = S.plans[planKey(t, p)] || newPlan(t, p);
+  const overview = roster.map((x) => { const g = S.plans[planKey(t, x)]?.goals || []; return { x, n: g.filter((y) => !['done', 'dropped'].includes(y.status)).length, risk: g.filter((y) => y.status === 'at risk').length, done: g.filter((y) => y.status === 'done').length }; });
+  return `${head}<div class="panel"><h2>${esc(t)} — all players</h2><div class="tw"><table><thead><tr><th>Player</th><th class="n">Open goals</th><th class="n">At risk</th><th class="n">Done</th></tr></thead><tbody>${overview.map((r) => `<tr class="${r.x === p ? 'me' : ''}"><td><b>${esc(r.x)}</b></td><td class="n">${r.n}</td><td class="n">${r.risk}</td><td class="n">${r.done}</td></tr>`).join('')}</tbody></table></div></div>
+  <div class="cols"><div class="panel"><h2>${esc(p)}</h2>${AREAS.map((a) => { const gs = pl.goals.filter((g) => g.area === a); return `<div class="h3">${esc(a[0].toUpperCase() + a.slice(1))}</div>${gs.map((g) => `<div class="obj"><header><div><span class="note">Owner ${esc(g.owner)}${g.due ? ` · due ${esc(g.due)}` : ''}</span><h3>${esc(g.goal)}</h3></div>${tag(g.status === 'done' ? 'c-High' : g.status === 'at risk' ? 'c-Blocked' : g.status === 'on track' ? 'c-Medium' : 'c-Low', g.status)}</header>
+      <p class="note">Measured by: ${esc(g.measure)}</p>${g.updates.length ? `<p class="note">Last update: ${esc(g.updates.at(-1).note || g.updates.at(-1).status)} — ${esc(g.updates.at(-1).by)}, ${esc(g.updates.at(-1).at.slice(0, 10))}</p>` : ''}
+      <div class="form"><label class="field" for="guS-${g.id}">Status<select id="guS-${g.id}">${GOAL_STATUS.map((s) => `<option ${s === g.status ? 'selected' : ''}>${s}</option>`).join('')}</select></label><label class="field" for="guN-${g.id}">Note<input type="text" id="guN-${g.id}"></label></div>
+      <div class="toolbar"><button class="btn small" type="button" data-goal-upd="${esc(g.id)}">Update</button><span class="msg" id="guMsg-${g.id}"></span></div></div>`).join('') || '<p class="note">No goal.</p>'}`; }).join('')}</div>
+  <div class="panel"><h2>Add a goal</h2><div class="form">
+    <label class="field" for="gaA">Area<select id="gaA">${AREAS.map((a) => `<option>${a}</option>`).join('')}</select></label>
+    <label class="field" for="gaD">Due<input type="date" id="gaD"></label><label class="field" for="gaO">Owner<input type="text" id="gaO" value="${esc(meName())}"></label></div>
+    <label class="field" for="gaG">Goal<input type="text" id="gaG" placeholder="${t === 'Dota 2' ? 'e.g. two more established heroes for pos 4' : 'e.g. widen hero/agent pool by two'}"></label>
+    <label class="field" for="gaM">How it is measured<input type="text" id="gaM" placeholder="e.g. 6+ scrim games on each by 1 Dec, coach sign-off"></label>
+    <div class="toolbar"><button class="btn primary" type="button" id="gaAdd">Add goal</button><span class="msg" id="gaMsg"></span></div></div></div>`;
+};
+
+// Decisions still open (decision log, 3 Nov). Edit here when they are settled.
+const PENDING = [
+  'Juara Umum (overall title) scoring rule — PB ESI intl. relations to obtain from IESF.',
+  'WEC coaching-contact rules (between games, pauses) — Fayad to confirm with IESF.',
+  'Pelatnas dates and player availability — to be collected and confirmed.',
+  'Player SK publication date and process — to be confirmed.',
+  'Player compensation — under discussion; no figures to be communicated.',
+  'Wellbeing record access: editors, or Donny only — Fayad/Donny to decide.',
+  'Who logs PUBG Mobile scrims and session RPE — Fayad to assign.',
+  'CS2 and CS2 Women focus owner on the staff — Fayad to assign.',
+];
+const briefText = () => weeklyBrief({ asOf: S.briefDate, cycle: S.cycle, scrims: S.scrims, rivals: S.rivals, tiers: S.tiers, checkins: S.well.checkins, roster: S.roster, rules: S.rules, pending: PENDING, plans: Object.values(S.plans) });
+function mdHtml(md) {
+  const out = []; let tbl = null, ul = false;
+  const flush = () => { if (tbl) { out.push(`<div class="tw"><table><thead><tr>${tbl[0].map((c) => `<th>${esc(c)}</th>`).join('')}</tr></thead><tbody>${tbl.slice(1).map((r) => `<tr>${r.map((c, i) => `<td${i > 1 ? ' class="n"' : ''}>${esc(c)}</td>`).join('')}</tr>`).join('')}</tbody></table></div>`); tbl = null; } if (ul) { out.push('</ul>'); ul = false; } };
+  for (const l of md.split('\n')) {
+    if (l.startsWith('|')) { if (/^\|[-| ]+\|$/.test(l)) continue; (tbl ||= []).push(l.slice(1, -1).split('|').map((x) => x.trim())); continue; }
+    if (l.startsWith('- ')) { if (tbl) flush(); if (!ul) { out.push('<ul class="plain">'); ul = true; } out.push(`<li>${esc(l.slice(2))}</li>`); continue; }
+    flush();
+    if (l.startsWith('# ')) out.push(`<h2>${esc(l.slice(2))}</h2>`); else if (l.startsWith('## ')) out.push(`<div class="h3">${esc(l.slice(3))}</div>`); else if (l.trim()) out.push(`<p>${esc(l)}</p>`);
+  }
+  flush(); return out.join('');
+}
+V.brief = () => {
+  if (S.mode === 'demo') return `<div class="panel">${DEMO_BANNER}<p class="empty">The brief uses operational records only.</p></div>`;
+  const md = briefText();
+  return `<div class="panel"><div class="lead">Weekly <em>brief</em></div><p>One page for Fayad and the BOD, built from the same records the staff use. Team-level counts only: no individual wellbeing values, no compensation, no win probabilities. Nothing is sent from here; Fayad decides what goes to the BOD.</p>
+    <div class="form"><label class="field" for="brD">Week ending<input type="date" id="brD" value="${esc(S.briefDate)}"></label></div>
+    <div class="toolbar"><button class="btn" type="button" id="brCopy">Copy text</button><button class="btn" type="button" id="brDl">Download .md</button><span class="msg" id="brMsg"></span></div></div>
+  <div class="panel brief">${mdHtml(md)}</div>`;
+};
+
 // ---------- render & events ----------
 function render() {
   const view = viewOf(); renderNav(view); LAST = { recs: {} };
@@ -755,6 +927,109 @@ document.addEventListener('click', async (e) => {
     return;
   }
   if (t.dataset.act) { await cycleAct(t.dataset.act, t.dataset.id); return; }
+  // ---- V1.4 handlers ----
+  if (id === 'rbAdd' || id === 'rbReset' || t.dataset.rbDel) {
+    const ti = S.tourTitle;
+    try {
+      let rb = runbookFor(ti).map((x) => ({ ...x }));
+      if (id === 'rbReset') rb = defaultRunbook(ti);
+      else if (t.dataset.rbDel) rb = rb.filter((x) => x.id !== t.dataset.rbDel);
+      else {
+        const mins = +val('rbT'); const item = val('rbI').trim(); const ow = val('rbO').trim();
+        if (!item || !ow || isNaN(mins) || mins < 0) throw new Error('Minutes, item and owner are required.');
+        rb.push({ id: `R${Date.now().toString(36)}`, t: -mins, item, owner: ow }); rb.sort((a, b) => a.t - b.t);
+      }
+      S.runbooks = { ...S.runbooks, [ti]: rb }; await saveRunbooks(); render();
+    } catch (err) { setMsg('rbMsg', err.message, 'err'); }
+    return;
+  }
+  if (id === 'wmAdd') {
+    try { await saveMatch(wecMatch({ title: S.tourTitle, date: val('wmD'), time: val('wmTm').trim(), stage: val('wmSt').trim(), opponent: val('wmO'), format: val('wmF') })); render(); }
+    catch (err) { setMsg('wmAddMsg', err.message, 'err'); }
+    return;
+  }
+  if (t.dataset.tick) {
+    const [mid, iid] = t.dataset.tick.split('|'); const m = S.wecMatches.find((x) => x.id === mid); if (!m) return;
+    try { await saveMatch(tick(m, iid, meName() || S.me)); render(); } catch (err) { setMsg(`wmMsg-${mid}`, err.message, 'err'); }
+    return;
+  }
+  if (t.dataset.wmResult) {
+    const m = S.wecMatches.find((x) => x.id === t.dataset.wmResult); if (!m) return;
+    try { await saveMatch(setResult(m, { result: val(`wrR-${m.id}`), score: val(`wrS-${m.id}`), by: meName() || S.me })); render(); } catch (err) { setMsg(`wmMsg-${m.id}`, err.message, 'err'); }
+    return;
+  }
+  if (t.dataset.series) { S.tourMatch = t.dataset.series; location.hash = 'tour-series'; return; }
+  if (id === 'gnSave') {
+    const all = [...S.wecMatches].sort((a, b) => `${a.date}${a.time}`.localeCompare(`${b.date}${b.time}`));
+    const m = all.find((x) => x.id === S.tourMatch) || all.find((x) => !x.result) || all[0]; if (!m) return;
+    try {
+      const calls = Object.fromEntries([...document.querySelectorAll('input[id^="gnC-"]')].map((x) => [x.dataset.player, x.value]));
+      await saveMatch(gameNote(m, { side: val('gnSide'), outcome: val('gnOut'), worked: val('gnW'), failed: val('gnF'), adjust: val('gnA'), calls, by: val('gnBy') }));
+      S.tourMatch = m.id; render();
+    } catch (err) { setMsg('gnMsg', err.message, 'err'); }
+    return;
+  }
+  if (t.dataset.applied) {
+    const [mid, g, yes] = t.dataset.applied.split('|'); const m = S.wecMatches.find((x) => x.id === mid); if (!m) return;
+    await saveMatch(markApplied(m, +g, yes === '1')); render(); return;
+  }
+  if (t.dataset.vodAdd) {
+    const title = t.dataset.vodAdd, fid = sid(title);
+    try {
+      if (S.mode === 'demo') throw new Error('Not available in the demo sandbox.');
+      const v = vod({ title, nation: val(`vdN-${fid}`), url: val(`vdU-${fid}`), event: val(`vdE-${fid}`), date: val(`vdD-${fid}`), game: val(`vdG-${fid}`), players: val(`vdP-${fid}`), notes: val(`vdX-${fid}`), by: val(`vdB-${fid}`), tags: [...document.querySelectorAll(`input[name="vdTag-${fid}"]:checked`)].map((x) => x.value) });
+      v.id = `V${Date.now().toString(36)}${Math.random().toString(36).slice(2, 5)}`;
+      if (S.db) await S.db.collection('vods').doc(v.id).set(v); else S.vods.push(v);
+      render();
+    } catch (err) { setMsg(`vdMsg-${fid}`, err.message, 'err'); }
+    return;
+  }
+  if (t.dataset.vodReview || t.dataset.vodNote) {
+    const vid = t.dataset.vodReview || t.dataset.vodNote; const v = S.vods.find((x) => x.id === vid); if (!v) return;
+    try {
+      if (t.dataset.vodReview) {
+        const r = reviewVod(v, { by: meName() || S.me, note: val(`vrN-${vid}`) });
+        if (S.db) await S.db.collection('vods').doc(vid).set(r); else Object.assign(v, r);
+      } else {
+        const n = rivalNote({ title: v.title, nation: v.nation, note: v.reviewNote || v.notes || `VOD reviewed: ${v.event}`, source: v.url, kind: 'observed', by: meName() || S.me });
+        if (S.db) await S.db.collection('rivals').add(n); else S.rivals.push(n);
+      }
+      render();
+    } catch (err) { setMsg(`vrMsg-${vid}`, err.message, 'err'); }
+    return;
+  }
+  if (t.dataset.partnerAdd) {
+    const title = t.dataset.partnerAdd, fid = sid(title);
+    try {
+      if (/\d{6,}/.test(`${val(`ptA-${fid}`)} ${val(`ptW-${fid}`)} ${val(`ptC-${fid}`)}`)) throw new Error('Looks like a phone number: record who holds the contact instead.');
+      const p = partnerRec({ title, name: val(`ptN-${fid}`), level: val(`ptL-${fid}`), region: val(`ptR-${fid}`), resembles: val(`ptM-${fid}`), why: val(`ptW-${fid}`), availability: val(`ptA-${fid}`), contactOwner: val(`ptC-${fid}`) });
+      p.id = sid(`${title}_${p.name}`);
+      if (S.db) await S.db.collection('partners').doc(p.id).set(p); else S.partners = [...S.partners.filter((x) => x.id !== p.id), p];
+      render();
+    } catch (err) { setMsg(`ptMsg-${fid}`, err.message, 'err'); }
+    return;
+  }
+  if (id === 'gaAdd' || t.dataset.goalUpd) {
+    const ti = S.planTitle, roster = S.roster[ti] || []; const p = roster.includes(S.planPlayer) ? S.planPlayer : roster[0]; if (!p) return;
+    const key = planKey(ti, p); const pl = JSON.parse(JSON.stringify(S.plans[key] || newPlan(ti, p)));
+    try {
+      if (id === 'gaAdd') pl.goals.push(goalRec({ area: val('gaA'), goal: val('gaG'), measure: val('gaM'), due: val('gaD'), owner: val('gaO') }));
+      else { const gid = t.dataset.goalUpd; pl.goals = pl.goals.map((g) => (g.id === gid ? updateGoal(g, { status: val(`guS-${gid}`), note: val(`guN-${gid}`), by: meName() || S.me }) : g)); }
+      S.plans = { ...S.plans, [key]: pl };
+      if (S.db) await S.db.collection('player_plans').doc(key).set(pl);
+      render();
+    } catch (err) { setMsg(id === 'gaAdd' ? 'gaMsg' : `guMsg-${t.dataset.goalUpd}`, err.message, 'err'); }
+    return;
+  }
+  if (id === 'brCopy') { try { await navigator.clipboard.writeText(briefText()); setMsg('brMsg', 'Copied.', 'ok'); } catch { setMsg('brMsg', 'Copy is blocked here; use Download.', 'err'); } return; }
+  if (id === 'brDl') {
+    try {
+      const dl = await window.claude?.use?.('downloads');
+      if (!dl) throw new Error('Downloads are not available in this view; use Copy text.');
+      await dl.save({ filename: `timnas-brief-${S.briefDate}.md`, data: briefText() }); setMsg('brMsg', 'Saved.', 'ok');
+    } catch (err) { setMsg('brMsg', err.code === 'declined' ? 'Download cancelled.' : err.message, err.code === 'declined' ? '' : 'err'); }
+    return;
+  }
   if (id === 'dLock') { const h = heroByName()[val('dHero').trim().toLowerCase()]; if (!h) return setMsg('dMsg', 'Pick a hero name from the list.', 'err'); if (S.draft.steps.includes(h)) return setMsg('dMsg', 'Already picked or banned.', 'err'); S.draft.steps.push(h); render(); }
   if (id === 'dUndo') { S.draft.steps.pop(); render(); }
   if (id === 'dReset') { S.draft.steps = []; render(); }
@@ -898,6 +1173,11 @@ document.addEventListener('change', (e) => {
   const id = e.target.id;
   if (id === 'meSel') { S.me = e.target.value; try { localStorage.setItem('hub-me', S.me); } catch { /* per-viewer convenience only */ } render(); }
   if (id === 'wT') { S.wellTitle = e.target.value; render(); }
+  if (id === 'tourT') { S.tourTitle = e.target.value; render(); }
+  if (id === 'tsM') { S.tourMatch = e.target.value; render(); }
+  if (id === 'plT') { S.planTitle = e.target.value; S.planPlayer = null; render(); }
+  if (id === 'plP') { S.planPlayer = e.target.value; render(); }
+  if (id === 'brD') { S.briefDate = e.target.value || today(); render(); }
   if (id === 'wD') { S.wellDate = e.target.value; render(); }
   if (id === 'dFirst') { S.draft.firstUs = e.target.value === 'us'; S.draft.steps = []; render(); }
   if (id === 'dOpp') { S.draft.opp = e.target.value; render(); }
