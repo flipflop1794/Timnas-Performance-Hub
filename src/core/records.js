@@ -74,3 +74,18 @@ export function recommendationRecord(rec, evidences) {
     contexts, sufficient: suff.every((s) => s.ok), uncertainty: [...new Set(uncertainty)],
   };
 }
+
+// A coach's own observation as evidence (titles without an engine, VOD notes, Draft Lab findings).
+import { confidenceFromN } from './evidence.js';
+let obsSeq = 0;
+export function staffObservation({ title, observation, source, kind = 'observed', n, context, by, date }) {
+  if (!observation || !observation.trim()) throw new Error('Write the observation.');
+  if (!source || !source.trim()) throw new Error('Name the source (scrim ID, VOD link, Draft Lab view, match).');
+  if (!by || !by.trim()) throw new Error('Who observed it is required.');
+  if (!CONTEXTS.includes(context) || context === 'demo') throw new Error('Choose national, mixed or club context.');
+  const games = n === '' || n == null ? null : +n;
+  if (games != null && (!Number.isInteger(games) || games < 1)) throw new Error('Games must be a whole number of 1 or more, or left empty.');
+  const id = `OBS-${Date.now().toString(36)}-${++obsSeq}`;
+  return evidence({ id, title: observation.trim(), kind, n: games, confidence: kind === 'hypothesis' ? 'Low' : confidenceFromN(games ?? 1), severity: -1, lens: 'strategic', area: 'staff', tags: ['staff'], detail: `${title} · observed by ${by.trim()}`, at: null },
+    { source: source.trim(), retrieved: date || new Date().toISOString().slice(0, 10), origin: 'operational', context, window: games ? `${games} game(s)` : 'not stated', completeness: 'Staff observation', limitations: games == null ? ['Number of games not stated.'] : [] });
+}

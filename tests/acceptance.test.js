@@ -42,7 +42,8 @@ async function hub(hash, db = mockDb()) {
   const go = async (h) => { dom.window.location.hash = h; dom.window.dispatchEvent(new dom.window.HashChangeEvent('hashchange')); await new Promise((r) => setTimeout(r, 5)); };
   const click = async (el) => { el.click(); await new Promise((r) => setTimeout(r, 15)); };
   const text = () => d.getElementById('main').textContent;
-  return { dom, d, db, go, click, text };
+  const as = async (who) => { const el = d.getElementById('meSel'); el.value = who; el.dispatchEvent(new dom.window.Event('change', { bubbles: true })); await new Promise((r) => setTimeout(r, 5)); };
+  return { dom, d, db, go, click, text, as };
 }
 
 // 1. Synthetic data never enters operational summaries or recommendations.
@@ -55,6 +56,7 @@ test('AC1 synthetic data is blocked from every operational path', async () => {
   assert.throws(() => recommendationRecord({ problem: 'p', findings: ['X1'] }, [ev]), DemoLeakError);
   assert.throws(() => propose({ problem: 'p' }, { title: 'PUBG Mobile', by: 'x', origin: 'demo' }), /Demo data cannot/);
   const h = await hub('today');
+  await h.as('fayad');
   assert.match(h.text(), /Not enough operational evidence/);
   assert.doesNotMatch(h.text(), /INA \(demo\)/);
   await h.click(h.d.getElementById('modeBtn'));
@@ -80,7 +82,7 @@ test('AC2 an engine proposal sent to review shows as proposed everywhere', async
   await h.go('today');
   assert.match(h.text(), /Proposed — awaiting coach review/);
   await h.go('staff-cycle');
-  assert.match(h.text(), /Waiting for title-coach review/);
+  assert.match(h.text(), /Waiting for review by Aufa Bassam/);
 });
 
 // 3 + 4. Coach can modify/reject with a preserved reason; sessions link to objective and next decision.
@@ -188,7 +190,8 @@ test('AC9 (simulated) operational PUBGM log → proposal → Today, with a stand
   await h.go('pubgm-team');
   assert.doesNotMatch(h.text(), /Not enough evidence/);
   const b = h.d.querySelector('[data-propose]'); assert.ok(b); await h.click(b);
-  await h.go('today');
+  await h.go('today'); await h.as('fayad');
   assert.match(h.text(), /Proposed — awaiting coach review/);
+  assert.match(h.text(), /To review1/, 'PUBGM proposal lands in the Head Coach queue');
   assert.equal(todayList([], [], 'PUBG Mobile').length, 0);
 });

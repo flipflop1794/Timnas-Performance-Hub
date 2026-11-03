@@ -173,13 +173,18 @@ html.demo .wrap main{outline:3px dashed var(--warn);outline-offset:8px;border-ra
 .kv.small{font-size:12.5px;grid-template-columns:120px minmax(0,1fr)}
 tr.me td{background:var(--gold-soft)}
 ul.today{gap:12px}
+.titles label.me{display:inline-flex;align-items:center;gap:6px;font-family:var(--f-display);font-weight:700;font-size:14px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
+.titles label.me select{width:auto;min-height:30px;padding:3px 8px}
+.flag-check{color:var(--warn);font-weight:600}
+header.top .wrap{padding-block:0}
+@media (max-width:760px){header.top{position:static}}
 @media (max-width:640px){.panel{padding:14px}.rec dl,.kv{grid-template-columns:minmax(0,1fr)}.simrow{grid-template-columns:minmax(0,1fr)}}
 @media (prefers-reduced-motion:no-preference){.btn,.chip,nav.tabs a,.titles button{transition:background-color .12s,border-color .12s,color .12s}}
 </style>
 <header class="top"><div class="wrap">
   <div class="bar1">
     <div class="brand"><span class="flag" aria-hidden="true"><i></i><i></i></span>Timnas <span>Performance Hub</span></div>
-    <div class="edition">IESF WEC 2026 · V1.1</div>
+    <div class="edition">IESF WEC 2026 · V1.2</div>
     <div class="spacer"></div>
     <div class="titles" id="titles" role="group" aria-label="Title"></div>
   </div>

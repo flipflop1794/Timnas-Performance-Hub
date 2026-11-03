@@ -17,6 +17,9 @@ import { standings, teamSummary } from '../pubgm/analytics.js';
 import { simulate, DEFAULT_ASSUMPTIONS } from '../pubgm/simulator.js';
 import { dotaTeamPipeline, dotaMatchPipeline, pubgmPipeline, todayList, PUBGM_MIN_MATCHES } from './pipeline.js';
 import { mmss, round, pct } from '../core/stats.js';
+import { STAFF, TITLES as WEC_TITLES, WELLBEING, owner, ownerNote, reviewersFor, queueFor } from '../core/staff.js';
+import { staffObservation, recommendationRecord } from '../core/records.js';
+import { checkin, session as loadSession, teamDay, ITEMS, ITEM_LABEL, THRESHOLDS, MIN_BASELINE_DAYS } from '../core/wellbeing.js';
 
 // ---------- state ----------
 const SHIPPED = '2026-11-03';
@@ -31,6 +34,11 @@ const S = {
   pubgm: { team: null, logged: { matches: [], fights: [] }, sim: null },
   draft: { firstUs: true, steps: [], opp: 'MGL', saved: {} },
   cycle: [], db: null, dbState: 'connecting', mcp: undefined,
+  me: (() => { try { return localStorage.getItem('hub-me') || 'aufa'; } catch { return 'aufa'; } })(),
+  // Rosters: Dota 2 and PUBGM from wec.iesf.org (3 Nov); MLBB core and eFootball from the project decision log; others to be entered.
+  roster: { 'Dota 2': ['Whitemon', 'Fbz', 'Jhocam', 'jikroy', 'Mikoto'], 'PUBG Mobile': ['AKxSatarrrGOLD', 'AKxAmetzGOLD', 'AKxVinzGOLD', 'AKxZaoo7GOLD'],
+    MLBB: ['Aran', 'Kevin', 'Drichel', 'Lyoni', 'Jull.'], 'MLBB Women': [], eFootball: ['ELGA'], CS2: [], 'CS2 Women': [] },
+  well: { checkins: [], loads: [] }, wellTitle: 'Dota 2', wellDate: new Date().toISOString().slice(0, 10),
   selMatch: 9057681759, selNation: 'MGL', selDay: null, freshPools: {}, importReport: null, lastFlag: null,
 };
 const heroByName = () => Object.fromEntries(Object.values(S.heroes).map((h) => [h.name.toLowerCase(), h.id]));
@@ -129,6 +137,10 @@ async function initCaps() {
       S.pubgm.logged = { matches: m, fights: f }; render();
     }, fail);
     db.collection('cycle').onSnapshot((snap) => { S.cycle = snap.docs.map((d) => d.data()).filter((o) => o?.origin === 'operational'); render(); }, fail);
+    db.doc('config/roster').onSnapshot((d) => { const x = d.data(); if (x?.roster) S.roster = { ...S.roster, ...x.roster }; render(); }, () => {});
+    // Wellbeing collections are readable and writable by editors only (declared in the page's db rules).
+    db.collection('wellbeing_checkins').onSnapshot((snap) => { S.well.checkins = snap.docs.map((d) => d.data()).filter((x) => x?.origin === 'operational'); S.wellAccess = 'ok'; render(); }, () => { S.wellAccess = 'denied'; render(); });
+    db.collection('wellbeing_load').onSnapshot((snap) => { S.well.loads = snap.docs.map((d) => d.data()).filter((x) => x?.origin === 'operational'); render(); }, () => {});
     db.doc('config/rules').onSnapshot((d) => { const x = d.data(); if (x?.rules) S.rules = x.rules; render(); }, () => {});
     db.collection('dota_pools').onSnapshot((snap) => {
       for (const d of snap.docs) { const x = d.data(); if (x?.games && S.players[d.id]) { S.players[d.id].games = x.games; S.freshPools[d.id] = x.at; } }
@@ -166,17 +178,19 @@ const dotaTeam = () => dotaTeamPipeline(S.players, S.heroes, S.asOf, Object.keys
 
 // ---------- routing ----------
 const TITLES = [
-  { id: 'home', label: 'Today', tabs: [['today', 'Before training']] },
-  { id: 'mlbb', label: 'MLBB', tabs: [['mlbb', 'Draft Lab']] },
+  { id: 'home', label: 'Today', tabs: [['today', 'My day'], ['board', 'Juara Umum board']] },
+  { id: 'mlbb', label: 'MLBB & others', tabs: [['mlbb', 'MLBB · MLBB W · eFootball · CS2']] },
   { id: 'dota', label: 'Dota 2', tabs: [['dota-team', 'Team'], ['dota-draft', 'Draft room'], ['dota-post', 'Post-match'], ['dota-scout', 'Scouting'], ['dota-review', 'Series review']] },
   { id: 'pubgm', label: 'PUBG Mobile', tabs: [['pubgm-team', 'Team'], ['pubgm-log', 'Log & import'], ['pubgm-sim', 'Strategy sim'], ['pubgm-review', 'Match-day review']] },
+  { id: 'well', label: 'Wellbeing', tabs: [['well-day', 'Daily check'], ['well-log', 'Log check-in & load']] },
   { id: 'staff', label: 'Staff', tabs: [['staff-cycle', 'Coaching cycle'], ['staff-measure', 'Is it working?'], ['staff-rules', 'Rules & decisions'], ['staff-sources', 'Sources & limits']] },
 ];
 const viewOf = () => { const h = location.hash.slice(1); return TITLES.some((t) => t.tabs.some(([id]) => id === h)) ? h : 'today'; };
 function renderNav(view) {
   const title = TITLES.find((t) => t.tabs.some(([id]) => id === view));
   const pending = S.cycle.filter((o) => o.status === 'proposed').length;
-  $('#titles').innerHTML = TITLES.map((t) => `<button type="button" data-go="${t.tabs[0][0]}" aria-pressed="${t === title}">${esc(t.label)}${t.id === 'staff' && pending ? ` · ${pending}` : ''}</button>`).join('')
+  const me = STAFF.find((x) => x.id === S.me);
+  $('#titles').innerHTML = `<label class="me" for="meSel">I am <select id="meSel">${STAFF.map((x) => `<option value="${x.id}" ${x.id === S.me ? 'selected' : ''}>${esc(x.name.split(' ')[0])}</option>`).join('')}</select></label>` + TITLES.map((t) => `<button type="button" data-go="${t.tabs[0][0]}" aria-pressed="${t === title}">${esc(t.label)}${t.id === 'staff' && pending ? ` · ${pending}` : ''}</button>`).join('')
     + `<button type="button" id="modeBtn" class="mode ${S.mode}" aria-pressed="${S.mode === 'demo'}">${S.mode === 'demo' ? 'Leave demo sandbox' : 'Demo sandbox'}</button>`;
   $('#tabs').innerHTML = title.tabs.map(([id, label]) => `<a href="#${id}" ${id === view ? 'aria-current="page"' : ''}>${esc(label)}</a>`).join('');
 }
@@ -193,27 +207,101 @@ function todayCard(item) {
   if (item.kind === 'awaiting-review') return `<li>${tag('c-Low', 'Proposed — awaiting coach review')} <b>${esc(item.obj.rec.problem)}</b><br><span class="note">Not a training decision until the title coach reviews it. <a href="#staff-cycle">Review</a></span></li>`;
   return `<li>${tag('c-Low', 'Engine proposal — not reviewed')} <b>${esc(item.rec.problem)}</b> ${item.rec.contexts.map(ctxTag).join('')}<br><span class="note">${esc(item.rec.uncertainty[0] || '')}</span></li>`;
 }
+function queueHtml(meId) {
+  const me = STAFF.find((x) => x.id === meId);
+  const q = queueFor(meId, S.cycle);
+  const reviews = q.filter((o) => o.status === 'proposed');
+  const toLog = q.filter((o) => ['accepted', 'modified'].includes(o.status) && (!o.sessions.length || o.decisions.some((d) => d.sessionId === o.sessions.at(-1).id)));
+  const toDecide = q.filter((o) => o.sessions.length && !o.decisions.some((d) => d.sessionId === o.sessions.at(-1).id));
+  const flagged = S.cycle.filter((o) => changedSince(o.rules, S.rules).length && !['retired', 'rejected'].includes(o.status));
+  const item = (o, what) => `<li><b>${esc(o.title)}</b> · ${esc(o.rec.problem)} <span class="note">— ${esc(what)}</span> <a href="#staff-cycle">Open</a></li>`;
+  return `<div class="panel"><h2>${esc(me.name)} — ${esc(me.role)}</h2><p class="note">Focus: ${esc(me.focus.join(', '))}${me.oversight ? ` · oversees ${esc(me.oversight)}` : ''}</p>
+    <div class="stats"><div class="stat"><span class="k">To review</span><span class="v">${reviews.length}</span></div><div class="stat"><span class="k">To practise / log</span><span class="v">${toLog.length}</span></div><div class="stat"><span class="k">Decisions due</span><span class="v">${toDecide.length}</span></div>${meId === 'fayad' ? `<div class="stat"><span class="k">Rule changes to re-check</span><span class="v">${flagged.length}</span></div>` : ''}</div>
+    ${reviews.length + toLog.length + toDecide.length ? `<ul class="plain">${reviews.map((o) => item(o, 'review: accept, modify or reject')).join('')}${toDecide.map((o) => item(o, `decide after ${o.sessions.at(-1).id}`)).join('')}${toLog.map((o) => item(o, 'run the drill and log the session')).join('')}</ul>` : '<p class="empty">Nothing in your queue.</p>'}</div>`;
+}
+function wellTodayPanel() {
+  if (S.wellAccess === 'denied') return `<div class="panel"><h2>Wellbeing</h2>${banner('block', '<div>Wellbeing records are visible to editors only.</div>')}</div>`;
+  const date = new Date().toISOString().slice(0, 10);
+  const rows = WEC_TITLES.map((t) => ({ t: t.id, d: teamDay(S.roster[t.id] || [], date, S.well.checkins, S.well.loads) }));
+  const flagged = rows.flatMap((r) => r.d.toCheck.map((x) => ({ title: r.t, ...x })));
+  return `<div class="panel"><h2>Wellbeing today</h2><div class="tw"><table><thead><tr><th>Title</th><th class="n">Check-ins</th><th class="n">To talk to</th></tr></thead><tbody>
+    ${rows.map((r) => `<tr><td>${esc(r.t)}</td><td class="n">${r.d.total ? `${r.d.done}/${r.d.total}` : 'roster not entered'}</td><td class="n">${r.d.toCheck.length}</td></tr>`).join('')}</tbody></table></div>
+    ${flagged.length ? `<ul class="plain">${flagged.map((f) => `<li><b>${esc(f.player)}</b> (${esc(f.title)}): ${f.flags.filter((x) => x.level === 'check').map((x) => esc(x.text)).join(' ')}</li>`).join('')}</ul>` : '<p class="note">No flags today.</p>'}<div class="toolbar"><a class="btn" href="#well-day">Daily check</a></div></div>`;
+}
 V.today = () => {
   if (S.mode === 'demo') return `<div class="panel">${DEMO_BANNER}<p>Today shows operational evidence only. Leave the demo sandbox to see it.</p></div>`;
+  const me = STAFF.find((x) => x.id === S.me) || STAFF[0];
   const d = dotaTeam();
   const pd = pubgmData(); const p = pubgmRun(pd);
-  const dList = todayList(S.cycle, d.recs, 'Dota 2');
-  const pList = p.insufficient ? todayList(S.cycle, [], 'PUBG Mobile') : todayList(S.cycle, p.recs, 'PUBG Mobile');
+  const titlePanel = (title) => {
+    if (title === 'Dota 2') { const L = todayList(S.cycle, d.recs, 'Dota 2'); return `<div class="panel"><h2>Dota 2</h2>${CLUB_BANNER}${L.length ? `<ul class="plain today">${L.map(todayCard).join('')}</ul>` : '<p class="empty">No proposals with enough evidence.</p>'}<div class="toolbar"><a class="btn" href="#dota-team">Evidence</a></div></div>`; }
+    if (title === 'PUBG Mobile') { const L = todayList(S.cycle, p.insufficient ? [] : p.recs, 'PUBG Mobile'); return `<div class="panel"><h2>PUBG Mobile</h2>${p.insufficient ? banner('block', `<div><b>Not enough operational evidence.</b> ${esc(p.insufficient)} <a href="#pubgm-log">Log scrims</a>.</div>`) : ''}${L.length ? `<ul class="plain today">${L.map(todayCard).join('')}</ul>` : ''}</div>`; }
+    const L = todayList(S.cycle, [], title);
+    return `<div class="panel"><h2>${esc(title)}</h2>${L.length ? `<ul class="plain today">${L.map(todayCard).join('')}</ul>` : `<p class="empty">No objectives yet. Add a staff observation from Draft Lab, VOD or scrims.</p>`}<div class="toolbar"><a class="btn" href="#mlbb">Add observation</a></div></div>`;
+  };
+  const titles = me.id === 'donny' ? [] : me.id === 'fayad' ? ['PUBG Mobile', 'eFootball', 'MLBB Women', 'Dota 2', 'MLBB'] : me.focus;
   return `<div class="panel"><div class="lead">What do we <em>train today</em>?</div>
-    <p>Objectives the title coach has accepted come first. Anything not yet reviewed is labelled as a proposal and is not a training decision.</p>
-    <div class="stats"><div class="stat"><span class="k">Awaiting review</span><span class="v">${S.cycle.filter((o) => o.status === 'proposed').length}</span></div>
-    <div class="stat"><span class="k">Accepted / modified</span><span class="v">${S.cycle.filter((o) => ['accepted', 'modified'].includes(o.status)).length}</span></div>
-    <div class="stat"><span class="k">Sessions logged</span><span class="v">${S.cycle.reduce((a, o) => a + o.sessions.length, 0)}</span></div>
-    <div class="stat"><span class="k">Shared store</span><span class="v" style="font-size:18px">${esc(S.dbState)}</span></div></div></div>
-  <div class="cols">
-    <div class="panel"><h2>Dota 2</h2>${CLUB_BANNER}${dList.length ? `<ul class="plain today">${dList.map(todayCard).join('')}</ul>` : '<p class="empty">No proposals with enough evidence.</p>'}<div class="toolbar"><a class="btn" href="#dota-team">Evidence</a><a class="btn" href="#staff-cycle">Coaching cycle</a></div></div>
-    <div class="panel"><h2>PUBG Mobile</h2>${p.insufficient ? banner('block', `<div><b>Not enough operational evidence.</b> ${esc(p.insufficient)} <a href="#pubgm-log">Log scrims</a>.</div>`) : ''}${pList.length ? `<ul class="plain today">${pList.map(todayCard).join('')}</ul>` : ''}<div class="toolbar"><a class="btn" href="#pubgm-log">Log scrims</a></div></div>
-  </div>`;
+    <p>Accepted objectives first. Anything not yet reviewed is a proposal, not a training decision. Choose who you are at the top to see your queue.</p></div>
+    ${queueHtml(me.id)}
+    ${me.id === 'donny' || me.id === 'fayad' ? wellTodayPanel() : ''}
+    <div class="cols">${titles.map(titlePanel).join('')}</div>`;
 };
 
-V.mlbb = () => `<div class="panel"><div class="lead">MLBB stays in <em>Draft Lab</em>.</div>
-  <p>The MLBB module is the existing Draft Lab, kept as it is. None of its formulas, hero ratings or draft weights are reused for Dota 2 or PUBG Mobile.</p>
-  <div class="toolbar"><a class="btn primary" href="https://claude.ai/code/artifact/2b3103c5-81c9-4ad4-ba3e-3303778a8259" target="_blank" rel="noopener">Open Draft Lab Pelatnas</a><a class="btn" href="https://claude.ai/artifact/VatjYMhyVs5DLHgp8Yx4Rj" target="_blank" rel="noopener">Open Draft Lab MLBB v19</a></div></div>`;
+// Juara Umum board: every title on one page, for the Head Coach and the BOD conversation.
+const PLAN_V3 = { 'MLBB Women': 75, MLBB: 40, eFootball: 40, 'PUBG Mobile': 35, 'Dota 2': 35, CS2: 10, 'CS2 Women': 5 };
+V.board = () => {
+  const since = new Date(Date.now() - 7 * 86400000).toISOString().slice(0, 10);
+  const today = new Date().toISOString().slice(0, 10);
+  const rows = WEC_TITLES.map((t) => {
+    const objs = S.cycle.filter((o) => o.title === t.id);
+    const active = objs.filter((o) => ['accepted', 'modified'].includes(o.status)).length;
+    const pending = objs.filter((o) => o.status === 'proposed').length;
+    const sess7 = objs.reduce((a, o) => a + o.sessions.filter((x) => x.date >= since).length, 0);
+    const met = objs.flatMap((o) => o.sessions).filter((x) => x.result === 'met').length;
+    const roster = S.roster[t.id] || [];
+    const wd = teamDay(roster, today, S.well.checkins, S.well.loads);
+    let evidence;
+    if (t.id === 'Dota 2') { const nat = Object.values(S.matches).filter((r) => { try { return dotaMatchPipeline(r, accounts(), S.heroes).context.context === 'national'; } catch { return false; } }).length; evidence = nat ? `${nat} national match(es) imported` : 'Club data only — no national scrims yet'; }
+    else if (t.id === 'PUBG Mobile') { const n = new Set(S.pubgm.logged.matches.map((r) => r.match_id)).size; evidence = n ? `${n} scrim match(es) logged` : 'No scrims logged'; }
+    else if (t.engine === 'draftlab') evidence = t.id === 'MLBB' ? 'Draft Lab: MPL ID S18 (TLID club data)' : 'Draft Lab: no women\'s data yet';
+    else evidence = 'Staff observations only';
+    const blockers = [...provisional(S.rules, t.id === 'Dota 2' ? 'dota-draft' : t.id === 'PUBG Mobile' ? 'pubgm-team' : 'none').filter((r) => r.status === 'blocked' || r.status === 'unverified').map((r) => r.label)];
+    if (!roster.length) blockers.push('Roster not entered in hub');
+    if (t.id === 'eFootball') blockers.push('Coach not named; entry not on IESF site');
+    return { t, own: ownerNote(t.id), objs: objs.length, active, pending, sess7, met, wd, roster, evidence, blockers };
+  });
+  return `<div class="panel"><div class="lead">Road to <em>Juara Umum</em></div>
+    <p>One line per title: who owns it, what evidence exists, whether the coaching cycle is running, and what blocks it. The overall-title scoring rule is not published yet, so the board does not compute medal tables.</p>
+    ${banner('block', '<div><b>Overall-title (Juara Umum) scoring: not published.</b> Owner: PB ESI intl. relations. Until it is, gold count is the working target (BOD plan: Juara Umum primary, 4 golds stretch).</div>')}
+    <div class="tw"><table class="board-t"><thead><tr><th>Title</th><th>Focus owner</th><th>Title coach</th><th>Evidence</th><th class="n">Objectives (active / to review)</th><th class="n">Sessions 7 d</th><th class="n">Wellbeing check-ins today</th><th>Blockers</th></tr></thead><tbody>
+    ${rows.map((r) => `<tr><td><b>${esc(r.t.id)}</b></td><td>${esc(r.own)}</td><td>${esc(r.t.coach)}</td><td>${esc(r.evidence)}</td><td class="n">${r.active} / ${r.pending}</td><td class="n">${r.sess7}</td><td class="n">${r.roster.length ? `${r.wd.done}/${r.wd.total}` : '—'}</td><td class="note">${r.blockers.map(esc).join('; ') || '—'}</td></tr>`).join('')}</tbody></table></div></div>
+  <div class="cols"><div class="panel"><h2>Where the cycle is not running</h2><ul class="plain">${rows.filter((r) => !r.active).map((r) => `<li><b>${esc(r.t.id)}</b> — no accepted objective. ${r.pending ? `${r.pending} waiting for ${esc(owner(r.t.id).name)}.` : 'Nothing proposed yet.'}</li>`).join('') || '<li>Every title has an accepted objective.</li>'}</ul></div>
+    <div class="panel"><h2>BOD planning assumptions (29 Oct, v3)</h2><p class="note">Staff estimates of each title's gold chance from the BOD plan. Not computed by the hub and not evidence: shown so the staff can see where the plan expects golds and revise it.</p>
+      <div class="tw"><table><thead><tr><th>Title</th><th class="n">Plan estimate</th></tr></thead><tbody>${Object.entries(PLAN_V3).map(([k, v]) => `<tr><td>${esc(k)}</td><td class="n">${v}%</td></tr>`).join('')}</tbody></table></div>
+      <p class="note">v3 total ≈ 2.4 golds base, 16% chance of 4+ (decision log). Revise in the planning workbook, not here.</p></div></div>`;
+};
+
+const OBS_TITLES = ['MLBB', 'MLBB Women', 'eFootball', 'CS2', 'CS2 Women', 'Dota 2', 'PUBG Mobile'];
+function observationForm(defTitle) {
+  return `<div class="form"><label class="field" for="obT">Title<select id="obT">${OBS_TITLES.map((t) => `<option ${t === defTitle ? 'selected' : ''}>${esc(t)}</option>`).join('')}</select></label>
+    <label class="field" for="obBy">Observed by<input type="text" id="obBy" list="staffNames"></label>
+    <label class="field" for="obSrc">Source<input type="text" id="obSrc" placeholder="Scrim ID, VOD link, Draft Lab view"></label>
+    <label class="field" for="obN">Games it is based on<input type="number" id="obN" min="1" placeholder="e.g. 4"></label>
+    <label class="field" for="obK">Kind<select id="obK"><option value="observed">Observed (seen in the games)</option><option value="hypothesis">Hypothesis (needs checking)</option></select></label>
+    <label class="field" for="obC">Roster context<select id="obC"><option value="national">National team</option><option value="mixed">Partial roster</option><option value="club">Club games</option></select></label></div>
+    <label class="field" for="obO">Observation (the problem)<input type="text" id="obO" placeholder="e.g. Red-side drafts lose the lane-priority heroes in phase 1"></label>
+    <div class="form"><label class="field" for="obD">Proposed drill<input type="text" id="obD"></label><label class="field" for="obS">Success criterion (measurable)<input type="text" id="obS"></label></div>
+    <datalist id="staffNames">${STAFF.map((x) => `<option value="${esc(x.name)}"></option>`).join('')}${WEC_TITLES.filter((t) => !/TBD|see WEC/.test(t.coach)).map((t) => `<option value="${esc(t.coach)}"></option>`).join('')}</datalist>
+    <div class="toolbar"><button class="btn primary" type="button" id="obSave">Send to review</button><span class="msg" id="obMsg"></span></div>`;
+}
+V.mlbb = () => {
+  const list = (t) => S.cycle.filter((o) => o.title === t && !['retired', 'rejected'].includes(o.status));
+  return `<div class="panel"><div class="lead">MLBB, MLBB Women, eFootball, CS2</div>
+  <p>These titles have no analysis engine in the hub. MLBB and MLBB Women keep Draft Lab as their engine. What the staff see there, on VOD or in scrims, enters the same coaching cycle as a <b>staff observation</b>: it needs a source, the number of games behind it and a measurable success criterion, and it goes to the title's focus owner for review.</p>
+  <div class="toolbar"><a class="btn" href="https://claude.ai/code/artifact/2b3103c5-81c9-4ad4-ba3e-3303778a8259" target="_blank" rel="noopener">Open Draft Lab Pelatnas</a><a class="btn" href="https://claude.ai/artifact/VatjYMhyVs5DLHgp8Yx4Rj" target="_blank" rel="noopener">Open Draft Lab MLBB v19</a></div></div>
+  <div class="panel"><h2>Add a staff observation</h2>${S.mode === 'demo' ? '<p class="empty">Not available in the demo sandbox.</p>' : observationForm('MLBB')}</div>
+  <div class="cols3">${['MLBB', 'MLBB Women', 'eFootball', 'CS2', 'CS2 Women'].map((t) => `<div class="panel"><h2>${esc(t)}</h2><p class="note">Focus owner: ${esc(ownerNote(t))}</p>${list(t).length ? `<ul class="plain">${list(t).map((o) => `<li>${tag(`s-${o.status}`, o.status)} ${esc(o.rec.problem)}</li>`).join('')}</ul>` : '<p class="empty">No objectives yet.</p>'}</div>`).join('')}</div>`;
+};
 
 V['dota-team'] = () => {
   const d = dotaTeam(); LAST.recs['Dota 2'] = d.recs;
@@ -436,7 +524,7 @@ function cycleCard(o) {
   const changed = changedSince(o.rules, S.rules);
   const t = trail(o);
   const open = !['retired'].includes(o.status);
-  return `<article class="obj" id="${esc(o.id)}"><header><div><span class="note">${esc(o.title)} · ${esc(o.id)} · proposed ${esc(o.createdAt.slice(0, 10))} by ${esc(o.proposedBy)}</span>
+  return `<article class="obj" id="${esc(o.id)}"><header><div><span class="note">${esc(o.title)} · ${esc(o.id)} · proposed ${esc(o.createdAt.slice(0, 10))} by ${esc(o.proposedBy)} · <b>for ${esc(o.assignedTo || owner(o.title).name)}</b></span>
       <h3>${esc(o.rec.problem)}</h3></div>${tag(`s-${o.status}`, o.status.replace('-', ' '))}</header>
     ${changed.length ? banner('block', `<div><b>Rules changed since proposal:</b> ${changed.map((c) => `${esc(c.label || c.id)} ${esc(c.from)} → ${esc(c.to)}`).join('; ')}. Re-check the evidence before practising.</div>`) : ''}
     <dl class="kv small"><dt>Evidence</dt><dd>${o.rec.evidence.map((e) => `${esc(e.title)} <span class="note">(${esc(e.kind)}, n=${e.n ?? '—'}, ${esc(CONTEXT_LABEL[e.context] || e.context)}, ${esc(e.source)}, ${esc(e.retrieved)})</span>`).join('<br>')}</dd>
@@ -445,7 +533,7 @@ function cycleCard(o) {
     ${o.reviews.length ? `<div class="h3">Reviews</div><ul class="plain">${o.reviews.map((r) => `<li><b>${esc(r.decision)}</b> by ${esc(r.reviewer)}, ${esc(r.at.slice(0, 16).replace('T', ' '))}${r.reason ? ` — ${esc(r.reason)}` : ''}</li>`).join('')}</ul>` : ''}
     ${t.length ? `<div class="h3">Sessions → decisions</div><ul class="plain">${t.map(({ session: s, decision: d }) => `<li><b>${esc(s.id)}</b> ${esc(s.date)} · ${esc(s.owner)} · ${esc(s.execution)} · result <b>${esc(s.result)}</b>${s.measure ? ` (${esc(s.measure)})` : ''}${s.context?.opponent ? ` · vs ${esc(s.context.opponent)}` : ''}${d ? ` → <b>${esc(d.decision)}</b> by ${esc(d.by)}: ${esc(d.reason)}` : ' → <i>no decision yet</i>'}</li>`).join('')}</ul>` : ''}
     ${open ? `<details ${o.status === 'proposed' ? 'open' : ''}><summary class="btn">Review</summary><div class="form">
-      <label class="field" for="rv-d-${o.id}">Decision<select id="rv-d-${o.id}">${opt(REVIEW)}</select></label><label class="field" for="rv-n-${o.id}">Reviewer<input type="text" id="rv-n-${o.id}" placeholder="Title coach name"></label>
+      <label class="field" for="rv-d-${o.id}">Decision<select id="rv-d-${o.id}">${opt(REVIEW)}</select></label><label class="field" for="rv-n-${o.id}">Reviewer<input type="text" id="rv-n-${o.id}" list="rv-l-${o.id}" value="${esc(STAFF.find((x) => x.id === S.me)?.name || '')}"></label><datalist id="rv-l-${o.id}">${reviewersFor(o.title).map((n) => `<option value="${esc(n)}"></option>`).join('')}</datalist>
       <label class="field" for="rv-r-${o.id}">Reason (required to modify or reject)<input type="text" id="rv-r-${o.id}"></label></div>
       <div class="form"><label class="field" for="rv-dr-${o.id}">Changed drill (if modifying)<input type="text" id="rv-dr-${o.id}"></label><label class="field" for="rv-s-${o.id}">Changed success criterion<input type="text" id="rv-s-${o.id}"></label></div>
       <div class="toolbar"><button class="btn primary" type="button" data-act="review" data-id="${esc(o.id)}">Save review</button></div></details>
@@ -465,7 +553,7 @@ V['staff-cycle'] = () => {
   if (S.mode === 'demo') return `<div class="panel">${DEMO_BANNER}<p class="empty">The coaching cycle holds operational records only.</p></div>`;
   const groups = [['proposed', 'Awaiting review'], ['accepted', 'In practice'], ['modified', 'In practice (modified)'], ['evidence-needed', 'Gathering evidence'], ['rejected', 'Rejected'], ['retired', 'Closed']];
   return `<div class="panel"><div class="lead">Coaching <em>cycle</em></div>
-    <p>Evidence → proposed objective → title-coach review → practice session → result → next decision. Proposals come from "Send to coach review" on any evidence view. Reviews, sessions and decisions keep their names, times and reasons.</p>
+    <p>Evidence → proposed objective → review by the focus owner → practice session → result → next decision. Dota 2 and MLBB go to Aufa; PUBG Mobile, eFootball and MLBB Women to Fayad, who oversees every title; wellbeing to Donny. Reviews, sessions and decisions keep their names, times and reasons.</p>
     ${S.dbState === 'live' ? '' : banner('synth', `<div><b>Shared store ${esc(S.dbState)}.</b> Records stay in this tab only.</div>`)}</div>
     ${groups.map(([st, label]) => { const list = S.cycle.filter((o) => o.status === st); return list.length ? `<div class="panel"><h2>${esc(label)} (${list.length})</h2>${list.map(cycleCard).join('')}</div>` : ''; }).join('') || '<div class="panel"><p class="empty">No objectives yet. Open Dota 2 → Team and press "Send to coach review" on a proposal.</p></div>'}
     <div class="panel"><h2>Export</h2><p class="note">Operational records only, as JSON for the decision log or a spreadsheet.</p><div class="toolbar"><button class="btn" type="button" id="exportBtn">Show export</button></div><textarea id="exportBox" readonly hidden aria-label="Exported records"></textarea></div>`;
@@ -517,6 +605,40 @@ V['staff-rules'] = () => {
 V['staff-sources'] = () => `<div class="panel"><h2>Source registry</h2><div class="tw"><table><thead><tr><th>Source</th><th>Collected</th><th>Scope</th><th>Status</th><th>Access</th></tr></thead><tbody>
   ${SOURCES.map((s) => `<tr><td><b>${esc(s.name)}</b><br><span class="note">${/^https?:/.test(s.url) ? `<a href="${esc(s.url)}" target="_blank" rel="noopener">${esc(s.url)}</a>` : esc(s.url)}</span></td><td>${esc(s.collected)}</td><td>${esc(s.scope)}<br><span class="note">${esc(s.completeness)}</span></td><td class="note">${esc(s.status)}</td><td class="note">${esc(s.access)}</td></tr>`).join('')}</tbody></table></div>
   <p class="note">Built ${esc(DATA.builtAt.slice(0, 16).replace('T', ' '))} UTC · V1.1.</p></div>`;
+
+// Wellbeing (Donny). Editors only; screening flags, never diagnoses or scores.
+const WELL_NOTE = 'Health and mental-wellbeing data. Visible to editors of this page only. Use with the players\' informed consent (pending PB ESI decision). Flags are prompts to talk to the player, not diagnoses.';
+V['well-day'] = () => {
+  if (S.mode === 'demo') return `<div class="panel">${DEMO_BANNER}<p class="empty">Wellbeing uses operational records only.</p></div>`;
+  if (S.wellAccess === 'denied') return `<div class="panel">${banner('block', '<div><b>Editors only.</b> Ask the page owner for edit access to see wellbeing records.</div>')}</div>`;
+  const t = S.wellTitle, roster = S.roster[t] || [];
+  const d = teamDay(roster, S.wellDate, S.well.checkins, S.well.loads);
+  return `<div class="panel"><h2>Daily check — ${esc(t)}</h2>${banner('synth', `<div>${esc(WELL_NOTE)}</div>`)}
+    <div class="form"><label class="field" for="wT">Title<select id="wT">${WEC_TITLES.map((x) => `<option ${x.id === t ? 'selected' : ''}>${esc(x.id)}</option>`).join('')}</select></label><label class="field" for="wD">Date<input type="date" id="wD" value="${esc(S.wellDate)}"></label></div>
+    ${roster.length ? `<p>${d.done} of ${d.total} players checked in.</p><div class="tw"><table><thead><tr><th>Player</th><th class="n">Wellness /25</th><th class="n">Sleep h</th><th>Flags</th></tr></thead><tbody>
+      ${d.rows.map((r) => { const c = S.well.checkins.find((x) => x.player === r.player && x.date === S.wellDate); return `<tr><td><b>${esc(r.player)}</b></td><td class="n">${c ? c.wellness : '—'}</td><td class="n">${c ? c.sleepH : '—'}</td><td>${r.flags.map((f) => `<div class="${f.level === 'check' ? 'flag-check' : 'note'}">${esc(f.text)}</div>`).join('')}</td></tr>`; }).join('')}</tbody></table></div>`
+      : banner('block', '<div>No roster for this title in the hub yet. Add it below (names as on the WEC roster).</div>')}
+    <p class="note">Flags: wellness ${THRESHOLDS.wellnessSD} SD below the player's own 28-day average (after ${MIN_BASELINE_DAYS} check-ins); under ${THRESHOLDS.shortSleepH} h sleep ${THRESHOLDS.shortSleepDays} days running; 7-day session load above ${THRESHOLDS.loadRatio}× the previous 3-week average. Thresholds are Donny's to change.</p></div>
+  <div class="panel"><h2>Roster — ${esc(t)}</h2><label class="field" for="wR">Players (comma-separated)<input type="text" id="wR" value="${esc(roster.join(', '))}"></label><div class="toolbar"><button class="btn" type="button" id="wRSave">Save roster</button><span class="msg" id="wRMsg"></span></div></div>`;
+};
+V['well-log'] = () => {
+  if (S.mode === 'demo') return `<div class="panel">${DEMO_BANNER}<p class="empty">Wellbeing uses operational records only.</p></div>`;
+  const t = S.wellTitle, roster = S.roster[t] || [];
+  const sel = (id, lo, hi) => `<select id="${id}">${Array.from({ length: hi - lo + 1 }, (_, i) => `<option ${i + lo === 3 ? 'selected' : ''}>${i + lo}</option>`).join('')}</select>`;
+  return `<div class="panel"><h2>Check-in</h2>${banner('synth', `<div>${esc(WELL_NOTE)}</div>`)}
+    <div class="form"><label class="field" for="wT">Title<select id="wT">${WEC_TITLES.map((x) => `<option ${x.id === t ? 'selected' : ''}>${esc(x.id)}</option>`).join('')}</select></label>
+    <label class="field" for="ciP">Player<select id="ciP">${roster.map((p) => `<option>${esc(p)}</option>`).join('')}</select></label><label class="field" for="ciD">Date<input type="date" id="ciD" value="${esc(S.wellDate)}"></label>
+    <label class="field" for="ciH">Sleep hours<input type="number" id="ciH" step="0.5" min="0" max="16" value="7"></label>
+    ${ITEMS.map((k) => `<label class="field" for="ci-${k}">${esc(ITEM_LABEL[k])} (1–5)${sel(`ci-${k}`, 1, 5)}</label>`).join('')}
+    <label class="field" for="ciBy">Entered by<input type="text" id="ciBy" value="${esc(STAFF.find((x) => x.id === S.me)?.name || '')}"></label></div>
+    <div class="toolbar"><button class="btn primary" type="button" id="ciSave" ${roster.length ? '' : 'disabled'}>Save check-in</button><span class="msg" id="ciMsg"></span></div>
+    <p class="note">5 = very good on every item (fresh, not sore, not stressed). Keep notes out of this form; talk to the player instead.</p></div>
+  <div class="panel"><h2>Session load</h2><div class="form">
+    <label class="field" for="slP">Player<select id="slP">${roster.map((p) => `<option>${esc(p)}</option>`).join('')}</select></label><label class="field" for="slD">Date<input type="date" id="slD" value="${esc(S.wellDate)}"></label>
+    <label class="field" for="slK">Session<select id="slK"><option>scrim</option><option>individual practice</option><option>physical training</option><option>review</option><option>official match</option></select></label>
+    <label class="field" for="slM">Minutes<input type="number" id="slM" min="1" max="600" value="120"></label><label class="field" for="slR">Session RPE (0–10, asked 30 min after)<input type="number" id="slR" min="0" max="10" value="5"></label></div>
+    <div class="toolbar"><button class="btn primary" type="button" id="slSave" ${roster.length ? '' : 'disabled'}>Save load</button><span class="msg" id="slMsg"></span></div></div>`;
+};
 
 // ---------- render & events ----------
 function render() {
@@ -615,6 +737,37 @@ document.addEventListener('click', async (e) => {
       S.lastFlag = { label: rule(rid).label, affected, objs }; render();
     } catch (err) { setMsg('ruMsg', err.message, 'err'); }
   }
+  if (id === 'obSave') {
+    try {
+      const title = val('obT');
+      const ev = staffObservation({ title, observation: val('obO'), source: val('obSrc'), kind: val('obK'), n: val('obN'), context: val('obC'), by: val('obBy') });
+      if (!val('obD').trim() || !val('obS').trim()) throw new Error('Add a proposed drill and a measurable success criterion.');
+      const rec = recommendationRecord({ problem: val('obO').trim(), drill: val('obD').trim(), success: val('obS').trim(), explanation: `Staff observation (${ev.kind}) from ${ev.source}.`, priority: 2, confidence: ev.confidence, area: 'staff', findings: [ev.id] }, [ev]);
+      await saveObj(propose(rec, { title, by: val('obBy').trim(), rulesSnapshot: snapshot(S.rules, title === 'PUBG Mobile' ? ['pubgm-scoring'] : title === 'Dota 2' ? ['dota-patch'] : []) }));
+      render(); setMsg('obMsg', `Sent to ${owner(title).name} for review.`, 'ok');
+    } catch (err) { setMsg('obMsg', err.message, 'err'); }
+  }
+  if (id === 'wRSave') {
+    const list = val('wR').split(',').map((x) => x.trim()).filter(Boolean);
+    S.roster = { ...S.roster, [S.wellTitle]: list };
+    if (S.db) { try { await S.db.doc('config/roster').set({ roster: S.roster }); } catch (err) { return setMsg('wRMsg', `Not saved (${err.code || err.message}).`, 'err'); } }
+    render();
+  }
+  if (id === 'ciSave') {
+    try {
+      const c = checkin({ player: val('ciP'), title: S.wellTitle, date: val('ciD'), sleepH: val('ciH'), by: val('ciBy'), ...Object.fromEntries(ITEMS.map((k) => [k, val(`ci-${k}`)])) });
+      if (S.db) await S.db.collection('wellbeing_checkins').doc(`${c.date}_${c.title}_${c.player}`.replace(/[^A-Za-z0-9_\-.]/g, '_')).set(c);
+      else { S.well.checkins = S.well.checkins.filter((x) => !(x.player === c.player && x.date === c.date)); S.well.checkins.push(c); }
+      setMsg('ciMsg', `Saved ${c.player}, wellness ${c.wellness}/25.`, 'ok');
+    } catch (err) { setMsg('ciMsg', err.code === 'permission_denied' || /permission|not_granted/.test(err.code || '') ? 'Only editors can save wellbeing records.' : err.message, 'err'); }
+  }
+  if (id === 'slSave') {
+    try {
+      const x = loadSession({ player: val('slP'), title: S.wellTitle, date: val('slD'), kind: val('slK'), minutes: val('slM'), rpe: val('slR') });
+      if (S.db) await S.db.collection('wellbeing_load').add(x); else S.well.loads.push(x);
+      setMsg('slMsg', `Saved ${x.load} AU for ${x.player}.`, 'ok');
+    } catch (err) { setMsg('slMsg', err.message, 'err'); }
+  }
   if (id === 'exportBtn') {
     const box = $('#exportBox'); const ops = assertOperational(S.cycle, 'export');
     box.value = JSON.stringify({ exported: new Date().toISOString(), origin: 'operational', rules: S.rules.map(({ id: i, version, status }) => ({ id: i, version, status })), objectives: ops }, null, 2); box.hidden = false; box.select();
@@ -622,6 +775,9 @@ document.addEventListener('click', async (e) => {
 });
 document.addEventListener('change', (e) => {
   const id = e.target.id;
+  if (id === 'meSel') { S.me = e.target.value; try { localStorage.setItem('hub-me', S.me); } catch { /* per-viewer convenience only */ } render(); }
+  if (id === 'wT') { S.wellTitle = e.target.value; render(); }
+  if (id === 'wD') { S.wellDate = e.target.value; render(); }
   if (id === 'dFirst') { S.draft.firstUs = e.target.value === 'us'; S.draft.steps = []; render(); }
   if (id === 'dOpp') { S.draft.opp = e.target.value; render(); }
   if (id === 'mSel') { S.selMatch = +e.target.value; S.importReport = null; render(); }

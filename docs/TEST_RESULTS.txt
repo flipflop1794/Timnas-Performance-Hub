@@ -2,219 +2,249 @@ TAP version 13
 # Subtest: AC1 synthetic data is blocked from every operational path
 ok 1 - AC1 synthetic data is blocked from every operational path
   ---
-  duration_ms: 522.343169
+  duration_ms: 510.939317
   type: 'test'
   ...
 # Subtest: AC2 an engine proposal sent to review shows as proposed everywhere
 ok 2 - AC2 an engine proposal sent to review shows as proposed everywhere
   ---
-  duration_ms: 514.758621
+  duration_ms: 671.709125
   type: 'test'
   ...
 # Subtest: AC3/AC4 review reasons are kept and sessions link forward to decisions
 ok 3 - AC3/AC4 review reasons are kept and sessions link forward to decisions
   ---
-  duration_ms: 489.805707
+  duration_ms: 861.360568
   type: 'test'
   ...
 # Subtest: AC5 sparse data gives an explicit limitation, not a recommendation
 ok 4 - AC5 sparse data gives an explicit limitation, not a recommendation
   ---
-  duration_ms: 3.613058
+  duration_ms: 5.985126
   type: 'test'
   ...
 # Subtest: AC6 club evidence is labelled club and excluded from national review
 ok 5 - AC6 club evidence is labelled club and excluded from national review
   ---
-  duration_ms: 164.627476
+  duration_ms: 178.156515
   type: 'test'
   ...
 # Subtest: AC7 changing a rule profile flags affected views and objectives
 ok 6 - AC7 changing a rule profile flags affected views and objectives
   ---
-  duration_ms: 408.013492
+  duration_ms: 613.369918
   type: 'test'
   ...
 # Subtest: AC8 import failures explain what to do
 ok 7 - AC8 import failures explain what to do
   ---
-  duration_ms: 1.600662
+  duration_ms: 1.333456
   type: 'test'
   ...
 # Subtest: AC8b the page reports a failed import and keeps going
 ok 8 - AC8b the page reports a failed import and keeps going
   ---
-  duration_ms: 235.504718
+  duration_ms: 282.644075
   type: 'test'
   ...
 # Subtest: AC9 (simulated) operational PUBGM log → proposal → Today, with a stand-in store
 ok 9 - AC9 (simulated) operational PUBGM log → proposal → Today, with a stand-in store
   ---
-  duration_ms: 409.496497
+  duration_ms: 501.002589
   type: 'test'
   ...
 # Subtest: stats: wilson, shrink, rng
 ok 10 - stats: wilson, shrink, rng
   ---
-  duration_ms: 1.727471
+  duration_ms: 1.93067
   type: 'test'
   ...
 # Subtest: evidence: finding requires a lens; recommendation requires all five parts
 ok 11 - evidence: finding requires a lens; recommendation requires all five parts
   ---
-  duration_ms: 0.681564
+  duration_ms: 0.728804
   type: 'test'
   ...
 # Subtest: measure: small or unfair windows are never reported as clean improvement
 ok 12 - measure: small or unfair windows are never reported as clean improvement
   ---
-  duration_ms: 0.878938
+  duration_ms: 0.884454
   type: 'test'
   ...
 # Subtest: dota data: all five WEC players loaded with real accounts
 ok 13 - dota data: all five WEC players loaded with real accounts
   ---
-  duration_ms: 1.62015
+  duration_ms: 1.694185
   type: 'test'
   ...
 # Subtest: dota data: shared match rows agree between players (cross-check)
 ok 14 - dota data: shared match rows agree between players (cross-check)
   ---
-  duration_ms: 1.025727
+  duration_ms: 0.998092
   type: 'test'
   ...
 # Subtest: dota data: OpenDota full-match reducer handles a minimal record
 ok 15 - dota data: OpenDota full-match reducer handles a minimal record
   ---
-  duration_ms: 0.547827
+  duration_ms: 0.618754
   type: 'test'
   ...
 # Subtest: dota pools: positions inferred from lanes and hero roles
 ok 16 - dota pools: positions inferred from lanes and hero roles
   ---
-  duration_ms: 0.344865
+  duration_ms: 0.402381
   type: 'test'
   ...
 # Subtest: dota team findings: club context is tagged and synergy gap is flagged
 ok 17 - dota team findings: club context is tagged and synergy gap is flagged
   ---
-  duration_ms: 6.080846
+  duration_ms: 6.224175
   type: 'test'
   ...
 # Subtest: dota draft: CM order matches both real tournament drafts
 ok 18 - dota draft: CM order matches both real tournament drafts
   ---
-  duration_ms: 0.94873
+  duration_ms: 1.079132
   type: 'test'
   ...
 # Subtest: dota draft: evaluation separates terms and explains a comparison
 ok 19 - dota draft: evaluation separates terms and explains a comparison
   ---
-  duration_ms: 3.353317
+  duration_ms: 3.572023
   type: 'test'
   ...
 # Subtest: dota draft: suggestions carry reasons and never repeat taken heroes
 ok 20 - dota draft: suggestions carry reasons and never repeat taken heroes
   ---
-  duration_ms: 12.858461
+  duration_ms: 12.828471
   type: 'test'
   ...
 # Subtest: dota draft patterns: first actions and adaptation from real picks_bans
 ok 21 - dota draft patterns: first actions and adaptation from real picks_bans
   ---
-  duration_ms: 0.738496
+  duration_ms: 0.86663
   type: 'test'
   ...
 # Subtest: dota match 9057681759: facts read correctly from the parsed record
 ok 22 - dota match 9057681759: facts read correctly from the parsed record
   ---
-  duration_ms: 3.073486
+  duration_ms: 3.477468
   type: 'test'
   ...
 # Subtest: dota match 9035078952: same match seen from both Indonesian players' sides
 ok 23 - dota match 9035078952: same match seen from both Indonesian players' sides
   ---
-  duration_ms: 1.440144
+  duration_ms: 1.647367
   type: 'test'
   ...
 # Subtest: dota scouting (Mongolia): coverage gaps are explicit and ban plan uses real counts
 ok 24 - dota scouting (Mongolia): coverage gaps are explicit and ban plan uses real counts
   ---
-  duration_ms: 0.885551
+  duration_ms: 0.973931
   type: 'test'
   ...
 # Subtest: coaches: three different outputs; C challenges single-match claims; verdict needs human review
 ok 25 - coaches: three different outputs; C challenges single-match claims; verdict needs human review
   ---
-  duration_ms: 3.161406
+  duration_ms: 3.403804
   type: 'test'
   ...
 # Subtest: pubgm: scoring profiles — WEC is blocked, default computes
 ok 26 - pubgm: scoring profiles — WEC is blocked, default computes
   ---
-  duration_ms: 0.504948
+  duration_ms: 0.489476
   type: 'test'
   ...
 # Subtest: pubgm: demo log is valid and clearly synthetic
 ok 27 - pubgm: demo log is valid and clearly synthetic
   ---
-  duration_ms: 6.326047
+  duration_ms: 5.832608
   type: 'test'
   ...
 # Subtest: pubgm: validator catches broken rows
 ok 28 - pubgm: validator catches broken rows
   ---
-  duration_ms: 0.245551
+  duration_ms: 0.386383
   type: 'test'
   ...
 # Subtest: pubgm: engine finds the patterns planted in the synthetic log
 ok 29 - pubgm: engine finds the patterns planted in the synthetic log
   ---
-  duration_ms: 2.875388
+  duration_ms: 4.573309
   type: 'test'
   ...
 # Subtest: pubgm: fight classification rules
 ok 30 - pubgm: fight classification rules
   ---
-  duration_ms: 0.576285
+  duration_ms: 0.723564
   type: 'test'
   ...
 # Subtest: pubgm simulator: reproducible ranges with stated basis
 ok 31 - pubgm simulator: reproducible ranges with stated basis
   ---
-  duration_ms: 18.156078
+  duration_ms: 28.39021
   type: 'test'
   ...
 # Subtest: pubgm coaches and recommendations
 ok 32 - pubgm coaches and recommendations
   ---
-  duration_ms: 3.389415
+  duration_ms: 4.94086
+  type: 'test'
+  ...
+# Subtest: routing follows the confirmed staff roles
+ok 33 - routing follows the confirmed staff roles
+  ---
+  duration_ms: 1.230853
+  type: 'test'
+  ...
+# Subtest: staff observation needs source, games, context and enters the owner's queue
+ok 34 - staff observation needs source, games, context and enters the owner's queue
+  ---
+  duration_ms: 1.606207
+  type: 'test'
+  ...
+# Subtest: wellbeing: validation, baseline building, personal flags, no scores
+ok 35 - wellbeing: validation, baseline building, personal flags, no scores
+  ---
+  duration_ms: 9.723951
+  type: 'test'
+  ...
+# Subtest: page: MLBB observation goes to Aufa, MLBB Women to Fayad; board covers all titles
+ok 36 - page: MLBB observation goes to Aufa, MLBB Women to Fayad; board covers all titles
+  ---
+  duration_ms: 600.264782
+  type: 'test'
+  ...
+# Subtest: page: wellbeing check-in saves for editors and is hidden when access is refused
+ok 37 - page: wellbeing check-in saves for editors and is hidden when access is refused
+  ---
+  duration_ms: 399.130469
   type: 'test'
   ...
 # Subtest: hub: every view renders without errors
-ok 33 - hub: every view renders without errors
+ok 38 - hub: every view renders without errors
   ---
-  duration_ms: 455.952538
+  duration_ms: 544.856871
   type: 'test'
   ...
 # Subtest: hub: draft room locks heroes and compares drafts
-ok 34 - hub: draft room locks heroes and compares drafts
+ok 39 - hub: draft room locks heroes and compares drafts
   ---
-  duration_ms: 474.144113
+  duration_ms: 424.268831
   type: 'test'
   ...
 # Subtest: hub: PUBGM CSV validation rejects a broken log and accepts a good one
-ok 35 - hub: PUBGM CSV validation rejects a broken log and accepts a good one
+ok 40 - hub: PUBGM CSV validation rejects a broken log and accepts a good one
   ---
-  duration_ms: 156.660281
+  duration_ms: 208.76493
   type: 'test'
   ...
-1..35
-# tests 35
+1..40
+# tests 40
 # suites 0
-# pass 35
+# pass 40
 # fail 0
 # cancelled 0
 # skipped 0
 # todo 0
-# duration_ms 5046.583179
+# duration_ms 7313.732573

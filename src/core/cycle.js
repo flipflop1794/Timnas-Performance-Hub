@@ -4,6 +4,7 @@
 
 import { assertOperational } from './records.js';
 import { changedSince } from './rules.js';
+import { owner } from './staff.js';
 
 export const REVIEW = ['accepted', 'modified', 'rejected'];
 export const DECISIONS = ['continue', 'adjust', 'retire', 'gather-evidence'];
@@ -13,14 +14,14 @@ export const RESULT = ['met', 'partly-met', 'not-met', 'not-measured'];
 const now = () => new Date().toISOString();
 const need = (cond, msg) => { if (!cond) throw new Error(msg); };
 
-export function propose(recRecord, { title, by, rulesSnapshot, at = now(), origin = 'operational' }) {
+export function propose(recRecord, { title, by, rulesSnapshot, at = now(), origin = 'operational', assignedTo }) {
   need(origin === 'operational', 'Demo data cannot become a practice objective.');
   assertOperational([{ origin }], 'propose');
   need(title, 'Title (game) is required.');
   need(by, 'Who proposed it is required (a person, or "Hub" for an engine proposal).');
   return {
     id: `OBJ-${at.slice(0, 10).replace(/-/g, '')}-${Math.random().toString(36).slice(2, 7)}`,
-    title, origin, status: 'proposed', createdAt: at, proposedBy: by,
+    title, origin, status: 'proposed', createdAt: at, proposedBy: by, assignedTo: assignedTo || owner(title).name,
     rec: recRecord, objective: { drill: recRecord.drill, success: recRecord.success },
     rules: rulesSnapshot || {}, reviews: [], sessions: [], decisions: [],
   };
@@ -64,7 +65,7 @@ export function nextStep(obj, rules) {
   const changed = rules ? changedSince(obj.rules, rules) : [];
   const flag = changed.length ? ` Rules changed since proposal (${changed.map((c) => c.label || c.id).join(', ')}): re-check before use.` : '';
   switch (obj.status) {
-    case 'proposed': return `Waiting for title-coach review.${flag}`;
+    case 'proposed': return `Waiting for review by ${obj.assignedTo || 'the title owner'}.${flag}`;
     case 'rejected': return `Rejected by ${obj.reviews.at(-1).reviewer}: ${obj.reviews.at(-1).reason}`;
     case 'accepted': case 'modified': {
       const last = obj.sessions.at(-1);
