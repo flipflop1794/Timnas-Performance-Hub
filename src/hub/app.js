@@ -19,6 +19,8 @@ import { dotaTeamPipeline, dotaMatchPipeline, pubgmPipeline, todayList, PUBGM_MI
 import { mmss, round, pct } from '../core/stats.js';
 import { STAFF, TITLES as WEC_TITLES, WELLBEING, owner, ownerNote, reviewersFor, queueFor } from '../core/staff.js';
 import { staffObservation, recommendationRecord } from '../core/records.js';
+import { FIELDS, FIELD_SOURCE, TIERS, board as rivalBoard, rivalNote } from '../core/competitors.js';
+import { planScrim, completeScrim, summary as scrimSummary, FORMATS, KINDS as SCRIM_KINDS } from '../core/scrims.js';
 import { checkin, session as loadSession, teamDay, ITEMS, ITEM_LABEL, THRESHOLDS, MIN_BASELINE_DAYS } from '../core/wellbeing.js';
 
 // ---------- state ----------
@@ -38,6 +40,7 @@ const S = {
   // Rosters: Dota 2 and PUBGM from wec.iesf.org (3 Nov); MLBB core and eFootball from the project decision log; others to be entered.
   roster: { 'Dota 2': ['Whitemon', 'Fbz', 'Jhocam', 'jikroy', 'Mikoto'], 'PUBG Mobile': ['AKxSatarrrGOLD', 'AKxAmetzGOLD', 'AKxVinzGOLD', 'AKxZaoo7GOLD'],
     MLBB: ['Aran', 'Kevin', 'Drichel', 'Lyoni', 'Jull.'], 'MLBB Women': [], eFootball: ['ELGA'], CS2: [], 'CS2 Women': [] },
+  rivals: [], tiers: {}, scrims: [],
   well: { checkins: [], loads: [] }, wellTitle: 'Dota 2', wellDate: new Date().toISOString().slice(0, 10),
   selMatch: 9057681759, selNation: 'MGL', selDay: null, freshPools: {}, importReport: null, lastFlag: null,
 };
@@ -137,6 +140,9 @@ async function initCaps() {
       S.pubgm.logged = { matches: m, fights: f }; render();
     }, fail);
     db.collection('cycle').onSnapshot((snap) => { S.cycle = snap.docs.map((d) => d.data()).filter((o) => o?.origin === 'operational'); render(); }, fail);
+    db.collection('rivals').onSnapshot((snap) => { S.rivals = snap.docs.map((d) => d.data()).filter((x) => x?.origin === 'operational'); render(); }, () => {});
+    db.collection('rival_tiers').onSnapshot((snap) => { S.tiers = Object.fromEntries(snap.docs.map((d) => { const x = d.data(); return [`${x.title}|${x.nation}`, x]; })); render(); }, () => {});
+    db.collection('scrims').onSnapshot((snap) => { S.scrims = snap.docs.map((d) => d.data()).filter((x) => x?.origin === 'operational'); render(); }, () => {});
     db.doc('config/roster').onSnapshot((d) => { const x = d.data(); if (x?.roster) S.roster = { ...S.roster, ...x.roster }; render(); }, () => {});
     // Wellbeing collections are readable and writable by editors only (declared in the page's db rules).
     db.collection('wellbeing_checkins').onSnapshot((snap) => { S.well.checkins = snap.docs.map((d) => d.data()).filter((x) => x?.origin === 'operational'); S.wellAccess = 'ok'; render(); }, () => { S.wellAccess = 'denied'; render(); });
@@ -179,9 +185,9 @@ const dotaTeam = () => dotaTeamPipeline(S.players, S.heroes, S.asOf, Object.keys
 // ---------- routing ----------
 const TITLES = [
   { id: 'home', label: 'Today', tabs: [['today', 'My day'], ['board', 'Juara Umum board']] },
-  { id: 'mlbb', label: 'MLBB & others', tabs: [['mlbb', 'MLBB · MLBB W · eFootball · CS2']] },
-  { id: 'dota', label: 'Dota 2', tabs: [['dota-team', 'Team'], ['dota-draft', 'Draft room'], ['dota-post', 'Post-match'], ['dota-scout', 'Scouting'], ['dota-review', 'Series review']] },
-  { id: 'pubgm', label: 'PUBG Mobile', tabs: [['pubgm-team', 'Team'], ['pubgm-log', 'Log & import'], ['pubgm-sim', 'Strategy sim'], ['pubgm-review', 'Match-day review']] },
+  { id: 'dota', label: 'Dota 2', tabs: [['dota-team', 'Team'], ['dota-scrims', 'Scrims & practice'], ['dota-post', 'Post-match'], ['dota-scout', 'Competitors'], ['dota-draft', 'Draft room'], ['dota-review', 'Series review']] },
+  { id: 'pubgm', label: 'PUBG Mobile', tabs: [['pubgm-team', 'Team'], ['pubgm-scrims', 'Scrims & practice'], ['pubgm-log', 'Log & import'], ['pubgm-rivals', 'Competitors'], ['pubgm-sim', 'Strategy sim'], ['pubgm-review', 'Match-day review']] },
+  { id: 'mlbb', label: 'Other titles', tabs: [['mlbb', 'MLBB'], ['t-mlbbw', 'MLBB Women'], ['t-efootball', 'eFootball'], ['t-cs2', 'CS2'], ['t-cs2w', 'CS2 Women']] },
   { id: 'well', label: 'Wellbeing', tabs: [['well-day', 'Daily check'], ['well-log', 'Log check-in & load']] },
   { id: 'staff', label: 'Staff', tabs: [['staff-cycle', 'Coaching cycle'], ['staff-measure', 'Is it working?'], ['staff-rules', 'Rules & decisions'], ['staff-sources', 'Sources & limits']] },
 ];
@@ -244,6 +250,8 @@ V.today = () => {
     <p>Accepted objectives first. Anything not yet reviewed is a proposal, not a training decision. Choose who you are at the top to see your queue.</p></div>
     ${queueHtml(me.id)}
     ${me.id === 'donny' || me.id === 'fayad' ? wellTodayPanel() : ''}
+    ${(() => { const mine = me.id === 'aufa' ? me.focus : WEC_TITLES.map((t) => t.id); const up = S.scrims.filter((x) => mine.includes(x.title) && x.status === 'planned').sort((a, b) => a.date.localeCompare(b.date)).slice(0, 6);
+      return up.length ? `<div class="panel"><h2>Scrims and practice coming up</h2><ul class="plain">${up.map((x) => `<li><b>${esc(x.date)}</b> ${esc(x.time)} · ${esc(x.title)} · ${esc(x.kind)}${x.partner ? ` vs ${esc(x.partner)}` : ''}${x.mirrors ? ` (stand-in for ${esc(x.mirrors)})` : ''}${x.date < today() ? ' — <b>result not logged</b>' : ''}</li>`).join('')}</ul></div>` : ''; })()}
     <div class="cols">${titles.map(titlePanel).join('')}</div>`;
 };
 
@@ -268,23 +276,79 @@ V.board = () => {
     const blockers = [...provisional(S.rules, t.id === 'Dota 2' ? 'dota-draft' : t.id === 'PUBG Mobile' ? 'pubgm-team' : 'none').filter((r) => r.status === 'blocked' || r.status === 'unverified').map((r) => r.label)];
     if (!roster.length) blockers.push('Roster not entered in hub');
     if (t.id === 'eFootball') blockers.push('Coach not named; entry not on IESF site');
-    return { t, own: ownerNote(t.id), objs: objs.length, active, pending, sess7, met, wd, roster, evidence, blockers };
+    const rb = rivalBoard(t.id, S.rivals, S.tiers); const ss = scrimSummary(S.scrims, t.id);
+    return { t, own: ownerNote(t.id), objs: objs.length, active, pending, sess7, met, wd, roster, evidence, blockers, rb, ss };
   });
   return `<div class="panel"><div class="lead">Road to <em>Juara Umum</em></div>
     <p>One line per title: who owns it, what evidence exists, whether the coaching cycle is running, and what blocks it. The overall-title scoring rule is not published yet, so the board does not compute medal tables.</p>
     ${banner('block', '<div><b>Overall-title (Juara Umum) scoring: not published.</b> Owner: PB ESI intl. relations. Until it is, gold count is the working target (BOD plan: Juara Umum primary, 4 golds stretch).</div>')}
-    <div class="tw"><table class="board-t"><thead><tr><th>Title</th><th>Focus owner</th><th>Title coach</th><th>Evidence</th><th class="n">Objectives (active / to review)</th><th class="n">Sessions 7 d</th><th class="n">Wellbeing check-ins today</th><th>Blockers</th></tr></thead><tbody>
-    ${rows.map((r) => `<tr><td><b>${esc(r.t.id)}</b></td><td>${esc(r.own)}</td><td>${esc(r.t.coach)}</td><td>${esc(r.evidence)}</td><td class="n">${r.active} / ${r.pending}</td><td class="n">${r.sess7}</td><td class="n">${r.roster.length ? `${r.wd.done}/${r.wd.total}` : '—'}</td><td class="note">${r.blockers.map(esc).join('; ') || '—'}</td></tr>`).join('')}</tbody></table></div></div>
+    <div class="tw"><table class="board-t"><thead><tr><th>Title</th><th>Focus owner</th><th>Title coach</th><th>Evidence</th><th class="n">Objectives (active / to review)</th><th class="n">Sessions 7 d</th><th class="n">Scrims 7 d / planned</th><th class="n">Rivals with notes</th><th class="n">Wellbeing check-ins today</th><th>Blockers</th></tr></thead><tbody>
+    ${rows.map((r) => `<tr><td><b>${esc(r.t.id)}</b></td><td>${esc(r.own)}</td><td>${esc(r.t.coach)}</td><td>${esc(r.evidence)}</td><td class="n">${r.active} / ${r.pending}</td><td class="n">${r.sess7}</td><td class="n">${r.ss.last7} / ${r.ss.upcoming.length}</td><td class="n">${r.rb.covered}/${r.rb.field}</td><td class="n">${r.roster.length ? `${r.wd.done}/${r.wd.total}` : '—'}</td><td class="note">${r.blockers.map(esc).join('; ') || '—'}</td></tr>`).join('')}</tbody></table></div></div>
   <div class="cols"><div class="panel"><h2>Where the cycle is not running</h2><ul class="plain">${rows.filter((r) => !r.active).map((r) => `<li><b>${esc(r.t.id)}</b> — no accepted objective. ${r.pending ? `${r.pending} waiting for ${esc(owner(r.t.id).name)}.` : 'Nothing proposed yet.'}</li>`).join('') || '<li>Every title has an accepted objective.</li>'}</ul></div>
     <div class="panel"><h2>BOD planning assumptions (29 Oct, v3)</h2><p class="note">Staff estimates of each title's gold chance from the BOD plan. Not computed by the hub and not evidence: shown so the staff can see where the plan expects golds and revise it.</p>
       <div class="tw"><table><thead><tr><th>Title</th><th class="n">Plan estimate</th></tr></thead><tbody>${Object.entries(PLAN_V3).map(([k, v]) => `<tr><td>${esc(k)}</td><td class="n">${v}%</td></tr>`).join('')}</tbody></table></div>
       <p class="note">v3 total ≈ 2.4 golds base, 16% chance of 4+ (decision log). Revise in the planning workbook, not here.</p></div></div>`;
 };
 
+// ---------- competitors & scrims (all titles) ----------
+const sid = (x) => x.replace(/[^A-Za-z0-9_\-.]/g, '_');
+function competitorsPanel(title) {
+  const B = rivalBoard(title, S.rivals, S.tiers);
+  const big = B.field > 20;
+  const shown = big ? B.rows.filter((r) => r.notes.length || r.tier !== 'not assessed') : B.rows;
+  const fid = sid(title);
+  return `<div class="panel"><h2>Competitors — ${esc(title)}</h2>
+    <p class="note">Field: ${B.field} nations (${esc(FIELD_SOURCE)}). ${B.covered} with notes. Threat tiers are staff judgements with a reason, never computed.</p>
+    ${shown.length ? `<div class="tw"><table><thead><tr><th>Nation</th><th>Staff tier</th><th class="n">Titles at WEC</th><th>What we know</th></tr></thead><tbody>
+      ${shown.map((r) => `<tr><td><b>${esc(r.nation)}</b></td><td>${tag(r.tier === 'main threat' ? 'c-Blocked' : r.tier === 'contender' ? 'c-Low' : r.tier === 'watch' ? 'c-Medium' : 'k-observed', r.tier)}${r.tierBy ? `<br><span class="note">${esc(r.tierBy)}: ${esc(r.tierWhy)}</span>` : ''}</td><td class="n">${r.multi}</td>
+        <td>${r.notes.length ? r.notes.slice(0, 3).map((n) => `<div>${tag(`k-${n.kind}`, n.kind)} ${esc(n.note)} <span class="note">— ${esc(n.source)}, ${esc(n.date)}${n.by ? `, ${esc(n.by)}` : ''}</span></div>`).join('') : '<span class="note">Nothing yet</span>'}</td></tr>`).join('')}</tbody></table></div>` : '<p class="empty">No nation assessed yet.</p>'}
+    ${big ? `<details><summary class="note">Full field (${B.field})</summary><p class="note">${B.rows.map((r) => esc(r.nation)).join(' · ')}</p></details>` : ''}
+    ${S.mode === 'demo' ? '' : `<details><summary class="btn">Add a note or set a tier</summary><div class="form">
+      <label class="field" for="rvN-${fid}">Nation<select id="rvN-${fid}">${(FIELDS[title] || []).map((n) => `<option>${esc(n)}</option>`).join('')}</select></label>
+      <label class="field" for="rvK-${fid}">Kind<select id="rvK-${fid}"><option value="observed">Observed</option><option value="hypothesis">Hypothesis</option></select></label>
+      <label class="field" for="rvS-${fid}">Source<input type="text" id="rvS-${fid}" placeholder="VOD link, tournament, Liquipedia page, scrim"></label>
+      <label class="field" for="rvB-${fid}">By<input type="text" id="rvB-${fid}" value="${esc(STAFF.find((x) => x.id === S.me)?.name || '')}"></label></div>
+      <label class="field" for="rvT-${fid}">Note<input type="text" id="rvT-${fid}" placeholder="Roster, style, draft habits, recent results"></label>
+      <div class="toolbar"><button class="btn primary" type="button" data-rival-note="${esc(title)}">Save note</button></div>
+      <div class="form"><label class="field" for="tiT-${fid}">Tier<select id="tiT-${fid}">${TIERS.map((t) => `<option>${t}</option>`).join('')}</select></label><label class="field" for="tiW-${fid}">Why (required)<input type="text" id="tiW-${fid}"></label></div>
+      <div class="toolbar"><button class="btn" type="button" data-rival-tier="${esc(title)}">Set tier for selected nation</button><span class="msg" id="rvMsg-${fid}"></span></div></details>`}</div>`;
+}
+function scrimsPanel(title) {
+  const Sm = scrimSummary(S.scrims, title);
+  const objs = S.cycle.filter((o) => o.title === title && ['accepted', 'modified'].includes(o.status));
+  const fid = sid(title);
+  const objName = (id) => S.cycle.find((o) => o.id === id)?.rec.problem || id;
+  const card = (sc) => `<div class="obj"><header><div><span class="note">${esc(sc.date)}${sc.time ? ` ${esc(sc.time)}` : ''} · ${esc(sc.kind)}${sc.format ? ` · ${esc(sc.format)}` : ''} · owner ${esc(sc.owner)}</span><h3>${sc.partner ? `vs ${esc(sc.partner)}` : esc(sc.kind)}${sc.mirrors ? ` <span class="note">(stand-in for ${esc(sc.mirrors)})</span>` : ''}</h3></div>${tag(sc.status === 'done' ? 'c-Verified' : sc.status === 'cancelled' ? 'c-Blocked' : 'c-Low', sc.status)}</header>
+    ${sc.objectives.length ? `<p class="note">Practising: ${sc.objectives.map((id) => esc(objName(id))).join('; ')}</p>` : '<p class="note">No objective attached: free scrim.</p>'}
+    ${sc.result ? `<p>${sc.result.score ? `<b>${esc(sc.result.score)}</b> · ` : ''}${sc.result.matchIds.length ? `matches ${sc.result.matchIds.map(esc).join(', ')} · ` : ''}${esc(sc.result.notes || sc.result.cancelledWhy)} <span class="note">— ${esc(sc.result.by)}</span></p>` : `<details><summary class="btn">Log result</summary><div class="form">
+      <label class="field" for="scS-${sc.id}">${title === 'PUBG Mobile' ? 'Points / placement' : 'Score (e.g. 2-1)'}<input type="text" id="scS-${sc.id}"></label>
+      <label class="field" for="scM-${sc.id}">Match IDs (comma-separated)<input type="text" id="scM-${sc.id}"></label>
+      <label class="field" for="scB-${sc.id}">Logged by<input type="text" id="scB-${sc.id}" value="${esc(STAFF.find((x) => x.id === S.me)?.name || '')}"></label>
+      <label class="field" for="scN-${sc.id}">Notes<input type="text" id="scN-${sc.id}"></label></div>
+      ${sc.objectives.map((id) => `<div class="form"><label class="field" for="scR-${sc.id}-${id}">Result for: ${esc(objName(id))}<select id="scR-${sc.id}-${id}"><option value="">skip</option><option>met</option><option>partly-met</option><option>not-met</option><option>not-measured</option></select></label><label class="field" for="scV-${sc.id}-${id}">Measured value<input type="text" id="scV-${sc.id}-${id}"></label></div>`).join('')}
+      <div class="toolbar"><button class="btn primary" type="button" data-scrim-done="${esc(sc.id)}">Save result</button><button class="btn" type="button" data-scrim-cancel="${esc(sc.id)}">Cancelled</button><span class="msg" id="scMsg-${sc.id}"></span></div></details>`}</div>`;
+  return `<div class="panel"><h2>Scrims &amp; practice — ${esc(title)}</h2>
+    <div class="stats"><div class="stat"><span class="k">Planned</span><span class="v">${Sm.upcoming.length}</span></div><div class="stat"><span class="k">Overdue to log</span><span class="v">${Sm.overdue.length}</span></div><div class="stat"><span class="k">Done, last 7 days</span><span class="v">${Sm.last7}</span></div>
+    <div class="stat"><span class="k">Done with an objective</span><span class="v">${Sm.done.length ? `${Sm.withObjective}/${Sm.done.length}` : '—'}</span></div><div class="stat"><span class="k">Rivals practised against (stand-ins)</span><span class="v">${Sm.mirrored.length}</span></div></div>
+    <p class="note">Attach accepted objectives to a scrim; logging its result also logs a session on each of them. Use "stand-in for" when a sparring partner plays like a WEC rival.</p></div>
+  ${S.mode === 'demo' ? '' : `<div class="panel"><h2>Plan a session</h2><div class="form">
+    <label class="field" for="spD-${fid}">Date<input type="date" id="spD-${fid}" value="${today()}"></label><label class="field" for="spTm-${fid}">Time<input type="text" id="spTm-${fid}" placeholder="19:00 WIB"></label>
+    <label class="field" for="spK-${fid}">Kind<select id="spK-${fid}">${SCRIM_KINDS.map((k) => `<option>${k}</option>`).join('')}</select></label>
+    <label class="field" for="spF-${fid}">Format<select id="spF-${fid}"><option value=""></option>${FORMATS.map((k) => `<option ${title === 'PUBG Mobile' && k === 'Lobby (BR)' ? 'selected' : ''}>${k}</option>`).join('')}</select></label>
+    <label class="field" for="spP-${fid}">Sparring partner<input type="text" id="spP-${fid}" placeholder="Team name"></label>
+    <label class="field" for="spL-${fid}">Partner level<select id="spL-${fid}"><option value=""></option><option>Tier 1 international</option><option>Tier 1 domestic</option><option>Tier 2</option><option>Academy / amateur</option></select></label>
+    <label class="field" for="spMi-${fid}">Stand-in for (WEC rival)<select id="spMi-${fid}"><option value=""></option>${(FIELDS[title] || []).map((n) => `<option>${esc(n)}</option>`).join('')}</select></label>
+    <label class="field" for="spO-${fid}">Owner<input type="text" id="spO-${fid}" value="${esc(STAFF.find((x) => x.id === S.me)?.name || '')}"></label></div>
+    ${objs.length ? `<fieldset class="objpick"><legend class="note">Objectives to practise</legend>${objs.map((o) => `<label><input type="checkbox" name="spObj-${fid}" value="${esc(o.id)}"> ${esc(o.rec.problem)}</label>`).join('')}</fieldset>` : '<p class="note">No accepted objective for this title yet: the scrim will be logged without one.</p>'}
+    <div class="toolbar"><button class="btn primary" type="button" data-scrim-plan="${esc(title)}">Add to plan</button><span class="msg" id="spMsg-${fid}"></span></div></div>`}
+  <div class="cols"><div class="panel"><h2>Upcoming${Sm.overdue.length ? ' and overdue' : ''}</h2>${[...Sm.overdue, ...Sm.upcoming].map(card).join('') || '<p class="empty">Nothing planned.</p>'}</div>
+  <div class="panel"><h2>Done</h2>${Sm.done.slice(0, 12).map(card).join('') || '<p class="empty">No scrims logged yet.</p>'}
+    ${Object.keys(Sm.partners).length ? `<div class="h3">Sparring partners</div><ul class="plain">${Object.entries(Sm.partners).map(([k, v]) => `<li>${esc(k)} — ${v.length} scrim${v.length > 1 ? 's' : ''}</li>`).join('')}</ul>` : ''}</div></div>`;
+}
 const OBS_TITLES = ['MLBB', 'MLBB Women', 'eFootball', 'CS2', 'CS2 Women', 'Dota 2', 'PUBG Mobile'];
 function observationForm(defTitle) {
   return `<div class="form"><label class="field" for="obT">Title<select id="obT">${OBS_TITLES.map((t) => `<option ${t === defTitle ? 'selected' : ''}>${esc(t)}</option>`).join('')}</select></label>
-    <label class="field" for="obBy">Observed by<input type="text" id="obBy" list="staffNames"></label>
+    <label class="field" for="obBy">Observed by<input type="text" id="obBy" list="staffNames" value="${esc(STAFF.find((x) => x.id === S.me)?.name || '')}"></label>
     <label class="field" for="obSrc">Source<input type="text" id="obSrc" placeholder="Scrim ID, VOD link, Draft Lab view"></label>
     <label class="field" for="obN">Games it is based on<input type="number" id="obN" min="1" placeholder="e.g. 4"></label>
     <label class="field" for="obK">Kind<select id="obK"><option value="observed">Observed (seen in the games)</option><option value="hypothesis">Hypothesis (needs checking)</option></select></label>
@@ -294,14 +358,24 @@ function observationForm(defTitle) {
     <datalist id="staffNames">${STAFF.map((x) => `<option value="${esc(x.name)}"></option>`).join('')}${WEC_TITLES.filter((t) => !/TBD|see WEC/.test(t.coach)).map((t) => `<option value="${esc(t.coach)}"></option>`).join('')}</datalist>
     <div class="toolbar"><button class="btn primary" type="button" id="obSave">Send to review</button><span class="msg" id="obMsg"></span></div>`;
 }
-V.mlbb = () => {
-  const list = (t) => S.cycle.filter((o) => o.title === t && !['retired', 'rejected'].includes(o.status));
-  return `<div class="panel"><div class="lead">MLBB, MLBB Women, eFootball, CS2</div>
-  <p>These titles have no analysis engine in the hub. MLBB and MLBB Women keep Draft Lab as their engine. What the staff see there, on VOD or in scrims, enters the same coaching cycle as a <b>staff observation</b>: it needs a source, the number of games behind it and a measurable success criterion, and it goes to the title's focus owner for review.</p>
-  <div class="toolbar"><a class="btn" href="https://claude.ai/code/artifact/2b3103c5-81c9-4ad4-ba3e-3303778a8259" target="_blank" rel="noopener">Open Draft Lab Pelatnas</a><a class="btn" href="https://claude.ai/artifact/VatjYMhyVs5DLHgp8Yx4Rj" target="_blank" rel="noopener">Open Draft Lab MLBB v19</a></div></div>
-  <div class="panel"><h2>Add a staff observation</h2>${S.mode === 'demo' ? '<p class="empty">Not available in the demo sandbox.</p>' : observationForm('MLBB')}</div>
-  <div class="cols3">${['MLBB', 'MLBB Women', 'eFootball', 'CS2', 'CS2 Women'].map((t) => `<div class="panel"><h2>${esc(t)}</h2><p class="note">Focus owner: ${esc(ownerNote(t))}</p>${list(t).length ? `<ul class="plain">${list(t).map((o) => `<li>${tag(`s-${o.status}`, o.status)} ${esc(o.rec.problem)}</li>`).join('')}</ul>` : '<p class="empty">No objectives yet.</p>'}</div>`).join('')}</div>`;
-};
+function titlePage(title) {
+  const objs = S.cycle.filter((o) => o.title === title && !['retired', 'rejected'].includes(o.status));
+  const dl = title === 'MLBB' || title === 'MLBB Women';
+  return `<div class="panel"><div class="lead">${esc(title)}</div>
+    <p class="note">Focus owner: ${esc(ownerNote(title))} · title coach: ${esc(WEC_TITLES.find((t) => t.id === title)?.coach || 'TBD')}. No analysis engine in the hub${dl ? '; Draft Lab is the MLBB engine' : ''}. What staff see in ${dl ? 'Draft Lab, ' : ''}VOD or scrims enters the coaching cycle as a staff observation.</p>
+    ${dl ? `<div class="toolbar"><a class="btn" href="https://claude.ai/code/artifact/2b3103c5-81c9-4ad4-ba3e-3303778a8259" target="_blank" rel="noopener">Open Draft Lab Pelatnas</a><a class="btn" href="https://claude.ai/artifact/VatjYMhyVs5DLHgp8Yx4Rj" target="_blank" rel="noopener">Open Draft Lab MLBB v19</a></div>` : ''}</div>
+  <div class="panel"><h2>Objectives</h2>${objs.length ? `<ul class="plain">${objs.map((o) => `<li>${tag(`s-${o.status}`, o.status)} ${esc(o.rec.problem)} <span class="note">— ${esc(nextStep(o, S.rules))}</span></li>`).join('')}</ul>` : '<p class="empty">No objectives yet.</p>'}
+    ${S.mode === 'demo' ? '' : `<details><summary class="btn">Add a staff observation</summary>${observationForm(title)}</details>`}</div>
+  ${scrimsPanel(title)}${competitorsPanel(title)}`;
+}
+V.mlbb = () => titlePage('MLBB');
+V['t-mlbbw'] = () => titlePage('MLBB Women');
+V['t-efootball'] = () => titlePage('eFootball');
+V['t-cs2'] = () => titlePage('CS2');
+V['t-cs2w'] = () => titlePage('CS2 Women');
+V['dota-scrims'] = () => scrimsPanel('Dota 2');
+V['pubgm-scrims'] = () => scrimsPanel('PUBG Mobile');
+V['pubgm-rivals'] = () => competitorsPanel('PUBG Mobile');
 
 V['dota-team'] = () => {
   const d = dotaTeam(); LAST.recs['Dota 2'] = d.recs;
@@ -424,7 +498,7 @@ V['dota-scout'] = () => {
       <div class="panel"><h2>Findings</h2>${findingList(r.findings.map((f) => ({ ...f, context: 'club' })))}</div></div>
       <div class="panel"><h2>Rule-based review</h2>${coachPanel(o)}</div>`;
   }
-  return `<div class="panel"><h2>Opponent scouting</h2><label class="field" for="nSel">Opponent<select id="nSel">${list}</select></label></div>${body}`;
+  return `${competitorsPanel('Dota 2')}<div class="panel"><h2>Player-pool scouting</h2><p class="note">Built from each registered player's club tournament games on OpenDota. Loaded: Mongolia.</p><label class="field" for="nSel">Opponent<select id="nSel">${list}</select></label></div>${body}`;
 };
 
 V['dota-review'] = () => {
@@ -607,7 +681,7 @@ V['staff-sources'] = () => `<div class="panel"><h2>Source registry</h2><div clas
   <p class="note">Built ${esc(DATA.builtAt.slice(0, 16).replace('T', ' '))} UTC · V1.1.</p></div>`;
 
 // Wellbeing (Donny). Editors only; screening flags, never diagnoses or scores.
-const WELL_NOTE = 'Health and mental-wellbeing data. Visible to editors of this page only. Use with the players\' informed consent (pending PB ESI decision). Flags are prompts to talk to the player, not diagnoses.';
+const WELL_NOTE = 'Health and mental-wellbeing data, recorded with the players\' consent (confirmed 3 Nov 2026). Visible to editors of this page only; whether access narrows to Donny alone is still open. Flags are prompts to talk to the player, not diagnoses.';
 V['well-day'] = () => {
   if (S.mode === 'demo') return `<div class="panel">${DEMO_BANNER}<p class="empty">Wellbeing uses operational records only.</p></div>`;
   if (S.wellAccess === 'denied') return `<div class="panel">${banner('block', '<div><b>Editors only.</b> Ask the page owner for edit access to see wellbeing records.</div>')}</div>`;
@@ -736,6 +810,53 @@ document.addEventListener('click', async (e) => {
       const objs = S.cycle.filter((o) => changedSince(o.rules, S.rules).length).length;
       S.lastFlag = { label: rule(rid).label, affected, objs }; render();
     } catch (err) { setMsg('ruMsg', err.message, 'err'); }
+  }
+  if (t.dataset.rivalNote || t.dataset.rivalTier) {
+    const title = t.dataset.rivalNote || t.dataset.rivalTier; const fid = sid(title);
+    try {
+      if (S.mode === 'demo') throw new Error('Not available in the demo sandbox.');
+      const nation = val(`rvN-${fid}`);
+      if (t.dataset.rivalNote) {
+        const n = rivalNote({ title, nation, note: val(`rvT-${fid}`), source: val(`rvS-${fid}`), kind: val(`rvK-${fid}`), by: val(`rvB-${fid}`) });
+        if (S.db) await S.db.collection('rivals').add(n); else S.rivals.push(n);
+      } else {
+        const tier = val(`tiT-${fid}`), why = val(`tiW-${fid}`).trim(), by = val(`rvB-${fid}`).trim();
+        if (!why || !by) throw new Error('A tier needs a reason and a name.');
+        const x = { title, nation, tier, why, by, at: new Date().toISOString(), origin: 'operational' };
+        if (S.db) await S.db.collection('rival_tiers').doc(sid(`${title}|${nation}`)).set(x); else S.tiers[`${title}|${nation}`] = x;
+      }
+      render();
+    } catch (err) { setMsg(`rvMsg-${fid}`, err.message, 'err'); }
+    return;
+  }
+  if (t.dataset.scrimPlan) {
+    const title = t.dataset.scrimPlan; const fid = sid(title);
+    try {
+      const objectives = [...document.querySelectorAll(`input[name="spObj-${fid}"]:checked`)].map((x) => x.value);
+      const sc = planScrim({ title, date: val(`spD-${fid}`), time: val(`spTm-${fid}`), kind: val(`spK-${fid}`), format: val(`spF-${fid}`), partner: val(`spP-${fid}`), partnerLevel: val(`spL-${fid}`), mirrors: val(`spMi-${fid}`), owner: val(`spO-${fid}`), objectives });
+      if (S.db) await S.db.collection('scrims').doc(sc.id).set(sc); else S.scrims.push(sc);
+      render();
+    } catch (err) { setMsg(`spMsg-${fid}`, err.message, 'err'); }
+    return;
+  }
+  if (t.dataset.scrimDone || t.dataset.scrimCancel) {
+    const sid2 = t.dataset.scrimDone || t.dataset.scrimCancel; const sc = S.scrims.find((x) => x.id === sid2); if (!sc) return;
+    try {
+      const cancelled = !!t.dataset.scrimCancel;
+      const per = {};
+      for (const oid of sc.objectives) { const r = val(`scR-${sid2}-${oid}`); if (r) per[oid] = { result: r, measure: val(`scV-${sid2}-${oid}`) }; }
+      const done = completeScrim(sc, { cancelled, cancelledWhy: cancelled ? (val(`scN-${sid2}`) || 'not given') : '', score: cancelled ? '' : val(`scS-${sid2}`), matchIds: val(`scM-${sid2}`).split(',').map((x) => x.trim()).filter(Boolean), notes: val(`scN-${sid2}`), by: val(`scB-${sid2}`), perObjective: per });
+      // Each objective result becomes a coaching-cycle session linked to this scrim.
+      const updated = [];
+      for (const [oid, r] of Object.entries(per)) {
+        const o = S.cycle.find((x) => x.id === oid); if (!o) continue;
+        updated.push(logSession(o, { owner: done.result.by, date: sc.date, execution: 'as-planned', result: r.result, measure: r.measure, context: { opponent: sc.partner, mirrors: sc.mirrors, scrimId: sc.id }, notes: done.result.notes }));
+      }
+      if (S.db) await S.db.collection('scrims').doc(sc.id).set(done); else Object.assign(sc, done);
+      for (const o of updated) await saveObj(o);
+      render();
+    } catch (err) { setMsg(`scMsg-${sid2}`, err.message, 'err'); }
+    return;
   }
   if (id === 'obSave') {
     try {
