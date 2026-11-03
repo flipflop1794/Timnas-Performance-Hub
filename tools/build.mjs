@@ -8,6 +8,8 @@ const data = {
   inaCsv: rd('data/dota/ina_pro_matches.csv'),
   matches: JSON.parse(rd('data/dota/matches_parsed.json')).matches,
   opp: { MGL: JSON.parse(rd('data/dota/opp_MGL.json')) },
+  rivalRosters: JSON.parse(rd('data/wec/rival_rosters.json')),
+  rivalPools: JSON.parse(rd('data/wec/rival_dota_pools.json')),
   profiles: JSON.parse(rd('data/pubgm/scoring_profiles.json')).profiles,
   pubgmMatchesCsv: rd('data/pubgm/demo_matches.csv'),
   pubgmFightsCsv: rd('data/pubgm/demo_fights.csv'),

@@ -11,7 +11,7 @@ const COMMON = [
   { t: -720, item: 'Sleep window agreed (lights-out / wake-up) for match day', owner: 'Donny (sport science)' },
   { t: -240, item: 'Main meal finished; hydration plan started', owner: 'Donny (sport science)' },
   { t: -180, item: 'Arrive at venue; devices, peripherals and accounts checked', owner: 'Team manager / title coach' },
-  { t: -120, item: 'Opponent brief: 3 points from the competitor board, no new strategy', owner: 'Title coach' },
+  { t: -120, item: 'Opponent brief from the opponent card (Competitors → Opponent card); no new strategy', owner: 'Title coach' },
   { t: -60, item: 'Physical warm-up (mobility, hands and wrists)', owner: 'Donny (sport science)' },
   { t: -45, item: 'Mental routine: breathing / focus cue, agreed comms words', owner: 'Donny (sport science)' },
   { t: -30, item: 'Game warm-up (aim, last hits or drills, per title)', owner: 'Title coach' },

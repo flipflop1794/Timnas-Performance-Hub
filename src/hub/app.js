@@ -1,4 +1,4 @@
-// Timnas Performance Hub V1.5 — page shell. Analysis lives in src/core, src/dota, src/pubgm;
+// Timnas Performance Hub V1.6 — page shell. Analysis lives in src/core, src/dota, src/pubgm;
 // evidence/demo boundaries in src/hub/pipeline.js; the coaching cycle in src/core/cycle.js.
 import { DATA } from './data.gen.js';
 import { parseHeroes, parsePlayerMatches, fromOpenDotaPlayerMatches } from '../dota/data.js';
@@ -24,6 +24,8 @@ import { planScrim, completeScrim, summary as scrimSummary, FORMATS, KINDS as SC
 import { EVENT, defaultRunbook, tLabel, wecMatch, tick, setResult, gameNote, markApplied } from '../core/matchday.js';
 import { VOD_TAGS, vod, reviewVod, LEVELS, partner as partnerRec, partnerStats, AREAS, GOAL_STATUS, goal as goalRec, updateGoal, plan as newPlan } from '../core/library.js';
 import { weeklyBrief } from '../core/brief.js';
+import { seedRosters, effective, editPlayers, recordCheck, checkStatus, dotaPool, ACCOUNT_KIND, ROLE_HINT, rosterKey, CHECK_EVERY_DAYS } from '../core/rosters.js';
+import { autoCard, cardPlan, approveCard, cardMarkdown } from '../core/oppcard.js';
 import { checkin, session as loadSession, teamDay, ITEMS, ITEM_LABEL, THRESHOLDS, MIN_BASELINE_DAYS } from '../core/wellbeing.js';
 
 // ---------- state ----------
@@ -44,7 +46,7 @@ const S = {
   roster: { 'Dota 2': ['Whitemon', 'Fbz', 'Jhocam', 'jikroy', 'Mikoto'], 'PUBG Mobile': ['AKxSatarrrGOLD', 'AKxAmetzGOLD', 'AKxVinzGOLD', 'AKxZaoo7GOLD'],
     MLBB: ['Aran', 'Kevin', 'Drichel', 'Lyoni', 'Jull.'], 'MLBB Women': [], eFootball: ['ELGA'], CS2: [], 'CS2 Women': [] },
   rivals: [], tiers: {}, scrims: [],
-  runbooks: {}, wecMatches: [], tourTitle: 'Dota 2', tourMatch: null, vods: [], partners: [], plans: {}, planTitle: 'Dota 2', planPlayer: null, compNation: 'Egypt', compAllEf: false, briefDate: new Date().toISOString().slice(0, 10),
+  runbooks: {}, wecMatches: [], tourTitle: 'Dota 2', tourMatch: null, vods: [], partners: [], plans: {}, planTitle: 'Dota 2', planPlayer: null, rivalSeed: seedRosters(DATA.rivalRosters), rosterEdits: {}, oppCards: {}, crTitle: 'Dota 2', crNation: 'All', ocTitle: 'Dota 2', ocNation: 'Mongolia', compNation: 'Egypt', compAllEf: false, briefDate: new Date().toISOString().slice(0, 10),
   well: { checkins: [], loads: [] }, wellTitle: 'Dota 2', wellDate: new Date().toISOString().slice(0, 10),
   selMatch: 9057681759, selNation: 'MGL', selDay: null, freshPools: {}, importReport: null, lastFlag: null,
 };
@@ -152,6 +154,8 @@ async function initCaps() {
     db.collection('vods').onSnapshot((snap) => { S.vods = snap.docs.map((d) => ({ ...d.data(), id: d.id })).filter((x) => x?.origin === 'operational'); render(); }, () => {});
     db.collection('partners').onSnapshot((snap) => { S.partners = snap.docs.map((d) => ({ ...d.data(), id: d.id })).filter((x) => x?.origin === 'operational'); render(); }, () => {});
     db.collection('player_plans').onSnapshot((snap) => { S.plans = Object.fromEntries(snap.docs.map((d) => [d.id, d.data()]).filter(([, x]) => x?.origin === 'operational')); render(); }, () => {});
+    db.collection('rival_rosters').onSnapshot((snap) => { S.rosterEdits = Object.fromEntries(snap.docs.map((d) => d.data()).filter((x) => x?.origin === 'operational' && x.key).map((x) => [x.key, x])); render(); }, () => {});
+    db.collection('opp_cards').onSnapshot((snap) => { S.oppCards = Object.fromEntries(snap.docs.map((d) => d.data()).filter((x) => x?.origin === 'operational' && x.key).map((x) => [x.key, x])); render(); }, () => {});
     db.doc('config/roster').onSnapshot((d) => { const x = d.data(); if (x?.roster) S.roster = { ...S.roster, ...x.roster }; render(); }, () => {});
     // Wellbeing collections are readable and writable by editors only (declared in the page's db rules).
     db.collection('wellbeing_checkins').onSnapshot((snap) => { S.well.checkins = snap.docs.map((d) => d.data()).filter((x) => x?.origin === 'operational'); S.wellAccess = 'ok'; render(); }, () => { S.wellAccess = 'denied'; render(); });
@@ -194,7 +198,7 @@ const dotaTeam = () => dotaTeamPipeline(S.players, S.heroes, S.asOf, Object.keys
 // ---------- routing ----------
 const TITLES = [
   { id: 'home', label: 'Today', tabs: [['today', 'My day'], ['board', 'Juara Umum board'], ['brief', 'Weekly brief']] },
-  { id: 'comp', label: 'Competitors', tabs: [['comp-overview', 'All nations'], ['comp-nation', 'Nation profile'], ['comp-coverage', 'Scouting coverage']] },
+  { id: 'comp', label: 'Competitors', tabs: [['comp-overview', 'All nations'], ['comp-nation', 'Nation profile'], ['comp-rosters', 'Rosters & players'], ['comp-card', 'Opponent card'], ['comp-coverage', 'Scouting coverage']] },
   { id: 'tour', label: 'Tournament', tabs: [['tour-runbook', 'Match-day runbook'], ['tour-series', 'Between games']] },
   { id: 'dota', label: 'Dota 2', tabs: [['dota-team', 'Team'], ['dota-scrims', 'Scrims & practice'], ['dota-post', 'Post-match'], ['dota-scout', 'Competitors'], ['dota-draft', 'Draft room'], ['dota-review', 'Series review']] },
   { id: 'pubgm', label: 'PUBG Mobile', tabs: [['pubgm-team', 'Team'], ['pubgm-scrims', 'Scrims & practice'], ['pubgm-log', 'Log & import'], ['pubgm-rivals', 'Competitors'], ['pubgm-sim', 'Strategy sim'], ['pubgm-review', 'Match-day review']] },
@@ -747,7 +751,7 @@ V['tour-runbook'] = () => {
     return `<div class="obj"><header><div><span class="note">${esc(m.date)}${m.time ? ` ${esc(m.time)}` : ''}${m.stage ? ` · ${esc(m.stage)}` : ''}${m.format ? ` · ${esc(m.format)}` : ''}</span><h3>vs ${esc(m.opponent)}</h3></div>${m.result ? tag(m.result.result === 'won' ? 'c-High' : m.result.result === 'lost' ? 'c-Blocked' : 'c-Medium', `${m.result.result}${m.result.score ? ` ${m.result.score}` : ''}`) : tag('c-Low', `${n}/${rb.length} ready`)}</header>
       <ul class="plain check">${rb.map((x) => `<li><button type="button" class="tick ${m.done[x.id] ? 'on' : ''}" data-tick="${esc(m.id)}|${esc(x.id)}" aria-pressed="${!!m.done[x.id]}">${m.done[x.id] ? '✓' : ''}</button> <span class="mono">${esc(tLabel(x.t))}</span> ${esc(x.item)} <span class="note">— ${esc(x.owner)}${m.done[x.id] ? ` · ticked by ${esc(m.done[x.id].by)}` : ''}</span></li>`).join('')}</ul>
       ${m.result ? `<p class="note">Result recorded by ${esc(m.result.by)}.</p>` : `<div class="form"><label class="field" for="wrR-${m.id}">Result<select id="wrR-${m.id}"><option value="">—</option><option>won</option><option>lost</option><option>draw</option><option>placed</option></select></label><label class="field" for="wrS-${m.id}">Score / placement<input type="text" id="wrS-${m.id}" placeholder="2-1 or 3rd, 45 pts"></label></div>`}
-      <div class="toolbar">${m.result ? '' : `<button class="btn" type="button" data-wm-result="${esc(m.id)}">Save result</button>`}<button class="btn" type="button" data-series="${esc(m.id)}">Between-games sheet (${m.games.length})</button><span class="msg" id="wmMsg-${m.id}"></span></div></div>`;
+      <div class="toolbar">${m.result ? '' : `<button class="btn" type="button" data-wm-result="${esc(m.id)}">Save result</button>`}${m.opponent !== 'TBD' ? `<button class="btn" type="button" data-card="${esc(m.title)}|${esc(m.opponent)}">Opponent card</button>` : ''}<button class="btn" type="button" data-series="${esc(m.id)}">Between-games sheet (${m.games.length})</button><span class="msg" id="wmMsg-${m.id}"></span></div></div>`;
   };
   return `<div class="panel"><div class="lead">Tournament <em>week</em></div>
     <p>WEC finals: ${esc(EVENT.start)} to ${esc(EVENT.end)}, ${esc(EVENT.venue)}. One match-day runbook per title, then one card per WEC match with the checklist ticked by whoever did it.</p>
@@ -915,11 +919,12 @@ V['comp-nation'] = () => {
   const P = nationProfile(n, compData());
   const section = (x) => `<div class="obj"><header><div><span class="note">${x.updated ? `Last update ${esc(x.updated)}` : 'Not scouted yet'}</span><h3>${esc(x.title)}</h3></div>${tierTag(x.tier)}</header>
     ${x.tierWhy ? `<p class="note">Tier by ${esc(x.tierBy)}: ${esc(x.tierWhy)}</p>` : ''}
+    ${(() => { const tm = rosterOf(x.title, P.nation); if (!tm) return ''; const st = checkStatus(tm, today()); return `<div class="h3">Roster</div><p>${tm.players.map((p) => `${esc(p.ign)}${p.captain ? ' (C)' : ''}${p.role ? ` <span class="note">${esc(p.role)}</span>` : ''}`).join(', ')}${tm.coach ? ` <span class="note">· coach ${esc(tm.coach)}</span>` : ''}</p><p class="note">Checked ${esc(st.last.date)}${st.changed.length ? ' · <b>roster changed</b>' : ''}${st.due ? ' · check due' : ''}</p>`; })()}
     <div class="h3">What we know</div>${x.notes.length ? x.notes.map((m) => `<div>${tag(`k-${m.kind}`, m.kind)} ${esc(m.note)} <span class="note">— ${esc(m.source)}, ${esc(m.date)}${m.by ? `, ${esc(m.by)}` : ''}</span></div>`).join('') : '<p class="note">Nothing yet.</p>'}
     <div class="h3">VODs</div>${x.vods.length ? `<ul class="plain">${x.vods.map((v) => `<li><a href="${esc(v.url)}" target="_blank" rel="noopener">${esc(v.event)}</a> ${v.tags.map((t) => tag('k-observed', t)).join(' ')} ${v.reviewed ? tag('c-Verified', 'reviewed') : tag('c-Low', 'not reviewed')}</li>`).join('')}</ul>` : '<p class="note">No VOD yet.</p>'}
     <div class="h3">Practice against their style</div><p>${x.standIns.length ? `Partners who play like them: ${x.standIns.map((p) => `<b>${esc(p.name)}</b> (${esc(p.level)})`).join(', ')}.` : 'No sparring partner in the bank plays like them yet.'} ${x.scrimsDone ? `${x.scrimsDone} stand-in scrim${x.scrimsDone > 1 ? 's' : ''} done, last ${esc(x.lastScrim)}.` : 'No stand-in scrim logged.'}${x.scrimsPlanned ? ` ${x.scrimsPlanned} planned.` : ''}</p>
     ${x.wecMatches.length ? `<div class="h3">WEC matches</div><ul class="plain">${x.wecMatches.map((m) => `<li>${esc(m.date)}${m.stage ? ` · ${esc(m.stage)}` : ''} — ${m.result ? `${esc(m.result.result)} ${esc(m.result.score)}` : 'to play'}${m.games.length ? ` · ${m.games.length} game note(s)` : ''}</li>`).join('')}</ul>` : ''}
-    <div class="toolbar"><a class="btn" href="#${TITLE_TAB[x.title]}">Add a note, tier or VOD in ${esc(x.title)}</a></div></div>`;
+    <div class="toolbar"><a class="btn" href="#${TITLE_TAB[x.title]}">Add a note, tier or VOD in ${esc(x.title)}</a><button class="btn" type="button" data-card="${esc(x.title)}|${esc(P.nation)}">Opponent card</button></div></div>`;
   return `${compHead('Everything the staff hold on one nation, across every title we meet them in. Use it before a match, or to share scouting work between title coaches.')}
   <div class="panel"><div class="form"><label class="field" for="cnN">Nation<select id="cnN">${all.map((x) => `<option ${x === n ? 'selected' : ''}>${esc(x)}</option>`).join('')}</select></label></div>
     <p><b>${esc(n)}</b> enters ${P.titles.length} of our titles: ${P.titles.map(esc).join(', ')}.${P.titles.length > 1 ? ' One scouting effort here can serve several title coaches.' : ''}</p></div>
@@ -933,6 +938,84 @@ V['comp-coverage'] = () => {
   <div class="panel"><div class="tw"><table><thead><tr><th>Title</th><th>Focus owner</th><th class="n">Field</th><th class="n">With notes</th><th class="n">Tier set</th><th class="n">VOD reviewed</th><th>Scout next (suggestion)</th></tr></thead><tbody>
   ${C.map((c) => `<tr><td><b>${esc(c.title)}</b></td><td>${esc(owner(c.title).name)}</td><td class="n">${c.field}</td><td class="n">${c.noted} (${c.field ? Math.round((c.noted / c.field) * 100) : 0}%)</td><td class="n">${c.tiered}</td><td class="n">${c.vodRev}</td><td>${c.next.map((x) => `<button class="linkbtn" type="button" data-nation="${esc(x)}">${esc(x)}</button>`).join(', ') || 'Field covered'}</td></tr>`).join('')}</tbody></table></div>
   <p class="note">eFootball's finals format is not published; its 96-nation list is the entry list, not the bracket.</p></div>`;
+};
+
+// ---------- V1.6: rival rosters & player tracker, pre-match opponent card ----------
+const rosterOf = (title, nation) => effective(S.rivalSeed, S.rosterEdits, rosterKey(title, nation));
+async function saveRoster(team) {
+  const key = rosterKey(team.title, team.nation); S.rosterEdits = { ...S.rosterEdits, [key]: team };
+  if (S.db) await S.db.collection('rival_rosters').doc(sid(key)).set({ ...team, key });
+}
+const heroName = (id) => S.heroes[id]?.name || `#${id}`;
+const titleOpts = (id, cur, list = WEC_TITLES.map((x) => x.id).filter((x) => x !== 'eFootball')) => `<select id="${id}">${list.map((x) => `<option ${x === cur ? 'selected' : ''}>${esc(x)}</option>`).join('')}</select>`;
+
+V['comp-rosters'] = () => {
+  if (S.mode === 'demo') return `<div class="panel">${DEMO_BANNER}<p class="empty">Operational records only.</p></div>`;
+  const t = S.crTitle; const field = FIELDS[t] || [];
+  const nations = S.crNation === 'All' || !field.includes(S.crNation) ? field : [S.crNation];
+  const today0 = today();
+  const teams = field.map((n) => rosterOf(t, n)).filter(Boolean);
+  const due = teams.filter((x) => checkStatus(x, today0).due).length;
+  const changed = teams.filter((x) => checkStatus(x, today0).changed.length);
+  const card = (n) => {
+    const tm = rosterOf(t, n); const key = rosterKey(t, n); const fk = sid(key);
+    if (!tm) return `<div class="obj"><h3>${esc(n)}</h3><p class="note">No roster on file.</p></div>`;
+    const st = checkStatus(tm, today0);
+    return `<div class="obj"><header><div><span class="note">${tm.coach ? `Coach ${esc(tm.coach)} · ` : ''}last checked ${esc(st.last.date)} (${esc(st.last.by)})</span><h3>${esc(n)}</h3></div>${st.due ? tag('c-Low', 'check due') : tag('c-Verified', 'checked')}${st.changed.length ? ` ${tag('c-Blocked', 'roster changed')}` : ''}</header>
+      ${tm.note ? `<p class="note">${esc(tm.note)}</p>` : ''}
+      ${st.changed.map((c) => `<p class="flag-check">${esc(c.date)} (${esc(c.by)}): ${c.added.length ? `added ${c.added.map(esc).join(', ')}` : ''}${c.added.length && c.removed.length ? '; ' : ''}${c.removed.length ? `removed ${c.removed.map(esc).join(', ')}` : ''}</p>`).join('')}
+      <div class="tw"><table><thead><tr><th>Player</th><th>Role</th><th>Club</th><th>${esc(ACCOUNT_KIND[t] || 'Account')}</th>${t === 'Dota 2' ? '<th>Most played since 7.41 (club tournament games)</th>' : ''}</tr></thead><tbody>
+      ${tm.players.map((p) => { const pool = t === 'Dota 2' ? dotaPool(n, p.ign, DATA) : null;
+        return `<tr><td><b>${esc(p.ign)}</b>${p.captain ? ' <span class="note">(C)</span>' : ''}${p.flags.map((f) => `<div class="note">⚠ ${esc(f)}</div>`).join('')}${p.note ? `<div class="note">${esc(p.note)}</div>` : ''}</td><td>${esc(p.role || '—')}</td><td>${esc(p.club || '—')}</td>
+        <td>${p.account ? (t === 'Dota 2' && /^\d+$/.test(p.account) ? `<a href="https://www.opendota.com/players/${esc(p.account)}" target="_blank" rel="noopener">${esc(p.account)}</a>` : esc(p.account)) : '<span class="note">not found yet</span>'}${p.accountNote ? `<div class="note">${esc(p.accountNote)}</div>` : ''}</td>
+        ${t === 'Dota 2' ? `<td>${pool ? (pool.n ? `${pool.heroes.slice(0, 4).map((h) => `${esc(heroName(h.hero))} <span class="note">${h.games}g ${h.wins}w</span>`).join(', ')}<div class="note">${pool.n} games, ${Math.round((pool.w / pool.n) * 100)}% won</div>` : '<span class="note">no tournament game since 7.41</span>') : '<span class="note">no data</span>'}</td>` : ''}</tr>`; }).join('')}</tbody></table></div>
+      <details><summary class="btn small">Edit players</summary>${tm.players.map((p, i) => `<div class="form"><label class="field" for="rr-${fk}-${i}-role">${esc(p.ign)} role<input type="text" id="rr-${fk}-${i}-role" value="${esc(p.role)}" placeholder="${esc(ROLE_HINT[t] || '')}"></label><label class="field" for="rr-${fk}-${i}-club">Club<input type="text" id="rr-${fk}-${i}-club" value="${esc(p.club)}"></label><label class="field" for="rr-${fk}-${i}-account">${esc(ACCOUNT_KIND[t] || 'Account')}<input type="text" id="rr-${fk}-${i}-account" value="${esc(p.account)}"></label><label class="field" for="rr-${fk}-${i}-note">Note<input type="text" id="rr-${fk}-${i}-note" value="${esc(p.note)}"></label></div>`).join('')}
+        <div class="toolbar"><button class="btn primary" type="button" data-roster-save="${esc(key)}">Save players</button><span class="msg" id="rrMsg-${fk}"></span></div></details>
+      <details><summary class="btn small">Record weekly check</summary><p class="note">Open <a href="https://wec.iesf.org/editions/wec-2026/teams/${esc(tm.code || '')}" target="_blank" rel="noopener">the ${esc(n)} page on wec.iesf.org</a> and enter the ${esc(t)} names as listed today, one per line.</p>
+        <label class="field" for="rc-${fk}-names">Names on the site today<textarea id="rc-${fk}-names" rows="5">${esc(tm.players.map((p) => p.ign).join('\n'))}</textarea></label>
+        <div class="toolbar"><button class="btn primary" type="button" data-roster-check="${esc(key)}">Save check</button><span class="msg" id="rcMsg-${fk}"></span></div></details></div>`;
+  };
+  return `${compHead('Every rival player, from the official WEC team pages, with role, club and game account added by the staff. Re-check each roster weekly; changes are flagged here and on the nation profile.')}
+  <div class="panel"><div class="form"><label class="field" for="crT">Title${titleOpts('crT', t)}</label><label class="field" for="crN">Nation<select id="crN"><option>All</option>${field.map((n) => `<option ${n === S.crNation ? 'selected' : ''}>${esc(n)}</option>`).join('')}</select></label></div>
+    <p class="note">Source: ${esc(DATA.rivalRosters.source)}, read ${esc(DATA.rivalRosters.read)} (${esc(DATA.rivalRosters.method)}) Names marked ⚠ need checking on the site.${t === 'Dota 2' ? ` Dota accounts and pools: ${esc(DATA.rivalPools._source)}` : ''}</p>
+    <div class="stats"><div class="stat"><span class="k">Teams</span><span class="v">${teams.length}</span></div><div class="stat"><span class="k">Checks due (${CHECK_EVERY_DAYS}+ days)</span><span class="v">${due}</span></div><div class="stat"><span class="k">Rosters changed</span><span class="v">${changed.length}</span></div>${t === 'Dota 2' ? `<div class="stat"><span class="k">Players with an account</span><span class="v">${teams.reduce((a, x) => a + x.players.filter((p) => p.account).length, 0)}/${teams.reduce((a, x) => a + x.players.length, 0)}</span></div>` : ''}</div></div>
+  <div class="panel">${nations.map(card).join('')}</div>`;
+};
+
+function oppCardHtml(a, plan, ours) {
+  return `<article class="oppcard"><header><div><span class="note">${esc(a.title)} · opponent card · internal</span><h2>Indonesia vs ${esc(a.nation)}</h2></div>${plan ? tag(plan.status === 'approved' ? 'c-Verified' : 'c-Low', plan.status === 'approved' ? `approved · ${plan.approvedBy}` : `draft · ${plan.by}`) : tag('c-Low', 'no plan yet')}</header>
+    ${plan ? `<div class="h3">Three things to know</div><ol>${plan.keys.map((k) => `<li>${esc(k)}</li>`).join('')}</ol>
+      ${plan.theirPlan ? `<div class="h3">What they are likely to do</div><p>${esc(plan.theirPlan)}</p>` : ''}
+      <div class="h3">Our answer</div><p><b>${esc(plan.ourAnswer)}</b></p>
+      ${Object.keys(plan.focus).length ? `<div class="h3">One focus per player</div><ul class="plain">${Object.entries(plan.focus).map(([k, v]) => `<li><b>${esc(k)}</b>: ${esc(v)}</li>`).join('')}</ul>` : ''}` : `<p class="empty">The title coach writes three key points and our answer (form on this page).</p>`}
+    <div class="h3">Their roster${a.coach ? ` · coach ${esc(a.coach)}` : ''}</div>
+    <div class="tw"><table><thead><tr><th>Player</th><th>Role / club</th>${a.title === 'Dota 2' ? '<th>Most played (club games since 7.41)</th>' : ''}</tr></thead><tbody>${a.roster.map((p) => `<tr><td><b>${esc(p.ign)}</b>${p.captain ? ' (C)' : ''}${p.flags.length ? ' <span class="note">⚠</span>' : ''}</td><td>${esc([p.role, p.club].filter(Boolean).join(' · ') || '—')}${p.pool?.lane ? `<div class="note">${esc(p.pool.lane)}</div>` : ''}</td>${a.title === 'Dota 2' ? `<td>${p.pool?.n ? `${p.pool.top.map((h) => `${esc(h.name)} <span class="note">${h.games}</span>`).join(', ')}<div class="note">${p.pool.n} games${p.pool.probable ? ' · account probable' : ''}</div>` : '<span class="note">no data</span>'}</td>` : ''}</tr>`).join('')}</tbody></table></div>
+    ${a.banCandidates.length ? `<div class="h3">Most-played heroes — ban candidates</div><ul class="plain">${a.banCandidates.map((b) => `<li><b>${esc(b.hero)}</b> — ${esc(b.player)}, ${b.games} of ${b.of} games${b.probable ? ' <span class="note">(account probable)</span>' : ''}</li>`).join('')}</ul><p class="note">Presence in club games, not proof they will draft it for the national team.</p>` : ''}
+    <div class="h3">What we know · staff tier: ${esc(a.tier)}</div>${a.tierWhy ? `<p class="note">${esc(a.tierBy)}: ${esc(a.tierWhy)}</p>` : ''}
+    ${a.observed.length || a.hypotheses.length || a.vods.length ? `<ul class="plain">${a.observed.map((n) => `<li>${tag('k-observed', 'observed')} ${esc(n.note)} <span class="note">— ${esc(n.source)}, ${esc(n.date)}</span></li>`).join('')}${a.hypotheses.map((n) => `<li>${tag('k-hypothesis', 'unconfirmed')} ${esc(n.note)} <span class="note">— ${esc(n.source)}</span></li>`).join('')}${a.vods.map((v) => `<li>${tag('k-observed', 'VOD')} <a href="${esc(v.url)}" target="_blank" rel="noopener">${esc(v.event)}</a>: ${esc(v.takeaway)}</li>`).join('')}</ul>` : '<p class="note">No notes or reviewed VODs yet.</p>'}
+    ${a.standIns.length || a.scrimsDone ? `<p class="note">Practised against their style: ${a.scrimsDone} stand-in scrim(s)${a.standIns.length ? ` with ${a.standIns.map(esc).join(', ')}` : ''}.</p>` : ''}
+    ${a.gaps.length ? `<div class="noprint">${banner('block', `<div><b>Gaps before this card is match-ready:</b> ${a.gaps.map(esc).join(' ')}</div>`)}</div>` : ''}
+    <p class="note">Our players: ${ours.length ? ours.map(esc).join(', ') : 'roster not entered'}.</p></article>`;
+}
+V['comp-card'] = () => {
+  if (S.mode === 'demo') return `<div class="panel">${DEMO_BANNER}<p class="empty">Operational records only.</p></div>`;
+  const t = S.ocTitle; const field = FIELDS[t] || []; const n = field.includes(S.ocNation) ? S.ocNation : field[0];
+  const per = nationProfile(n, compData()).per.find((x) => x.title === t);
+  const a = autoCard({ title: t, nation: n, per, team: rosterOf(t, n), data: DATA, heroes: S.heroes });
+  const plan = S.oppCards[rosterKey(t, n)] || null; const ours = S.roster[t] || [];
+  return `<div class="noprint">${compHead('One page per opponent for the opponent brief two hours before a match. The hub fills in what the staff already hold; the title coach writes three key points and our answer, and the focus owner approves it.')}
+    <div class="panel"><div class="form"><label class="field" for="ocT">Title${titleOpts('ocT', t, WEC_TITLES.map((x) => x.id))}</label><label class="field" for="ocN">Opponent<select id="ocN">${field.map((x) => `<option ${x === n ? 'selected' : ''}>${esc(x)}</option>`).join('')}</select></label></div>
+      <div class="toolbar"><button class="btn" type="button" id="ocPrint">Print</button><button class="btn" type="button" id="ocDl">Download .md</button><span class="msg" id="ocMsg"></span></div></div></div>
+  <div class="cols"><div class="panel">${oppCardHtml(a, plan, ours)}</div>
+  <div class="panel noprint"><h2>${plan ? 'Edit the plan' : 'Write the plan'}</h2>
+    ${[0, 1, 2].map((i) => `<label class="field" for="ocK${i}">Key point ${i + 1}${i ? ' (optional)' : ''}<input type="text" id="ocK${i}" value="${esc(plan?.keys[i] || '')}"></label>`).join('')}
+    <label class="field" for="ocTh">What they are likely to do<input type="text" id="ocTh" value="${esc(plan?.theirPlan || '')}" placeholder="${t === 'Dota 2' || t.startsWith('MLBB') ? 'first-phase bans, comfort picks, side' : t === 'PUBG Mobile' ? 'drops per map, rotation style' : t.startsWith('CS2') ? 'map picks and bans, default setups' : 'formation, tempo'}"></label>
+    <label class="field" for="ocA">Our answer (required)<input type="text" id="ocA" value="${esc(plan?.ourAnswer || '')}"></label>
+    ${ours.length ? `<fieldset class="objpick"><legend class="note">One focus per player (optional)</legend>${ours.map((p, i) => `<label class="field" for="ocF${i}">${esc(p)}<input type="text" id="ocF${i}" data-player="${esc(p)}" value="${esc(plan?.focus[p] || '')}"></label>`).join('')}</fieldset>` : ''}
+    <label class="field" for="ocBy">Written by<input type="text" id="ocBy" value="${esc(meName())}"></label>
+    <div class="toolbar"><button class="btn primary" type="button" id="ocSave">Save draft</button><span class="msg" id="ocSaveMsg"></span></div>
+    ${plan && plan.status !== 'approved' ? `<div class="form"><label class="field" for="ocAp">Approve as (${esc(owner(t).name)} or the title coach)<input type="text" id="ocAp" value="${esc(meName())}"></label></div><div class="toolbar"><button class="btn" type="button" id="ocApprove">Approve card</button><span class="msg" id="ocApMsg"></span></div>` : ''}
+    <p class="note">Editing an approved card returns it to draft.</p></div></div>`;
 };
 
 // ---------- render & events ----------
@@ -976,6 +1059,36 @@ document.addEventListener('click', async (e) => {
     return;
   }
   if (t.dataset.act) { await cycleAct(t.dataset.act, t.dataset.id); return; }
+  if (t.dataset.card) { const [ti, na] = t.dataset.card.split('|'); S.ocTitle = ti; S.ocNation = na; location.hash = 'comp-card'; if (viewOf() === 'comp-card') render(); return; }
+  if (t.dataset.rosterSave || t.dataset.rosterCheck) {
+    const key = t.dataset.rosterSave || t.dataset.rosterCheck; const [ti, na] = key.split('|'); const fk = sid(key); const tm = rosterOf(ti, na); if (!tm) return;
+    try {
+      let n;
+      if (t.dataset.rosterSave) { const up = {}; tm.players.forEach((p, i) => { up[p.ign] = Object.fromEntries(['role', 'club', 'account', 'note'].map((k) => [k, val(`rr-${fk}-${i}-${k}`)])); }); n = editPlayers(tm, up, meName() || S.me); }
+      else n = recordCheck(tm, { date: today(), by: meName() || S.me, names: val(`rc-${fk}-names`) });
+      await saveRoster(n); render();
+    } catch (err) { setMsg(`${t.dataset.rosterSave ? 'rrMsg' : 'rcMsg'}-${fk}`, err.message, 'err'); }
+    return;
+  }
+  if (id === 'ocSave' || id === 'ocApprove' || id === 'ocDl' || id === 'ocPrint') {
+    const ti = S.ocTitle, field = FIELDS[ti] || [], na = field.includes(S.ocNation) ? S.ocNation : field[0]; const key = rosterKey(ti, na);
+    try {
+      if (id === 'ocPrint') { window.print(); return; }
+      if (id === 'ocDl') {
+        const per = nationProfile(na, compData()).per.find((x) => x.title === ti);
+        const md = cardMarkdown(autoCard({ title: ti, nation: na, per, team: rosterOf(ti, na), data: DATA, heroes: S.heroes }), S.oppCards[key] || null);
+        const dl = await window.claude?.use?.('downloads'); if (!dl) throw new Error('Downloads are not available in this view; use Print.');
+        await dl.save({ filename: `opponent-card-${sid(ti)}-${sid(na)}.md`, data: md }); setMsg('ocMsg', 'Saved.', 'ok'); return;
+      }
+      const plan = id === 'ocSave'
+        ? cardPlan({ keys: [0, 1, 2].map((i) => val(`ocK${i}`)), theirPlan: val('ocTh'), ourAnswer: val('ocA'), by: val('ocBy'), focus: Object.fromEntries([...document.querySelectorAll('input[id^="ocF"]')].map((x) => [x.dataset.player, x.value])) })
+        : approveCard(S.oppCards[key], { by: val('ocAp') });
+      const doc = { ...plan, key, title: ti, nation: na };
+      S.oppCards = { ...S.oppCards, [key]: doc }; if (S.db) await S.db.collection('opp_cards').doc(sid(key)).set(doc);
+      render();
+    } catch (err) { setMsg(id === 'ocSave' ? 'ocSaveMsg' : id === 'ocApprove' ? 'ocApMsg' : 'ocMsg', err.code === 'declined' ? 'Download cancelled.' : err.message, 'err'); }
+    return;
+  }
   if (t.dataset.nation) { S.compNation = t.dataset.nation; location.hash = 'comp-nation'; if (viewOf() === 'comp-nation') render(); return; }
   if (id === 'compEf') { S.compAllEf = !S.compAllEf; render(); return; }
   // ---- V1.4 handlers ----
@@ -1224,6 +1337,10 @@ document.addEventListener('change', (e) => {
   const id = e.target.id;
   if (id === 'meSel') { S.me = e.target.value; try { localStorage.setItem('hub-me', S.me); } catch { /* per-viewer convenience only */ } render(); }
   if (id === 'wT') { S.wellTitle = e.target.value; render(); }
+  if (id === 'crT') { S.crTitle = e.target.value; S.crNation = 'All'; render(); }
+  if (id === 'crN') { S.crNation = e.target.value; render(); }
+  if (id === 'ocT') { S.ocTitle = e.target.value; render(); }
+  if (id === 'ocN') { S.ocNation = e.target.value; render(); }
   if (id === 'cnN') { S.compNation = e.target.value; render(); }
   if (id === 'tourT') { S.tourTitle = e.target.value; render(); }
   if (id === 'tsM') { S.tourMatch = e.target.value; render(); }

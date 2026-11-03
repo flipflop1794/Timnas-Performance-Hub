@@ -1,0 +1,1970 @@
+{
+ "source": "wec.iesf.org/editions/wec-2026/teams/{code}",
+ "read": "2026-11-03",
+ "method": "Each team page read with an automated page reader; eFootball not included.",
+ "teams": [
+  {
+   "title": "CS2",
+   "nation": "Egypt",
+   "code": "EGY",
+   "coach": "Mohamed Fouad Mashhour Kamel Ahmed",
+   "players": [
+    {
+     "ign": "b1NGO",
+     "captain": true,
+     "flags": []
+    },
+    {
+     "ign": "Alone",
+     "captain": false,
+     "flags": []
+    },
+    {
+     "ign": "b2k",
+     "captain": false,
+     "flags": []
+    },
+    {
+     "ign": "Hellsing",
+     "captain": false,
+     "flags": []
+    },
+    {
+     "ign": "wESO",
+     "captain": false,
+     "flags": []
+    }
+   ],
+   "checks": [],
+   "note": "The page reader joined the word \"Player\"/\"Coach\" to each name; removed. Check spellings on the site."
+  },
+  {
+   "title": "Dota 2",
+   "nation": "Egypt",
+   "code": "EGY",
+   "coach": "Mohamed Atef Abdou Ali Elnawasra",
+   "players": [
+    {
+     "ign": "Famousar3a",
+     "captain": true,
+     "flags": []
+    },
+    {
+     "ign": "forever",
+     "captain": false,
+     "flags": []
+    },
+    {
+     "ign": "Kemps",
+     "captain": false,
+     "flags": []
+    },
+    {
+     "ign": "MeetYourBob",
+     "captain": false,
+     "flags": []
+    },
+    {
+     "ign": "strive",
+     "captain": false,
+     "flags": []
+    }
+   ],
+   "checks": [],
+   "note": "The page reader joined the word \"Player\"/\"Coach\" to each name; removed. Check spellings on the site."
+  },
+  {
+   "title": "MLBB",
+   "nation": "Egypt",
+   "code": "EGY",
+   "coach": "Amr Wafed Yassein Hafez Elsayed",
+   "players": [
+    {
+     "ign": "shen",
+     "captain": true,
+     "flags": []
+    },
+    {
+     "ign": "#MiO#",
+     "captain": false,
+     "flags": []
+    },
+    {
+     "ign": "7oda",
+     "captain": false,
+     "flags": []
+    },
+    {
+     "ign": "ABO AMMAR",
+     "captain": false,
+     "flags": []
+    },
+    {
+     "ign": "Aody",
+     "captain": false,
+     "flags": []
+    }
+   ],
+   "checks": [],
+   "note": "The page reader joined the word \"Player\"/\"Coach\" to each name; removed. Check spellings on the site."
+  },
+  {
+   "title": "MLBB Women",
+   "nation": "Egypt",
+   "code": "EGY",
+   "coach": "Mohmmed Mhmoud Mohmmed Teleb Abdrabou",
+   "players": [
+    {
+     "ign": "Names",
+     "captain": false,
+     "flags": []
+    },
+    {
+     "ign": "Nana",
+     "captain": false,
+     "flags": []
+    },
+    {
+     "ign": "Nucci",
+     "captain": false,
+     "flags": []
+    },
+    {
+     "ign": "Rio",
+     "captain": false,
+     "flags": []
+    },
+    {
+     "ign": "Syrinx",
+     "captain": false,
+     "flags": []
+    }
+   ],
+   "checks": [],
+   "note": "The page reader joined the word \"Player\"/\"Coach\" to each name; removed. Check spellings on the site."
+  },
+  {
+   "title": "PUBG Mobile",
+   "nation": "Egypt",
+   "code": "EGY",
+   "coach": "HASSAN AHMED HAMDY IBRAHIM AHMED",
+   "players": [
+    {
+     "ign": "AGA1N",
+     "captain": false,
+     "flags": []
+    },
+    {
+     "ign": "APKRINO",
+     "captain": false,
+     "flags": []
+    },
+    {
+     "ign": "NASSER74",
+     "captain": false,
+     "flags": []
+    },
+    {
+     "ign": "ZUXXY隋",
+     "captain": false,
+     "flags": []
+    }
+   ],
+   "checks": [],
+   "note": "The page reader joined the word \"Player\"/\"Coach\" to each name; removed. Check spellings on the site."
+  },
+  {
+   "title": "CS2",
+   "nation": "Argentina",
+   "code": "ARG",
+   "coach": "RUGO",
+   "players": [
+    {
+     "ign": "BK1",
+     "captain": false,
+     "flags": []
+    },
+    {
+     "ign": "Fakzwall",
+     "captain": false,
+     "flags": []
+    },
+    {
+     "ign": "nacho",
+     "captain": false,
+     "flags": []
+    },
+    {
+     "ign": "reversive",
+     "captain": false,
+     "flags": []
+    },
+    {
+     "ign": "righi",
+     "captain": false,
+     "flags": []
+    }
+   ],
+   "checks": []
+  },
+  {
+   "title": "Dota 2",
+   "nation": "Argentina",
+   "code": "ARG",
+   "coach": "Worlock",
+   "players": [
+    {
+     "ign": "Hermit",
+     "captain": true,
+     "flags": [],
+     "account": "145372258",
+     "accountNote": "exact name + country AR (Working Hard Team)",
+     "club": "Working Hard Team"
+    },
+    {
+     "ign": "Balenci",
+     "captain": false,
+     "flags": []
+    },
+    {
+     "ign": "Runaway",
+     "captain": false,
+     "flags": []
+    },
+    {
+     "ign": "Shifu",
+     "captain": false,
+     "flags": []
+    },
+    {
+     "ign": "Un Gato",
+     "captain": false,
+     "flags": []
+    }
+   ],
+   "checks": []
+  },
+  {
+   "title": "MLBB Women",
+   "nation": "Argentina",
+   "code": "ARG",
+   "coach": "alegroove",
+   "players": [
+    {
+     "ign": "Mizz",
+     "captain": true,
+     "flags": []
+    },
+    {
+     "ign": "HawksHawks",
+     "captain": false,
+     "flags": []
+    },
+    {
+     "ign": "Miyuki",
+     "captain": false,
+     "flags": []
+    },
+    {
+     "ign": "Myzhlet",
+     "captain": false,
+     "flags": []
+    },
+    {
+     "ign": "RIZAA",
+     "captain": false,
+     "flags": []
+    }
+   ],
+   "checks": []
+  },
+  {
+   "title": "MLBB",
+   "nation": "Türkiye",
+   "code": "TUR",
+   "coach": "Yosua Sanger",
+   "players": [
+    {
+     "ign": "Blotzfet",
+     "captain": false,
+     "flags": []
+    },
+    {
+     "ign": "EKSI",
+     "captain": false,
+     "flags": []
+    },
+    {
+     "ign": "Kazue",
+     "captain": false,
+     "flags": []
+    },
+    {
+     "ign": "Rx",
+     "captain": false,
+     "flags": []
+    },
+    {
+     "ign": "Saiki",
+     "captain": false,
+     "flags": []
+    }
+   ],
+   "checks": []
+  },
+  {
+   "title": "MLBB Women",
+   "nation": "Türkiye",
+   "code": "TUR",
+   "coach": "Bereat Taha Gocen",
+   "players": [
+    {
+     "ign": "KUJOU",
+     "captain": false,
+     "flags": []
+    },
+    {
+     "ign": "MIEKO",
+     "captain": false,
+     "flags": []
+    },
+    {
+     "ign": "Nora",
+     "captain": false,
+     "flags": []
+    },
+    {
+     "ign": "UNOHANA",
+     "captain": false,
+     "flags": []
+    },
+    {
+     "ign": "ZENDAYA",
+     "captain": false,
+     "flags": []
+    }
+   ],
+   "checks": []
+  },
+  {
+   "title": "PUBG Mobile",
+   "nation": "Türkiye",
+   "code": "TUR",
+   "coach": "Mehmet Anil Guven",
+   "players": [
+    {
+     "ign": "Solkay",
+     "captain": true,
+     "flags": []
+    },
+    {
+     "ign": "HamsiG",
+     "captain": false,
+     "flags": []
+    },
+    {
+     "ign": "Lost",
+     "captain": false,
+     "flags": []
+    },
+    {
+     "ign": "S2GKam1kaze",
+     "captain": false,
+     "flags": []
+    }
+   ],
+   "checks": []
+  },
+  {
+   "title": "CS2",
+   "nation": "South Africa",
+   "code": "RSA",
+   "coach": "Daniel Thomas Hufton",
+   "players": [
+    {
+     "ign": "march",
+     "captain": true,
+     "flags": []
+    },
+    {
+     "ign": "Doru",
+     "captain": false,
+     "flags": []
+    },
+    {
+     "ign": "FROZ3N",
+     "captain": false,
+     "flags": []
+    },
+    {
+     "ign": "Triton",
+     "captain": false,
+     "flags": []
+    },
+    {
+     "ign": "wilj",
+     "captain": false,
+     "flags": []
+    }
+   ],
+   "checks": []
+  },
+  {
+   "title": "CS2 Women",
+   "nation": "South Africa",
+   "code": "RSA",
+   "coach": "Simon Slingsby Zandstra",
+   "players": [
+    {
+     "ign": "Pixar",
+     "captain": true,
+     "flags": []
+    },
+    {
+     "ign": "huntress.",
+     "captain": false,
+     "flags": []
+    },
+    {
+     "ign": "KayC",
+     "captain": false,
+     "flags": []
+    },
+    {
+     "ign": "nAAtz",
+     "captain": false,
+     "flags": []
+    },
+    {
+     "ign": "scorpz",
+     "captain": false,
+     "flags": []
+    }
+   ],
+   "checks": []
+  },
+  {
+   "title": "Dota 2",
+   "nation": "South Africa",
+   "code": "RSA",
+   "coach": null,
+   "players": [
+    {
+     "ign": "bee",
+     "captain": true,
+     "flags": []
+    },
+    {
+     "ign": "Berend",
+     "captain": false,
+     "flags": []
+    },
+    {
+     "ign": "remedy",
+     "captain": false,
+     "flags": []
+    },
+    {
+     "ign": "Skep",
+     "captain": false,
+     "flags": []
+    },
+    {
+     "ign": "soup",
+     "captain": false,
+     "flags": []
+    }
+   ],
+   "checks": []
+  },
+  {
+   "title": "MLBB",
+   "nation": "Myanmar",
+   "code": "MYA",
+   "coach": "Jina",
+   "players": [
+    {
+     "ign": "KidX",
+     "captain": true,
+     "flags": []
+    },
+    {
+     "ign": "Lucky",
+     "captain": false,
+     "flags": []
+    },
+    {
+     "ign": "NewCold",
+     "captain": false,
+     "flags": []
+    },
+    {
+     "ign": "Op",
+     "captain": false,
+     "flags": []
+    },
+    {
+     "ign": "Ps",
+     "captain": false,
+     "flags": []
+    }
+   ],
+   "checks": []
+  },
+  {
+   "title": "PUBG Mobile",
+   "nation": "Myanmar",
+   "code": "MYA",
+   "coach": "Gon Zet Naw",
+   "players": [
+    {
+     "ign": "Mernatt",
+     "captain": true,
+     "flags": []
+    },
+    {
+     "ign": "Rexx",
+     "captain": false,
+     "flags": []
+    },
+    {
+     "ign": "Romeo",
+     "captain": false,
+     "flags": []
+    },
+    {
+     "ign": "YGSaycloudq44",
+     "captain": false,
+     "flags": []
+    }
+   ],
+   "checks": []
+  },
+  {
+   "title": "MLBB",
+   "nation": "Malaysia",
+   "code": "MAS",
+   "coach": "SaintDeLucaz",
+   "players": [
+    {
+     "ign": "Unii",
+     "captain": true,
+     "flags": []
+    },
+    {
+     "ign": "Kyym",
+     "captain": false,
+     "flags": []
+    },
+    {
+     "ign": "NovaXcobar",
+     "captain": false,
+     "flags": []
+    },
+    {
+     "ign": "Rokji",
+     "captain": false,
+     "flags": []
+    },
+    {
+     "ign": "Sepat",
+     "captain": false,
+     "flags": []
+    }
+   ],
+   "checks": []
+  },
+  {
+   "title": "PUBG Mobile",
+   "nation": "Malaysia",
+   "code": "MAS",
+   "coach": "Pasha",
+   "players": [
+    {
+     "ign": "CZ",
+     "captain": true,
+     "flags": []
+    },
+    {
+     "ign": "Bobby",
+     "captain": false,
+     "flags": []
+    },
+    {
+     "ign": "dep",
+     "captain": false,
+     "flags": []
+    },
+    {
+     "ign": "Kenny",
+     "captain": false,
+     "flags": []
+    }
+   ],
+   "checks": []
+  },
+  {
+   "title": "Dota 2",
+   "nation": "Greece",
+   "code": "GRE",
+   "coach": "ENEA QAZOLLI",
+   "players": [
+    {
+     "ign": "SsaSpartan-",
+     "captain": true,
+     "flags": [
+      "OpenDota account is a probable match; verify before relying on the hero pool."
+     ],
+     "account": "92949094",
+     "accountNote": "probable: OpenDota name \"SsaSparTaN.\", no country set, same club as Focus and Skylark (JustBetter) — verify",
+     "club": "JustBetter (probable)"
+    },
+    {
+     "ign": "dEsire",
+     "captain": false,
+     "flags": []
+    },
+    {
+     "ign": "Focus",
+     "captain": false,
+     "flags": [],
+     "account": "196490133",
+     "accountNote": "exact name + country GR (JustBetter)",
+     "club": "JustBetter"
+    },
+    {
+     "ign": "Skylark",
+     "captain": false,
+     "flags": [],
+     "account": "27178898",
+     "accountNote": "exact name + country GR (JustBetter)",
+     "club": "JustBetter"
+    },
+    {
+     "ign": "Thugitoo",
+     "captain": false,
+     "flags": []
+    }
+   ],
+   "checks": []
+  },
+  {
+   "title": "CS2",
+   "nation": "Kazakhstan",
+   "code": "KAZ",
+   "coach": "smiley",
+   "players": [
+    {
+     "ign": "def1zer",
+     "captain": true,
+     "flags": []
+    },
+    {
+     "ign": "adai",
+     "captain": false,
+     "flags": []
+    },
+    {
+     "ign": "Aldikon",
+     "captain": false,
+     "flags": []
+    },
+    {
+     "ign": "Botpa1",
+     "captain": false,
+     "flags": []
+    },
+    {
+     "ign": "dan4o",
+     "captain": false,
+     "flags": []
+    }
+   ],
+   "checks": []
+  },
+  {
+   "title": "Dota 2",
+   "nation": "Kazakhstan",
+   "code": "KAZ",
+   "coach": "Alibek Sarsenbayev",
+   "players": [
+    {
+     "ign": "HardL",
+     "captain": true,
+     "flags": []
+    },
+    {
+     "ign": "BAXA",
+     "captain": false,
+     "flags": []
+    },
+    {
+     "ign": "Kuka11",
+     "captain": false,
+     "flags": []
+    },
+    {
+     "ign": "overkill",
+     "captain": false,
+     "flags": []
+    },
+    {
+     "ign": "Shakh",
+     "captain": false,
+     "flags": [],
+     "account": "325697153",
+     "accountNote": "exact name + country KZ (Tengri eSports)",
+     "club": "Tengri eSports"
+    }
+   ],
+   "checks": []
+  },
+  {
+   "title": "CS2",
+   "nation": "Iran",
+   "code": "IRI",
+   "coach": "Milad",
+   "players": [
+    {
+     "ign": "Equalizer",
+     "captain": true,
+     "flags": []
+    },
+    {
+     "ign": "A1one",
+     "captain": false,
+     "flags": []
+    },
+    {
+     "ign": "inSid10us",
+     "captain": false,
+     "flags": []
+    },
+    {
+     "ign": "Krypt0n",
+     "captain": false,
+     "flags": []
+    },
+    {
+     "ign": "X1ron",
+     "captain": false,
+     "flags": []
+    }
+   ],
+   "checks": []
+  },
+  {
+   "title": "Dota 2",
+   "nation": "Iran",
+   "code": "IRI",
+   "coach": "SEYED",
+   "players": [
+    {
+     "ign": "KaChal",
+     "captain": true,
+     "flags": []
+    },
+    {
+     "ign": "A9",
+     "captain": false,
+     "flags": [],
+     "account": "880397480",
+     "accountNote": "exact name + country IR; no tournament game since 7.41 (last pro match Dec 2025)"
+    },
+    {
+     "ign": "Cold-",
+     "captain": false,
+     "flags": []
+    },
+    {
+     "ign": "Matson",
+     "captain": false,
+     "flags": []
+    },
+    {
+     "ign": "Zesky~",
+     "captain": false,
+     "flags": []
+    }
+   ],
+   "checks": []
+  },
+  {
+   "title": "Dota 2",
+   "nation": "Belarus",
+   "code": "BLR",
+   "coach": "Mikhail Turchyn",
+   "players": [
+    {
+     "ign": "kur0patbI4",
+     "captain": true,
+     "flags": []
+    },
+    {
+     "ign": "Byun",
+     "captain": false,
+     "flags": []
+    },
+    {
+     "ign": "Miyaoo",
+     "captain": false,
+     "flags": [],
+     "account": "383361785",
+     "accountNote": "exact name + country BY (VP.Prodigy)",
+     "club": "VP.Prodigy"
+    },
+    {
+     "ign": "Onejey",
+     "captain": false,
+     "flags": []
+    },
+    {
+     "ign": "young G",
+     "captain": false,
+     "flags": [
+      "OpenDota account is a probable match; verify before relying on the hero pool."
+     ],
+     "account": "127530803",
+     "accountNote": "probable: exact name, no country set, club Nemiga Gaming — verify",
+     "club": "Nemiga Gaming (probable)"
+    }
+   ],
+   "checks": []
+  },
+  {
+   "title": "PUBG Mobile",
+   "nation": "Belarus",
+   "code": "BLR",
+   "coach": "RAMAN KUCHARUK",
+   "players": [
+    {
+     "ign": "blrMELW1N",
+     "captain": true,
+     "flags": []
+    },
+    {
+     "ign": "blrPTENCHIK",
+     "captain": false,
+     "flags": []
+    },
+    {
+     "ign": "blrRamz1kBoss",
+     "captain": false,
+     "flags": []
+    },
+    {
+     "ign": "blrTUBA",
+     "captain": false,
+     "flags": []
+    }
+   ],
+   "checks": []
+  },
+  {
+   "title": "Dota 2",
+   "nation": "Venezuela",
+   "code": "VEN",
+   "coach": "Johanny Alejandro Uzcategui Morales",
+   "players": [
+    {
+     "ign": "Shy",
+     "captain": true,
+     "flags": [],
+     "account": "99622043",
+     "accountNote": "exact name + country VE (BIZ GAMING)",
+     "club": "BIZ GAMING"
+    },
+    {
+     "ign": "ArkaNa",
+     "captain": false,
+     "flags": []
+    },
+    {
+     "ign": "arrakiz",
+     "captain": false,
+     "flags": []
+    },
+    {
+     "ign": "Raykill",
+     "captain": false,
+     "flags": []
+    },
+    {
+     "ign": "Ryoma",
+     "captain": false,
+     "flags": []
+    }
+   ],
+   "checks": []
+  },
+  {
+   "title": "Dota 2",
+   "nation": "North Macedonia",
+   "code": "MKD",
+   "coach": "Blagoja Jovanov",
+   "players": [
+    {
+     "ign": "H8",
+     "captain": true,
+     "flags": []
+    },
+    {
+     "ign": "Belief",
+     "captain": false,
+     "flags": []
+    },
+    {
+     "ign": "Kralot bulo",
+     "captain": false,
+     "flags": []
+    },
+    {
+     "ign": "Stojkov",
+     "captain": false,
+     "flags": [],
+     "account": "262476000",
+     "accountNote": "exact name + country MK (Inner Circle x Insanity)",
+     "club": "Inner Circle x Insanity"
+    },
+    {
+     "ign": "zipzap",
+     "captain": false,
+     "flags": []
+    }
+   ],
+   "checks": []
+  },
+  {
+   "title": "Dota 2",
+   "nation": "New Zealand",
+   "code": "NZL",
+   "coach": "Tobz",
+   "players": [
+    {
+     "ign": "Fury",
+     "captain": true,
+     "flags": [],
+     "account": "78891550",
+     "accountNote": "exact name + country NZ (Team Essence)",
+     "club": "Team Essence"
+    },
+    {
+     "ign": "Magic",
+     "captain": false,
+     "flags": []
+    },
+    {
+     "ign": "NzRain",
+     "captain": false,
+     "flags": []
+    },
+    {
+     "ign": "SeveM",
+     "captain": false,
+     "flags": []
+    },
+    {
+     "ign": "Zavier nz",
+     "captain": false,
+     "flags": []
+    }
+   ],
+   "checks": []
+  },
+  {
+   "title": "CS2",
+   "nation": "Mongolia",
+   "code": "MGL",
+   "coach": "shinobi",
+   "players": [
+    {
+     "ign": "NEUZ",
+     "captain": true,
+     "flags": []
+    },
+    {
+     "ign": "ariucle",
+     "captain": false,
+     "flags": []
+    },
+    {
+     "ign": "clouden",
+     "captain": false,
+     "flags": []
+    },
+    {
+     "ign": "hoolig4n",
+     "captain": false,
+     "flags": []
+    },
+    {
+     "ign": "RATE",
+     "captain": false,
+     "flags": []
+    }
+   ],
+   "checks": []
+  },
+  {
+   "title": "Dota 2",
+   "nation": "Mongolia",
+   "code": "MGL",
+   "coach": "Chimid Batsukh",
+   "players": [
+    {
+     "ign": "Se",
+     "captain": true,
+     "flags": [
+      "OpenDota account: not found in OpenDota pro list"
+     ]
+    },
+    {
+     "ign": "11",
+     "captain": false,
+     "flags": [],
+     "account": "377594124",
+     "accountNote": "ambiguous: two MN pro accounts named '11' (377594124 IHC, 466093373); used the one active in Nov 2026. Only 13 tournament games since 7.41 — verify"
+    },
+    {
+     "ign": "423",
+     "captain": false,
+     "flags": [],
+     "club": "Klim Sani4",
+     "account": "458287006",
+     "accountNote": "exact name + country"
+    },
+    {
+     "ign": "NARMAN",
+     "captain": false,
+     "flags": [],
+     "club": "Team Nemesis",
+     "account": "343084576",
+     "accountNote": "exact name + country. Same club as Indonesia's Jhocam (Team Nemesis)"
+    },
+    {
+     "ign": "sanctity",
+     "captain": false,
+     "flags": [],
+     "club": "Team Bald",
+     "account": "392169957",
+     "accountNote": "exact name + country"
+    }
+   ],
+   "checks": []
+  },
+  {
+   "title": "PUBG Mobile",
+   "nation": "Mongolia",
+   "code": "MGL",
+   "coach": "Sukhbat Otgon",
+   "players": [
+    {
+     "ign": "C1丨Demo",
+     "captain": true,
+     "flags": []
+    },
+    {
+     "ign": "ATOMIC",
+     "captain": false,
+     "flags": []
+    },
+    {
+     "ign": "Fearless",
+     "captain": false,
+     "flags": []
+    },
+    {
+     "ign": "KEENO",
+     "captain": false,
+     "flags": []
+    }
+   ],
+   "checks": []
+  },
+  {
+   "title": "MLBB",
+   "nation": "Cambodia",
+   "code": "CAM",
+   "coach": "Bunchhay Sin",
+   "players": [
+    {
+     "ign": "SryimFelix",
+     "captain": true,
+     "flags": []
+    },
+    {
+     "ign": "Linnn",
+     "captain": false,
+     "flags": []
+    },
+    {
+     "ign": "PPPPPP",
+     "captain": false,
+     "flags": [
+      "Read as six P's on 3 Nov; decision log v6 recorded five (\"PPPPP\"). Check on the site."
+     ]
+    },
+    {
+     "ign": "Saa",
+     "captain": false,
+     "flags": []
+    },
+    {
+     "ign": "Wickyyy",
+     "captain": false,
+     "flags": []
+    }
+   ],
+   "checks": []
+  },
+  {
+   "title": "MLBB",
+   "nation": "Dominican Republic",
+   "code": "DOM",
+   "coach": "L O Y A LRibel Cruz",
+   "players": [
+    {
+     "ign": "JunnJose Ortiz",
+     "captain": true,
+     "flags": [
+      "Tag and real name run together on the site (decision log v6); tag uncertain."
+     ]
+    },
+    {
+     "ign": "Desz",
+     "captain": false,
+     "flags": []
+    },
+    {
+     "ign": "INSTNCTElio Olivero",
+     "captain": false,
+     "flags": [
+      "Tag and real name run together on the site (decision log v6); tag uncertain."
+     ]
+    },
+    {
+     "ign": "PANINI.",
+     "captain": false,
+     "flags": []
+    },
+    {
+     "ign": "Ricky.Ricky Consuegra",
+     "captain": false,
+     "flags": [
+      "Tag and real name run together on the site (decision log v6); tag uncertain."
+     ]
+    }
+   ],
+   "checks": []
+  },
+  {
+   "title": "MLBB",
+   "nation": "Nepal",
+   "code": "NEP",
+   "coach": "Saujanya Shrestha",
+   "players": [
+    {
+     "ign": "Yahiko",
+     "captain": true,
+     "flags": []
+    },
+    {
+     "ign": "bobe.",
+     "captain": false,
+     "flags": []
+    },
+    {
+     "ign": "GonnyGon",
+     "captain": false,
+     "flags": []
+    },
+    {
+     "ign": "Hybrid",
+     "captain": false,
+     "flags": []
+    },
+    {
+     "ign": "Luck.",
+     "captain": false,
+     "flags": []
+    }
+   ],
+   "checks": []
+  },
+  {
+   "title": "CS2",
+   "nation": "Romania",
+   "code": "ROU",
+   "coach": "Ionut-Catalin Stanescu",
+   "players": [
+    {
+     "ign": "fNk",
+     "captain": false,
+     "flags": []
+    },
+    {
+     "ign": "lauNX",
+     "captain": false,
+     "flags": []
+    },
+    {
+     "ign": "MoDo",
+     "captain": false,
+     "flags": []
+    },
+    {
+     "ign": "s0und",
+     "captain": false,
+     "flags": []
+    },
+    {
+     "ign": "XELLOW",
+     "captain": false,
+     "flags": []
+    }
+   ],
+   "checks": []
+  },
+  {
+   "title": "PUBG Mobile",
+   "nation": "Romania",
+   "code": "ROU",
+   "coach": "Remus Petca",
+   "players": [
+    {
+     "ign": "EXO",
+     "captain": false,
+     "flags": []
+    },
+    {
+     "ign": "NEBUNIE17",
+     "captain": false,
+     "flags": []
+    },
+    {
+     "ign": "VCūDORIN23",
+     "captain": false,
+     "flags": []
+    },
+    {
+     "ign": "VCūreDOXyz",
+     "captain": false,
+     "flags": []
+    }
+   ],
+   "checks": []
+  },
+  {
+   "title": "PUBG Mobile",
+   "nation": "Bangladesh",
+   "code": "BAN",
+   "coach": "MD ABDUL JABBAR SHAKIL",
+   "players": [
+    {
+     "ign": "RowDY",
+     "captain": true,
+     "flags": []
+    },
+    {
+     "ign": "CJboyyyy",
+     "captain": false,
+     "flags": []
+    },
+    {
+     "ign": "Deathstorm",
+     "captain": false,
+     "flags": []
+    },
+    {
+     "ign": "FLASH",
+     "captain": false,
+     "flags": []
+    }
+   ],
+   "checks": []
+  },
+  {
+   "title": "CS2 Women",
+   "nation": "Brazil",
+   "code": "BRA",
+   "coach": "FABRICIO SIMOES E SILVA",
+   "players": [
+    {
+     "ign": "OL6A",
+     "captain": true,
+     "flags": []
+    },
+    {
+     "ign": "dani",
+     "captain": false,
+     "flags": []
+    },
+    {
+     "ign": "GaBi",
+     "captain": false,
+     "flags": []
+    },
+    {
+     "ign": "poppins",
+     "captain": false,
+     "flags": []
+    },
+    {
+     "ign": "yungher",
+     "captain": false,
+     "flags": []
+    }
+   ],
+   "checks": []
+  },
+  {
+   "title": "PUBG Mobile",
+   "nation": "Brazil",
+   "code": "BRA",
+   "coach": "Janderson De Deus Silva",
+   "players": [
+    {
+     "ign": "PEDRINHO",
+     "captain": true,
+     "flags": []
+    },
+    {
+     "ign": "FederaL",
+     "captain": false,
+     "flags": []
+    },
+    {
+     "ign": "LiLBOY",
+     "captain": false,
+     "flags": []
+    },
+    {
+     "ign": "Obscure",
+     "captain": false,
+     "flags": []
+    }
+   ],
+   "checks": []
+  },
+  {
+   "title": "PUBG Mobile",
+   "nation": "Colombia",
+   "code": "COL",
+   "coach": "Wilson Ricardo Mariño Pinzon",
+   "players": [
+    {
+     "ign": "Reyes",
+     "captain": true,
+     "flags": []
+    },
+    {
+     "ign": "COLMadeon",
+     "captain": false,
+     "flags": []
+    },
+    {
+     "ign": "COLvictex",
+     "captain": false,
+     "flags": []
+    },
+    {
+     "ign": "Molina",
+     "captain": false,
+     "flags": []
+    }
+   ],
+   "checks": [],
+   "note": "The page reader joined the word \"Player\"/\"Coach\" to each name; removed. Check spellings on the site."
+  },
+  {
+   "title": "CS2 Women",
+   "nation": "Kyrgyzstan",
+   "code": "KGZ",
+   "coach": "Timur Nurmambetov",
+   "players": [
+    {
+     "ign": "Jammie",
+     "captain": true,
+     "flags": []
+    },
+    {
+     "ign": "amy",
+     "captain": false,
+     "flags": []
+    },
+    {
+     "ign": "Destroy_zloy",
+     "captain": false,
+     "flags": []
+    },
+    {
+     "ign": "kitosyy",
+     "captain": false,
+     "flags": []
+    },
+    {
+     "ign": "nomercyvec",
+     "captain": false,
+     "flags": []
+    }
+   ],
+   "checks": []
+  },
+  {
+   "title": "PUBG Mobile",
+   "nation": "Kyrgyzstan",
+   "code": "KGZ",
+   "coach": "Anton Gentselman",
+   "players": [
+    {
+     "ign": "EFFECT",
+     "captain": true,
+     "flags": []
+    },
+    {
+     "ign": "FLYQE",
+     "captain": false,
+     "flags": []
+    },
+    {
+     "ign": "WARRIOR",
+     "captain": false,
+     "flags": []
+    },
+    {
+     "ign": "ZERYCH",
+     "captain": false,
+     "flags": []
+    }
+   ],
+   "checks": []
+  },
+  {
+   "title": "PUBG Mobile",
+   "nation": "Montenegro",
+   "code": "MNE",
+   "coach": "Miloš Ćirović",
+   "players": [
+    {
+     "ign": "mneAEIMEY13333",
+     "captain": false,
+     "flags": []
+    },
+    {
+     "ign": "mneLazarmvp",
+     "captain": false,
+     "flags": []
+    },
+    {
+     "ign": "mneROGGO357",
+     "captain": false,
+     "flags": []
+    },
+    {
+     "ign": "mneZ3USsorrie",
+     "captain": false,
+     "flags": []
+    }
+   ],
+   "checks": []
+  },
+  {
+   "title": "CS2 Women",
+   "nation": "Morocco",
+   "code": "MAR",
+   "coach": "Haytam Nanai",
+   "players": [
+    {
+     "ign": "Helkooky",
+     "captain": false,
+     "flags": []
+    },
+    {
+     "ign": "KillerQueen",
+     "captain": false,
+     "flags": []
+    },
+    {
+     "ign": "Kim",
+     "captain": false,
+     "flags": []
+    },
+    {
+     "ign": "Scarlet",
+     "captain": false,
+     "flags": []
+    },
+    {
+     "ign": "Sebsgirl1",
+     "captain": false,
+     "flags": []
+    }
+   ],
+   "checks": []
+  },
+  {
+   "title": "PUBG Mobile",
+   "nation": "Morocco",
+   "code": "MAR",
+   "coach": "lazyboy",
+   "players": [
+    {
+     "ign": "md",
+     "captain": true,
+     "flags": []
+    },
+    {
+     "ign": "Carryboy",
+     "captain": false,
+     "flags": []
+    },
+    {
+     "ign": "MARSHALL",
+     "captain": false,
+     "flags": []
+    },
+    {
+     "ign": "SenKayy",
+     "captain": false,
+     "flags": []
+    }
+   ],
+   "checks": []
+  },
+  {
+   "title": "PUBG Mobile",
+   "nation": "Serbia",
+   "code": "SRB",
+   "coach": "PEKSY",
+   "players": [
+    {
+     "ign": "Coa77k",
+     "captain": true,
+     "flags": []
+    },
+    {
+     "ign": "BISKE",
+     "captain": false,
+     "flags": []
+    },
+    {
+     "ign": "LEON44",
+     "captain": false,
+     "flags": []
+    },
+    {
+     "ign": "MELAZ",
+     "captain": false,
+     "flags": []
+    }
+   ],
+   "checks": []
+  },
+  {
+   "title": "CS2",
+   "nation": "United States",
+   "code": "USA",
+   "coach": "Noah Oliver Francis",
+   "players": [
+    {
+     "ign": "WolfY",
+     "captain": true,
+     "flags": []
+    },
+    {
+     "ign": "JBa",
+     "captain": false,
+     "flags": []
+    },
+    {
+     "ign": "mason",
+     "captain": false,
+     "flags": []
+    },
+    {
+     "ign": "Momo",
+     "captain": false,
+     "flags": []
+    },
+    {
+     "ign": "Swisher",
+     "captain": false,
+     "flags": []
+    }
+   ],
+   "checks": []
+  },
+  {
+   "title": "CS2 Women",
+   "nation": "United States",
+   "code": "USA",
+   "coach": "Wrenna Trampel",
+   "players": [
+    {
+     "ign": "madss",
+     "captain": true,
+     "flags": []
+    },
+    {
+     "ign": "emy",
+     "captain": false,
+     "flags": []
+    },
+    {
+     "ign": "olya",
+     "captain": false,
+     "flags": []
+    },
+    {
+     "ign": "uhKelsie",
+     "captain": false,
+     "flags": []
+    },
+    {
+     "ign": "vanessa",
+     "captain": false,
+     "flags": []
+    }
+   ],
+   "checks": []
+  },
+  {
+   "title": "CS2",
+   "nation": "Australia",
+   "code": "AUS",
+   "coach": null,
+   "players": [
+    {
+     "ign": "viridian",
+     "captain": true,
+     "flags": []
+    },
+    {
+     "ign": "damyo",
+     "captain": false,
+     "flags": []
+    },
+    {
+     "ign": "dexter",
+     "captain": false,
+     "flags": []
+    },
+    {
+     "ign": "liazz",
+     "captain": false,
+     "flags": []
+    },
+    {
+     "ign": "TjP",
+     "captain": false,
+     "flags": []
+    }
+   ],
+   "checks": []
+  },
+  {
+   "title": "CS2 Women",
+   "nation": "Australia",
+   "code": "AUS",
+   "coach": null,
+   "players": [
+    {
+     "ign": "BiBiAhn",
+     "captain": true,
+     "flags": []
+    },
+    {
+     "ign": "epoh",
+     "captain": false,
+     "flags": []
+    },
+    {
+     "ign": "hdizz",
+     "captain": false,
+     "flags": []
+    },
+    {
+     "ign": "jaydee",
+     "captain": false,
+     "flags": []
+    },
+    {
+     "ign": "riv",
+     "captain": false,
+     "flags": []
+    }
+   ],
+   "checks": []
+  },
+  {
+   "title": "CS2",
+   "nation": "Iraq",
+   "code": "IRQ",
+   "coach": null,
+   "players": [
+    {
+     "ign": "r4id3n",
+     "captain": true,
+     "flags": []
+    },
+    {
+     "ign": "Bibu",
+     "captain": false,
+     "flags": []
+    },
+    {
+     "ign": "Oscar",
+     "captain": false,
+     "flags": []
+    },
+    {
+     "ign": "VeGGo",
+     "captain": false,
+     "flags": []
+    },
+    {
+     "ign": "wAti",
+     "captain": false,
+     "flags": []
+    }
+   ],
+   "checks": []
+  },
+  {
+   "title": "CS2",
+   "nation": "Lithuania",
+   "code": "LTU",
+   "coach": "Albinas Seputis",
+   "players": [
+    {
+     "ign": "Bymas",
+     "captain": true,
+     "flags": []
+    },
+    {
+     "ign": "dziugss",
+     "captain": false,
+     "flags": []
+    },
+    {
+     "ign": "MAGILA",
+     "captain": false,
+     "flags": []
+    },
+    {
+     "ign": "tAk",
+     "captain": false,
+     "flags": []
+    },
+    {
+     "ign": "Uzman",
+     "captain": false,
+     "flags": []
+    }
+   ],
+   "checks": []
+  },
+  {
+   "title": "PUBG Mobile",
+   "nation": "Uzbekistan",
+   "code": "UZB",
+   "coach": "Khusanov",
+   "players": [
+    {
+     "ign": "JONIK",
+     "captain": true,
+     "flags": []
+    },
+    {
+     "ign": "AGGRESSOR",
+     "captain": false,
+     "flags": []
+    },
+    {
+     "ign": "KHOJI",
+     "captain": false,
+     "flags": []
+    },
+    {
+     "ign": "SP1DY",
+     "captain": false,
+     "flags": []
+    }
+   ],
+   "checks": []
+  },
+  {
+   "title": "CS2 Women",
+   "nation": "Poland",
+   "code": "POL",
+   "coach": "Adrian Chyziak",
+   "players": [
+    {
+     "ign": "LETi",
+     "captain": true,
+     "flags": []
+    },
+    {
+     "ign": "Angelka",
+     "captain": false,
+     "flags": []
+    },
+    {
+     "ign": "Hanka-",
+     "captain": false,
+     "flags": [
+      "Trailing \"-\" may be part of the tag or left over from the label; check on the site."
+     ]
+    },
+    {
+     "ign": "Hikomi",
+     "captain": false,
+     "flags": []
+    },
+    {
+     "ign": "vicu",
+     "captain": false,
+     "flags": []
+    }
+   ],
+   "checks": [],
+   "note": "The page reader joined the word \"Player\"/\"Coach\" to each name; removed. Check spellings on the site."
+  },
+  {
+   "title": "CS2 Women",
+   "nation": "France",
+   "code": "FRA",
+   "coach": "Leo Gabriel Intronati",
+   "players": [
+    {
+     "ign": "Monkey D. Julie",
+     "captain": true,
+     "flags": []
+    },
+    {
+     "ign": "ASTRA",
+     "captain": false,
+     "flags": []
+    },
+    {
+     "ign": "Emerald",
+     "captain": false,
+     "flags": []
+    },
+    {
+     "ign": "Kaoday",
+     "captain": false,
+     "flags": []
+    },
+    {
+     "ign": "Si",
+     "captain": false,
+     "flags": []
+    }
+   ],
+   "checks": []
+  },
+  {
+   "title": "CS2 Women",
+   "nation": "Hong Kong, China",
+   "code": "HKG",
+   "coach": "Blue",
+   "players": [
+    {
+     "ign": "Joker",
+     "captain": true,
+     "flags": []
+    },
+    {
+     "ign": "cand1d",
+     "captain": false,
+     "flags": []
+    },
+    {
+     "ign": "kimbee",
+     "captain": false,
+     "flags": []
+    },
+    {
+     "ign": "MiyukiBB",
+     "captain": false,
+     "flags": []
+    },
+    {
+     "ign": "yilammmm",
+     "captain": false,
+     "flags": []
+    }
+   ],
+   "checks": []
+  },
+  {
+   "title": "CS2 Women",
+   "nation": "Netherlands",
+   "code": "NED",
+   "coach": "Hidde Hofsté",
+   "players": [
+    {
+     "ign": "ManeschijnX",
+     "captain": true,
+     "flags": []
+    },
+    {
+     "ign": "Lieszaaa",
+     "captain": false,
+     "flags": []
+    },
+    {
+     "ign": "Missy",
+     "captain": false,
+     "flags": []
+    },
+    {
+     "ign": "Nayomy",
+     "captain": false,
+     "flags": []
+    },
+    {
+     "ign": "Qiyarah",
+     "captain": false,
+     "flags": []
+    }
+   ],
+   "checks": []
+  },
+  {
+   "title": "CS2 Women",
+   "nation": "Portugal",
+   "code": "POR",
+   "coach": "HS",
+   "players": [
+    {
+     "ign": "Aida",
+     "captain": true,
+     "flags": []
+    },
+    {
+     "ign": "CatyJones",
+     "captain": false,
+     "flags": []
+    },
+    {
+     "ign": "D7",
+     "captain": false,
+     "flags": []
+    },
+    {
+     "ign": "lekas",
+     "captain": false,
+     "flags": []
+    },
+    {
+     "ign": "ZAna-th",
+     "captain": false,
+     "flags": []
+    }
+   ],
+   "checks": []
+  }
+ ]
+}

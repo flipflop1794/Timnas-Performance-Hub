@@ -1,0 +1,364 @@
+#EGY|Egypt
+Counter-Strike 2 | player | b1NGOPlayer | yes
+Counter-Strike 2 | player | AlonePlayer | no
+Counter-Strike 2 | player | b2kPlayer | no
+Counter-Strike 2 | player | HellsingPlayer | no
+Counter-Strike 2 | player | wESOPlayer | no
+Counter-Strike 2 | coach | Mohamed Fouad Mashhour Kamel AhmedCoach | no
+Dota 2 | player | Famousar3aPlayer | yes
+Dota 2 | player | foreverPlayer | no
+Dota 2 | player | KempsPlayer | no
+Dota 2 | player | MeetYourBobPlayer | no
+Dota 2 | player | strivePlayer | no
+Dota 2 | coach | Mohamed Atef Abdou Ali ElnawasraCoach | no
+Mobile Legends: Bang Bang | player | shenPlayer | yes
+Mobile Legends: Bang Bang | player | #MiO#Player | no
+Mobile Legends: Bang Bang | player | 7odaPlayer | no
+Mobile Legends: Bang Bang | player | ABO AMMARPlayer | no
+Mobile Legends: Bang Bang | player | AodyPlayer | no
+Mobile Legends: Bang Bang | coach | Amr Wafed Yassein Hafez ElsayedCoach | no
+Mobile Legends: Bang Bang Women | player | NamesPlayer | no
+Mobile Legends: Bang Bang Women | player | NanaPlayer | no
+Mobile Legends: Bang Bang Women | player | NucciPlayer | no
+Mobile Legends: Bang Bang Women | player | RioPlayer | no
+Mobile Legends: Bang Bang Women | player | SyrinxPlayer | no
+Mobile Legends: Bang Bang Women | coach | Mohmmed Mhmoud Mohmmed Teleb AbdrabouCoach | no
+PUBG MOBILE | player | AGA1NPlayer | no
+PUBG MOBILE | player | APKRINOPlayer | no
+PUBG MOBILE | player | NASSER74Player | no
+PUBG MOBILE | player | ZUXXY隋Player | no
+PUBG MOBILE | coach | HASSAN AHMED HAMDY IBRAHIM AHMEDCoach | no
+#ARG|Argentina
+Counter-Strike 2 | player | BK1 | no
+Counter-Strike 2 | player | Fakzwall | no
+Counter-Strike 2 | player | nacho | no
+Counter-Strike 2 | player | reversive | no
+Counter-Strike 2 | player | righi | no
+Counter-Strike 2 | coach | RUGO | no
+Dota 2 | player | Hermit | yes
+Dota 2 | player | Balenci | no
+Dota 2 | player | Runaway | no
+Dota 2 | player | Shifu | no
+Dota 2 | player | Un Gato | no
+Dota 2 | coach | Worlock | no
+Mobile Legends: Bang Bang Women | player | Mizz | yes
+Mobile Legends: Bang Bang Women | player | HawksHawks | no
+Mobile Legends: Bang Bang Women | player | Miyuki | no
+Mobile Legends: Bang Bang Women | player | Myzhlet | no
+Mobile Legends: Bang Bang Women | player | RIZAA | no
+Mobile Legends: Bang Bang Women | coach | alegroove | no
+#TUR|Türkiye
+Mobile Legends: Bang Bang | player | Blotzfet | no
+Mobile Legends: Bang Bang | player | EKSI | no
+Mobile Legends: Bang Bang | player | Kazue | no
+Mobile Legends: Bang Bang | player | Rx | no
+Mobile Legends: Bang Bang | player | Saiki | no
+Mobile Legends: Bang Bang | coach | Yosua Sanger | no
+Mobile Legends: Bang Bang Women | player | KUJOU | no
+Mobile Legends: Bang Bang Women | player | MIEKO | no
+Mobile Legends: Bang Bang Women | player | Nora | no
+Mobile Legends: Bang Bang Women | player | UNOHANA | no
+Mobile Legends: Bang Bang Women | player | ZENDAYA | no
+Mobile Legends: Bang Bang Women | coach | Bereat Taha Gocen | no
+PUBG MOBILE | player | Solkay | yes
+PUBG MOBILE | player | HamsiG | no
+PUBG MOBILE | player | Lost | no
+PUBG MOBILE | player | S2GKam1kaze | no
+PUBG MOBILE | coach | Mehmet Anil Guven | no
+#RSA|South Africa
+Counter-Strike 2 | player | march | yes
+Counter-Strike 2 | player | Doru | no
+Counter-Strike 2 | player | FROZ3N | no
+Counter-Strike 2 | player | Triton | no
+Counter-Strike 2 | player | wilj | no
+Counter-Strike 2 | coach | Daniel Thomas Hufton | no
+Counter-Strike Women | player | Pixar | yes
+Counter-Strike Women | player | huntress. | no
+Counter-Strike Women | player | KayC | no
+Counter-Strike Women | player | nAAtz | no
+Counter-Strike Women | player | scorpz | no
+Counter-Strike Women | coach | Simon Slingsby Zandstra | no
+Dota 2 | player | bee | yes
+Dota 2 | player | Berend | no
+Dota 2 | player | remedy | no
+Dota 2 | player | Skep | no
+Dota 2 | player | soup | no
+#MYA|Myanmar
+Mobile Legends: Bang Bang | player | KidX | yes
+Mobile Legends: Bang Bang | player | Lucky | no
+Mobile Legends: Bang Bang | player | NewCold | no
+Mobile Legends: Bang Bang | player | Op | no
+Mobile Legends: Bang Bang | player | Ps | no
+Mobile Legends: Bang Bang | coach | Jina | no
+PUBG MOBILE | player | Mernatt | yes
+PUBG MOBILE | player | Rexx | no
+PUBG MOBILE | player | Romeo | no
+PUBG MOBILE | player | YGSaycloudq44 | no
+PUBG MOBILE | coach | Gon Zet Naw | no
+#MAS|Malaysia
+Mobile Legends: Bang Bang | player | Unii | yes
+Mobile Legends: Bang Bang | player | Kyym | no
+Mobile Legends: Bang Bang | player | NovaXcobar | no
+Mobile Legends: Bang Bang | player | Rokji | no
+Mobile Legends: Bang Bang | player | Sepat | no
+Mobile Legends: Bang Bang | coach | SaintDeLucaz | no
+PUBG MOBILE | player | CZ | yes
+PUBG MOBILE | player | Bobby | no
+PUBG MOBILE | player | dep | no
+PUBG MOBILE | player | Kenny | no
+PUBG MOBILE | coach | Pasha | no
+#GRE|Greece
+Dota 2 | player | SsaSpartan- | yes
+Dota 2 | player | dEsire | no
+Dota 2 | player | Focus | no
+Dota 2 | player | Skylark | no
+Dota 2 | player | Thugitoo | no
+Dota 2 | coach | ENEA QAZOLLI | no
+#KAZ|Kazakhstan
+Counter-Strike 2 | player | def1zer | yes
+Counter-Strike 2 | player | adai | no
+Counter-Strike 2 | player | Aldikon | no
+Counter-Strike 2 | player | Botpa1 | no
+Counter-Strike 2 | player | dan4o | no
+Counter-Strike 2 | coach | smiley | no
+Dota 2 | player | HardL | yes
+Dota 2 | player | BAXA | no
+Dota 2 | player | Kuka11 | no
+Dota 2 | player | overkill | no
+Dota 2 | player | Shakh | no
+Dota 2 | coach | Alibek Sarsenbayev | no
+#IRI|Iran
+Counter-Strike 2 | player | Equalizer | yes
+Counter-Strike 2 | player | A1one | no
+Counter-Strike 2 | player | inSid10us | no
+Counter-Strike 2 | player | Krypt0n | no
+Counter-Strike 2 | player | X1ron | no
+Counter-Strike 2 | coach | Milad | no
+Dota 2 | player | KaChal | yes
+Dota 2 | player | A9 | no
+Dota 2 | player | Cold- | no
+Dota 2 | player | Matson | no
+Dota 2 | player | Zesky~ | no
+Dota 2 | coach | SEYED | no
+#BLR|Belarus
+Dota 2 | player | kur0patbI4 | yes
+Dota 2 | player | Byun | no
+Dota 2 | player | Miyaoo | no
+Dota 2 | player | Onejey | no
+Dota 2 | player | young G | no
+Dota 2 | coach | Mikhail Turchyn | no
+PUBG MOBILE | player | blrMELW1N | yes
+PUBG MOBILE | player | blrPTENCHIK | no
+PUBG MOBILE | player | blrRamz1kBoss | no
+PUBG MOBILE | player | blrTUBA | no
+PUBG MOBILE | coach | RAMAN KUCHARUK | no
+#VEN|Venezuela
+Dota 2 | player | Shy | yes
+Dota 2 | player | ArkaNa | no
+Dota 2 | player | arrakiz | no
+Dota 2 | player | Raykill | no
+Dota 2 | player | Ryoma | no
+Dota 2 | coach | Johanny Alejandro Uzcategui Morales | no
+#MKD|North Macedonia
+Dota 2 | player | H8 | yes
+Dota 2 | player | Belief | no
+Dota 2 | player | Kralot bulo | no
+Dota 2 | player | Stojkov | no
+Dota 2 | player | zipzap | no
+Dota 2 | coach | Blagoja Jovanov | no
+#NZL|New Zealand
+Dota 2 | player | Fury | yes
+Dota 2 | player | Magic | no
+Dota 2 | player | NzRain | no
+Dota 2 | player | SeveM | no
+Dota 2 | player | Zavier nz | no
+Dota 2 | coach | Tobz | no
+#MGL|Mongolia
+Counter-Strike 2 | player | NEUZ | yes
+Counter-Strike 2 | player | ariucle | no
+Counter-Strike 2 | player | clouden | no
+Counter-Strike 2 | player | hoolig4n | no
+Counter-Strike 2 | player | RATE | no
+Counter-Strike 2 | coach | shinobi | no
+Dota 2 | player | Se | yes
+Dota 2 | player | 11 | no
+Dota 2 | player | 423 | no
+Dota 2 | player | NARMAN | no
+Dota 2 | player | sanctity | no
+Dota 2 | coach | Chimid Batsukh | no
+PUBG MOBILE | player | C1丨Demo | yes
+PUBG MOBILE | player | ATOMIC | no
+PUBG MOBILE | player | Fearless | no
+PUBG MOBILE | player | KEENO | no
+PUBG MOBILE | coach | Sukhbat Otgon | no
+#CAM|Cambodia
+Mobile Legends: Bang Bang | player | SryimFelix | yes
+Mobile Legends: Bang Bang | player | Linnn | no
+Mobile Legends: Bang Bang | player | PPPPPP | no
+Mobile Legends: Bang Bang | player | Saa | no
+Mobile Legends: Bang Bang | player | Wickyyy | no
+Mobile Legends: Bang Bang | coach | Bunchhay Sin | no
+#DOM|Dominican Republic
+Mobile Legends: Bang Bang | player | JunnJose Ortiz | yes
+Mobile Legends: Bang Bang | player | Desz | no
+Mobile Legends: Bang Bang | player | INSTNCTElio Olivero | no
+Mobile Legends: Bang Bang | player | PANINI. | no
+Mobile Legends: Bang Bang | player | Ricky.Ricky Consuegra | no
+Mobile Legends: Bang Bang | coach | L O Y A LRibel Cruz | no
+#NEP|Nepal
+Mobile Legends: Bang Bang | player | Yahiko | yes
+Mobile Legends: Bang Bang | player | bobe. | no
+Mobile Legends: Bang Bang | player | GonnyGon | no
+Mobile Legends: Bang Bang | player | Hybrid | no
+Mobile Legends: Bang Bang | player | Luck. | no
+Mobile Legends: Bang Bang | coach | Saujanya Shrestha | no
+#ROU|Romania
+Counter-Strike 2 | player | fNk | no
+Counter-Strike 2 | player | lauNX | no
+Counter-Strike 2 | player | MoDo | no
+Counter-Strike 2 | player | s0und | no
+Counter-Strike 2 | player | XELLOW | no
+Counter-Strike 2 | coach | Ionut-Catalin Stanescu | no
+PUBG MOBILE | player | EXO | no
+PUBG MOBILE | player | NEBUNIE17 | no
+PUBG MOBILE | player | VCūDORIN23 | no
+PUBG MOBILE | player | VCūreDOXyz | no
+PUBG MOBILE | coach | Remus Petca | no
+#BAN|Bangladesh
+PUBG MOBILE | player | RowDY | yes
+PUBG MOBILE | player | CJboyyyy | no
+PUBG MOBILE | player | Deathstorm | no
+PUBG MOBILE | player | FLASH | no
+PUBG MOBILE | coach | MD ABDUL JABBAR SHAKIL | no
+#BRA|Brazil
+Counter-Strike Women | player | OL6A | yes
+Counter-Strike Women | player | dani | no
+Counter-Strike Women | player | GaBi | no
+Counter-Strike Women | player | poppins | no
+Counter-Strike Women | player | yungher | no
+Counter-Strike Women | coach | FABRICIO SIMOES E SILVA | no
+PUBG MOBILE | player | PEDRINHO | yes
+PUBG MOBILE | player | FederaL | no
+PUBG MOBILE | player | LiLBOY | no
+PUBG MOBILE | player | Obscure | no
+PUBG MOBILE | coach | Janderson De Deus Silva | no
+#COL|Colombia
+PUBG MOBILE | player | ReyesPlayer | yes
+PUBG MOBILE | player | COLMadeonPlayer | no
+PUBG MOBILE | player | COLvictexPlayer | no
+PUBG MOBILE | player | MolinaPlayer | no
+PUBG MOBILE | coach | Wilson Ricardo Mariño Pinzon | no
+#KGZ|Kyrgyzstan
+Counter-Strike Women | player | Jammie | yes
+Counter-Strike Women | player | amy | no
+Counter-Strike Women | player | Destroy_zloy | no
+Counter-Strike Women | player | kitosyy | no
+Counter-Strike Women | player | nomercyvec | no
+Counter-Strike Women | coach | Timur Nurmambetov | no
+PUBG MOBILE | player | EFFECT | yes
+PUBG MOBILE | player | FLYQE | no
+PUBG MOBILE | player | WARRIOR | no
+PUBG MOBILE | player | ZERYCH | no
+PUBG MOBILE | coach | Anton Gentselman | no
+#MNE|Montenegro
+PUBG MOBILE | player | mneAEIMEY13333 | no
+PUBG MOBILE | player | mneLazarmvp | no
+PUBG MOBILE | player | mneROGGO357 | no
+PUBG MOBILE | player | mneZ3USsorrie | no
+PUBG MOBILE | coach | Miloš Ćirović | no
+#MAR|Morocco
+Counter-Strike Women | player | Helkooky | no
+Counter-Strike Women | player | KillerQueen | no
+Counter-Strike Women | player | Kim | no
+Counter-Strike Women | player | Scarlet | no
+Counter-Strike Women | player | Sebsgirl1 | no
+Counter-Strike Women | coach | Haytam Nanai | no
+PUBG MOBILE | player | md | yes
+PUBG MOBILE | player | Carryboy | no
+PUBG MOBILE | player | MARSHALL | no
+PUBG MOBILE | player | SenKayy | no
+PUBG MOBILE | coach | lazyboy | no
+#SRB|Serbia
+PUBG MOBILE | player | Coa77k | yes
+PUBG MOBILE | player | BISKE | no
+PUBG MOBILE | player | LEON44 | no
+PUBG MOBILE | player | MELAZ | no
+PUBG MOBILE | coach | PEKSY | no
+#USA|United States
+Counter-Strike 2 | player | WolfY | yes
+Counter-Strike 2 | player | JBa | no
+Counter-Strike 2 | player | mason | no
+Counter-Strike 2 | player | Momo | no
+Counter-Strike 2 | player | Swisher | no
+Counter-Strike 2 | coach | Noah Oliver Francis | no
+Counter-Strike Women | player | madss | yes
+Counter-Strike Women | player | emy | no
+Counter-Strike Women | player | olya | no
+Counter-Strike Women | player | uhKelsie | no
+Counter-Strike Women | player | vanessa | no
+Counter-Strike Women | coach | Wrenna Trampel | no
+#AUS|Australia
+Counter-Strike 2 | player | viridian | yes
+Counter-Strike 2 | player | damyo | no
+Counter-Strike 2 | player | dexter | no
+Counter-Strike 2 | player | liazz | no
+Counter-Strike 2 | player | TjP | no
+Counter-Strike Women | player | BiBiAhn | yes
+Counter-Strike Women | player | epoh | no
+Counter-Strike Women | player | hdizz | no
+Counter-Strike Women | player | jaydee | no
+Counter-Strike Women | player | riv | no
+#IRQ|Iraq
+Counter-Strike 2 | player | r4id3n | yes
+Counter-Strike 2 | player | Bibu | no
+Counter-Strike 2 | player | Oscar | no
+Counter-Strike 2 | player | VeGGo | no
+Counter-Strike 2 | player | wAti | no
+#LTU|Lithuania
+Counter-Strike 2 | player | Bymas | yes
+Counter-Strike 2 | player | dziugss | no
+Counter-Strike 2 | player | MAGILA | no
+Counter-Strike 2 | player | tAk | no
+Counter-Strike 2 | player | Uzman | no
+Counter-Strike 2 | coach | Albinas Seputis | no
+#UZB|Uzbekistan
+PUBG MOBILE | player | JONIK | yes
+PUBG MOBILE | player | AGGRESSOR | no
+PUBG MOBILE | player | KHOJI | no
+PUBG MOBILE | player | SP1DY | no
+PUBG MOBILE | coach | Khusanov | no
+#POL|Poland
+Counter-Strike Women | player | LETiPlayer | yes
+Counter-Strike Women | player | AngelkaPlayer | no
+Counter-Strike Women | player | Hanka-Player | no
+Counter-Strike Women | player | HikomiPlayer | no
+Counter-Strike Women | player | vicuPlayer | no
+Counter-Strike Women | coach | Adrian Chyziak | no
+#FRA|France
+Counter-Strike Women | player | Monkey D. Julie | yes
+Counter-Strike Women | player | ASTRA | no
+Counter-Strike Women | player | Emerald | no
+Counter-Strike Women | player | Kaoday | no
+Counter-Strike Women | player | Si | no
+Counter-Strike Women | coach | Leo Gabriel Intronati | no
+#HKG|Hong Kong, China
+Counter-Strike Women | player | Joker | yes
+Counter-Strike Women | player | cand1d | no
+Counter-Strike Women | player | kimbee | no
+Counter-Strike Women | player | MiyukiBB | no
+Counter-Strike Women | player | yilammmm | no
+Counter-Strike Women | coach | Blue | no
+#NED|Netherlands
+Counter-Strike Women | player | ManeschijnX | yes
+Counter-Strike Women | player | Lieszaaa | no
+Counter-Strike Women | player | Missy | no
+Counter-Strike Women | player | Nayomy | no
+Counter-Strike Women | player | Qiyarah | no
+Counter-Strike Women | coach | Hidde Hofsté | no
+#POR|Portugal
+Counter-Strike Women | player | Aida | yes
+Counter-Strike Women | player | CatyJones | no
+Counter-Strike Women | player | D7 | no
+Counter-Strike Women | player | lekas | no
+Counter-Strike Women | player | ZAna-th | no
+Counter-Strike Women | coach | HS | no
