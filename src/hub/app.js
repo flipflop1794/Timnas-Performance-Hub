@@ -1,4 +1,4 @@
-// Timnas Performance Hub V1.6 — page shell. Analysis lives in src/core, src/dota, src/pubgm;
+// Timnas Performance Hub V1.7 — page shell. Analysis lives in src/core, src/dota, src/pubgm;
 // evidence/demo boundaries in src/hub/pipeline.js; the coaching cycle in src/core/cycle.js.
 import { DATA } from './data.gen.js';
 import { parseHeroes, parsePlayerMatches, fromOpenDotaPlayerMatches } from '../dota/data.js';
@@ -25,6 +25,9 @@ import { EVENT, defaultRunbook, tLabel, wecMatch, tick, setResult, gameNote, mar
 import { VOD_TAGS, vod, reviewVod, LEVELS, partner as partnerRec, partnerStats, AREAS, GOAL_STATUS, goal as goalRec, updateGoal, plan as newPlan } from '../core/library.js';
 import { weeklyBrief } from '../core/brief.js';
 import { seedRosters, effective, editPlayers, recordCheck, checkStatus, dotaPool, ACCOUNT_KIND, ROLE_HINT, rosterKey, CHECK_EVERY_DAYS } from '../core/rosters.js';
+import { loadReadiness, READINESS_SLOT } from '../readiness/contract.js';
+import { mockProvider, MOCK_TITLES } from '../readiness/mockProvider.js';
+import { readinessView } from '../readiness/view.js';
 import { autoCard, cardPlan, approveCard, cardMarkdown } from '../core/oppcard.js';
 import { checkin, session as loadSession, teamDay, ITEMS, ITEM_LABEL, THRESHOLDS, MIN_BASELINE_DAYS } from '../core/wellbeing.js';
 
@@ -46,7 +49,7 @@ const S = {
   roster: { 'Dota 2': ['Whitemon', 'Fbz', 'Jhocam', 'jikroy', 'Mikoto'], 'PUBG Mobile': ['AKxSatarrrGOLD', 'AKxAmetzGOLD', 'AKxVinzGOLD', 'AKxZaoo7GOLD'],
     MLBB: ['Aran', 'Kevin', 'Drichel', 'Lyoni', 'Jull.'], 'MLBB Women': [], eFootball: ['ELGA'], CS2: [], 'CS2 Women': [] },
   rivals: [], tiers: {}, scrims: [],
-  runbooks: {}, wecMatches: [], tourTitle: 'Dota 2', tourMatch: null, vods: [], partners: [], plans: {}, planTitle: 'Dota 2', planPlayer: null, rivalSeed: seedRosters(DATA.rivalRosters), rosterEdits: {}, oppCards: {}, crTitle: 'Dota 2', crNation: 'All', ocTitle: 'Dota 2', ocNation: 'Mongolia', compNation: 'Egypt', compAllEf: false, briefDate: new Date().toISOString().slice(0, 10),
+  runbooks: {}, wecMatches: [], tourTitle: 'Dota 2', tourMatch: null, vods: [], partners: [], plans: {}, planTitle: 'Dota 2', planPlayer: null, rd: { title: 'All titles', date: new Date().toISOString().slice(0, 10), data: null, key: null }, rivalSeed: seedRosters(DATA.rivalRosters), rosterEdits: {}, oppCards: {}, crTitle: 'Dota 2', crNation: 'All', ocTitle: 'Dota 2', ocNation: 'Mongolia', compNation: 'Egypt', compAllEf: false, briefDate: new Date().toISOString().slice(0, 10),
   well: { checkins: [], loads: [] }, wellTitle: 'Dota 2', wellDate: new Date().toISOString().slice(0, 10),
   selMatch: 9057681759, selNation: 'MGL', selDay: null, freshPools: {}, importReport: null, lastFlag: null,
 };
@@ -203,7 +206,7 @@ const TITLES = [
   { id: 'dota', label: 'Dota 2', tabs: [['dota-team', 'Team'], ['dota-scrims', 'Scrims & practice'], ['dota-post', 'Post-match'], ['dota-scout', 'Competitors'], ['dota-draft', 'Draft room'], ['dota-review', 'Series review']] },
   { id: 'pubgm', label: 'PUBG Mobile', tabs: [['pubgm-team', 'Team'], ['pubgm-scrims', 'Scrims & practice'], ['pubgm-log', 'Log & import'], ['pubgm-rivals', 'Competitors'], ['pubgm-sim', 'Strategy sim'], ['pubgm-review', 'Match-day review']] },
   { id: 'mlbb', label: 'Other titles', tabs: [['mlbb', 'MLBB'], ['t-mlbbw', 'MLBB Women'], ['t-efootball', 'eFootball'], ['t-cs2', 'CS2'], ['t-cs2w', 'CS2 Women']] },
-  { id: 'well', label: 'Players', tabs: [['players', 'Player plans'], ['well-day', 'Wellbeing check'], ['well-log', 'Log check-in & load']] },
+  { id: 'well', label: 'Performance', tabs: [['readiness', 'Athlete readiness (preview)'], ['players', 'Player plans'], ['well-day', 'Wellbeing check'], ['well-log', 'Log check-in & load']] },
   { id: 'staff', label: 'Staff', tabs: [['staff-cycle', 'Coaching cycle'], ['staff-measure', 'Is it working?'], ['staff-rules', 'Rules & decisions'], ['staff-sources', 'Sources & limits']] },
 ];
 const viewOf = () => { const h = location.hash.slice(1); return TITLES.some((t) => t.tabs.some(([id]) => id === h)) ? h : 'today'; };
@@ -940,6 +943,17 @@ V['comp-coverage'] = () => {
   <p class="note">eFootball's finals format is not published; its 96-nation list is the entry list, not the bracket.</p></div>`;
 };
 
+// ---------- V1.7: Athlete readiness — UI preview of Coach Donny's system (src/readiness) ----------
+// The hub only renders; the provider supplies everything. Swap the provider in READINESS_SLOT later.
+const READINESS_PROVIDERS = { mock: mockProvider };
+function ensureReadiness() {
+  const key = `${S.rd.title}|${S.rd.date}`; if (S.rd.key === key) return;
+  S.rd.key = key; S.rd.data = null;
+  const provider = READINESS_PROVIDERS[READINESS_SLOT.use] || mockProvider;
+  loadReadiness(provider, { title: S.rd.title, date: S.rd.date }).then((d) => { if (S.rd.key === key) { S.rd.data = d; if (viewOf() === 'readiness') render(); } }).catch((e) => { S.rd.error = e.message; render(); });
+}
+V.readiness = () => { ensureReadiness(); return readinessView({ data: S.rd.data, titles: MOCK_TITLES, title: S.rd.title, date: S.rd.date }); };
+
 // ---------- V1.6: rival rosters & player tracker, pre-match opponent card ----------
 const rosterOf = (title, nation) => effective(S.rivalSeed, S.rosterEdits, rosterKey(title, nation));
 async function saveRoster(team) {
@@ -1337,6 +1351,8 @@ document.addEventListener('change', (e) => {
   const id = e.target.id;
   if (id === 'meSel') { S.me = e.target.value; try { localStorage.setItem('hub-me', S.me); } catch { /* per-viewer convenience only */ } render(); }
   if (id === 'wT') { S.wellTitle = e.target.value; render(); }
+  if (id === 'rdT') { S.rd.title = e.target.value; render(); }
+  if (id === 'rdD') { S.rd.date = e.target.value || today(); render(); }
   if (id === 'crT') { S.crTitle = e.target.value; S.crNation = 'All'; render(); }
   if (id === 'crN') { S.crNation = e.target.value; render(); }
   if (id === 'ocT') { S.ocTitle = e.target.value; render(); }
