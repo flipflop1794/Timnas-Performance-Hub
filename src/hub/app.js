@@ -1,4 +1,4 @@
-// Timnas Performance Hub V1.4 — page shell. Analysis lives in src/core, src/dota, src/pubgm;
+// Timnas Performance Hub V1.5 — page shell. Analysis lives in src/core, src/dota, src/pubgm;
 // evidence/demo boundaries in src/hub/pipeline.js; the coaching cycle in src/core/cycle.js.
 import { DATA } from './data.gen.js';
 import { parseHeroes, parsePlayerMatches, fromOpenDotaPlayerMatches } from '../dota/data.js';
@@ -19,7 +19,7 @@ import { dotaTeamPipeline, dotaMatchPipeline, pubgmPipeline, todayList, PUBGM_MI
 import { mmss, round, pct } from '../core/stats.js';
 import { STAFF, TITLES as WEC_TITLES, WELLBEING, owner, ownerNote, reviewersFor, queueFor } from '../core/staff.js';
 import { staffObservation, recommendationRecord } from '../core/records.js';
-import { FIELDS, FIELD_SOURCE, TIERS, board as rivalBoard, rivalNote } from '../core/competitors.js';
+import { FIELDS, FIELD_SOURCE, TIERS, board as rivalBoard, rivalNote, crossTitle, nationProfile, coverage } from '../core/competitors.js';
 import { planScrim, completeScrim, summary as scrimSummary, FORMATS, KINDS as SCRIM_KINDS } from '../core/scrims.js';
 import { EVENT, defaultRunbook, tLabel, wecMatch, tick, setResult, gameNote, markApplied } from '../core/matchday.js';
 import { VOD_TAGS, vod, reviewVod, LEVELS, partner as partnerRec, partnerStats, AREAS, GOAL_STATUS, goal as goalRec, updateGoal, plan as newPlan } from '../core/library.js';
@@ -44,7 +44,7 @@ const S = {
   roster: { 'Dota 2': ['Whitemon', 'Fbz', 'Jhocam', 'jikroy', 'Mikoto'], 'PUBG Mobile': ['AKxSatarrrGOLD', 'AKxAmetzGOLD', 'AKxVinzGOLD', 'AKxZaoo7GOLD'],
     MLBB: ['Aran', 'Kevin', 'Drichel', 'Lyoni', 'Jull.'], 'MLBB Women': [], eFootball: ['ELGA'], CS2: [], 'CS2 Women': [] },
   rivals: [], tiers: {}, scrims: [],
-  runbooks: {}, wecMatches: [], tourTitle: 'Dota 2', tourMatch: null, vods: [], partners: [], plans: {}, planTitle: 'Dota 2', planPlayer: null, briefDate: new Date().toISOString().slice(0, 10),
+  runbooks: {}, wecMatches: [], tourTitle: 'Dota 2', tourMatch: null, vods: [], partners: [], plans: {}, planTitle: 'Dota 2', planPlayer: null, compNation: 'Egypt', compAllEf: false, briefDate: new Date().toISOString().slice(0, 10),
   well: { checkins: [], loads: [] }, wellTitle: 'Dota 2', wellDate: new Date().toISOString().slice(0, 10),
   selMatch: 9057681759, selNation: 'MGL', selDay: null, freshPools: {}, importReport: null, lastFlag: null,
 };
@@ -194,6 +194,7 @@ const dotaTeam = () => dotaTeamPipeline(S.players, S.heroes, S.asOf, Object.keys
 // ---------- routing ----------
 const TITLES = [
   { id: 'home', label: 'Today', tabs: [['today', 'My day'], ['board', 'Juara Umum board'], ['brief', 'Weekly brief']] },
+  { id: 'comp', label: 'Competitors', tabs: [['comp-overview', 'All nations'], ['comp-nation', 'Nation profile'], ['comp-coverage', 'Scouting coverage']] },
   { id: 'tour', label: 'Tournament', tabs: [['tour-runbook', 'Match-day runbook'], ['tour-series', 'Between games']] },
   { id: 'dota', label: 'Dota 2', tabs: [['dota-team', 'Team'], ['dota-scrims', 'Scrims & practice'], ['dota-post', 'Post-match'], ['dota-scout', 'Competitors'], ['dota-draft', 'Draft room'], ['dota-review', 'Series review']] },
   { id: 'pubgm', label: 'PUBG Mobile', tabs: [['pubgm-team', 'Team'], ['pubgm-scrims', 'Scrims & practice'], ['pubgm-log', 'Log & import'], ['pubgm-rivals', 'Competitors'], ['pubgm-sim', 'Strategy sim'], ['pubgm-review', 'Match-day review']] },
@@ -886,6 +887,54 @@ V.brief = () => {
   <div class="panel brief">${mdHtml(md)}</div>`;
 };
 
+// ---------- V1.5: Competitors (all titles) ----------
+const TITLE_TAB = { 'Dota 2': 'dota-scout', 'PUBG Mobile': 'pubgm-rivals', MLBB: 'mlbb', 'MLBB Women': 't-mlbbw', eFootball: 't-efootball', CS2: 't-cs2', 'CS2 Women': 't-cs2w' };
+const SHORT = { 'Dota 2': 'Dota', MLBB: 'MLBB', 'MLBB Women': 'MLBB W', 'PUBG Mobile': 'PUBGM', CS2: 'CS2', 'CS2 Women': 'CS2 W', eFootball: 'eFb' };
+const tierTag = (tier, label) => tag(tier === 'main threat' ? 'c-Blocked' : tier === 'contender' ? 'c-Low' : tier === 'watch' ? 'c-Medium' : 'k-observed', label ?? tier);
+const compData = () => ({ rivals: S.rivals, tiers: S.tiers, vods: S.vods, partners: S.partners, scrims: S.scrims, matches: S.wecMatches });
+const compHead = (sub) => `<div class="panel"><div class="lead">Competitor <em>analysis</em></div><p>${sub}</p><p class="note">Fields: ${esc(FIELD_SOURCE)}. Threat tiers are staff judgements with a reason; nothing here is scored or predicted.</p></div>`;
+
+V['comp-overview'] = () => {
+  if (S.mode === 'demo') return `<div class="panel">${DEMO_BANNER}<p class="empty">Competitor analysis uses operational records only.</p></div>`;
+  const rows = crossTitle(compData(), { includeEfootballUnscouted: S.compAllEf });
+  const multi = rows.filter((r) => r.titles.length > 1);
+  const threats = rows.flatMap((r) => r.per.filter((x) => x.tier === 'main threat').map((x) => ({ nation: r.nation, ...x })));
+  return `${compHead('Every nation Indonesia can meet at WEC, across all seven titles, in one place. Pick a nation to see everything the staff hold on it.')}
+  <div class="stats"><div class="stat"><span class="k">Nations in our fields</span><span class="v">${crossTitle(compData(), { includeEfootballUnscouted: true }).length}</span></div><div class="stat"><span class="k">In 2+ of our titles</span><span class="v">${multi.length}</span></div><div class="stat"><span class="k">Main threats set</span><span class="v">${threats.length}</span></div><div class="stat"><span class="k">Nations with notes</span><span class="v">${rows.filter((r) => r.notes).length}</span></div></div>
+  ${threats.length ? `<div class="panel"><h2>Main threats (staff)</h2><ul class="plain">${threats.map((x) => `<li>${tierTag('main threat', SHORT[x.title])} <b>${esc(x.nation)}</b> — ${esc(x.tierWhy)} <span class="note">(${esc(x.tierBy)})</span></li>`).join('')}</ul></div>` : ''}
+  <div class="panel"><h2>All nations</h2>
+    <p class="note">Sorted by main threats, then how many of our titles they enter, then notes. ${S.compAllEf ? '' : 'eFootball-only nations are hidden until someone scouts them.'} <button class="btn small" type="button" id="compEf">${S.compAllEf ? 'Hide' : 'Show'} eFootball-only nations</button></p>
+    <div class="tw"><table><thead><tr><th>Nation</th><th>Titles (staff tier)</th><th class="n">Notes</th><th class="n">VODs</th><th class="n">Stand-in scrims</th><th>Last update</th></tr></thead><tbody>
+    ${rows.map((r) => `<tr><td><button class="linkbtn" type="button" data-nation="${esc(r.nation)}">${esc(r.nation)}</button></td><td>${r.per.map((x) => tierTag(x.tier, `${SHORT[x.title]}${x.tier === 'not assessed' ? '' : ` · ${x.tier}`}`)).join(' ')}</td><td class="n">${r.notes || '—'}</td><td class="n">${r.vods || '—'}</td><td class="n">${r.scrimsDone || '—'}</td><td class="note">${esc(r.updated || '—')}</td></tr>`).join('')}</tbody></table></div></div>`;
+};
+
+V['comp-nation'] = () => {
+  if (S.mode === 'demo') return `<div class="panel">${DEMO_BANNER}<p class="empty">Operational records only.</p></div>`;
+  const all = crossTitle(compData(), { includeEfootballUnscouted: true }).map((r) => r.nation).sort((a, b) => a.localeCompare(b));
+  const n = all.includes(S.compNation) ? S.compNation : 'Egypt';
+  const P = nationProfile(n, compData());
+  const section = (x) => `<div class="obj"><header><div><span class="note">${x.updated ? `Last update ${esc(x.updated)}` : 'Not scouted yet'}</span><h3>${esc(x.title)}</h3></div>${tierTag(x.tier)}</header>
+    ${x.tierWhy ? `<p class="note">Tier by ${esc(x.tierBy)}: ${esc(x.tierWhy)}</p>` : ''}
+    <div class="h3">What we know</div>${x.notes.length ? x.notes.map((m) => `<div>${tag(`k-${m.kind}`, m.kind)} ${esc(m.note)} <span class="note">— ${esc(m.source)}, ${esc(m.date)}${m.by ? `, ${esc(m.by)}` : ''}</span></div>`).join('') : '<p class="note">Nothing yet.</p>'}
+    <div class="h3">VODs</div>${x.vods.length ? `<ul class="plain">${x.vods.map((v) => `<li><a href="${esc(v.url)}" target="_blank" rel="noopener">${esc(v.event)}</a> ${v.tags.map((t) => tag('k-observed', t)).join(' ')} ${v.reviewed ? tag('c-Verified', 'reviewed') : tag('c-Low', 'not reviewed')}</li>`).join('')}</ul>` : '<p class="note">No VOD yet.</p>'}
+    <div class="h3">Practice against their style</div><p>${x.standIns.length ? `Partners who play like them: ${x.standIns.map((p) => `<b>${esc(p.name)}</b> (${esc(p.level)})`).join(', ')}.` : 'No sparring partner in the bank plays like them yet.'} ${x.scrimsDone ? `${x.scrimsDone} stand-in scrim${x.scrimsDone > 1 ? 's' : ''} done, last ${esc(x.lastScrim)}.` : 'No stand-in scrim logged.'}${x.scrimsPlanned ? ` ${x.scrimsPlanned} planned.` : ''}</p>
+    ${x.wecMatches.length ? `<div class="h3">WEC matches</div><ul class="plain">${x.wecMatches.map((m) => `<li>${esc(m.date)}${m.stage ? ` · ${esc(m.stage)}` : ''} — ${m.result ? `${esc(m.result.result)} ${esc(m.result.score)}` : 'to play'}${m.games.length ? ` · ${m.games.length} game note(s)` : ''}</li>`).join('')}</ul>` : ''}
+    <div class="toolbar"><a class="btn" href="#${TITLE_TAB[x.title]}">Add a note, tier or VOD in ${esc(x.title)}</a></div></div>`;
+  return `${compHead('Everything the staff hold on one nation, across every title we meet them in. Use it before a match, or to share scouting work between title coaches.')}
+  <div class="panel"><div class="form"><label class="field" for="cnN">Nation<select id="cnN">${all.map((x) => `<option ${x === n ? 'selected' : ''}>${esc(x)}</option>`).join('')}</select></label></div>
+    <p><b>${esc(n)}</b> enters ${P.titles.length} of our titles: ${P.titles.map(esc).join(', ')}.${P.titles.length > 1 ? ' One scouting effort here can serve several title coaches.' : ''}</p></div>
+  <div class="cols">${P.per.map(section).join('')}</div>`;
+};
+
+V['comp-coverage'] = () => {
+  if (S.mode === 'demo') return `<div class="panel">${DEMO_BANNER}<p class="empty">Operational records only.</p></div>`;
+  const C = coverage(compData());
+  return `${compHead('How much of each field the staff have scouted, and who to scout next. Suggestions favour nations we meet in several titles, so one piece of work helps more coaches.')}
+  <div class="panel"><div class="tw"><table><thead><tr><th>Title</th><th>Focus owner</th><th class="n">Field</th><th class="n">With notes</th><th class="n">Tier set</th><th class="n">VOD reviewed</th><th>Scout next (suggestion)</th></tr></thead><tbody>
+  ${C.map((c) => `<tr><td><b>${esc(c.title)}</b></td><td>${esc(owner(c.title).name)}</td><td class="n">${c.field}</td><td class="n">${c.noted} (${c.field ? Math.round((c.noted / c.field) * 100) : 0}%)</td><td class="n">${c.tiered}</td><td class="n">${c.vodRev}</td><td>${c.next.map((x) => `<button class="linkbtn" type="button" data-nation="${esc(x)}">${esc(x)}</button>`).join(', ') || 'Field covered'}</td></tr>`).join('')}</tbody></table></div>
+  <p class="note">eFootball's finals format is not published; its 96-nation list is the entry list, not the bracket.</p></div>`;
+};
+
 // ---------- render & events ----------
 function render() {
   const view = viewOf(); renderNav(view); LAST = { recs: {} };
@@ -927,6 +976,8 @@ document.addEventListener('click', async (e) => {
     return;
   }
   if (t.dataset.act) { await cycleAct(t.dataset.act, t.dataset.id); return; }
+  if (t.dataset.nation) { S.compNation = t.dataset.nation; location.hash = 'comp-nation'; if (viewOf() === 'comp-nation') render(); return; }
+  if (id === 'compEf') { S.compAllEf = !S.compAllEf; render(); return; }
   // ---- V1.4 handlers ----
   if (id === 'rbAdd' || id === 'rbReset' || t.dataset.rbDel) {
     const ti = S.tourTitle;
@@ -1173,6 +1224,7 @@ document.addEventListener('change', (e) => {
   const id = e.target.id;
   if (id === 'meSel') { S.me = e.target.value; try { localStorage.setItem('hub-me', S.me); } catch { /* per-viewer convenience only */ } render(); }
   if (id === 'wT') { S.wellTitle = e.target.value; render(); }
+  if (id === 'cnN') { S.compNation = e.target.value; render(); }
   if (id === 'tourT') { S.tourTitle = e.target.value; render(); }
   if (id === 'tsM') { S.tourMatch = e.target.value; render(); }
   if (id === 'plT') { S.planTitle = e.target.value; S.planPlayer = null; render(); }

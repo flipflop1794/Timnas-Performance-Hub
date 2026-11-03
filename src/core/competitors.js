@@ -43,10 +43,63 @@ export function board(title, notes = [], tiers = {}) {
   const rows = field.map((nation) => {
     const ns = all.filter((n) => n.nation === nation).sort((a, b) => b.date.localeCompare(a.date));
     const t = tiers[`${title}|${nation}`];
-    return { nation, notes: ns, tier: t?.tier || 'not assessed', tierBy: t?.by || null, tierWhy: t?.why || null, multi: MULTI_TITLE[nation] || 1 };
+    return { nation, notes: ns, tier: t?.tier || 'not assessed', tierBy: t?.by || null, tierWhy: t?.why || null, multi: titleCount(nation) };
   });
   const order = (r) => TIERS.indexOf(r.tier);
   rows.sort((a, b) => order(a) - order(b) || b.notes.length - a.notes.length || a.nation.localeCompare(b.nation));
   const covered = rows.filter((r) => r.notes.length).length;
   return { title, field: field.length, rows, covered, coverage: field.length ? covered / field.length : 0 };
+}
+
+// ---- V1.5: cross-title competitor analysis ----
+export const titleCount = (nation) => Object.values(FIELDS).filter((f) => f.includes(nation)).length;
+// Every nation Indonesia can meet, across titles, with what the staff hold on it. Counts only; nothing is scored.
+export const TITLE_ORDER = ['Dota 2', 'MLBB', 'MLBB Women', 'PUBG Mobile', 'CS2', 'CS2 Women', 'eFootball'];
+const lc = (s) => (s || '').toLowerCase();
+
+export function nationProfile(nation, { rivals = [], tiers = {}, vods = [], partners = [], scrims = [], matches = [] } = {}) {
+  const titles = TITLE_ORDER.filter((t) => FIELDS[t]?.includes(nation));
+  const per = titles.map((title) => {
+    const notes = [...KNOWN, ...rivals].filter((n) => n.title === title && n.nation === nation).sort((a, b) => (b.date || '').localeCompare(a.date || ''));
+    const t = tiers[`${title}|${nation}`];
+    const v = vods.filter((x) => x.title === title && x.nation === nation);
+    const standIns = partners.filter((p) => p.title === title && p.resembles === nation);
+    const sc = scrims.filter((s) => s.title === title && s.mirrors === nation);
+    const done = sc.filter((s) => s.status === 'done');
+    const wm = matches.filter((m) => m.title === title && m.opponent === nation);
+    return { title, tier: t?.tier || 'not assessed', tierBy: t?.by || null, tierWhy: t?.why || null, notes, vods: v, vodsReviewed: v.filter((x) => x.reviewed).length,
+      standIns, scrimsDone: done.length, scrimsPlanned: sc.filter((s) => s.status === 'planned').length, lastScrim: done.map((s) => s.date).sort().at(-1) || null, wecMatches: wm,
+      updated: [...notes.map((n) => n.date), ...v.map((x) => x.added), ...(t?.at ? [t.at.slice(0, 10)] : [])].filter(Boolean).sort().at(-1) || null };
+  });
+  return { nation, titles, per };
+}
+
+export function crossTitle(data = {}, { includeEfootballUnscouted = false } = {}) {
+  const nations = [...new Set(TITLE_ORDER.flatMap((t) => FIELDS[t] || []))];
+  const rows = nations.map((n) => {
+    const p = nationProfile(n, data);
+    const onlyEf = p.titles.length === 1 && p.titles[0] === 'eFootball';
+    const touched = p.per.some((x) => x.notes.length || x.tier !== 'not assessed' || x.vods.length || x.wecMatches.length);
+    return { ...p, onlyEf, touched,
+      threats: p.per.filter((x) => x.tier === 'main threat').length,
+      notes: p.per.reduce((a, x) => a + x.notes.length, 0), vods: p.per.reduce((a, x) => a + x.vods.length, 0),
+      scrimsDone: p.per.reduce((a, x) => a + x.scrimsDone, 0), updated: p.per.map((x) => x.updated).filter(Boolean).sort().at(-1) || null };
+  }).filter((r) => includeEfootballUnscouted || !r.onlyEf || r.touched);
+  const rank = (r) => [-r.threats, -r.titles.length, -r.notes];
+  rows.sort((a, b) => { const x = rank(a), y = rank(b); for (let i = 0; i < x.length; i++) if (x[i] !== y[i]) return x[i] - y[i]; return a.nation.localeCompare(b.nation); });
+  return rows;
+}
+
+// Scouting coverage per title and the next nations to scout: unscouted first, multi-title nations first
+// (one scouting effort serves several title coaches), then tier.
+export function coverage(data = {}) {
+  return TITLE_ORDER.map((title) => {
+    const field = FIELDS[title] || [];
+    const ps = field.map((n) => ({ nation: n, ...nationProfile(n, data).per.find((x) => x.title === title) }));
+    const noted = ps.filter((x) => x.notes.length).length;
+    const tiered = ps.filter((x) => x.tier !== 'not assessed').length;
+    const vodRev = ps.filter((x) => x.vodsReviewed).length;
+    const next = ps.filter((x) => !x.notes.length).sort((a, b) => titleCount(b.nation) - titleCount(a.nation) || TIERS.indexOf(a.tier) - TIERS.indexOf(b.tier) || a.nation.localeCompare(b.nation)).slice(0, 3).map((x) => x.nation);
+    return { title, field: field.length, noted, tiered, vodRev, next };
+  });
 }

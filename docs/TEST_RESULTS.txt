@@ -6,303 +6,327 @@ TAP version 13
 # Subtest: AC1 synthetic data is blocked from every operational path
 ok 1 - AC1 synthetic data is blocked from every operational path
   ---
-  duration_ms: 911.59493
+  duration_ms: 878.537533
   type: 'test'
   ...
 # Subtest: AC2 an engine proposal sent to review shows as proposed everywhere
 ok 2 - AC2 an engine proposal sent to review shows as proposed everywhere
   ---
-  duration_ms: 1315.597617
+  duration_ms: 1353.527267
   type: 'test'
   ...
 # Subtest: AC3/AC4 review reasons are kept and sessions link forward to decisions
 ok 3 - AC3/AC4 review reasons are kept and sessions link forward to decisions
   ---
-  duration_ms: 1716.057761
+  duration_ms: 1877.367365
   type: 'test'
   ...
 # Subtest: AC5 sparse data gives an explicit limitation, not a recommendation
 ok 4 - AC5 sparse data gives an explicit limitation, not a recommendation
   ---
-  duration_ms: 6.144166
+  duration_ms: 4.138561
   type: 'test'
   ...
 # Subtest: AC6 club evidence is labelled club and excluded from national review
 ok 5 - AC6 club evidence is labelled club and excluded from national review
   ---
-  duration_ms: 303.081026
+  duration_ms: 242.340599
   type: 'test'
   ...
 # Subtest: AC7 changing a rule profile flags affected views and objectives
 ok 6 - AC7 changing a rule profile flags affected views and objectives
   ---
-  duration_ms: 1382.492491
+  duration_ms: 1150.573366
   type: 'test'
   ...
 # Subtest: AC8 import failures explain what to do
 ok 7 - AC8 import failures explain what to do
   ---
-  duration_ms: 2.1179
+  duration_ms: 1.790087
   type: 'test'
   ...
 # Subtest: AC8b the page reports a failed import and keeps going
 ok 8 - AC8b the page reports a failed import and keeps going
   ---
-  duration_ms: 682.716439
+  duration_ms: 532.167202
   type: 'test'
   ...
 # Subtest: AC9 (simulated) operational PUBGM log → proposal → Today, with a stand-in store
 ok 9 - AC9 (simulated) operational PUBGM log → proposal → Today, with a stand-in store
   ---
-  duration_ms: 866.418358
+  duration_ms: 1117.798785
   type: 'test'
   ...
 # Subtest: competitor fields match the published finals sizes (Indonesia excluded)
 ok 10 - competitor fields match the published finals sizes (Indonesia excluded)
   ---
-  duration_ms: 1.662437
+  duration_ms: 1.532315
   type: 'test'
   ...
 # Subtest: competitor board: verified notes, staff tiers with reasons, field check
 ok 11 - competitor board: verified notes, staff tiers with reasons, field check
   ---
-  duration_ms: 8.444223
+  duration_ms: 9.637421
   type: 'test'
   ...
 # Subtest: scrim rules: partner and owner required; a scrim result needs a score
 ok 12 - scrim rules: partner and owner required; a scrim result needs a score
   ---
-  duration_ms: 1.260223
+  duration_ms: 2.311322
   type: 'test'
   ...
 # Subtest: page: a scrim that practises an accepted objective logs a linked session
 ok 13 - page: a scrim that practises an accepted objective logs a linked session
   ---
-  duration_ms: 2406.990969
+  duration_ms: 2373.836144
+  type: 'test'
+  ...
+# Subtest: cross-title: nations ranked by staff main threats, then titles entered
+ok 14 - cross-title: nations ranked by staff main threats, then titles entered
+  ---
+  duration_ms: 11.262703
+  type: 'test'
+  ...
+# Subtest: nation profile joins notes, tiers, VODs, stand-in partners, scrims and WEC matches
+ok 15 - nation profile joins notes, tiers, VODs, stand-in partners, scrims and WEC matches
+  ---
+  duration_ms: 0.97597
+  type: 'test'
+  ...
+# Subtest: coverage suggests unscouted nations, multi-title first
+ok 16 - coverage suggests unscouted nations, multi-title first
+  ---
+  duration_ms: 2.633874
+  type: 'test'
+  ...
+# Subtest: page: competitors tab — overview, nation profile, coverage
+ok 17 - page: competitors tab — overview, nation profile, coverage
+  ---
+  duration_ms: 615.946306
   type: 'test'
   ...
 # Subtest: stats: wilson, shrink, rng
-ok 14 - stats: wilson, shrink, rng
+ok 18 - stats: wilson, shrink, rng
   ---
-  duration_ms: 1.830399
+  duration_ms: 2.071744
   type: 'test'
   ...
 # Subtest: evidence: finding requires a lens; recommendation requires all five parts
-ok 15 - evidence: finding requires a lens; recommendation requires all five parts
+ok 19 - evidence: finding requires a lens; recommendation requires all five parts
   ---
-  duration_ms: 0.727306
+  duration_ms: 0.785673
   type: 'test'
   ...
 # Subtest: measure: small or unfair windows are never reported as clean improvement
-ok 16 - measure: small or unfair windows are never reported as clean improvement
+ok 20 - measure: small or unfair windows are never reported as clean improvement
   ---
-  duration_ms: 0.744466
+  duration_ms: 0.981008
   type: 'test'
   ...
 # Subtest: dota data: all five WEC players loaded with real accounts
-ok 17 - dota data: all five WEC players loaded with real accounts
+ok 21 - dota data: all five WEC players loaded with real accounts
   ---
-  duration_ms: 1.793745
+  duration_ms: 1.902288
   type: 'test'
   ...
 # Subtest: dota data: shared match rows agree between players (cross-check)
-ok 18 - dota data: shared match rows agree between players (cross-check)
+ok 22 - dota data: shared match rows agree between players (cross-check)
   ---
-  duration_ms: 0.960199
+  duration_ms: 1.102205
   type: 'test'
   ...
 # Subtest: dota data: OpenDota full-match reducer handles a minimal record
-ok 19 - dota data: OpenDota full-match reducer handles a minimal record
+ok 23 - dota data: OpenDota full-match reducer handles a minimal record
   ---
-  duration_ms: 0.5994
+  duration_ms: 0.744345
   type: 'test'
   ...
 # Subtest: dota pools: positions inferred from lanes and hero roles
-ok 20 - dota pools: positions inferred from lanes and hero roles
+ok 24 - dota pools: positions inferred from lanes and hero roles
   ---
-  duration_ms: 0.304715
+  duration_ms: 0.404695
   type: 'test'
   ...
 # Subtest: dota team findings: club context is tagged and synergy gap is flagged
-ok 21 - dota team findings: club context is tagged and synergy gap is flagged
+ok 25 - dota team findings: club context is tagged and synergy gap is flagged
   ---
-  duration_ms: 5.981734
+  duration_ms: 6.461455
   type: 'test'
   ...
 # Subtest: dota draft: CM order matches both real tournament drafts
-ok 22 - dota draft: CM order matches both real tournament drafts
+ok 26 - dota draft: CM order matches both real tournament drafts
   ---
-  duration_ms: 0.880766
+  duration_ms: 1.099799
   type: 'test'
   ...
 # Subtest: dota draft: evaluation separates terms and explains a comparison
-ok 23 - dota draft: evaluation separates terms and explains a comparison
+ok 27 - dota draft: evaluation separates terms and explains a comparison
   ---
-  duration_ms: 3.316088
+  duration_ms: 3.719151
   type: 'test'
   ...
 # Subtest: dota draft: suggestions carry reasons and never repeat taken heroes
-ok 24 - dota draft: suggestions carry reasons and never repeat taken heroes
+ok 28 - dota draft: suggestions carry reasons and never repeat taken heroes
   ---
-  duration_ms: 12.403116
+  duration_ms: 13.924771
   type: 'test'
   ...
 # Subtest: dota draft patterns: first actions and adaptation from real picks_bans
-ok 25 - dota draft patterns: first actions and adaptation from real picks_bans
+ok 29 - dota draft patterns: first actions and adaptation from real picks_bans
   ---
-  duration_ms: 0.783292
+  duration_ms: 0.977352
   type: 'test'
   ...
 # Subtest: dota match 9057681759: facts read correctly from the parsed record
-ok 26 - dota match 9057681759: facts read correctly from the parsed record
+ok 30 - dota match 9057681759: facts read correctly from the parsed record
   ---
-  duration_ms: 3.101388
+  duration_ms: 3.837711
   type: 'test'
   ...
 # Subtest: dota match 9035078952: same match seen from both Indonesian players' sides
-ok 27 - dota match 9035078952: same match seen from both Indonesian players' sides
+ok 31 - dota match 9035078952: same match seen from both Indonesian players' sides
   ---
-  duration_ms: 1.515124
+  duration_ms: 1.821298
   type: 'test'
   ...
 # Subtest: dota scouting (Mongolia): coverage gaps are explicit and ban plan uses real counts
-ok 28 - dota scouting (Mongolia): coverage gaps are explicit and ban plan uses real counts
+ok 32 - dota scouting (Mongolia): coverage gaps are explicit and ban plan uses real counts
   ---
-  duration_ms: 0.886834
+  duration_ms: 1.022221
   type: 'test'
   ...
 # Subtest: coaches: three different outputs; C challenges single-match claims; verdict needs human review
-ok 29 - coaches: three different outputs; C challenges single-match claims; verdict needs human review
+ok 33 - coaches: three different outputs; C challenges single-match claims; verdict needs human review
   ---
-  duration_ms: 3.324718
+  duration_ms: 4.013376
   type: 'test'
   ...
 # Subtest: pubgm: scoring profiles — WEC is blocked, default computes
-ok 30 - pubgm: scoring profiles — WEC is blocked, default computes
+ok 34 - pubgm: scoring profiles — WEC is blocked, default computes
   ---
-  duration_ms: 0.468953
+  duration_ms: 0.593118
   type: 'test'
   ...
 # Subtest: pubgm: demo log is valid and clearly synthetic
-ok 31 - pubgm: demo log is valid and clearly synthetic
+ok 35 - pubgm: demo log is valid and clearly synthetic
   ---
-  duration_ms: 6.29781
+  duration_ms: 6.624127
   type: 'test'
   ...
 # Subtest: pubgm: validator catches broken rows
-ok 32 - pubgm: validator catches broken rows
+ok 36 - pubgm: validator catches broken rows
   ---
-  duration_ms: 0.306202
+  duration_ms: 0.424914
   type: 'test'
   ...
 # Subtest: pubgm: engine finds the patterns planted in the synthetic log
-ok 33 - pubgm: engine finds the patterns planted in the synthetic log
+ok 37 - pubgm: engine finds the patterns planted in the synthetic log
   ---
-  duration_ms: 4.681418
+  duration_ms: 5.929785
   type: 'test'
   ...
 # Subtest: pubgm: fight classification rules
-ok 34 - pubgm: fight classification rules
+ok 38 - pubgm: fight classification rules
   ---
-  duration_ms: 0.632079
+  duration_ms: 0.815915
   type: 'test'
   ...
 # Subtest: pubgm simulator: reproducible ranges with stated basis
-ok 35 - pubgm simulator: reproducible ranges with stated basis
+ok 39 - pubgm simulator: reproducible ranges with stated basis
   ---
-  duration_ms: 31.140767
+  duration_ms: 29.326389
   type: 'test'
   ...
 # Subtest: pubgm coaches and recommendations
-ok 36 - pubgm coaches and recommendations
+ok 40 - pubgm coaches and recommendations
   ---
-  duration_ms: 5.476921
+  duration_ms: 4.935254
   type: 'test'
   ...
 # Subtest: routing follows the confirmed staff roles
-ok 37 - routing follows the confirmed staff roles
+ok 41 - routing follows the confirmed staff roles
   ---
-  duration_ms: 1.732554
+  duration_ms: 1.75966
   type: 'test'
   ...
 # Subtest: staff observation needs source, games, context and enters the owner's queue
-ok 38 - staff observation needs source, games, context and enters the owner's queue
+ok 42 - staff observation needs source, games, context and enters the owner's queue
   ---
-  duration_ms: 2.183248
+  duration_ms: 2.353657
   type: 'test'
   ...
 # Subtest: wellbeing: validation, baseline building, personal flags, no scores
-ok 39 - wellbeing: validation, baseline building, personal flags, no scores
+ok 43 - wellbeing: validation, baseline building, personal flags, no scores
   ---
-  duration_ms: 18.311105
+  duration_ms: 17.578156
   type: 'test'
   ...
 # Subtest: page: MLBB observation goes to Aufa, MLBB Women to Fayad; board covers all titles
-ok 40 - page: MLBB observation goes to Aufa, MLBB Women to Fayad; board covers all titles
+ok 44 - page: MLBB observation goes to Aufa, MLBB Women to Fayad; board covers all titles
   ---
-  duration_ms: 2040.97107
+  duration_ms: 2214.803922
   type: 'test'
   ...
 # Subtest: page: wellbeing check-in saves for editors and is hidden when access is refused
-ok 41 - page: wellbeing check-in saves for editors and is hidden when access is refused
+ok 45 - page: wellbeing check-in saves for editors and is hidden when access is refused
   ---
-  duration_ms: 714.008757
+  duration_ms: 644.674943
   type: 'test'
   ...
 # Subtest: hub: every view renders without errors
-ok 42 - hub: every view renders without errors
+ok 46 - hub: every view renders without errors
   ---
-  duration_ms: 687.895521
+  duration_ms: 747.403749
   type: 'test'
   ...
 # Subtest: hub: draft room locks heroes and compares drafts
-ok 43 - hub: draft room locks heroes and compares drafts
+ok 47 - hub: draft room locks heroes and compares drafts
   ---
-  duration_ms: 395.4166
+  duration_ms: 524.385335
   type: 'test'
   ...
 # Subtest: hub: PUBGM CSV validation rejects a broken log and accepts a good one
-ok 44 - hub: PUBGM CSV validation rejects a broken log and accepts a good one
+ok 48 - hub: PUBGM CSV validation rejects a broken log and accepts a good one
   ---
-  duration_ms: 293.269575
+  duration_ms: 240.509408
   type: 'test'
   ...
 # Subtest: runbook template and WEC match tracker rules
-ok 45 - runbook template and WEC match tracker rules
+ok 49 - runbook template and WEC match tracker rules
   ---
-  duration_ms: 1.970593
+  duration_ms: 2.10774
   type: 'test'
   ...
 # Subtest: between-games sheet: adjustment required, calls kept per player, applied marked
-ok 46 - between-games sheet: adjustment required, calls kept per player, applied marked
+ok 50 - between-games sheet: adjustment required, calls kept per player, applied marked
   ---
-  duration_ms: 1.073024
+  duration_ms: 1.18934
   type: 'test'
   ...
 # Subtest: VOD library, partner bank and goals validate their inputs
-ok 47 - VOD library, partner bank and goals validate their inputs
+ok 51 - VOD library, partner bank and goals validate their inputs
   ---
-  duration_ms: 0.911698
+  duration_ms: 0.910994
   type: 'test'
   ...
 # Subtest: weekly brief: counts per title, gaps, no individual wellbeing values
-ok 48 - weekly brief: counts per title, gaps, no individual wellbeing values
+ok 52 - weekly brief: counts per title, gaps, no individual wellbeing values
   ---
-  duration_ms: 9.565277
+  duration_ms: 9.715019
   type: 'test'
   ...
 # Subtest: page: runbook, WEC match, between-games, VOD, partner, player plan and brief
-ok 49 - page: runbook, WEC match, between-games, VOD, partner, player plan and brief
+ok 53 - page: runbook, WEC match, between-games, VOD, partner, player plan and brief
   ---
-  duration_ms: 4426.736848
+  duration_ms: 4855.443925
   type: 'test'
   ...
-1..49
-# tests 49
+1..53
+# tests 53
 # suites 0
-# pass 49
+# pass 53
 # fail 0
 # cancelled 0
 # skipped 0
 # todo 0
-# duration_ms 21146.430452
+# duration_ms 22756.56491
