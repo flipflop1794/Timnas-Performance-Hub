@@ -32,7 +32,7 @@ jobs:
           gpg --batch --yes --pinentry-mode loopback --passphrase "$PASS" --symmetric --cipher-algo AES256 -o "hub-backup-$stamp.tgz.gpg" "hub-backup-$stamp.tgz"
           rm -f public.sql auth.sql "hub-backup-$stamp.tgz"
           ls -la
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v5
         if: steps.check.outputs.ok == 'true'
         with:
           name: hub-backup

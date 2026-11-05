@@ -10,7 +10,8 @@
     "typecheck": "tsc -p tsconfig.json",
     "build": "node tools/build.mjs",
     "build:web": "node tools/build.mjs --web",
-    "demo": "node tools/gen_pubgm_demo.mjs"
+    "demo": "node tools/gen_pubgm_demo.mjs",
+    "pretest": "node tools/build.mjs"
   },
   "devDependencies": {
     "esbuild": "^0.25.12",
