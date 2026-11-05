@@ -1,392 +1,478 @@
-
-> perfhub@1.0.0 test
-> node --test tests/*.test.js
-
 TAP version 13
 # Subtest: AC1 synthetic data is blocked from every operational path
 ok 1 - AC1 synthetic data is blocked from every operational path
   ---
-  duration_ms: 868.527181
+  duration_ms: 705.855779
   type: 'test'
   ...
 # Subtest: AC2 an engine proposal sent to review shows as proposed everywhere
 ok 2 - AC2 an engine proposal sent to review shows as proposed everywhere
   ---
-  duration_ms: 1371.369827
+  duration_ms: 1245.344585
   type: 'test'
   ...
 # Subtest: AC3/AC4 review reasons are kept and sessions link forward to decisions
 ok 3 - AC3/AC4 review reasons are kept and sessions link forward to decisions
   ---
-  duration_ms: 2037.015854
+  duration_ms: 1487.26733
   type: 'test'
   ...
 # Subtest: AC5 sparse data gives an explicit limitation, not a recommendation
 ok 4 - AC5 sparse data gives an explicit limitation, not a recommendation
   ---
-  duration_ms: 6.432751
+  duration_ms: 3.684996
   type: 'test'
   ...
 # Subtest: AC6 club evidence is labelled club and excluded from national review
 ok 5 - AC6 club evidence is labelled club and excluded from national review
   ---
-  duration_ms: 367.301284
+  duration_ms: 288.479241
   type: 'test'
   ...
 # Subtest: AC7 changing a rule profile flags affected views and objectives
 ok 6 - AC7 changing a rule profile flags affected views and objectives
   ---
-  duration_ms: 1306.853876
+  duration_ms: 1189.038351
   type: 'test'
   ...
 # Subtest: AC8 import failures explain what to do
 ok 7 - AC8 import failures explain what to do
   ---
-  duration_ms: 1.580083
+  duration_ms: 1.695089
   type: 'test'
   ...
 # Subtest: AC8b the page reports a failed import and keeps going
 ok 8 - AC8b the page reports a failed import and keeps going
   ---
-  duration_ms: 736.884868
+  duration_ms: 631.809741
   type: 'test'
   ...
 # Subtest: AC9 (simulated) operational PUBGM log → proposal → Today, with a stand-in store
 ok 9 - AC9 (simulated) operational PUBGM log → proposal → Today, with a stand-in store
   ---
-  duration_ms: 1108.567772
+  duration_ms: 1123.555354
   type: 'test'
   ...
 # Subtest: competitor fields match the published finals sizes (Indonesia excluded)
 ok 10 - competitor fields match the published finals sizes (Indonesia excluded)
   ---
-  duration_ms: 1.827705
+  duration_ms: 1.409576
   type: 'test'
   ...
 # Subtest: competitor board: verified notes, staff tiers with reasons, field check
 ok 11 - competitor board: verified notes, staff tiers with reasons, field check
   ---
-  duration_ms: 9.001053
+  duration_ms: 8.95007
   type: 'test'
   ...
 # Subtest: scrim rules: partner and owner required; a scrim result needs a score
 ok 12 - scrim rules: partner and owner required; a scrim result needs a score
   ---
-  duration_ms: 1.69226
+  duration_ms: 1.33759
   type: 'test'
   ...
 # Subtest: page: a scrim that practises an accepted objective logs a linked session
 ok 13 - page: a scrim that practises an accepted objective logs a linked session
   ---
-  duration_ms: 2947.759129
+  duration_ms: 2614.732709
   type: 'test'
   ...
 # Subtest: cross-title: nations ranked by staff main threats, then titles entered
 ok 14 - cross-title: nations ranked by staff main threats, then titles entered
   ---
-  duration_ms: 16.461219
+  duration_ms: 9.998783
   type: 'test'
   ...
 # Subtest: nation profile joins notes, tiers, VODs, stand-in partners, scrims and WEC matches
 ok 15 - nation profile joins notes, tiers, VODs, stand-in partners, scrims and WEC matches
   ---
-  duration_ms: 1.073727
+  duration_ms: 0.849348
   type: 'test'
   ...
 # Subtest: coverage suggests unscouted nations, multi-title first
 ok 16 - coverage suggests unscouted nations, multi-title first
   ---
-  duration_ms: 2.925587
+  duration_ms: 2.512559
   type: 'test'
   ...
 # Subtest: page: competitors tab — overview, nation profile, coverage
 ok 17 - page: competitors tab — overview, nation profile, coverage
   ---
-  duration_ms: 720.745505
+  duration_ms: 562.708448
   type: 'test'
   ...
 # Subtest: stats: wilson, shrink, rng
 ok 18 - stats: wilson, shrink, rng
   ---
-  duration_ms: 1.363585
+  duration_ms: 1.286762
   type: 'test'
   ...
 # Subtest: evidence: finding requires a lens; recommendation requires all five parts
 ok 19 - evidence: finding requires a lens; recommendation requires all five parts
   ---
-  duration_ms: 0.5636
+  duration_ms: 0.62066
   type: 'test'
   ...
 # Subtest: measure: small or unfair windows are never reported as clean improvement
 ok 20 - measure: small or unfair windows are never reported as clean improvement
   ---
-  duration_ms: 0.600607
+  duration_ms: 0.750589
   type: 'test'
   ...
 # Subtest: dota data: all five WEC players loaded with real accounts
 ok 21 - dota data: all five WEC players loaded with real accounts
   ---
-  duration_ms: 1.297744
+  duration_ms: 1.478244
   type: 'test'
   ...
 # Subtest: dota data: shared match rows agree between players (cross-check)
 ok 22 - dota data: shared match rows agree between players (cross-check)
   ---
-  duration_ms: 1.370935
+  duration_ms: 0.891033
   type: 'test'
   ...
 # Subtest: dota data: OpenDota full-match reducer handles a minimal record
 ok 23 - dota data: OpenDota full-match reducer handles a minimal record
   ---
-  duration_ms: 0.64602
+  duration_ms: 0.544676
   type: 'test'
   ...
 # Subtest: dota pools: positions inferred from lanes and hero roles
 ok 24 - dota pools: positions inferred from lanes and hero roles
   ---
-  duration_ms: 0.405879
+  duration_ms: 0.503692
   type: 'test'
   ...
 # Subtest: dota team findings: club context is tagged and synergy gap is flagged
 ok 25 - dota team findings: club context is tagged and synergy gap is flagged
   ---
-  duration_ms: 6.664362
+  duration_ms: 3.647594
   type: 'test'
   ...
 # Subtest: dota draft: CM order matches both real tournament drafts
 ok 26 - dota draft: CM order matches both real tournament drafts
   ---
-  duration_ms: 1.102765
+  duration_ms: 0.564437
   type: 'test'
   ...
 # Subtest: dota draft: evaluation separates terms and explains a comparison
 ok 27 - dota draft: evaluation separates terms and explains a comparison
   ---
-  duration_ms: 3.79165
+  duration_ms: 1.969601
   type: 'test'
   ...
 # Subtest: dota draft: suggestions carry reasons and never repeat taken heroes
 ok 28 - dota draft: suggestions carry reasons and never repeat taken heroes
   ---
-  duration_ms: 13.332847
+  duration_ms: 7.051638
   type: 'test'
   ...
 # Subtest: dota draft patterns: first actions and adaptation from real picks_bans
 ok 29 - dota draft patterns: first actions and adaptation from real picks_bans
   ---
-  duration_ms: 0.968037
+  duration_ms: 0.57534
   type: 'test'
   ...
 # Subtest: dota match 9057681759: facts read correctly from the parsed record
 ok 30 - dota match 9057681759: facts read correctly from the parsed record
   ---
-  duration_ms: 3.621443
+  duration_ms: 1.950858
   type: 'test'
   ...
 # Subtest: dota match 9035078952: same match seen from both Indonesian players' sides
 ok 31 - dota match 9035078952: same match seen from both Indonesian players' sides
   ---
-  duration_ms: 1.776457
+  duration_ms: 0.974763
   type: 'test'
   ...
 # Subtest: dota scouting (Mongolia): coverage gaps are explicit and ban plan uses real counts
 ok 32 - dota scouting (Mongolia): coverage gaps are explicit and ban plan uses real counts
   ---
-  duration_ms: 1.016584
+  duration_ms: 0.622383
   type: 'test'
   ...
 # Subtest: coaches: three different outputs; C challenges single-match claims; verdict needs human review
 ok 33 - coaches: three different outputs; C challenges single-match claims; verdict needs human review
   ---
-  duration_ms: 3.973349
+  duration_ms: 2.000822
   type: 'test'
   ...
 # Subtest: pubgm: scoring profiles — WEC is blocked, default computes
 ok 34 - pubgm: scoring profiles — WEC is blocked, default computes
   ---
-  duration_ms: 0.730287
+  duration_ms: 0.3146
   type: 'test'
   ...
 # Subtest: pubgm: demo log is valid and clearly synthetic
 ok 35 - pubgm: demo log is valid and clearly synthetic
   ---
-  duration_ms: 5.134104
+  duration_ms: 5.934987
   type: 'test'
   ...
 # Subtest: pubgm: validator catches broken rows
 ok 36 - pubgm: validator catches broken rows
   ---
-  duration_ms: 0.232346
+  duration_ms: 0.175952
   type: 'test'
   ...
 # Subtest: pubgm: engine finds the patterns planted in the synthetic log
 ok 37 - pubgm: engine finds the patterns planted in the synthetic log
   ---
-  duration_ms: 2.961424
+  duration_ms: 3.061945
   type: 'test'
   ...
 # Subtest: pubgm: fight classification rules
 ok 38 - pubgm: fight classification rules
   ---
-  duration_ms: 0.494567
+  duration_ms: 0.506743
   type: 'test'
   ...
 # Subtest: pubgm simulator: reproducible ranges with stated basis
 ok 39 - pubgm simulator: reproducible ranges with stated basis
   ---
-  duration_ms: 18.222173
+  duration_ms: 14.464196
   type: 'test'
   ...
 # Subtest: pubgm coaches and recommendations
 ok 40 - pubgm coaches and recommendations
   ---
-  duration_ms: 3.258359
+  duration_ms: 2.661297
+  type: 'test'
+  ...
+# Subtest: every title has its own section with Team, Scrims, Scrim reports and Competitors; MLBB titles add Draft Lab
+ok 41 - every title has its own section with Team, Scrims, Scrim reports and Competitors; MLBB titles add Draft Lab
+  ---
+  duration_ms: 1169.036997
+  type: 'test'
+  ...
+# Subtest: a coach files a report: saved, shown by day, closes the planned session, corrections appended, CSV offered
+ok 42 - a coach files a report: saved, shown by day, closes the planned session, corrections appended, CSV offered
+  ---
+  duration_ms: 1263.546095
+  type: 'test'
+  ...
+# Subtest: PUBG Mobile reports use points; future dates and phone numbers are refused
+ok 43 - PUBG Mobile reports use points; future dates and phone numbers are refused
+  ---
+  duration_ms: 422.143264
+  type: 'test'
+  ...
+# Subtest: weekly brief includes a scrim report table and flags titles without a report
+ok 44 - weekly brief includes a scrim report table and flags titles without a report
+  ---
+  duration_ms: 4.622891
   type: 'test'
   ...
 # Subtest: dictionary, prefixes and patterns; data and blank text untouched
-ok 41 - dictionary, prefixes and patterns; data and blank text untouched
+ok 45 - dictionary, prefixes and patterns; data and blank text untouched
   ---
-  duration_ms: 6.174217
+  duration_ms: 6.085187
   type: 'test'
   ...
 # Subtest: page in Bahasa Indonesia: toggle, stable redraws, option values kept, logic still works
-ok 42 - page in Bahasa Indonesia: toggle, stable redraws, option values kept, logic still works
+ok 46 - page in Bahasa Indonesia: toggle, stable redraws, option values kept, logic still works
   ---
-  duration_ms: 1601.965027
+  duration_ms: 1126.319377
+  type: 'test'
+  ...
+# Subtest: V1.9 report pages and title hubs are translated; data and option values stay as written
+ok 47 - V1.9 report pages and title hubs are translated; data and option values stay as written
+  ---
+  duration_ms: 367.508457
   type: 'test'
   ...
 # Subtest: mock provider fulfils the contract for every title and for all titles together
-ok 43 - mock provider fulfils the contract for every title and for all titles together
+ok 48 - mock provider fulfils the contract for every title and for all titles together
   ---
-  duration_ms: 5.779494
+  duration_ms: 5.966231
   type: 'test'
   ...
 # Subtest: view renders the preview label, all five components, and only the provider's data
-ok 44 - view renders the preview label, all five components, and only the provider's data
+ok 49 - view renders the preview label, all five components, and only the provider's data
   ---
-  duration_ms: 17.996741
+  duration_ms: 13.880789
   type: 'test'
   ...
 # Subtest: page: Performance → Athlete readiness (preview) loads, filters by title and date
-ok 45 - page: Performance → Athlete readiness (preview) loads, filters by title and date
+ok 50 - page: Performance → Athlete readiness (preview) loads, filters by title and date
   ---
-  duration_ms: 529.307238
+  duration_ms: 402.507708
+  type: 'test'
+  ...
+# Subtest: every WEC title has a report spec
+ok 51 - every WEC title has a report spec
+  ---
+  duration_ms: 1.531494
+  type: 'test'
+  ...
+# Subtest: a complete report is saved as operational data
+ok 52 - a complete report is saved as operational data
+  ---
+  duration_ms: 1.879739
+  type: 'test'
+  ...
+# Subtest: required fields are enforced with plain messages
+ok 53 - required fields are enforced with plain messages
+  ---
+  duration_ms: 0.810144
+  type: 'test'
+  ...
+# Subtest: PUBG Mobile records points, not wins and losses
+ok 54 - PUBG Mobile records points, not wins and losses
+  ---
+  duration_ms: 0.346793
+  type: 'test'
+  ...
+# Subtest: eFootball and CS2 use their own wording; round scores are allowed in notes
+ok 55 - eFootball and CS2 use their own wording; round scores are allowed in notes
+  ---
+  duration_ms: 0.283184
+  type: 'test'
+  ...
+# Subtest: phone or ID numbers are refused in player notes and corrections only
+ok 56 - phone or ID numbers are refused in player notes and corrections only
+  ---
+  duration_ms: 0.266341
+  type: 'test'
+  ...
+# Subtest: corrections are appended; the original report is never changed
+ok 57 - corrections are appended; the original report is never changed
+  ---
+  duration_ms: 0.211408
+  type: 'test'
+  ...
+# Subtest: daily roll-up groups sessions by date and adds up results
+ok 58 - daily roll-up groups sessions by date and adds up results
+  ---
+  duration_ms: 6.927098
+  type: 'test'
+  ...
+# Subtest: summary: seven-day totals, trend, days since last report, carry-over adjustment
+ok 59 - summary: seven-day totals, trend, days since last report, carry-over adjustment
+  ---
+  duration_ms: 0.72216
+  type: 'test'
+  ...
+# Subtest: CSV export keeps quotes and commas intact and includes corrections
+ok 60 - CSV export keeps quotes and commas intact and includes corrections
+  ---
+  duration_ms: 0.687344
   type: 'test'
   ...
 # Subtest: routing follows the confirmed staff roles
-ok 46 - routing follows the confirmed staff roles
+ok 61 - routing follows the confirmed staff roles
   ---
-  duration_ms: 1.965305
+  duration_ms: 1.09404
   type: 'test'
   ...
 # Subtest: staff observation needs source, games, context and enters the owner's queue
-ok 47 - staff observation needs source, games, context and enters the owner's queue
+ok 62 - staff observation needs source, games, context and enters the owner's queue
   ---
-  duration_ms: 2.571409
+  duration_ms: 1.406679
   type: 'test'
   ...
 # Subtest: wellbeing: validation, baseline building, personal flags, no scores
-ok 48 - wellbeing: validation, baseline building, personal flags, no scores
+ok 63 - wellbeing: validation, baseline building, personal flags, no scores
   ---
-  duration_ms: 17.885668
+  duration_ms: 8.177029
   type: 'test'
   ...
 # Subtest: page: MLBB observation goes to Aufa, MLBB Women to Fayad; board covers all titles
-ok 49 - page: MLBB observation goes to Aufa, MLBB Women to Fayad; board covers all titles
+ok 64 - page: MLBB observation goes to Aufa, MLBB Women to Fayad; board covers all titles
   ---
-  duration_ms: 2273.274421
+  duration_ms: 851.191937
   type: 'test'
   ...
 # Subtest: page: wellbeing check-in saves for editors and is hidden when access is refused
-ok 50 - page: wellbeing check-in saves for editors and is hidden when access is refused
+ok 65 - page: wellbeing check-in saves for editors and is hidden when access is refused
   ---
-  duration_ms: 882.40397
+  duration_ms: 697.327304
   type: 'test'
   ...
 # Subtest: seeded rosters cover every published rival team in six titles, with flags kept
-ok 51 - seeded rosters cover every published rival team in six titles, with flags kept
+ok 66 - seeded rosters cover every published rival team in six titles, with flags kept
   ---
-  duration_ms: 1.744467
+  duration_ms: 2.150649
   type: 'test'
   ...
 # Subtest: player edits, weekly check flags added and removed players, check due after 7 days
-ok 52 - player edits, weekly check flags added and removed players, check due after 7 days
+ok 67 - player edits, weekly check flags added and removed players, check due after 7 days
   ---
-  duration_ms: 2.193786
+  duration_ms: 2.717797
   type: 'test'
   ...
 # Subtest: Dota pools for rivals: shipped OpenDota aggregates and Mongolia, no data marked
-ok 53 - Dota pools for rivals: shipped OpenDota aggregates and Mongolia, no data marked
+ok 68 - Dota pools for rivals: shipped OpenDota aggregates and Mongolia, no data marked
   ---
-  duration_ms: 0.393136
+  duration_ms: 0.497151
   type: 'test'
   ...
 # Subtest: opponent card: auto part, ban candidates by presence, plan rules, approval, markdown
-ok 54 - opponent card: auto part, ban candidates by presence, plan rules, approval, markdown
+ok 69 - opponent card: auto part, ban candidates by presence, plan rules, approval, markdown
   ---
-  duration_ms: 1.560222
+  duration_ms: 1.932339
   type: 'test'
   ...
 # Subtest: page: rosters tab, weekly check, opponent card write → approve → download
-ok 55 - page: rosters tab, weekly check, opponent card write → approve → download
+ok 70 - page: rosters tab, weekly check, opponent card write → approve → download
   ---
-  duration_ms: 6860.539712
+  duration_ms: 5852.969151
   type: 'test'
   ...
 # Subtest: hub: every view renders without errors
-ok 56 - hub: every view renders without errors
+ok 71 - hub: every view renders without errors
   ---
-  duration_ms: 731.131615
+  duration_ms: 587.443128
   type: 'test'
   ...
 # Subtest: hub: draft room locks heroes and compares drafts
-ok 57 - hub: draft room locks heroes and compares drafts
+ok 72 - hub: draft room locks heroes and compares drafts
   ---
-  duration_ms: 628.440952
+  duration_ms: 572.404682
   type: 'test'
   ...
 # Subtest: hub: PUBGM CSV validation rejects a broken log and accepts a good one
-ok 58 - hub: PUBGM CSV validation rejects a broken log and accepts a good one
+ok 73 - hub: PUBGM CSV validation rejects a broken log and accepts a good one
   ---
-  duration_ms: 398.968515
+  duration_ms: 299.053681
   type: 'test'
   ...
 # Subtest: runbook template and WEC match tracker rules
-ok 59 - runbook template and WEC match tracker rules
+ok 74 - runbook template and WEC match tracker rules
   ---
-  duration_ms: 2.020205
+  duration_ms: 2.492307
   type: 'test'
   ...
 # Subtest: between-games sheet: adjustment required, calls kept per player, applied marked
-ok 60 - between-games sheet: adjustment required, calls kept per player, applied marked
+ok 75 - between-games sheet: adjustment required, calls kept per player, applied marked
   ---
-  duration_ms: 1.05335
+  duration_ms: 1.367962
   type: 'test'
   ...
 # Subtest: VOD library, partner bank and goals validate their inputs
-ok 61 - VOD library, partner bank and goals validate their inputs
+ok 76 - VOD library, partner bank and goals validate their inputs
   ---
-  duration_ms: 0.904149
+  duration_ms: 1.142809
   type: 'test'
   ...
 # Subtest: weekly brief: counts per title, gaps, no individual wellbeing values
-ok 62 - weekly brief: counts per title, gaps, no individual wellbeing values
+ok 77 - weekly brief: counts per title, gaps, no individual wellbeing values
   ---
-  duration_ms: 10.199755
+  duration_ms: 11.55789
   type: 'test'
   ...
 # Subtest: page: runbook, WEC match, between-games, VOD, partner, player plan and brief
-ok 63 - page: runbook, WEC match, between-games, VOD, partner, player plan and brief
+ok 78 - page: runbook, WEC match, between-games, VOD, partner, player plan and brief
   ---
-  duration_ms: 5712.542665
+  duration_ms: 4206.125294
   type: 'test'
   ...
-1..63
-# tests 63
+1..78
+# tests 78
 # suites 0
-# pass 63
+# pass 78
 # fail 0
 # cancelled 0
 # skipped 0
 # todo 0
-# duration_ms 36118.404538
+# duration_ms 32006.543441

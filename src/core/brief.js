@@ -6,10 +6,11 @@ import { board as rivalBoard } from './competitors.js';
 import { summary as scrimSummary } from './scrims.js';
 import { teamDay } from './wellbeing.js';
 import { EVENT } from './matchday.js';
+import { reportSummary, GAME_SPEC } from './reports.js';
 
 const days = (a, b) => Math.round((Date.parse(b) - Date.parse(a)) / 86400000);
 
-export function weeklyBrief({ asOf, cycle, scrims, rivals, tiers, checkins, roster, rules, pending, plans = [] }) {
+export function weeklyBrief({ asOf, cycle, scrims, rivals, tiers, checkins, roster, rules, pending, plans = [], reports = null }) {
   const since = new Date(Date.parse(asOf) - 6 * 86400000).toISOString().slice(0, 10);
   const lines = [];
   const toGo = days(asOf, EVENT.start);
@@ -37,9 +38,20 @@ export function weeklyBrief({ asOf, cycle, scrims, rivals, tiers, checkins, rost
     if (!scrimWeek) gaps.push(`${t.id}: no scrim logged this week.`);
     if (sm.overdue.length) gaps.push(`${t.id}: ${sm.overdue.length} scrim result(s) not logged.`);
   }
+  const repRows = [];
+  if (reports) for (const t of TITLES) { const s = reportSummary(reports, t.id, asOf); if (!s.sessions) gaps.push(`${t.id}: no scrim report filed this week.`); repRows.push([t, s]); }
   lines.push('');
   lines.push('## Needs attention');
   lines.push(...(gaps.length ? gaps.map((g) => `- ${g}`) : ['- Nothing flagged.']));
+  if (reports) {
+    lines.push(''); lines.push('## Scrim reports, last 7 days');
+    lines.push('| Title | Sessions | Result | Plan followed (1–5) | Last report | Next session starts from |');
+    lines.push('|---|---|---|---|---|---|');
+    for (const [t, s] of repRows) {
+      const pts = GAME_SPEC[t.id]?.mode === 'points';
+      lines.push(`| ${t.id} | ${s.sessions} | ${s.sessions ? (pts ? `${s.points} pts in ${s.matches} matches` : `${s.won}-${s.lost}${s.drawn ? `-${s.drawn}` : ''}`) : '—'} | ${s.progress ?? '—'}${s.trend === 'up' ? ' ↑' : s.trend === 'down' ? ' ↓' : ''} | ${s.last ? s.last.date : 'none'} | ${s.carryOver ? s.carryOver.adjust.replace(/\|/g, '/') : '—'} |`);
+    }
+  }
   const main = Object.values(tiers).filter((x) => x.tier === 'main threat');
   if (main.length) { lines.push(''); lines.push('## Main threats (staff assessment)'); lines.push(...main.map((x) => `- ${x.title}: ${x.nation} — ${x.why} (${x.by})`)); }
   const atRisk = plans.flatMap((p) => p.goals.filter((g) => g.status === 'at risk').map((g) => `${p.title} · ${p.player}: ${g.area} goal at risk`));

@@ -62,5 +62,5 @@ test('page: a scrim that practises an accepted objective logs a linked session',
   await go('board');
   assert.match(d.getElementById('main').textContent, /1 \/ 0/);
   await go('pubgm-rivals'); assert.match(d.getElementById('main').textContent, /Myanmar/);
-  await go('t-cs2w'); assert.match(d.getElementById('main').textContent, /Field: 11 nations/);
+  await go('t-cs2w-rivals'); assert.match(d.getElementById('main').textContent, /Field: 11 nations/);
 });
