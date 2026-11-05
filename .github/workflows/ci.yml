@@ -1,0 +1,37 @@
+name: CI
+on:
+  push:
+  pull_request:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_PASSWORD: localtest
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd pg_isready --health-interval 5s --health-timeout 5s --health-retries 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run typecheck
+      - name: Tests (core, database access rules, website)
+        run: npm test
+        env:
+          REQUIRE_DB: '1'
+          DATABASE_URL: postgres://postgres:localtest@localhost:5432/postgres
+      - name: Website build check (placeholder values)
+        run: npm run build:web
+        env:
+          SUPABASE_URL: https://ci-placeholder.supabase.co
+          SUPABASE_ANON_KEY: sb_publishable_ci_placeholder
+      - name: No secrets committed
+        run: |
+          if git grep -nE "service_role\"?[[:space:]]*:|sb_secret_[A-Za-z0-9]{10,}|eyJhbGciOi[A-Za-z0-9_-]{20,}\.[A-Za-z0-9_-]{40,}" -- ':!*.test.js' ':!tools/build.mjs' ':!.github/*'; then
+            echo "Possible secret found above"; exit 1; fi

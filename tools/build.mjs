@@ -1,5 +1,6 @@
 // Bundles the hub page: engines + shipped data + UI into one self-contained HTML file.
-import { readFileSync, writeFileSync, mkdirSync } from 'node:fs';
+import { readFileSync, writeFileSync, mkdirSync, rmSync } from 'node:fs';
+import { createHash } from 'node:crypto';
 import { build } from 'esbuild';
 
 const rd = (p) => readFileSync(new URL(`../${p}`, import.meta.url), 'utf8');
@@ -22,3 +23,41 @@ const html = rd('src/hub/index.html').replace('/*__APP__*/', () => js);
 mkdirSync(new URL('../dist/', import.meta.url), { recursive: true });
 writeFileSync(new URL('../dist/hub.html', import.meta.url), html);
 console.log(`dist/hub.html ${(html.length / 1024).toFixed(0)} KB`);
+
+// ---------------------------------------------------------------- website build (Vercel)
+// `node tools/build.mjs --web`      → dist-web/ for production (needs SUPABASE_URL and SUPABASE_ANON_KEY)
+// `node tools/build.mjs --web-test` → dist-web-test/index.html, one file with test hooks, for the jsdom tests
+const mode = process.argv.includes('--web') ? 'web' : process.argv.includes('--web-test') ? 'web-test' : null;
+if (mode) {
+  const test = mode === 'web-test';
+  const url = test ? 'https://test.supabase.co' : (process.env.SUPABASE_URL || '').trim().replace(/\/+$/, '');
+  const key = test ? 'test-anon-key' : (process.env.SUPABASE_ANON_KEY || '').trim();
+  if (!test) {
+    if (!/^https:\/\/[a-z0-9-]+\.supabase\.co$/.test(url)) throw new Error('SUPABASE_URL must look like https://<project-ref>.supabase.co (set it in Vercel → Settings → Environment Variables).');
+    if (!key) throw new Error('SUPABASE_ANON_KEY is missing (Supabase → Project Settings → API → anon / publishable key).');
+    // Never ship a secret key to browsers.
+    if (/^sb_secret_/.test(key)) throw new Error('SUPABASE_ANON_KEY is a secret key. Use the anon / publishable key.');
+    if (key.split('.').length === 3) {
+      let role = '';
+      try { role = JSON.parse(Buffer.from(key.split('.')[1], 'base64url').toString()).role; } catch { /* not a JWT */ }
+      if (role === 'service_role') throw new Error('SUPABASE_ANON_KEY is the service_role key. Use the anon key; the service key must never reach the browser.');
+    }
+  }
+  const outDir = new URL(`../${test ? 'dist-web-test' : 'dist-web'}/`, import.meta.url);
+  rmSync(outDir, { recursive: true, force: true }); mkdirSync(new URL('assets/', outDir), { recursive: true });
+  const web = await build({
+    entryPoints: [new URL('../src/web/main.ts', import.meta.url).pathname], bundle: true, format: 'iife', write: false, minify: !test, target: 'es2020',
+    define: { __HUB_CONFIG__: JSON.stringify({ url, key }), __TEST_HOOKS__: String(test) },
+  });
+  const code = web.outputFiles[0].text;
+  // The template is a fragment (the artifact host adds the document shell); the website needs a full document.
+  let page = `<!doctype html>\n<html lang="en">\n<head>\n<meta charset="utf-8">\n<meta name="viewport" content="width=device-width, initial-scale=1">\n<meta name="robots" content="noindex, nofollow">\n<meta name="referrer" content="strict-origin-when-cross-origin">\n</head>\n<body>\n${rd('src/hub/index.html')}\n</body>\n</html>\n`;
+  if (test) page = page.replace('/*__APP__*/', () => code.replace(/<\/script/gi, '<\\/script'));
+  else {
+    const name = `app-${createHash('sha256').update(code).digest('hex').slice(0, 12)}.js`;
+    writeFileSync(new URL(`assets/${name}`, outDir), code);
+    page = page.replace('<script>/*__APP__*/</script>', `<script src="/assets/${name}" defer></script>`);
+  }
+  writeFileSync(new URL('index.html', outDir), page);
+  console.log(`${test ? 'dist-web-test' : 'dist-web'}/index.html (${(code.length / 1024).toFixed(0)} KB script)`);
+}

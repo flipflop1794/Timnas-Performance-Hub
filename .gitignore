@@ -1,3 +1,13 @@
 node_modules/
 dist/
+dist-web/
+dist-web-test/
 src/hub/data.gen.js
+.env
+.env.*
+!.env.example
+.vercel/
+*.dump
+*.dump.gpg
+*.log
+.DS_Store

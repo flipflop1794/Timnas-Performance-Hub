@@ -18,6 +18,13 @@ import { simulate, DEFAULT_ASSUMPTIONS } from '../pubgm/simulator.js';
 import { dotaTeamPipeline, dotaMatchPipeline, pubgmPipeline, todayList, PUBGM_MIN_MATCHES } from './pipeline.js';
 import { mmss, round, pct } from '../core/stats.js';
 import { STAFF, TITLES as WEC_TITLES, WELLBEING, owner, ownerNote, reviewersFor, queueFor } from '../core/staff.js';
+// Website build: the signed-in account (src/web/main.ts). Absent in the Claude artifact build.
+const HUB_USER = (typeof window !== 'undefined' && window.__HUB_USER__) || null;
+const PLATFORM = (typeof window !== 'undefined' && window.__HUB_PLATFORM__) || null;
+if (HUB_USER && !HUB_USER.staffKey) {
+  const ROLE_LABEL = { admin: 'Admin', head_coach: 'Head Coach', assistant_coach: 'Assistant coach', readiness_owner: 'Readiness owner', title_coach: 'Title coach', analyst: 'Analyst' };
+  STAFF.push({ id: 'user', name: HUB_USER.name, role: HUB_USER.roles.map((r) => ROLE_LABEL[r] || r).join(', '), focus: HUB_USER.titles.length ? HUB_USER.titles : WEC_TITLES.map((t) => t.id) });
+}
 import { staffObservation, recommendationRecord } from '../core/records.js';
 import { FIELDS, FIELD_SOURCE, TIERS, board as rivalBoard, rivalNote, crossTitle, nationProfile, coverage } from '../core/competitors.js';
 import { planScrim, completeScrim, summary as scrimSummary, FORMATS, KINDS as SCRIM_KINDS } from '../core/scrims.js';
@@ -47,7 +54,7 @@ const S = {
   pubgm: { team: null, logged: { matches: [], fights: [] }, sim: null },
   draft: { firstUs: true, steps: [], opp: 'MGL', saved: {} },
   cycle: [], db: null, dbState: 'connecting', mcp: undefined,
-  me: (() => { try { return localStorage.getItem('hub-me') || 'aufa'; } catch { return 'aufa'; } })(),
+  me: HUB_USER ? (HUB_USER.staffKey || 'user') : (() => { try { return localStorage.getItem('hub-me') || 'aufa'; } catch { return 'aufa'; } })(),
   // Rosters: Dota 2 and PUBGM from wec.iesf.org (3 Nov); MLBB core and eFootball from the project decision log; others to be entered.
   roster: { 'Dota 2': ['Whitemon', 'Fbz', 'Jhocam', 'jikroy', 'Mikoto'], 'PUBG Mobile': ['AKxSatarrrGOLD', 'AKxAmetzGOLD', 'AKxVinzGOLD', 'AKxZaoo7GOLD'],
     MLBB: ['Aran', 'Kevin', 'Drichel', 'Lyoni', 'Jull.'], 'MLBB Women': [], eFootball: ['ELGA'], CS2: [], 'CS2 Women': [] },
@@ -175,6 +182,7 @@ async function initCaps() {
   } catch { S.dbState = 'off'; render(); }
 }
 async function browserFetchText(url) {
+  if (HUB_USER) { const r = await fetch(url); if (!r.ok) throw new Error(`OpenDota answered ${r.status}. Try again later or use the file / paste route.`); return r.text(); }
   if (S.mcp === undefined) S.mcp = (await window.claude?.use?.('mcp')) || null;
   if (!S.mcp) throw new Error('Fetching needs the Claude desktop app. Use the file or paste route below — it works everywhere.');
   await S.mcp.callTool('host:claude_browser', 'navigate', { url });
@@ -220,14 +228,15 @@ const TITLES = [
   { id: 'pubgm', label: 'PUBG Mobile', tabs: [['pubgm-team', 'Team'], ['pubgm-scrims', 'Scrims & practice'], ['pubgm-reports', 'Scrim reports'], ['pubgm-log', 'Log & import'], ['pubgm-rivals', 'Competitors'], ['pubgm-sim', 'Strategy sim'], ['pubgm-review', 'Match-day review']] },
   ...GAME_HUBS.map((h) => ({ id: h.id, label: h.label, tabs: hubTabs(h) })),
   { id: 'well', label: 'Performance', tabs: [['readiness', 'Athlete readiness (preview)'], ['players', 'Player plans'], ['well-day', 'Wellbeing check'], ['well-log', 'Log check-in & load']] },
-  { id: 'staff', label: 'Staff', tabs: [['staff-cycle', 'Coaching cycle'], ['staff-measure', 'Is it working?'], ['staff-rules', 'Rules & decisions'], ['staff-sources', 'Sources & limits']] },
+  { id: 'staff', label: 'Staff', tabs: [['staff-cycle', 'Coaching cycle'], ['staff-measure', 'Is it working?'], ['staff-rules', 'Rules & decisions'], ['staff-sources', 'Sources & limits'], ...(HUB_USER?.isAdmin ? [['admin-users', 'Users & access']] : [])] },
 ];
 const viewOf = () => { const h = location.hash.slice(1); return TITLES.some((t) => t.tabs.some(([id]) => id === h)) ? h : 'today'; };
 function renderNav(view) {
   const title = TITLES.find((t) => t.tabs.some(([id]) => id === view));
   const pending = S.cycle.filter((o) => o.status === 'proposed').length;
   const me = STAFF.find((x) => x.id === S.me);
-  $('#titles').innerHTML = `<label class="me" for="meSel">I am <select id="meSel">${STAFF.map((x) => `<option value="${x.id}" ${x.id === S.me ? 'selected' : ''}>${esc(x.name.split(' ')[0])}</option>`).join('')}</select></label>` + TITLES.map((t) => `<button type="button" data-go="${t.tabs[0][0]}" aria-pressed="${t === title}">${esc(t.label)}${t.id === 'staff' && pending ? ` · ${pending}` : ''}</button>`).join('')
+  $('#titles').innerHTML = (HUB_USER ? `<span class="me" title="${esc(HUB_USER.email)}">${esc(HUB_USER.name)}</span><button type="button" id="signOutBtn" class="mode">Sign out</button>`
+    : `<label class="me" for="meSel">I am <select id="meSel">${STAFF.map((x) => `<option value="${x.id}" ${x.id === S.me ? 'selected' : ''}>${esc(x.name.split(' ')[0])}</option>`).join('')}</select></label>`) + TITLES.map((t) => `<button type="button" data-go="${t.tabs[0][0]}" aria-pressed="${t === title}">${esc(t.label)}${t.id === 'staff' && pending ? ` · ${pending}` : ''}</button>`).join('')
     + `<button type="button" id="langBtn" class="lang" aria-label="${S.lang === 'id' ? 'Switch to English' : 'Ganti ke Bahasa Indonesia'}"><b${S.lang === 'en' ? ' class="on"' : ''}>EN</b><b${S.lang === 'id' ? ' class="on"' : ''}>ID</b></button>`
     + `<button type="button" id="modeBtn" class="mode ${S.mode}" aria-pressed="${S.mode === 'demo'}">${S.mode === 'demo' ? 'Leave demo sandbox' : 'Demo sandbox'}</button>`;
   $('#tabs').innerHTML = title.tabs.map(([id, label]) => `<a href="#${id}" ${id === view ? 'aria-current="page"' : ''}>${esc(label)}</a>`).join('');
@@ -258,7 +267,7 @@ function queueHtml(meId) {
     ${reviews.length + toLog.length + toDecide.length ? `<ul class="plain">${reviews.map((o) => item(o, 'review: accept, modify or reject')).join('')}${toDecide.map((o) => item(o, `decide after ${o.sessions.at(-1).id}`)).join('')}${toLog.map((o) => item(o, 'run the drill and log the session')).join('')}</ul>` : '<p class="empty">Nothing in your queue.</p>'}</div>`;
 }
 function wellTodayPanel() {
-  if (S.wellAccess === 'denied') return `<div class="panel"><h2>Wellbeing</h2>${banner('block', '<div>Wellbeing records are visible to editors only.</div>')}</div>`;
+  if (S.wellAccess === 'denied') return `<div class="panel"><h2>Wellbeing</h2>${banner('block', HUB_USER ? '<div>Wellbeing records are limited to the readiness owner and admins.</div>' : '<div>Wellbeing records are visible to editors only.</div>')}</div>`;
   const date = localDay();
   const rows = WEC_TITLES.map((t) => ({ t: t.id, d: teamDay(S.roster[t.id] || [], date, S.well.checkins, S.well.loads) }));
   const flagged = rows.flatMap((r) => r.d.toCheck.map((x) => ({ title: r.t, ...x })));
@@ -400,7 +409,7 @@ const trendTag = (t) => (t === 'up' ? tag('c-Verified', 'improving') : t === 'do
 function reportCard(r) {
   const spec = GAME_SPEC[r.title];
   const pl = PROGRESS.find(([n]) => n === r.progress)?.[1] || '';
-  return `<div class="obj"><header><div><span class="note">${esc(r.date)}${r.time ? ` ${esc(r.time)}` : ''}${r.format ? ` · ${esc(r.format)}` : ''} · ${esc(r.roster)} · written by ${esc(r.by)}</span><h3>vs ${esc(r.partner)}${r.partnerLevel ? ` <span class="note">(${esc(r.partnerLevel)})</span>` : ''}</h3></div>${tag(r.progress >= 4 ? 'c-Verified' : r.progress <= 2 ? 'c-Blocked' : 'c-Low', `Plan ${r.progress}/5`)}</header>
+  return `<div class="obj"><header><div><span class="note">${esc(r.date)}${r.time ? ` ${esc(r.time)}` : ''}${r.format ? ` · ${esc(r.format)}` : ''} · ${esc(r.roster)} · written by ${esc(r.by)}${r._entered?.by && r._entered.by !== r.by ? ` (entered by ${esc(r._entered.by)}, ${esc(new Date(r._entered.at).toLocaleString('en-GB', { timeZone: 'Asia/Jakarta', dateStyle: 'medium', timeStyle: 'short' }))} WIB)` : ''}</span><h3>vs ${esc(r.partner)}${r.partnerLevel ? ` <span class="note">(${esc(r.partnerLevel)})</span>` : ''}</h3></div>${tag(r.progress >= 4 ? 'c-Verified' : r.progress <= 2 ? 'c-Blocked' : 'c-Low', `Plan ${r.progress}/5`)}</header>
     <p><b>${esc(resultText(r.result))}</b> · <span class="note">Practised: ${esc(r.focus)} · ${esc(pl)}</span></p>
     ${r.worked ? `<p><b>Worked:</b> ${esc(r.worked)}</p>` : ''}${r.failed ? `<p><b>Failed:</b> ${esc(r.failed)}</p>` : ''}
     ${r.detail ? `<p><b>${esc(spec.detail)}:</b> ${esc(r.detail)}</p>` : ''}${r.playerNotes ? `<p><b>Player notes:</b> ${esc(r.playerNotes)}</p>` : ''}
@@ -541,6 +550,41 @@ function reportForm(title, { fid, spec, pts, unit, planned, t0 }) {
       ${txt('players', 'Player notes (optional, performance only)', 'e.g. Aran: strong first lane, hesitates on second tower')}
       ${txt('vod', 'VOD link or timestamp (optional)')}</details>
     <div class="toolbar"><button class="btn primary" type="button" data-report-save="${esc(title)}">Save report</button><span class="msg" id="rpMsg-${fid}" role="status"></span></div></div>`;
+}
+
+
+// ---------- website: users & access (admins only; the database enforces it too) ----------
+const ROLES = [['admin', 'Admin'], ['head_coach', 'Head Coach'], ['assistant_coach', 'Assistant coach'], ['readiness_owner', 'Readiness owner'], ['title_coach', 'Title coach'], ['analyst', 'Analyst']];
+async function loadAdminUsers() {
+  S.admin = { ...(S.admin || {}), loading: true, error: '' };
+  try { S.admin.users = await PLATFORM.admin.listUsers(); } catch (e) { S.admin.error = e.message; }
+  S.admin.loading = false; render();
+}
+V['admin-users'] = () => {
+  if (!HUB_USER?.isAdmin || !PLATFORM?.admin) return `<div class="panel">${banner('block', '<div>Admins only.</div>')}</div>`;
+  S.admin ||= { users: null, loading: false, error: '' };
+  if (!S.admin.users && !S.admin.loading && !S.admin.error) setTimeout(loadAdminUsers, 0);
+  const users = S.admin.users || [];
+  const row = (u) => `<div class="obj"><header><div><span class="note">${esc(u.email)}</span><h3>${esc(u.display_name || u.email)}</h3></div>${u.roles.length ? tag('c-Verified', u.roles.join(', ')) : tag('c-Blocked', 'no access')}</header>
+    <div class="form"><label class="field" for="ad-${u.id}-name">Display name<input type="text" id="ad-${u.id}-name" value="${esc(u.display_name)}"></label>
+    <label class="field" for="ad-${u.id}-staff">Staff routing<select id="ad-${u.id}-staff"><option value="">— (title coach / analyst)</option>${STAFF.filter((x) => x.id !== 'user').map((x) => `<option value="${x.id}" ${u.staff_key === x.id ? 'selected' : ''}>${esc(x.name)} — ${esc(x.role)}</option>`).join('')}</select></label></div>
+    <fieldset class="objpick"><legend class="note">Roles</legend>${ROLES.map(([k, l]) => `<label><input type="checkbox" id="ad-${u.id}-role-${k}" ${u.roles.includes(k) ? 'checked' : ''}> ${l}</label>`).join('')}</fieldset>
+    <fieldset class="objpick"><legend class="note">Assigned titles</legend>${WEC_TITLES.map((t) => `<label><input type="checkbox" id="ad-${u.id}-title-${sid(t.id)}" ${u.titles.includes(t.id) ? 'checked' : ''}> ${esc(t.id)}</label>`).join('')}</fieldset>
+    <div class="toolbar"><button class="btn primary" type="button" data-admin-save="${esc(u.id)}">Save access</button><span class="msg" id="adMsg-${u.id}" role="status"></span></div></div>`;
+  return `<div class="panel"><div class="lead">Users &amp; <em>access</em></div>
+    <p>Who can sign in and what they can see. The database enforces these rules for every request; this page only changes them.</p>
+    <ul class="plain"><li><b>Admin, Head Coach, assistant coaches:</b> read every title. Admin and Head Coach write every title; assistant coaches write their assigned titles and approve proposals there.</li>
+    <li><b>Title coaches, analysts:</b> read and write only their assigned titles.</li><li><b>Wellbeing:</b> readiness owner and admins only (until visibility is decided).</li></ul>
+    <p class="note">To add someone: Supabase dashboard → Authentication → Users → Invite user (their email). They set a password from the email, then appear here with no access until you tick a role.</p>
+    <div class="toolbar"><button class="btn" type="button" id="adReload">Reload list</button><button class="btn" type="button" id="adExport">Export all data (JSON)</button><span class="msg" id="adExportMsg" role="status"></span></div>
+    ${S.admin.error ? banner('block', `<div>${esc(S.admin.error)}</div>`) : ''}</div>
+  <div class="panel"><h2>People (${users.length})</h2>${S.admin.loading && !users.length ? '<p>Loading…</p>' : users.map(row).join('') || '<p class="empty">Nobody yet.</p>'}</div>`;
+};
+// Which title a view belongs to (for the "not assigned" notice).
+function viewTitle(view) {
+  const g = TITLES.find((t) => t.tabs.some(([id]) => id === view)); if (!g) return null;
+  if (g.id === 'dota') return 'Dota 2'; if (g.id === 'pubgm') return 'PUBG Mobile';
+  return GAME_HUBS.find((h) => h.id === g.id)?.title || null;
 }
 
 // ---------- title hubs (MLBB, MLBB Women, eFootball, CS2, CS2 Women) ----------
@@ -887,7 +931,7 @@ V['staff-sources'] = () => `<div class="panel"><h2>Source registry</h2><div clas
 const WELL_NOTE = 'Health and mental-wellbeing data, recorded with the players\' consent (confirmed 3 Nov 2026). Visible to editors of this page only; whether access narrows to Donny alone is still open. Flags are prompts to talk to the player, not diagnoses.';
 V['well-day'] = () => {
   if (S.mode === 'demo') return `<div class="panel">${DEMO_BANNER}<p class="empty">Wellbeing uses operational records only.</p></div>`;
-  if (S.wellAccess === 'denied') return `<div class="panel">${banner('block', '<div><b>Editors only.</b> Ask the page owner for edit access to see wellbeing records.</div>')}</div>`;
+  if (S.wellAccess === 'denied') return `<div class="panel">${banner('block', HUB_USER ? '<div><b>Restricted.</b> Wellbeing records are limited to the readiness owner (Coach Donny) and admins until the Head Coach decides who else may see them.</div>' : '<div><b>Editors only.</b> Ask the page owner for edit access to see wellbeing records.</div>')}</div>`;
   const t = S.wellTitle, roster = S.roster[t] || [];
   const d = teamDay(roster, S.wellDate, S.well.checkins, S.well.loads);
   return `<div class="panel"><h2>Daily check — ${esc(t)}</h2>${banner('synth', `<div>${esc(WELL_NOTE)}</div>`)}
@@ -1250,6 +1294,10 @@ function render() {
     translateDom(document.querySelector('header.top'), 'id'); translateDom($('#main'), 'id');
     if (ORIGINAL_LANG_VIEWS.test(view)) $('#main').insertAdjacentHTML('afterbegin', '<p class="note lang-note">Catatan: temuan analisis otomatis, catatan staf, nama dan sumber data ditampilkan dalam bahasa aslinya (Inggris).</p>');
   }
+  if (HUB_USER && !HUB_USER.seesAllTitles) {
+    const vt = viewTitle(view);
+    if (vt && !HUB_USER.titles.includes(vt)) $('#main').insertAdjacentHTML('afterbegin', `<div class="panel">${banner('synth', `<div><b>You are not assigned to ${esc(vt)}.</b> Its records are hidden and you cannot save here. Ask the admin if you need access.</div>`)}</div>`);
+  }
   if (kept) restoreForms(kept);
   LAST_VIEW = view;
 }
@@ -1498,6 +1546,22 @@ async function onClick(e) {
       }
       render();
     } catch (err) { setMsg(`rvMsg-${fid}`, err.message, 'err'); }
+    return;
+  }
+  if (id === 'signOutBtn') { await PLATFORM?.signOut(); return; }
+  if (id === 'adReload') { S.admin = { users: null, loading: false, error: '' }; render(); return; }
+  if (id === 'adExport') {
+    try { setMsg('adExportMsg', 'Exporting…'); const json = await PLATFORM.admin.exportAll(); await PLATFORM.download({ filename: `timnas-hub-export-${localDay()}.json`, data: json }); setMsg('adExportMsg', 'Saved. It may contain wellbeing data: store it securely.', 'ok'); }
+    catch (err) { setMsg('adExportMsg', err.message, 'err'); }
+    return;
+  }
+  if (t.dataset.adminSave) {
+    const uid = t.dataset.adminSave; const u = (S.admin?.users || []).find((x) => x.id === uid); if (!u) return;
+    const want = { display_name: val(`ad-${uid}-name`).trim(), staff_key: val(`ad-${uid}-staff`) || null,
+      roles: ROLES.map(([k]) => k).filter((k) => document.getElementById(`ad-${uid}-role-${k}`)?.checked),
+      titles: WEC_TITLES.map((x) => x.id).filter((x) => document.getElementById(`ad-${uid}-title-${sid(x)}`)?.checked) };
+    try { await PLATFORM.admin.saveUser(uid, want, u); Object.assign(u, want); setMsg(`adMsg-${uid}`, 'Saved. The person sees the change after reloading the page.', 'ok'); }
+    catch (err) { setMsg(`adMsg-${uid}`, err.message, 'err'); }
     return;
   }
   if (t.dataset.rpFill) { try { const { fid, v } = JSON.parse(t.dataset.rpFill); fillReport(fid, v); } catch { /* malformed chip */ } return; }

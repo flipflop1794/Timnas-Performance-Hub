@@ -1,0 +1,40 @@
+name: Nightly database backup
+# Encrypted dump of the production database, kept as a workflow artifact for 30 days.
+# Needs two repository secrets (Settings → Secrets and variables → Actions):
+#   SUPABASE_DB_URL     Supabase → Connect → Session pooler connection string (with the DB password)
+#   BACKUP_PASSPHRASE   a long random passphrase, also stored in your password manager (needed to restore)
+on:
+  schedule:
+    - cron: '0 19 * * *'   # 02:00 WIB
+  workflow_dispatch:
+jobs:
+  backup:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check secrets
+        id: check
+        env:
+          DB: ${{ secrets.SUPABASE_DB_URL }}
+          PASS: ${{ secrets.BACKUP_PASSPHRASE }}
+        run: |
+          if [ -z "$DB" ] || [ -z "$PASS" ]; then echo "::warning::Backup skipped: SUPABASE_DB_URL or BACKUP_PASSPHRASE is not set."; echo "ok=false" >> "$GITHUB_OUTPUT"; else echo "ok=true" >> "$GITHUB_OUTPUT"; fi
+      - name: Dump and encrypt
+        if: steps.check.outputs.ok == 'true'
+        env:
+          DB: ${{ secrets.SUPABASE_DB_URL }}
+          PASS: ${{ secrets.BACKUP_PASSPHRASE }}
+        run: |
+          set -euo pipefail
+          stamp=$(date -u +%Y%m%dT%H%MZ)
+          docker run --rm -e DB postgres:17 sh -c 'pg_dump "$DB" --data-only --schema=public --no-owner --no-privileges' > public.sql
+          docker run --rm -e DB postgres:17 sh -c 'pg_dump "$DB" --data-only --table=auth.users --table=auth.identities --no-owner --no-privileges' > auth.sql
+          tar czf "hub-backup-$stamp.tgz" public.sql auth.sql
+          gpg --batch --yes --pinentry-mode loopback --passphrase "$PASS" --symmetric --cipher-algo AES256 -o "hub-backup-$stamp.tgz.gpg" "hub-backup-$stamp.tgz"
+          rm -f public.sql auth.sql "hub-backup-$stamp.tgz"
+          ls -la
+      - uses: actions/upload-artifact@v4
+        if: steps.check.outputs.ok == 'true'
+        with:
+          name: hub-backup
+          path: hub-backup-*.tgz.gpg
+          retention-days: 30
