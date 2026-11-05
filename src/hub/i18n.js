@@ -298,10 +298,25 @@ const EXACT = {
   "tab to file or read the details.": "milik sebuah title untuk mengisi atau membaca detailnya.",
   "No reports filed yet. Coaches file them from each title's Scrim reports tab.": "Belum ada laporan. Pelatih mengisinya dari tab Laporan scrim tiap title.",
   "Names as listed on the WEC site or in the decision log. Roles and details are not stored here.": "Nama sesuai situs WEC atau log keputusan. Peran dan detail lain tidak disimpan di sini.",
+  // V1.10 fast report entry
+  "Far off": "Jauh",
+  "Mostly off": "Banyak meleset",
+  "Partly": "Sebagian",
+  "Mostly": "Sebagian besar",
+  "Fully": "Penuh",
+  "More details (optional)": "Detail lainnya (opsional)",
+  "Quick pick:": "Pilih cepat:",
+  "Quick score:": "Skor cepat:",
+  "Recent and active objectives:": "Objektif terbaru dan aktif:",
+  "Copy setup from last report": "Salin pengaturan dari laporan terakhir",
+  "Clear form": "Kosongkan formulir",
+  "Draw": "Seri",
+  "Close a planned session": "Tutup sesi yang direncanakan",
 };
 
 // Long sentences matched by their opening words (the rest of the node is ours, not data).
 const PREFIX = [
+  ["One report per sparring partner, the same day.", "Satu laporan per lawan sparring, di hari yang sama. Kolom wajib di atas; semua di bawah \"Detail lainnya\" opsional. Laporan tidak bisa diedit setelahnya: tambahkan catatan koreksi. Hanya catatan performa: tanpa data kesehatan, pribadi, atau kontak (wellbeing lewat Coach Donny)."],
   ["One report per sparring partner.", "Satu laporan per lawan sparring. Tulis di hari yang sama selagi masih segar. Laporan tidak bisa diedit setelahnya: tambahkan catatan koreksi. Hanya catatan performa: tanpa data kesehatan, pribadi, atau kontak (wellbeing lewat Coach Donny)."],
   ["Progress is the coach's rating", "Progres adalah penilaian pelatih tentang seberapa dekat tim mengikuti rencana hari itu. Tidak dihitung otomatis, dan nilai dari pelatih berbeda tidak bisa dibandingkan langsung."],
   ["Numbers in the day columns", "Angka di kolom hari adalah jumlah sesi yang dilaporkan pada hari itu. Tidak setiap title berlatih tiap hari, jadi hari kosong belum tentu terlewat."],
@@ -335,8 +350,11 @@ const PREFIX = [
 const RULES = [
 
   // V1.9 scrim reports
-  [/^(games|matches|maps) (won|lost)$/, (m, u, k) => `${{ games: 'game', matches: 'pertandingan', maps: 'map' }[u]} ${k === 'won' ? 'menang' : 'kalah'}`],
-  [/^(games|matches|maps) drawn \(optional\)$/, (m, u) => `${{ games: 'game', matches: 'pertandingan', maps: 'map' }[u]} seri (opsional)`],
+  [/^Draft kept on this device(?: \(last typed (\d\d:\d\d)\))?\.$/, (m, a) => `Draf tersimpan di perangkat ini${a ? ` (terakhir diketik ${a})` : ''}.`],
+  [/^Planned today: (.+)$/, 'Rencana hari ini: $1'],
+  [/^Report saved \((.+) vs (.+)\)\. Next partner\? The setup is kept\.$/, (m, a, b) => `Laporan tersimpan (${a.replace(/ pts in (\d+) match(es)?/, ' poin dalam $1 pertandingan')} vs ${b}). Lawan berikutnya? Pengaturan tetap disimpan.`],
+  [/^(games|matches|maps|Games|Matches|Maps) (won|lost)$/, (m, u, k) => `${{ games: 'Game', matches: 'Pertandingan', maps: 'Map' }[u.toLowerCase()]} ${k === 'won' ? 'menang' : 'kalah'}`],
+  [/^(games|matches|maps|Games|Matches|Maps) drawn \(optional\)$/, (m, u) => `${{ games: 'Game', matches: 'Pertandingan', maps: 'Map' }[u.toLowerCase()]} seri (opsional)`],
   [/^Scrim reports — (.+)$/, 'Laporan scrim — $1'],
   [/^File a scrim report — (.+)$/, 'Isi laporan scrim — $1'],
   [/^— last (.+)$/, (m, a) => `— terakhir ${a === 'never' ? 'belum pernah' : a}`],

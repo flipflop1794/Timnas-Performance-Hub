@@ -1,3 +1,4 @@
+import { localDay } from './dates.js';
 // Scrim / practice planner and log, shared by all titles. A scrim can carry the accepted objectives it
 // is meant to practise; completing it logs a session on each of those objectives (core/cycle.js).
 
@@ -29,7 +30,7 @@ export function completeScrim(s, r) {
 }
 
 const days = (a, b) => Math.round((Date.parse(b) - Date.parse(a)) / 86400000);
-export function summary(scrims, title, today = new Date().toISOString().slice(0, 10)) {
+export function summary(scrims, title, today = localDay()) {
   const mine = scrims.filter((s) => s.title === title);
   const upcoming = mine.filter((s) => s.status === 'planned' && s.date >= today).sort((a, b) => a.date.localeCompare(b.date));
   const overdue = mine.filter((s) => s.status === 'planned' && s.date < today);

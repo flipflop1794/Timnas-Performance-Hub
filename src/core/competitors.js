@@ -1,3 +1,4 @@
+import { localDay } from './dates.js';
 // Competitor fields and verified notes per title. Fields as published on wec.iesf.org (read 3 Nov 2026).
 // Notes come from the project decision log with their dates; staff add more in the hub. Threat tiers are
 // staff judgements, never computed.
@@ -33,7 +34,7 @@ export function rivalNote(x) {
   for (const k of ['title', 'nation', 'note', 'source', 'by']) if (!x[k] || !String(x[k]).trim()) throw new Error(`${k === 'by' ? 'Who wrote it' : k[0].toUpperCase() + k.slice(1)} is required.`);
   if (!FIELDS[x.title]?.includes(x.nation)) throw new Error(`${x.nation} is not in the published ${x.title} field.`);
   if (!['observed', 'hypothesis'].includes(x.kind)) throw new Error('Kind must be observed or hypothesis.');
-  return { title: x.title, nation: x.nation, note: x.note.trim(), source: x.source.trim(), kind: x.kind, by: x.by.trim(), date: x.date || new Date().toISOString().slice(0, 10), origin: 'operational' };
+  return { title: x.title, nation: x.nation, note: x.note.trim(), source: x.source.trim(), kind: x.kind, by: x.by.trim(), date: x.date || localDay(), origin: 'operational' };
 }
 
 // One title's competitor board: field, notes per nation, staff tier, coverage.

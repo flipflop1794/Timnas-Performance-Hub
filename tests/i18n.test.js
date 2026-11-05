@@ -46,9 +46,10 @@ test('V1.9 report pages and title hubs are translated; data and option values st
   const d = dom.window.document; const go = async (h) => { dom.window.location.hash = h; dom.window.dispatchEvent(new dom.window.HashChangeEvent('hashchange')); await wait(); };
   const main = () => d.getElementById('main').textContent;
   assert.match(main(), /Laporan scrim/); assert.match(main(), /Sesi 7 h/);
-  await go('mlbb-reports'); assert.match(main(), /Isi laporan scrim — MLBB/); assert.match(main(), /Simpan laporan/); assert.match(main(), /game menang/); assert.match(main(), /Satu perubahan konkret|Penyesuaian untuk sesi berikutnya/);
+  await go('mlbb-reports'); assert.match(main(), /Isi laporan scrim — MLBB/); assert.match(main(), /Simpan laporan/); assert.match(main(), /Game menang/); assert.match(main(), /Satu perubahan konkret|Penyesuaian untuk sesi berikutnya/);
   assert.equal(d.getElementById('rp-MLBB-roster').options[0].value, 'Full national roster', 'option values stay English');
-  assert.equal(d.getElementById('rp-MLBB-progress').options[1].textContent, '1 — Jauh dari rencana');
+  assert.match(d.querySelector('[data-rp-prog="MLBB"][data-v="1"]').textContent, /1 Jauh/); assert.equal(d.querySelector('[data-rp-prog="MLBB"][data-v="1"]').title, 'Jauh dari rencana');
+  assert.match(main(), /Detail lainnya \(opsional\)/); assert.match(main(), /Skor cepat/);
   await go('pubgm-reports'); assert.match(main(), /Total poin/);
   await go('t-efootball'); assert.match(main(), /Skuad/); assert.match(main(), /Laporan scrim, 7 hari terakhir/);
   await go('t-mlbbw-draft'); assert.match(main(), /Draft Lab adalah alat analisis MLBB/);

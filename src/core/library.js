@@ -1,9 +1,10 @@
 // Rival VOD library, sparring-partner bank and individual player plans.
 
 import { FIELDS } from './competitors.js';
+import { localDay } from './dates.js';
 
 const need = (c, m) => { if (!c) throw new Error(m); };
-const today = () => new Date().toISOString().slice(0, 10);
+const today = () => localDay();
 
 export const VOD_TAGS = ['draft', 'early game', 'objectives', 'teamfight', 'late game', 'drops', 'rotation', 'endgame', 'map veto', 'tactics', 'set piece', 'individual player'];
 export function vod(x) {

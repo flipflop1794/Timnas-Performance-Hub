@@ -24,6 +24,7 @@ import { planScrim, completeScrim, summary as scrimSummary, FORMATS, KINDS as SC
 import { EVENT, defaultRunbook, tLabel, wecMatch, tick, setResult, gameNote, markApplied } from '../core/matchday.js';
 import { VOD_TAGS, vod, reviewVod, LEVELS, partner as partnerRec, partnerStats, AREAS, GOAL_STATUS, goal as goalRec, updateGoal, plan as newPlan } from '../core/library.js';
 import { weeklyBrief } from '../core/brief.js';
+import { localDay, shiftDay } from '../core/dates.js';
 import { scrimReport, addNote as reportNote, byDay as reportDays, reportSummary, reportsCsv, resultText, GAME_SPEC, PROGRESS, ROSTER_PLAYED } from '../core/reports.js';
 import { seedRosters, effective, editPlayers, recordCheck, checkStatus, dotaPool, ACCOUNT_KIND, ROLE_HINT, rosterKey, CHECK_EVERY_DAYS } from '../core/rosters.js';
 import { loadReadiness, READINESS_SLOT } from '../readiness/contract.js';
@@ -51,8 +52,8 @@ const S = {
   roster: { 'Dota 2': ['Whitemon', 'Fbz', 'Jhocam', 'jikroy', 'Mikoto'], 'PUBG Mobile': ['AKxSatarrrGOLD', 'AKxAmetzGOLD', 'AKxVinzGOLD', 'AKxZaoo7GOLD'],
     MLBB: ['Aran', 'Kevin', 'Drichel', 'Lyoni', 'Jull.'], 'MLBB Women': [], eFootball: ['ELGA'], CS2: [], 'CS2 Women': [] },
   rivals: [], tiers: {}, scrims: [], reports: [],
-  runbooks: {}, wecMatches: [], tourTitle: 'Dota 2', tourMatch: null, vods: [], partners: [], plans: {}, planTitle: 'Dota 2', planPlayer: null, lang: (() => { try { return localStorage.getItem('hub-lang') === 'id' ? 'id' : 'en'; } catch { return 'en'; } })(), rd: { title: 'All titles', date: new Date().toISOString().slice(0, 10), data: null, key: null }, rivalSeed: seedRosters(DATA.rivalRosters), rosterEdits: {}, oppCards: {}, crTitle: 'Dota 2', crNation: 'All', ocTitle: 'Dota 2', ocNation: 'Mongolia', compNation: 'Egypt', compAllEf: false, briefDate: new Date().toISOString().slice(0, 10),
-  well: { checkins: [], loads: [] }, wellTitle: 'Dota 2', wellDate: new Date().toISOString().slice(0, 10),
+  runbooks: {}, wecMatches: [], tourTitle: 'Dota 2', tourMatch: null, vods: [], partners: [], plans: {}, planTitle: 'Dota 2', planPlayer: null, lang: (() => { try { return localStorage.getItem('hub-lang') === 'id' ? 'id' : 'en'; } catch { return 'en'; } })(), rd: { title: 'All titles', date: localDay(), data: null, key: null }, rivalSeed: seedRosters(DATA.rivalRosters), rosterEdits: {}, oppCards: {}, crTitle: 'Dota 2', crNation: 'All', ocTitle: 'Dota 2', ocNation: 'Mongolia', compNation: 'Egypt', compAllEf: false, briefDate: localDay(),
+  well: { checkins: [], loads: [] }, wellTitle: 'Dota 2', wellDate: localDay(),
   selMatch: 9057681759, selNation: 'MGL', selDay: null, freshPools: {}, importReport: null, lastFlag: null,
 };
 const heroByName = () => Object.fromEntries(Object.values(S.heroes).map((h) => [h.name.toLowerCase(), h.id]));
@@ -67,7 +68,7 @@ const tag = (cls, text) => `<span class="tag ${cls}">${esc(text)}</span>`;
 const ctxTag = (c) => (c ? tag(`x-${c}`, CONTEXT_LABEL[c] || c) : '');
 const banner = (kind, html) => `<div class="banner ${kind}">${html}</div>`;
 const rule = (id) => S.rules.find((r) => r.id === id);
-const today = () => new Date().toISOString().slice(0, 10);
+const today = () => localDay();
 
 function scoringNow() {
   const r = rule('pubgm-scoring');
@@ -258,7 +259,7 @@ function queueHtml(meId) {
 }
 function wellTodayPanel() {
   if (S.wellAccess === 'denied') return `<div class="panel"><h2>Wellbeing</h2>${banner('block', '<div>Wellbeing records are visible to editors only.</div>')}</div>`;
-  const date = new Date().toISOString().slice(0, 10);
+  const date = localDay();
   const rows = WEC_TITLES.map((t) => ({ t: t.id, d: teamDay(S.roster[t.id] || [], date, S.well.checkins, S.well.loads) }));
   const flagged = rows.flatMap((r) => r.d.toCheck.map((x) => ({ title: r.t, ...x })));
   return `<div class="panel"><h2>Wellbeing today</h2><div class="tw"><table><thead><tr><th>Title</th><th class="n">Check-ins</th><th class="n">To talk to</th></tr></thead><tbody>
@@ -292,8 +293,8 @@ V.today = () => {
 // Juara Umum board: every title on one page, for the Head Coach and the BOD conversation.
 const PLAN_V3 = { 'MLBB Women': 75, MLBB: 40, eFootball: 40, 'PUBG Mobile': 35, 'Dota 2': 35, CS2: 10, 'CS2 Women': 5 };
 V.board = () => {
-  const since = new Date(Date.now() - 7 * 86400000).toISOString().slice(0, 10);
-  const today = new Date().toISOString().slice(0, 10);
+  const since = shiftDay(localDay(), -7);
+  const today = localDay();
   const rows = WEC_TITLES.map((t) => {
     const objs = S.cycle.filter((o) => o.title === t.id);
     const active = objs.filter((o) => ['accepted', 'modified'].includes(o.status)).length;
@@ -310,7 +311,7 @@ V.board = () => {
     const blockers = [...provisional(S.rules, t.id === 'Dota 2' ? 'dota-draft' : t.id === 'PUBG Mobile' ? 'pubgm-team' : 'none').filter((r) => r.status === 'blocked' || r.status === 'unverified').map((r) => r.label)];
     if (!roster.length) blockers.push('Roster not entered in hub');
     if (t.id === 'eFootball') blockers.push('Coach not named; entry not on IESF site');
-    const rb = rivalBoard(t.id, S.rivals, S.tiers); const ss = scrimSummary(S.scrims, t.id);
+    const rb = rivalBoard(t.id, S.rivals, S.tiers); const ss = scrimSummary(S.scrims, t.id, localDay());
     return { t, own: ownerNote(t.id), objs: objs.length, active, pending, sess7, met, wd, roster, evidence, blockers, rb, ss };
   });
   return `<div class="panel"><div class="lead">Road to <em>Juara Umum</em></div>
@@ -348,7 +349,7 @@ function competitorsPanel(title) {
       <div class="toolbar"><button class="btn" type="button" data-rival-tier="${esc(title)}">Set tier for selected nation</button><span class="msg" id="rvMsg-${fid}"></span></div></details>`}</div>${vodPanel(title)}`;
 }
 function scrimsPanel(title) {
-  const Sm = scrimSummary(S.scrims, title);
+  const Sm = scrimSummary(S.scrims, title, localDay());
   const objs = S.cycle.filter((o) => o.title === title && ['accepted', 'modified'].includes(o.status));
   const fid = sid(title);
   const objName = (id) => S.cycle.find((o) => o.id === id)?.rec.problem || id;
@@ -393,8 +394,7 @@ function observationForm(defTitle) {
     <div class="toolbar"><button class="btn primary" type="button" id="obSave">Send to review</button><span class="msg" id="obMsg"></span></div>`;
 }
 // ---------- scrim reports (all titles) ----------
-const localToday = () => { const d = new Date(); d.setMinutes(d.getMinutes() - d.getTimezoneOffset()); return d.toISOString().slice(0, 10); };
-const shiftDay = (iso, n) => new Date(Date.parse(iso) + n * 86400000).toISOString().slice(0, 10);
+const localToday = localDay;
 const safeUrl = (u) => (/^https?:\/\//i.test(u) ? u : '');
 const trendTag = (t) => (t === 'up' ? tag('c-Verified', 'improving') : t === 'down' ? tag('c-Blocked', 'slipping') : t === 'steady' ? tag('k-observed', 'steady') : '');
 function reportCard(r) {
@@ -418,33 +418,7 @@ function reportsPanel(title) {
   const stale = Sm.daysSince != null && Sm.daysSince >= 3;
   const unit = spec.unit;
   const ready = Sm.carryOver ? `<div class="panel"><h2>Start the next session from here</h2><p>${esc(Sm.carryOver.adjust)}</p><p class="note">Adjustment written by ${esc(Sm.carryOver.by)} on ${esc(Sm.carryOver.date)}. If the next report does not mention it, ask whether it was tried.</p></div>` : '';
-  const form = S.mode === 'demo' ? '' : `<div class="panel"><h2>File a scrim report — ${esc(title)}</h2>
-    <p class="note">One report per sparring partner. Write it the same day while it is fresh. Reports cannot be edited afterwards: add a correction note instead. Performance notes only: no health, personal or contact details (wellbeing goes through Coach Donny).</p>
-    <div class="form">
-    <label class="field" for="rp-${fid}-date">Date<input type="date" id="rp-${fid}-date" value="${t0}" max="${t0}"></label>
-    <label class="field" for="rp-${fid}-time">Time<input type="text" id="rp-${fid}-time" placeholder="19:00 WIB"></label>
-    <label class="field" for="rp-${fid}-by">Written by<input type="text" id="rp-${fid}-by" list="staffNames" value="${esc(meName())}"></label>
-    <label class="field" for="rp-${fid}-partner">Sparring partner<input type="text" id="rp-${fid}-partner" list="pbList-${fid}" placeholder="Team name, or internal"></label>
-    <label class="field" for="rp-${fid}-level">Partner level<select id="rp-${fid}-level"><option value=""></option><option>Tier 1 international</option><option>Tier 1 domestic</option><option>Tier 2</option><option>Academy / amateur</option></select></label>
-    <label class="field" for="rp-${fid}-format">Format<select id="rp-${fid}-format"><option value=""></option>${FORMATS.map((k) => `<option ${pts && k === 'Lobby (BR)' ? 'selected' : ''}>${k}</option>`).join('')}</select></label>
-    <label class="field" for="rp-${fid}-roster">Who played<select id="rp-${fid}-roster">${ROSTER_PLAYED.map((k) => `<option>${k}</option>`).join('')}</select></label>
-    ${planned.length ? `<label class="field" for="rp-${fid}-scrim">Close a planned session<select id="rp-${fid}-scrim"><option value=""></option>${planned.map((x) => `<option value="${esc(x.id)}">${esc(x.date)}${x.partner ? ` vs ${esc(x.partner)}` : ` ${esc(x.kind)}`}</option>`).join('')}</select></label>` : ''}
-    </div><datalist id="pbList-${fid}">${S.partners.filter((p) => p.title === title).map((p) => `<option value="${esc(p.name)}">${esc(p.level)}${p.resembles ? ` · like ${esc(p.resembles)}` : ''}</option>`).join('')}</datalist>
-    <div class="h3">Result</div><div class="form">
-    ${pts ? `<label class="field" for="rp-${fid}-played">Matches played<input type="number" min="0" max="999" id="rp-${fid}-played"></label><label class="field" for="rp-${fid}-points">Total points<input type="number" min="0" max="999" id="rp-${fid}-points"></label>
-      <label class="field" for="rp-${fid}-avg">Average placement (optional)<input type="number" min="1" max="25" step="0.1" id="rp-${fid}-avg"></label><label class="field" for="rp-${fid}-chicken">Match wins (optional)<input type="number" min="0" max="999" id="rp-${fid}-chicken"></label>`
-    : `<label class="field" for="rp-${fid}-won">${esc(unit)} won<input type="number" min="0" max="999" id="rp-${fid}-won"></label><label class="field" for="rp-${fid}-lost">${esc(unit)} lost<input type="number" min="0" max="999" id="rp-${fid}-lost"></label><label class="field" for="rp-${fid}-drawn">${esc(unit)} drawn (optional)<input type="number" min="0" max="999" id="rp-${fid}-drawn"></label>`}
-    </div>
-    <div class="h3">Progress</div>
-    <label class="field" for="rp-${fid}-focus">What was this session meant to practise?<input type="text" id="rp-${fid}-focus" placeholder="e.g. Early rotations; fallback drop; set-piece defending"></label>
-    <label class="field" for="rp-${fid}-progress">How closely did the team follow the plan?<select id="rp-${fid}-progress"><option value=""></option>${PROGRESS.map(([n, l]) => `<option value="${n}">${n} — ${l}</option>`).join('')}</select></label>
-    <label class="field" for="rp-${fid}-worked">What worked<input type="text" id="rp-${fid}-worked"></label>
-    <label class="field" for="rp-${fid}-failed">What failed<input type="text" id="rp-${fid}-failed"></label>
-    <label class="field" for="rp-${fid}-detail">${esc(spec.detail)} (optional)<input type="text" id="rp-${fid}-detail" placeholder="${esc(spec.hint)}"></label>
-    <label class="field" for="rp-${fid}-players">Player notes (optional, performance only)<input type="text" id="rp-${fid}-players" placeholder="e.g. Aran: strong first lane, hesitates on second tower"></label>
-    <label class="field" for="rp-${fid}-adjust">Adjustment for the next session<input type="text" id="rp-${fid}-adjust" placeholder="One concrete change to try next time"></label>
-    <label class="field" for="rp-${fid}-vod">VOD link or timestamp (optional)<input type="text" id="rp-${fid}-vod"></label>
-    <div class="toolbar"><button class="btn primary" type="button" data-report-save="${esc(title)}">Save report</button><span class="msg" id="rpMsg-${fid}"></span></div></div>`;
+  const form = S.mode === 'demo' ? '' : reportForm(title, { fid, spec, pts, unit, planned, t0 });
   return `<div class="panel"><h2>Scrim reports — ${esc(title)}</h2>
     <div class="stats"><div class="stat"><span class="k">Sessions, last 7 days</span><span class="v">${Sm.sessions}</span></div>
     <div class="stat"><span class="k">${pts ? 'Points, last 7 days' : 'Record, last 7 days'}</span><span class="v">${Sm.sessions ? (pts ? `${Sm.points} (${Sm.matches} m)` : `${Sm.won}-${Sm.lost}${Sm.drawn ? `-${Sm.drawn}` : ''}`) : '—'}</span></div>
@@ -472,6 +446,102 @@ V['reports-all'] = () => {
   <div class="cols"><div class="panel"><h2>No report yet today</h2>${missing.length ? `<ul class="plain">${missing.map((r) => `<li><b>${esc(r.t.id)}</b> <a href="#${REPORT_TAB[r.t.id]}">File</a> <span class="note">— last ${r.s.last ? esc(r.s.last.date) : 'never'}</span></li>`).join('')}</ul>` : '<p class="note">Every title has a report for today.</p>'}</div>
   <div class="panel"><h2>Next session starts from</h2>${rows.filter((r) => r.s.carryOver).length ? `<ul class="plain">${rows.filter((r) => r.s.carryOver).map((r) => `<li><b>${esc(r.t.id)}</b> — ${esc(r.s.carryOver.adjust)} <span class="note">(${esc(r.s.carryOver.by)}, ${esc(r.s.carryOver.date)})</span></li>`).join('')}</ul>` : '<p class="empty">Nothing yet.</p>'}</div></div>`;
 };
+
+
+// ---------- fast report entry: drafts, quick picks, progress buttons ----------
+// Drafts are a per-device convenience (this browser only). The saved report is what counts.
+const RP_KEYS = ['date', 'time', 'by', 'partner', 'level', 'format', 'roster', 'scrim', 'won', 'lost', 'drawn', 'played', 'points', 'avg', 'chicken', 'focus', 'progress', 'worked', 'failed', 'detail', 'players', 'adjust', 'vod'];
+const RP_RE = new RegExp(`^rp-(.+)-(${RP_KEYS.join('|')})$`);
+const RP_KEEP_AFTER_SAVE = ['time', 'by', 'level', 'format', 'roster', 'focus'];
+const cap = (x) => x.charAt(0).toUpperCase() + x.slice(1);
+const RP_OPTIONAL = ['time', 'level', 'format', 'roster', 'scrim', 'detail', 'players', 'vod', 'avg', 'chicken', 'drawn'];
+const PROG_SHORT = { 1: 'Far off', 2: 'Mostly off', 3: 'Partly', 4: 'Mostly', 5: 'Fully' };
+const rpDrafts = {};
+function rpDraft(fid) {
+  if (!rpDrafts[fid]) { let d = {}; try { d = JSON.parse(localStorage.getItem(`hub-rp-draft-${fid}`) || '{}') || {}; } catch { d = {}; } rpDrafts[fid] = d; }
+  return rpDrafts[fid];
+}
+function storeDraft(fid, d) {
+  rpDrafts[fid] = d;
+  try { if (Object.keys(d).some((k) => k !== 'at' && d[k] !== '')) localStorage.setItem(`hub-rp-draft-${fid}`, JSON.stringify(d)); else localStorage.removeItem(`hub-rp-draft-${fid}`); } catch { /* per-device convenience only */ }
+}
+function draftField(el) {
+  const m = el?.id?.match(RP_RE); if (!m) return;
+  const d = { ...rpDraft(m[1]), [m[2]]: el.value, at: new Date().toISOString() }; storeDraft(m[1], d);
+  el.removeAttribute('aria-invalid');
+}
+function fillReport(fid, values) {
+  for (const [k, v] of Object.entries(values)) {
+    const el = document.getElementById(`rp-${fid}-${k}`); if (!el) continue;
+    if (el.tagName === 'SELECT' && v && ![...el.options].some((o) => o.value === v)) continue;
+    el.value = v; draftField(el);
+    if (k === 'progress') document.querySelectorAll(`[data-rp-prog="${fid}"]`).forEach((x) => x.setAttribute('aria-pressed', String(x.dataset.v === String(v))));
+    if (RP_OPTIONAL.includes(k) && v && !(k === 'roster' && v === ROSTER_PLAYED[0])) { const det = el.closest('details'); if (det) det.open = true; }
+  }
+}
+const ERR_FIELD = [[/future|Date/, 'date'], [/Who wrote/, 'by'], [/sparring partner/, 'partner'], [/Matches played/, 'played'], [/Total points|points is required/i, 'points'], [/placement/, 'avg'], [/Won|Lost|Drawn|at least one|whole number/, 'won'], [/practise/, 'focus'], [/1 to 5/, 'progress'], [/worked or what failed/, 'worked'], [/adjustment/, 'adjust'], [/Player notes/, 'players']];
+function markInvalid(fid, message) {
+  const key = ERR_FIELD.find(([re]) => re.test(message))?.[1]; if (!key) return;
+  const el = key === 'progress' ? document.querySelector(`[data-rp-prog="${fid}"]`) : document.getElementById(`rp-${fid}-${key}`); if (!el) return;
+  const det = el.closest('details'); if (det) det.open = true;
+  if (key !== 'progress') el.setAttribute('aria-invalid', 'true');
+  el.focus();
+}
+const chip = (fid, values, label, extra = '') => `<button type="button" class="chip${extra}" data-rp-fill="${esc(JSON.stringify({ fid, v: values }))}">${esc(label)}</button>`;
+function reportForm(title, { fid, spec, pts, unit, planned, t0 }) {
+  const d = rpDraft(fid); const dv = (k, def = '') => (d[k] != null ? d[k] : def);
+  const mine = S.reports.filter((r) => r.title === title).sort((a, b) => b.date.localeCompare(a.date) || b.createdAt.localeCompare(a.createdAt));
+  const last = mine[0];
+  const uniq = (xs) => [...new Set(xs.filter(Boolean))];
+  const plannedToday = planned.filter((x) => x.date === t0 && x.partner);
+  const partners = uniq(mine.map((r) => r.partner)).filter((p) => !plannedToday.some((x) => x.partner === p)).slice(0, 5);
+  const objectives = S.cycle.filter((o) => o.title === title && ['accepted', 'modified'].includes(o.status)).map((o) => o.rec.problem);
+  const focuses = uniq([...objectives, ...mine.map((r) => r.focus)]).slice(0, 5);
+  const scores = title === 'eFootball' ? [['1-0', 1, 0, 0], ['0-1', 0, 1, 0], ['Draw', 0, 0, 1], ['2-0', 2, 0, 0], ['1-1', 1, 1, 0], ['0-2', 0, 2, 0]] : [['2-0', 2, 0, 0], ['2-1', 2, 1, 0], ['1-2', 1, 2, 0], ['0-2', 0, 2, 0], ['1-0', 1, 0, 0], ['0-1', 0, 1, 0]];
+  const hasDraft = Object.keys(d).some((k) => k !== 'at' && d[k] !== '');
+  const isDefault = (k, v) => (k === 'roster' && v === ROSTER_PLAYED[0]) || (k === 'format' && pts && v === 'Lobby (BR)');
+  const optOpen = RP_OPTIONAL.some((k) => d[k] && !isDefault(k, d[k])) ? ' open' : '';
+  const num = (k, label, attrs = 'min="0" max="999"') => `<label class="field" for="rp-${fid}-${k}">${label}<input type="number" inputmode="${k === 'avg' ? 'decimal' : 'numeric'}" ${attrs} id="rp-${fid}-${k}" value="${esc(dv(k))}"></label>`;
+  const txt = (k, label, ph = '', area = false) => (area
+    ? `<label class="field" for="rp-${fid}-${k}">${label}<textarea rows="2" id="rp-${fid}-${k}" placeholder="${esc(ph)}">${esc(dv(k))}</textarea></label>`
+    : `<label class="field" for="rp-${fid}-${k}">${label}<input type="text" id="rp-${fid}-${k}" placeholder="${esc(ph)}" value="${esc(dv(k))}"></label>`);
+  const sel = (k, label, opts, def = '') => `<label class="field" for="rp-${fid}-${k}">${label}<select id="rp-${fid}-${k}">${opts.map(([v, l]) => `<option value="${esc(v)}" ${v === dv(k, def) ? 'selected' : ''}>${esc(l)}</option>`).join('')}</select></label>`;
+  const prog = dv('progress');
+  return `<div class="panel rp"><h2>File a scrim report — ${esc(title)}</h2>
+    <p class="note">One report per sparring partner, the same day. Required fields first; everything under "More details" is optional. Reports cannot be edited afterwards: add a correction note instead. Performance notes only: no health, personal or contact details (wellbeing goes through Coach Donny).</p>
+    ${hasDraft ? `<p class="note draftnote">Draft kept on this device${d.at ? ` (last typed ${esc(new Date(d.at).toTimeString().slice(0, 5))})` : ''}. <button type="button" class="linkbtn" data-rp-clear="${esc(fid)}">Clear form</button></p>` : ''}
+    ${last ? `<div class="toolbar">${chip(fid, { partner: last.partner, level: last.partnerLevel, format: last.format, roster: last.roster, focus: last.focus, by: last.by }, 'Copy setup from last report', ' wide')}<span class="note">vs ${esc(last.partner)}, ${esc(last.date)}</span></div>` : ''}
+    <div class="form">
+      <label class="field" for="rp-${fid}-date">Date<input type="date" id="rp-${fid}-date" value="${esc(dv('date', t0))}" max="${t0}"></label>
+      <label class="field" for="rp-${fid}-by">Written by<input type="text" id="rp-${fid}-by" list="staffNames" value="${esc(dv('by', meName()))}"></label>
+      <label class="field" for="rp-${fid}-partner">Sparring partner<input type="text" id="rp-${fid}-partner" list="pbList-${fid}" placeholder="Team name, or internal" value="${esc(dv('partner'))}"></label>
+    </div><datalist id="pbList-${fid}">${S.partners.filter((p) => p.title === title).map((p) => `<option value="${esc(p.name)}">${esc(p.level)}${p.resembles ? ` · like ${esc(p.resembles)}` : ''}</option>`).join('')}</datalist>
+    ${plannedToday.length || partners.length ? `<div class="chips"><span class="note">Quick pick:</span>${plannedToday.map((x) => chip(fid, { partner: x.partner, scrim: x.id, format: x.format, level: x.partnerLevel }, `Planned today: ${x.partner}`, ' planned')).join('')}${partners.map((p) => chip(fid, { partner: p }, p)).join('')}</div>` : ''}
+    <div class="h3">Result</div>
+    ${pts ? '' : `<div class="chips"><span class="note">Quick score:</span>${scores.map(([l, w, lo, dr]) => chip(fid, { won: String(w), lost: String(lo), drawn: dr ? String(dr) : '' }, l)).join('')}</div>`}
+    <div class="form">
+    ${pts ? `${num('played', 'Matches played')}${num('points', 'Total points')}` : `${num('won', `${esc(cap(unit))} won`)}${num('lost', `${esc(cap(unit))} lost`)}`}
+    </div>
+    <div class="h3">Progress</div>
+    ${txt('focus', 'What was this session meant to practise?', 'e.g. Early rotations; fallback drop; set-piece defending')}
+    ${focuses.length ? `<div class="chips"><span class="note">Recent and active objectives:</span>${focuses.map((f) => chip(fid, { focus: f }, f.length > 48 ? `${f.slice(0, 46)}…` : f)).join('')}</div>` : ''}
+    <div class="field"><span id="rp-${fid}-proglabel">How closely did the team follow the plan?</span><input type="hidden" id="rp-${fid}-progress" value="${esc(prog)}">
+      <div class="seg" role="group" aria-labelledby="rp-${fid}-proglabel">${PROGRESS.map(([n, l]) => `<button type="button" data-rp-prog="${esc(fid)}" data-v="${n}" aria-pressed="${String(prog) === String(n)}" title="${esc(l)}"><b>${n}</b> ${esc(PROG_SHORT[n])}</button>`).join('')}</div></div>
+    <div class="form">${txt('worked', 'What worked', '', true)}${txt('failed', 'What failed', '', true)}</div>
+    ${txt('adjust', 'Adjustment for the next session', 'One concrete change to try next time', true)}
+    <details class="more"${optOpen}><summary>More details (optional)</summary><div class="form">
+      <label class="field" for="rp-${fid}-time">Time<input type="text" id="rp-${fid}-time" placeholder="19:00 WIB" value="${esc(dv('time'))}"></label>
+      ${sel('level', 'Partner level', [['', ''], ...['Tier 1 international', 'Tier 1 domestic', 'Tier 2', 'Academy / amateur'].map((x) => [x, x])])}
+      ${sel('format', 'Format', [['', ''], ...FORMATS.map((x) => [x, x])], pts ? 'Lobby (BR)' : '')}
+      ${sel('roster', 'Who played', ROSTER_PLAYED.map((x) => [x, x]))}
+      ${planned.length ? sel('scrim', 'Close a planned session', [['', ''], ...planned.map((x) => [x.id, `${x.date}${x.partner ? ` vs ${x.partner}` : ` ${x.kind}`}`])]) : ''}
+      ${pts ? `${num('avg', 'Average placement (optional)', 'min="1" max="25" step="0.1"')}${num('chicken', 'Match wins (optional)')}` : num('drawn', `${esc(cap(unit))} drawn (optional)`)}
+      </div>
+      ${txt('detail', `${esc(spec.detail)} (optional)`, spec.hint)}
+      ${txt('players', 'Player notes (optional, performance only)', 'e.g. Aran: strong first lane, hesitates on second tower')}
+      ${txt('vod', 'VOD link or timestamp (optional)')}</details>
+    <div class="toolbar"><button class="btn primary" type="button" data-report-save="${esc(title)}">Save report</button><span class="msg" id="rpMsg-${fid}" role="status"></span></div></div>`;
+}
 
 // ---------- title hubs (MLBB, MLBB Women, eFootball, CS2, CS2 Women) ----------
 function teamPage(title) {
@@ -1150,8 +1220,29 @@ V['comp-card'] = () => {
 };
 
 // ---------- render & events ----------
+let KEEP_FORMS = true; let LAST_VIEW = null;
+function captureForms() {
+  const m = $('#main'); if (!m) return null;
+  const vals = {};
+  for (const el of m.querySelectorAll('input[id],select[id],textarea[id]')) { if (el.type === 'file') continue; vals[el.id] = el.type === 'checkbox' || el.type === 'radio' ? { c: el.checked } : { v: el.value }; }
+  const a = document.activeElement;
+  const focus = a && a.id && m.contains(a) ? { id: a.id, s: typeof a.selectionStart === 'number' ? a.selectionStart : null, e: typeof a.selectionEnd === 'number' ? a.selectionEnd : null } : null;
+  return { vals, open: [...m.querySelectorAll('details')].map((d) => d.open), focus };
+}
+function restoreForms(st) {
+  const m = $('#main');
+  for (const [id, x] of Object.entries(st.vals)) {
+    const el = document.getElementById(id); if (!el || !m.contains(el)) continue;
+    if ('c' in x) el.checked = x.c;
+    else if (el.value !== x.v && !(el.tagName === 'SELECT' && ![...el.options].some((o) => o.value === x.v))) el.value = x.v;
+  }
+  for (const b of m.querySelectorAll('[data-rp-prog]')) { const h = document.getElementById(`rp-${b.dataset.rpProg}-progress`); if (h) b.setAttribute('aria-pressed', String(h.value === b.dataset.v)); }
+  const ds = m.querySelectorAll('details'); if (ds.length === st.open.length) ds.forEach((d, i) => { d.open = st.open[i]; });
+  if (st.focus) { const el = document.getElementById(st.focus.id); if (el) { el.focus({ preventScroll: true }); try { if (st.focus.s != null) el.setSelectionRange(st.focus.s, st.focus.e); } catch { /* not a text field */ } } }
+}
 function render() {
-  const view = viewOf(); renderNav(view); LAST = { recs: {} };
+  const view = viewOf(); const kept = KEEP_FORMS && view === LAST_VIEW ? captureForms() : null;
+  renderNav(view); LAST = { recs: {} };
   document.documentElement.classList.toggle('demo', S.mode === 'demo');
   try { $('#main').innerHTML = V[view](); } catch (e) { $('#main').innerHTML = `<div class="panel">${banner('block', `<div>Something failed while building this view: ${esc(e.message)}</div>`)}</div>`; console.error(e); }
   document.documentElement.lang = S.lang;
@@ -1159,6 +1250,8 @@ function render() {
     translateDom(document.querySelector('header.top'), 'id'); translateDom($('#main'), 'id');
     if (ORIGINAL_LANG_VIEWS.test(view)) $('#main').insertAdjacentHTML('afterbegin', '<p class="note lang-note">Catatan: temuan analisis otomatis, catatan staf, nama dan sumber data ditampilkan dalam bahasa aslinya (Inggris).</p>');
   }
+  if (kept) restoreForms(kept);
+  LAST_VIEW = view;
 }
 // Views that show engine findings or data notes, which stay in English.
 const ORIGINAL_LANG_VIEWS = /^(dota-team|dota-post|dota-scout|dota-draft|dota-review|pubgm-(team|log|rivals|sim|review)|comp-nation|comp-card|comp-rosters|staff-sources|staff-rules)/;
@@ -1184,7 +1277,7 @@ async function cycleAct(act, id) {
     await saveObj(n); render();
   } catch (e) { setMsg(`msg-${id}`, e.message, 'err'); }
 }
-document.addEventListener('click', async (e) => {
+async function onClick(e) {
   const t = e.target.closest('button, [data-go]'); if (!t) return;
   if (t.dataset.go) { location.hash = t.dataset.go; return; }
   const id = t.id;
@@ -1407,6 +1500,9 @@ document.addEventListener('click', async (e) => {
     } catch (err) { setMsg(`rvMsg-${fid}`, err.message, 'err'); }
     return;
   }
+  if (t.dataset.rpFill) { try { const { fid, v } = JSON.parse(t.dataset.rpFill); fillReport(fid, v); } catch { /* malformed chip */ } return; }
+  if (t.dataset.rpProg) { fillReport(t.dataset.rpProg, { progress: t.dataset.v }); return; }
+  if (t.dataset.rpClear) { storeDraft(t.dataset.rpClear, {}); render(); return; }
   if (t.dataset.reportSave) {
     const title = t.dataset.reportSave; const fid = sid(title); const g = (k) => val(`rp-${fid}-${k}`);
     try {
@@ -1418,8 +1514,10 @@ document.addEventListener('click', async (e) => {
       const done = sc ? completeScrim(sc, { score: resultText(r.result), notes: r.worked || r.failed, by: r.by, matchIds: [], perObjective: {} }) : null;
       if (S.db) { await S.db.collection('scrim_reports').doc(r.id).set(r); if (done) await S.db.collection('scrims').doc(sc.id).set(done); }
       else { S.reports.push(r); if (done) Object.assign(sc, done); }
-      render(); setMsg(`rpMsg-${fid}`, 'Report saved.', 'ok');
-    } catch (err) { setMsg(`rpMsg-${fid}`, err.message, 'err'); }
+      const keep = Object.fromEntries(RP_KEEP_AFTER_SAVE.map((k) => [k, g(k)]).filter(([, v]) => v));
+      storeDraft(fid, { ...keep, at: new Date().toISOString() });
+      render(); setMsg(`rpMsg-${fid}`, `Report saved (${resultText(r.result)} vs ${r.partner}). Next partner? The setup is kept.`, 'ok');
+    } catch (err) { setMsg(`rpMsg-${fid}`, err.message, 'err'); markInvalid(fid, err.message); }
     return;
   }
   if (t.dataset.reportNote) {
@@ -1504,7 +1602,16 @@ document.addEventListener('click', async (e) => {
     const box = $('#exportBox'); const ops = assertOperational(S.cycle, 'export');
     box.value = JSON.stringify({ exported: new Date().toISOString(), origin: 'operational', rules: S.rules.map(({ id: i, version, status }) => ({ id: i, version, status })), objectives: ops }, null, 2); box.hidden = false; box.select();
   }
+}
+// A button action (save, add, tick) redraws with fresh forms. Any other redraw — a colleague's save
+// arriving from the shared database, a filter, the language switch — keeps what is being typed.
+document.addEventListener('click', async (e) => {
+  const b = e.target.closest('button');
+  KEEP_FORMS = !b || b.id === 'langBtn' || b.id === 'modeBtn' || 'rpFill' in b.dataset || 'rpProg' in b.dataset;
+  try { await onClick(e); } finally { KEEP_FORMS = true; }
 });
+for (const ev of ['input', 'change']) document.addEventListener(ev, (e) => draftField(e.target));
+
 document.addEventListener('change', (e) => {
   const id = e.target.id;
   if (id === 'meSel') { S.me = e.target.value; try { localStorage.setItem('hub-me', S.me); } catch { /* per-viewer convenience only */ } render(); }
