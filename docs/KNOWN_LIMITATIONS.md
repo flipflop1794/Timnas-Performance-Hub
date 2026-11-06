@@ -1,4 +1,4 @@
-# Known limitations and post-launch backlog (V1.11)
+# Known limitations and post-launch backlog (V1.12)
 
 ## Limitations at launch
 1. **Not yet run against the live Supabase project or Vercel** from the build environment: their APIs are outside its network.
@@ -18,6 +18,6 @@
 ## Backlog (in order)
 1. Custom SMTP sender for invites and resets.
 2. Invite people from the admin page (needs a small Supabase Edge Function with the service key kept server-side).
-4. Coach Donny's readiness system: API provider or embed (docs/READINESS_INTEGRATION.md).
-5. Restore drill: restore last night's backup into a scratch project once, and time it.
-6. Decide wellbeing visibility (Head Coach) and widen the rule if agreed.
+3. Coach Donny's readiness system: API provider or embed (docs/READINESS_INTEGRATION.md).
+4. Restore drill: restore last night's backup into a scratch project once, and time it.
+5. Decide wellbeing visibility (Head Coach) and widen the rule if agreed.
