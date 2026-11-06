@@ -60,7 +60,8 @@ test('a coach files a report: saved, shown by day, closes the planned session, c
   const saved = [...db.store.entries()].filter(([k]) => k.startsWith('scrim_reports/'));
   assert.equal(saved.length, 1); assert.equal(saved[0][1].result.won, 2); assert.equal(saved[0][1].origin, 'operational');
   assert.equal([...db.store.entries()].find(([k]) => k.startsWith('scrims/'))[1].status, 'done', 'planned session closed by the report');
-  assert.match(h.text(), new RegExp(t0)); assert.match(h.text(), /2-1/); assert.match(h.text(), /Faster turtle setup/); assert.match(h.text(), /Start the next session from here/);
+  assert.match(h.text(), new RegExp(t0)); assert.match(h.text(), /2-1/);
+  assert.match(h.text(), /Last 14 days/); assert.match(h.text(), /Win rate by day \(games won\)/); assert.equal(d.querySelectorAll('.trend .tb').length, 1); assert.match(d.querySelector('.trend .tm title').textContent, /2-1 \(67%\), 1 session/); assert.match(h.text(), /Faster turtle setup/); assert.match(h.text(), /Start the next session from here/);
   assert.ok(d.querySelector('[data-report-csv="MLBB"]'));
   // correction
   const id = saved[0][1].id; d.getElementById(`rpN-${id}`).value = 'Score was 2-0, not 2-1';

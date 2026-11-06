@@ -1,5 +1,5 @@
 // Bundles the hub page: engines + shipped data + UI into one self-contained HTML file.
-import { readFileSync, writeFileSync, mkdirSync, rmSync } from 'node:fs';
+import { readFileSync, writeFileSync, mkdirSync, rmSync, cpSync } from 'node:fs';
 import { createHash } from 'node:crypto';
 import { build } from 'esbuild';
 
@@ -51,7 +51,7 @@ if (mode) {
   });
   const code = web.outputFiles[0].text;
   // The template is a fragment (the artifact host adds the document shell); the website needs a full document.
-  let page = `<!doctype html>\n<html lang="en">\n<head>\n<meta charset="utf-8">\n<meta name="viewport" content="width=device-width, initial-scale=1">\n<meta name="robots" content="noindex, nofollow">\n<meta name="referrer" content="strict-origin-when-cross-origin">\n</head>\n<body>\n${rd('src/hub/index.html')}\n</body>\n</html>\n`;
+  let page = `<!doctype html>\n<html lang="en">\n<head>\n<meta charset="utf-8">\n<meta name="viewport" content="width=device-width, initial-scale=1">\n<meta name="robots" content="noindex, nofollow">\n<meta name="referrer" content="strict-origin-when-cross-origin">\n<meta name="theme-color" content="#080D17">\n<link rel="manifest" href="/manifest.webmanifest">\n<link rel="icon" type="image/png" sizes="192x192" href="/icons/icon-192.png">\n<link rel="apple-touch-icon" href="/icons/apple-touch-icon.png">\n<meta name="apple-mobile-web-app-capable" content="yes">\n<meta name="apple-mobile-web-app-title" content="Timnas Hub">\n<meta name="mobile-web-app-capable" content="yes">\n</head>\n<body>\n${rd('src/hub/index.html')}\n</body>\n</html>\n`;
   if (test) page = page.replace('/*__APP__*/', () => code.replace(/<\/script/gi, '<\\/script'));
   else {
     const name = `app-${createHash('sha256').update(code).digest('hex').slice(0, 12)}.js`;
@@ -59,5 +59,7 @@ if (mode) {
     page = page.replace('<script>/*__APP__*/</script>', `<script src="/assets/${name}" defer></script>`);
   }
   writeFileSync(new URL('index.html', outDir), page);
+  // Home-screen install: manifest and icons (public/).
+  if (!test) cpSync(new URL('../public/', import.meta.url), outDir, { recursive: true });
   console.log(`${test ? 'dist-web-test' : 'dist-web'}/index.html (${(code.length / 1024).toFixed(0)} KB script)`);
 }

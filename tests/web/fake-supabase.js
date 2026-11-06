@@ -49,16 +49,18 @@ function client(B, sessionUserId) {
   let session = sessionUserId ? { user: { id: sessionUserId } } : null;
   const listeners = [];
   const uid = () => session?.user.id || null;
+  let tick = 0;
   const stamp = (table, row, old) => {
-    const now = new Date().toISOString();
+    const now = new Date(Date.now() + ++tick).toISOString();
     if (DOC_TABLES.includes(table)) return { ...row, title: FIXED[table] || row.data?.title || null, created_by: old ? old.created_by : uid(), created_at: old ? old.created_at : now, updated_by: uid(), updated_at: now };
     if (table === 'scrim_report_corrections') return { ...row, id: B.tables[table].length + 1, created_by: uid(), created_at: now };
-    return { ...row, updated_by: uid() };
+    return { ...row, updated_by: uid(), updated_at: now };
   };
   function query(table) {
+    let returning = false; const written = [];
     const filters = []; let range = null; let single = false; let action = 'select'; let payload = null; let conflict = 'id';
     const q = {
-      select() { return q; }, order() { return q; },
+      select() { if (action !== 'select') returning = true; return q; }, order() { return q; },
       eq(c, v) { filters.push([c, v]); return q; },
       range(a, b) { range = [a, b]; return q; },
       maybeSingle() { single = true; return q; },
@@ -87,15 +89,15 @@ function client(B, sessionUserId) {
           const i = action === 'upsert' ? T.findIndex((r) => r[conflict] === row[conflict]) : -1;
           const s = stamp(table, structuredClone(row), i >= 0 ? T[i] : null);
           if (i >= 0) T[i] = s; else T.push(s);
-          B.log.push({ table, action, by: id, row: s });
+          B.log.push({ table, action, by: id, row: s }); written.push(s);
         }
-        B.notify(table); return { data: null, error: null };
+        B.notify(table); return { data: returning ? written.map((x) => structuredClone(x)) : null, error: null };
       }
       if (action === 'update') {
         const rows = T.filter(match);
         for (const r of rows) { const err = B.write(id, table, 'update', { ...r, ...payload }, r); if (err) return { data: null, error: err }; }
-        for (const r of rows) Object.assign(r, payload);
-        B.notify(table); return { data: null, error: null };
+        for (const r of rows) { Object.assign(r, payload); if (DOC_TABLES.includes(table) || table === 'app_config') { r.updated_by = id; r.updated_at = new Date(Date.now() + ++tick).toISOString(); } }
+        B.notify(table); return { data: returning ? rows.map((x) => structuredClone(x)) : null, error: null };
       }
       if (action === 'delete') {
         const rows = T.filter(match);

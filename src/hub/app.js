@@ -236,7 +236,7 @@ function renderNav(view) {
   const pending = S.cycle.filter((o) => o.status === 'proposed').length;
   const me = STAFF.find((x) => x.id === S.me);
   $('#titles').innerHTML = (HUB_USER ? `<span class="me" title="${esc(HUB_USER.email)}">${esc(HUB_USER.name)}</span><button type="button" id="signOutBtn" class="mode">Sign out</button>`
-    : `<label class="me" for="meSel">I am <select id="meSel">${STAFF.map((x) => `<option value="${x.id}" ${x.id === S.me ? 'selected' : ''}>${esc(x.name.split(' ')[0])}</option>`).join('')}</select></label>`) + TITLES.map((t) => `<button type="button" data-go="${t.tabs[0][0]}" aria-pressed="${t === title}">${esc(t.label)}${t.id === 'staff' && pending ? ` · ${pending}` : ''}</button>`).join('')
+    : `<label class="me" for="meSel">I am <select id="meSel">${STAFF.map((x) => `<option value="${x.id}" ${x.id === S.me ? 'selected' : ''}>${esc(x.name.split(' ')[0])}</option>`).join('')}</select></label>`) + TITLES.filter(groupVisible).map((t) => `<button type="button" data-go="${t.tabs[0][0]}" aria-pressed="${t === title}">${esc(t.label)}${t.id === 'staff' && pending ? ` · ${pending}` : ''}</button>`).join('')
     + `<button type="button" id="langBtn" class="lang" aria-label="${S.lang === 'id' ? 'Switch to English' : 'Ganti ke Bahasa Indonesia'}"><b${S.lang === 'en' ? ' class="on"' : ''}>EN</b><b${S.lang === 'id' ? ' class="on"' : ''}>ID</b></button>`
     + `<button type="button" id="modeBtn" class="mode ${S.mode}" aria-pressed="${S.mode === 'demo'}">${S.mode === 'demo' ? 'Leave demo sandbox' : 'Demo sandbox'}</button>`;
   $('#tabs').innerHTML = title.tabs.map(([id, label]) => `<a href="#${id}" ${id === view ? 'aria-current="page"' : ''}>${esc(label)}</a>`).join('');
@@ -291,9 +291,9 @@ V.today = () => {
     <p>Accepted objectives first. Anything not yet reviewed is a proposal, not a training decision. Choose who you are at the top to see your queue.</p></div>
     ${queueHtml(me.id)}
     ${me.id === 'donny' || me.id === 'fayad' ? wellTodayPanel() : ''}
-    ${(() => { const mine = me.id === 'aufa' ? me.focus : WEC_TITLES.map((t) => t.id); const up = S.scrims.filter((x) => mine.includes(x.title) && x.status === 'planned').sort((a, b) => a.date.localeCompare(b.date)).slice(0, 6);
+    ${(() => { const mine = me.id === 'aufa' || me.id === 'user' ? me.focus : WEC_TITLES.map((t) => t.id); const up = S.scrims.filter((x) => mine.includes(x.title) && x.status === 'planned').sort((a, b) => a.date.localeCompare(b.date)).slice(0, 6);
       return up.length ? `<div class="panel"><h2>Scrims and practice coming up</h2><ul class="plain">${up.map((x) => `<li><b>${esc(x.date)}</b> ${esc(x.time)} · ${esc(x.title)} · ${esc(x.kind)}${x.partner ? ` vs ${esc(x.partner)}` : ''}${x.mirrors ? ` (stand-in for ${esc(x.mirrors)})` : ''}${x.date < today() ? ' — <b>result not logged</b>' : ''}</li>`).join('')}</ul></div>` : ''; })()}
-    ${(() => { const mine = me.id === 'aufa' ? me.focus : WEC_TITLES.map((t) => t.id); const t0 = localToday();
+    ${(() => { const mine = me.id === 'aufa' || me.id === 'user' ? me.focus : WEC_TITLES.map((t) => t.id); const t0 = localToday();
       const rows = mine.filter((t) => GAME_SPEC[t]).map((t) => ({ t, s: reportSummary(S.reports, t, t0) }));
       return rows.length ? `<div class="panel"><h2>Scrim reports</h2><ul class="plain">${rows.map((r) => `<li><b>${esc(r.t)}</b> — ${r.s.last ? (r.s.daysSince === 0 ? 'report filed today' : `last report ${r.s.daysSince} day(s) ago`) : 'no report yet'} <a href="#${REPORT_TAB[r.t]}">${r.s.daysSince === 0 ? 'Open' : 'File one'}</a></li>`).join('')}</ul></div>` : ''; })()}
     <div class="cols">${titles.map(titlePanel).join('')}</div>`;
@@ -418,6 +418,47 @@ function reportCard(r) {
     ${S.mode === 'demo' ? '' : `<details><summary class="note">Add a correction</summary><div class="form"><label class="field" for="rpN-${r.id}">Correction or follow-up<input type="text" id="rpN-${r.id}" placeholder="e.g. Score was 2-0, not 2-1"></label></div>
       <div class="toolbar"><button class="btn" type="button" data-report-note="${esc(r.id)}">Add note</button><span class="msg" id="rpNMsg-${r.id}"></span></div></details>`}</div>`;
 }
+
+// ---------- scrim report trends: two small charts, one measure each (no dual axis) ----------
+function trendSvg({ days, values, kind, min = 0, max, ticks, fmt, label, tip }) {
+  const W = 320, H = 132, L = 38, R = 6, T = 10, B = 22, iw = W - L - R, ih = H - T - B, n = days.length, band = iw / n;
+  const y = (v) => T + ih - ((v - min) / (max - min)) * ih; const x = (i) => L + band * i + band / 2;
+  const grid = ticks.map((v) => `<line x1="${L}" x2="${W - R}" y1="${y(v)}" y2="${y(v)}" class="tg"/><text x="${L - 5}" y="${y(v) + 3.5}" class="tl" text-anchor="end">${fmt(v)}</text>`).join('');
+  const xl = [0, Math.floor((n - 1) / 2), n - 1].map((i) => `<text x="${x(i)}" y="${H - 6}" class="tl" text-anchor="middle">${days[i].slice(8)}/${days[i].slice(5, 7)}</text>`).join('');
+  let marks = '';
+  if (kind === 'bar') {
+    const w = Math.max(4, band * 0.62);
+    marks = values.map((v, i) => {
+      if (v == null) return '';
+      const x0 = x(i) - w / 2, y0 = y(v), base = T + ih, r = Math.min(4, w / 2, base - y0);
+      const d = r > 0 ? `M${x0},${base}V${y0 + r}Q${x0},${y0} ${x0 + r},${y0}H${x0 + w - r}Q${x0 + w},${y0} ${x0 + w},${y0 + r}V${base}Z` : `M${x0},${base}H${x0 + w}V${base - 1}H${x0}Z`;
+      return `<g class="tm"><rect x="${L + band * i}" y="${T}" width="${band}" height="${ih}" fill="transparent"/><path d="${d}" class="tb"/><title>${esc(tip(i))}</title></g>`;
+    }).join('');
+  } else {
+    const pts = values.map((v, i) => (v == null ? null : [x(i), y(v)]));
+    const segs = []; let cur = [];
+    for (const p of pts) { if (p) cur.push(p); else if (cur.length) { segs.push(cur); cur = []; } }
+    if (cur.length) segs.push(cur);
+    marks = segs.filter((sg) => sg.length > 1).map((sg) => `<polyline points="${sg.map((p) => p.join(',')).join(' ')}" class="tline"/>`).join('')
+      + pts.map((p, i) => (p ? `<g class="tm"><rect x="${L + band * i}" y="${T}" width="${band}" height="${ih}" fill="transparent"/><circle cx="${p[0]}" cy="${p[1]}" r="4" class="tdot"/><title>${esc(tip(i))}</title></g>` : '')).join('');
+  }
+  return `<figure class="trend"><figcaption>${esc(label)}</figcaption><svg viewBox="0 0 ${W} ${H}" role="img" aria-label="${esc(label)}">${grid}<line x1="${L}" x2="${W - R}" y1="${T + ih}" y2="${T + ih}" class="ta"/>${marks}${xl}</svg></figure>`;
+}
+function reportTrends(title) {
+  const t0 = localToday(); const days = Array.from({ length: 14 }, (_, i) => shiftDay(t0, i - 13));
+  const byDate = Object.fromEntries(reportDays(S.reports, title).map((d) => [d.date, d]));
+  if (!days.some((d) => byDate[d])) return '';
+  const pts = GAME_SPEC[title].mode === 'points';
+  const res = days.map((d) => { const r = byDate[d]; if (!r) return null; if (pts) return r.points; const n = r.won + r.lost + r.drawn; return n ? Math.round((r.won / n) * 100) : null; });
+  const prog = days.map((d) => byDate[d]?.progress ?? null);
+  const maxPts = Math.max(10, ...res.filter((v) => v != null)); const step = Math.ceil(maxPts / 2 / 10) * 10;
+  const tipRes = (i) => { const r = byDate[days[i]]; return pts ? `${days[i]}: ${r.points} pts in ${r.played} matches, ${r.n} session(s)` : `${days[i]}: ${r.won}-${r.lost}${r.drawn ? `-${r.drawn}` : ''} (${res[i]}%), ${r.n} session(s)`; };
+  return `<div class="panel"><h2>Last 14 days</h2><div class="trends">
+    ${trendSvg({ days, values: res, kind: 'bar', max: pts ? step * 2 : 100, ticks: pts ? [0, step, step * 2] : [0, 50, 100], fmt: (v) => (pts ? `${v}` : `${v}%`), label: pts ? 'Points by day' : `Win rate by day (${GAME_SPEC[title].unit} won)`, tip: tipRes })}
+    ${trendSvg({ days, values: prog, kind: 'line', min: 1, max: 5, ticks: [1, 3, 5], fmt: (v) => `${v}`, label: 'Plan followed by day (1–5)', tip: (i) => `${days[i]}: plan followed ${prog[i]}/5 (average of ${byDate[days[i]].n} report(s))` })}
+    </div><p class="note">Days without a report are left empty. Hover or tap a day for its numbers; the full list is under "Day by day".</p></div>`;
+}
+
 function reportsPanel(title) {
   const spec = GAME_SPEC[title]; const fid = sid(title); const t0 = localToday();
   const mine = S.reports.filter((r) => r.title === title);
@@ -436,14 +477,14 @@ function reportsPanel(title) {
     ${stale ? banner('synth', `<div><b>No report for ${Sm.daysSince} days.</b> If sessions took place, please file them.</div>`) : ''}
     ${!mine.length ? '<p class="empty">No report yet.</p>' : ''}
     <p class="note">Progress is the coach's rating of how closely the team followed the plan of the day. It is not computed, and ratings from different coaches are not directly comparable.</p></div>
-  ${ready}${form}
+  ${reportTrends(title)}${ready}${form}
   <div class="panel"><h2>Day by day</h2>${days.length ? days.slice(0, 14).map((d) => `<details ${d.date === t0 ? 'open' : ''}><summary><b>${esc(d.date)}</b> · ${d.n} session${d.n > 1 ? 's' : ''} · ${pts ? `${d.points} pts in ${d.played} m` : `${d.won}-${d.lost}${d.drawn ? `-${d.drawn}` : ''}`} · plan ${d.progress}/5 <span class="note">— ${esc(d.focus.join('; '))}</span></summary>${d.sessions.map(reportCard).join('')}</details>`).join('') : '<p class="empty">Nothing filed yet.</p>'}
     ${days.length > 14 ? `<p class="note">${days.length - 14} older day(s) are in the CSV download.</p>` : ''}
     ${mine.length ? `<div class="toolbar"><button class="btn" type="button" data-report-csv="${esc(title)}">Download CSV</button><span class="msg" id="rpCsvMsg-${fid}"></span></div>` : ''}</div>`;
 }
 V['reports-all'] = () => {
   const t0 = localToday(); const dayList = Array.from({ length: 7 }, (_, i) => shiftDay(t0, i - 6));
-  const rows = WEC_TITLES.map((t) => ({ t, s: reportSummary(S.reports, t.id, t0), pts: GAME_SPEC[t.id].mode === 'points', per: dayList.map((d) => S.reports.filter((r) => r.title === t.id && r.date === d).length) }));
+  const rows = WEC_TITLES.filter((t) => titleVisible(t.id)).map((t) => ({ t, s: reportSummary(S.reports, t.id, t0), pts: GAME_SPEC[t.id].mode === 'points', per: dayList.map((d) => S.reports.filter((r) => r.title === t.id && r.date === d).length) }));
   const missing = rows.filter((r) => !r.per.at(-1));
   return `<div class="panel"><div class="lead">Scrim <em>reports</em></div>
     <p>What every coach filed in the last seven days, all titles. Open a title's <b>Scrim reports</b> tab to file or read the details.</p>
@@ -580,6 +621,11 @@ V['admin-users'] = () => {
     ${S.admin.error ? banner('block', `<div>${esc(S.admin.error)}</div>`) : ''}</div>
   <div class="panel"><h2>People (${users.length})</h2>${S.admin.loading && !users.length ? '<p>Loading…</p>' : users.map(row).join('') || '<p class="empty">Nobody yet.</p>'}</div>`;
 };
+// Title coaches and analysts see only their assigned games (the database hides the rest anyway).
+const restricted = () => !!HUB_USER && !HUB_USER.seesAllTitles;
+const titleVisible = (t) => !restricted() || HUB_USER.titles.includes(t);
+function groupTitle(gid) { return gid === 'dota' ? 'Dota 2' : gid === 'pubgm' ? 'PUBG Mobile' : GAME_HUBS.find((h) => h.id === gid)?.title || null; }
+function groupVisible(g) { const t = groupTitle(g.id); return !t || titleVisible(t); }
 // Which title a view belongs to (for the "not assigned" notice).
 function viewTitle(view) {
   const g = TITLES.find((t) => t.tabs.some(([id]) => id === view)); if (!g) return null;
@@ -1705,5 +1751,6 @@ document.addEventListener('change', (e) => {
 });
 document.addEventListener('keydown', (e) => { if (e.key === 'Enter' && e.target.id === 'dHero') $('#dLock')?.click(); });
 window.addEventListener('hashchange', render);
+if (restricted() && HUB_USER.titles[0] && (!location.hash || location.hash === '#')) history.replaceState(null, '', `#${REPORT_TAB[HUB_USER.titles[0]]}`);
 render();
 initCaps();

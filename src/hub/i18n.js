@@ -312,6 +312,12 @@ const EXACT = {
   "Clear form": "Kosongkan formulir",
   "Draw": "Seri",
   "Close a planned session": "Tutup sesi yang direncanakan",
+  // V1.12
+  "Last 14 days": "14 hari terakhir",
+  "Points by day": "Poin per hari",
+  "Plan followed by day (1–5)": "Kepatuhan rencana per hari (1–5)",
+  "Sign out": "Keluar",
+  "Days without a report are left empty. Hover or tap a day for its numbers; the full list is under \"Day by day\".": "Hari tanpa laporan dibiarkan kosong. Arahkan atau ketuk satu hari untuk melihat angkanya; daftar lengkap ada di \"Hari demi hari\".",
 };
 
 // Long sentences matched by their opening words (the rest of the node is ours, not data).
@@ -350,6 +356,12 @@ const PREFIX = [
 const RULES = [
 
   // V1.9 scrim reports
+  [/^Win rate by day \((games|matches|maps) won\)$/, (m, u) => `Persentase menang per hari (${{ games: 'game', matches: 'pertandingan', maps: 'map' }[u]} menang)`],
+  [/^Not saved: (.+) changed this record(?: at (\d\d:\d\d) WIB)?, after you opened it\. The page now shows their version; check it, then make your change again\.$/, (m, w, t) => `Tidak tersimpan: ${w === 'A colleague' ? 'rekan Anda' : w} mengubah data ini${t ? ` pukul ${t} WIB` : ''}, setelah Anda membukanya. Halaman kini menampilkan versi mereka; periksa, lalu ulangi perubahan Anda.`],
+  [/^You are not assigned to (.+)\.$/, 'Anda tidak ditugaskan ke $1.'],
+  [/^Its records are hidden and you cannot save here\. Ask the admin if you need access\.$/, 'Datanya disembunyikan dan Anda tidak bisa menyimpan di sini. Minta akses ke admin jika perlu.'],
+  [/^Restricted\.$/, 'Terbatas.'],
+  [/^Wellbeing records are limited to the readiness owner \(Coach Donny\) and admins until the Head Coach decides who else may see them\.$/, 'Data wellbeing hanya untuk penanggung jawab kesiapan (Coach Donny) dan admin, sampai Head Coach memutuskan siapa lagi yang boleh melihat.'],
   [/^Draft kept on this device(?: \(last typed (\d\d:\d\d)\))?\.$/, (m, a) => `Draf tersimpan di perangkat ini${a ? ` (terakhir diketik ${a})` : ''}.`],
   [/^Planned today: (.+)$/, 'Rencana hari ini: $1'],
   [/^Report saved \((.+) vs (.+)\)\. Next partner\? The setup is kept\.$/, (m, a, b) => `Laporan tersimpan (${a.replace(/ pts in (\d+) match(es)?/, ' poin dalam $1 pertandingan')} vs ${b}). Lawan berikutnya? Pengaturan tetap disimpan.`],

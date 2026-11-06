@@ -23,7 +23,7 @@ const people = {
 };
 function world() { const B = backend(); Object.values(people).forEach((p) => B.addUser(p)); return B; }
 async function open(B, who, hash = 'today') {
-  const dom = new JSDOM(html, { runScripts: 'dangerously', pretendToBeVisual: true, url: `https://hub.example.test/#${hash}`,
+  const dom = new JSDOM(html, { runScripts: 'dangerously', pretendToBeVisual: true, url: hash ? `https://hub.example.test/#${hash}` : 'https://hub.example.test/',
     beforeParse(w) { w.__HUB_TEST_CLIENT__ = B.client(who ? people[who].id : null); w.URL.createObjectURL = () => 'blob:x'; w.URL.revokeObjectURL = () => {}; } });
   const d = dom.window.document;
   for (let i = 0; i < 60 && /Loading/.test(d.getElementById('main')?.textContent || 'Loading'); i++) await sleep(25);
@@ -42,7 +42,8 @@ test('no session: the sign-in screen, not the hub; wrong password refused; right
   assert.match(p.d.getElementById('authMsg').textContent, /not correct/);
   p.d.getElementById('authPw').value = people.indra.password;
   p.d.getElementById('loginForm').dispatchEvent(new p.w.Event('submit', { cancelable: true })); await sleep(250);
-  for (const t of ['Dota 2', 'PUBG Mobile', 'MLBB', 'MLBB Women', 'eFootball', 'CS2', 'CS2 Women']) assert.match(p.nav(), new RegExp(t));
+  // A title coach sees only his own game and lands on its scrim reports.
+  assert.match(p.nav(), /MLBB/); for (const t of ['Dota 2', 'PUBG Mobile', 'eFootball', 'CS2']) assert.doesNotMatch(p.nav(), new RegExp(t));
   assert.match(p.nav(), /Coach Indra/); assert.ok(p.d.getElementById('signOutBtn')); assert.equal(p.d.getElementById('meSel'), null, 'no self-declared identity');
 });
 
@@ -135,4 +136,13 @@ test('typing is kept while a colleague saves; the database refuses demo data; si
   assert.match(r.error.message, /Only operational records/);
   await indra.click('#signOutBtn'); await sleep(50);
   assert.equal((await B.client(null).from('scrim_reports').select('*')).data.length, 0, 'signed-out reads return nothing');
+});
+
+test('title coach lands on his own scrim reports; Head Coach sees all seven games', async () => {
+  const B = world();
+  const indra = await open(B, 'indra', ''); await sleep(50);
+  assert.equal(indra.w.location.hash, '#mlbb-reports'); assert.match(indra.text(), /Scrim reports — MLBB/);
+  const fayad = await open(B, 'fayad', 'today');
+  for (const t of ['Dota 2', 'PUBG Mobile', 'MLBB', 'MLBB Women', 'eFootball', 'CS2', 'CS2 Women']) assert.match(fayad.nav(), new RegExp(t));
+  await indra.go('reports-all'); assert.doesNotMatch(indra.text(), /PUBG Mobile/);
 });

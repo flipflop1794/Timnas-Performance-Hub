@@ -54,6 +54,10 @@ export function createHubDb(client: SupabaseClient, opts: HubDbOptions) {
   const names = opts.names || {};
   const wait = opts.debounceMs ?? 250;
   const reportNotes = new Map<string, number>();   // report id -> corrections already stored
+  // Last known version (updated_at) of each record this device has loaded: a save based on an older
+  // copy is refused instead of silently overwriting a colleague's change.
+  const versions = new Map<string, string>();
+  const loaded = new Set<string>();                 // tables whose rows have been loaded at least once
   let seq = 0;
 
   // One subscription per table, shared by every listener on it.
@@ -86,7 +90,9 @@ export function createHubDb(client: SupabaseClient, opts: HubDbOptions) {
     };
   }
   async function loadTable(table: string): Promise<QuerySnap> {
-    const rows = await selectAll(client, table, 'id, data');
+    const rows = await selectAll(client, table, 'id, data, updated_at');
+    for (const r of rows) versions.set(`${table}:${r.id}`, String(r.updated_at));
+    loaded.add(table);
     return { docs: rows.map((r) => ({ id: String(r.id), exists: true, data: () => r.data as Doc })) };
   }
 
@@ -107,10 +113,33 @@ export function createHubDb(client: SupabaseClient, opts: HubDbOptions) {
     if (error) throw friendlyError(error);
     reportNotes.set(id, 0);
   }
+  async function conflict(table: string, keyCol: string, id: string): Promise<never> {
+    const { data } = await client.from(table).select('updated_by, updated_at').eq(keyCol, id).maybeSingle();
+    const who = data ? names[String((data as Doc).updated_by)] || 'A colleague' : 'A colleague';
+    const at = data ? new Date(String((data as Doc).updated_at)).toLocaleTimeString('en-GB', { timeZone: 'Asia/Jakarta', hour: '2-digit', minute: '2-digit' }) : '';
+    const err = new Error(`Not saved: ${who} changed this record${at ? ` at ${at} WIB` : ''}, after you opened it. The page now shows their version; check it, then make your change again.`) as Error & { code: string };
+    err.code = 'conflict'; throw err;
+  }
+  // Insert a new record, or update one only if it is still the version this device last saw.
+  async function versionedWrite(table: string, keyCol: string, id: string, row: Doc) {
+    const vkey = `${table}:${id}`; const known = versions.get(vkey);
+    if (!loaded.has(table) && !known) {
+      // Not loaded on this device (should not happen in the app): keep the plain upsert.
+      const { data, error } = await client.from(table).upsert({ [keyCol]: id, ...row }, { onConflict: keyCol }).select('updated_at');
+      if (error) throw friendlyError(error);
+      if (data?.[0]) versions.set(vkey, String((data[0] as Doc).updated_at));
+      return;
+    }
+    const res = known
+      ? await client.from(table).update(row).eq(keyCol, id).eq('updated_at', known).select('updated_at')
+      : await client.from(table).insert({ [keyCol]: id, ...row }).select('updated_at');
+    if (res.error) { if (res.error.code === '23505') await conflict(table, keyCol, id); throw friendlyError(res.error); }
+    if (!res.data?.length) await conflict(table, keyCol, id);
+    versions.set(vkey, String((res.data![0] as Doc).updated_at));
+  }
   async function writeRow(table: string, id: string, data: Doc) {
     const clean = { ...data }; delete clean._entered;
-    const { error } = await client.from(table).upsert({ id, data: clean }, { onConflict: 'id' });
-    if (error) throw friendlyError(error);
+    await versionedWrite(table, 'id', id, { data: clean });
   }
 
   // ---- config documents: config/runbooks, config/rules (app_config) and config/roster (roster_players)
@@ -134,12 +163,14 @@ export function createHubDb(client: SupabaseClient, opts: HubDbOptions) {
     }
     if (!CONFIG_KEYS.has(key)) throw new Error(`Unknown config document: ${key}`);
     return {
-      async set(d: Doc) { const { error } = await client.from('app_config').upsert({ key, data: d }, { onConflict: 'key' }); if (error) throw friendlyError(error); },
+      async set(d: Doc) { await versionedWrite('app_config', 'key', key, { data: d }); },
       onSnapshot(next: Next<DocSnap>, fail?: Fail) {
         const load = async () => {
           try {
-            const { data, error } = await client.from('app_config').select('data').eq('key', key).maybeSingle();
+            const { data, error } = await client.from('app_config').select('data, updated_at').eq('key', key).maybeSingle();
             if (error) throw error;
+            loaded.add('app_config');
+            if (data) versions.set(`app_config:${key}`, String((data as Doc).updated_at));
             next({ id: key, exists: !!data, data: () => (data ? (data as Doc).data as Doc : undefined) });
           } catch (e) { fail?.(friendlyError(e as Doc, 'read')); }
         };
