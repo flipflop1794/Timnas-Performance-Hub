@@ -11,3 +11,7 @@ src/hub/data.gen.js
 *.dump.gpg
 *.log
 .DS_Store
+data/eval/*/*.png
+data/eval/*/*.jpg
+data/eval/*/*.jpeg
+data/eval/*/*.webp

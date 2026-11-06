@@ -15,6 +15,18 @@ const EXACT = {
   'Draft room': 'Ruang draft', 'Series review': 'Review seri', 'Log & import': 'Log & impor', 'Strategy sim': 'Simulasi strategi', 'Match-day review': 'Review hari pertandingan',
   'Athlete readiness (preview)': 'Kesiapan atlet (pratinjau)', 'Player plans': 'Rencana pemain', 'Wellbeing check': 'Cek wellbeing', 'Log check-in & load': 'Catat check-in & beban',
   'Coaching cycle': 'Siklus coaching', 'Is it working?': 'Apakah efektif?', 'Rules & decisions': 'Aturan & keputusan', 'Sources & limits': 'Sumber & batasan', Views: 'Tampilan', Title: 'Title',
+  // V1.13 AI capture and patterns
+  Patterns: 'Pola', Games: 'Game', 'Add game from screenshot': 'Tambah game dari screenshot', 'Add game by hand': 'Tambah game manual', 'Confirm game': 'Konfirmasi game',
+  Discard: 'Buang', 'Add draft screenshot': 'Tambah screenshot draft', 'Our side': 'Sisi kita', 'Our player': 'Pemain kita', 'Name on screen': 'Nama di layar',
+  'Duration (mm:ss)': 'Durasi (mm:dd)', 'Match ID (optional)': 'Match ID (opsional)', 'Fill the fields': 'Isi kolom', 'Your note': 'Catatan Anda',
+  'Say it once: one note, AI fills the fields': 'Cukup sekali: satu catatan, AI mengisi kolom', 'Say it once: one note, AI fills the fields (website only)': 'Cukup sekali: satu catatan, AI mengisi kolom (khusus website)',
+  'Look for patterns (AI)': 'Cari pola (AI)', 'Results by split': 'Hasil per kategori', 'Partners and rival stand-ins': 'Partner dan stand-in rival',
+  'Our heroes (2+ games)': 'Hero kita (2+ game)', 'Banned against us': 'Di-ban melawan kita', 'Confirmed games': 'Game terkonfirmasi', 'From screenshots': 'Dari screenshot',
+  'AI values corrected': 'Nilai AI yang dikoreksi', 'With a draft': 'Dengan draft', Useful: 'Berguna', 'Already known': 'Sudah diketahui', Wrong: 'Salah',
+  'Turn into a coaching proposal': 'Jadikan usulan coaching', 'The numbers behind it': 'Angka di baliknya',
+  'Retry saving games': 'Simpan ulang game', 'Read cleanly. Still check each value against the screenshot.': 'Terbaca jelas. Tetap cek setiap nilai dengan screenshot.',
+  'Filled from the confirmed games above.': 'Diisi dari game terkonfirmasi di atas.', 'Tie to a scrim stat (optional)': 'Kaitkan ke statistik scrim (opsional)',
+  'No findings yet.': 'Belum ada temuan.', 'AI findings work on the website.': 'Temuan AI hanya tersedia di website.', 'Why it matters:': 'Mengapa penting:',
   // Today
     'Accepted objectives first. Anything not yet reviewed is a proposal, not a training decision. Choose who you are at the top to see your queue.': 'Objektif yang sudah diterima tampil lebih dulu. Yang belum direview masih usulan, bukan keputusan latihan. Pilih siapa Anda di atas untuk melihat antrean Anda.',
   'To review': 'Perlu direview', 'To practise / log': 'Perlu dilatih / dicatat', 'Decisions due': 'Keputusan jatuh tempo', 'Rule changes to re-check': 'Perubahan aturan untuk dicek ulang',

@@ -14,7 +14,11 @@ Supabase
   Realtime  change events → other devices refresh within ~0.3 s
 ```
 
-There is no server code of our own: the permission rules live in the database (`supabase/migrations`),
+V1.13 adds one server function, `scrim-ai` (Supabase Edge Function), for AI reading of screenshots, debrief notes
+and pattern findings. It runs with the coach's own session, so the database rules below still decide everything;
+the AI key is a function secret. Details: HUB_V1_13.md.
+
+Apart from that function, there is no server code of our own: the permission rules live in the database (`supabase/migrations`),
 so hiding a button is never the only protection.
 
 ## Where each record lives
@@ -33,6 +37,9 @@ so hiding a button is never the only protection.
 | config/runbooks, config/rules | app_config | — | runbooks: HC, admin, assistant coaches; rules: HC, admin |
 | config/roster | roster_players | — | via `set_roster()` |
 | (people) | profiles, user_roles, user_titles | — | admin manages |
+| scrim_games | scrim_games | record | V1.13; insert-only, a fix supersedes; must belong to a report of the same title |
+| scrim_captures, pattern_findings, player_aliases | same names | record | V1.13 |
+| (AI calls) | ai_usage | record | V1.13; own rows, admins all; daily cap |
 | (history) | audit_log | — | every insert/update/delete with old and new row; admin read-only |
 
 Each operational row: `id`, `title`, `data` (the app's record), `created_by`, `created_at`, `updated_by`, `updated_at`.

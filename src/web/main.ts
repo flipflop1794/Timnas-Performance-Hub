@@ -114,7 +114,7 @@ function adminApi(client: SupabaseClient) {
     async exportAll() {
       const tables = ['profiles', 'user_roles', 'user_titles', 'disciplines', 'roster_players', 'app_config', 'scrim_sessions', 'scrim_reports', 'scrim_report_corrections',
         'coaching_objectives', 'scouting_notes', 'rival_tiers', 'rival_rosters', 'rival_vods', 'opponent_cards', 'sparring_partners', 'wec_matches', 'player_plans',
-        'pubgm_logs', 'dota_matches', 'dota_pools', 'wellbeing_checkins', 'wellbeing_loads'];
+        'pubgm_logs', 'dota_matches', 'dota_pools', 'wellbeing_checkins', 'wellbeing_loads', 'scrim_games', 'scrim_captures', 'pattern_findings', 'player_aliases', 'ai_usage'];
       const out: Record<string, unknown> = { exported_at: new Date().toISOString(), note: 'Timnas Performance Hub export. Contains wellbeing data if exported by an admin: store securely.' };
       for (const tb of tables) {
         const rows: unknown[] = [];
@@ -126,6 +126,25 @@ function adminApi(client: SupabaseClient) {
         out[tb] = rows;
       }
       return JSON.stringify(out, null, 1);
+    },
+  };
+}
+
+// V1.13: the scrim-ai server function (screenshots, debrief, patterns). Errors come back as plain sentences.
+function aiApi(client: SupabaseClient) {
+  return {
+    async call(body: Record<string, unknown>) {
+      const { data, error } = await client.functions.invoke('scrim-ai', { body });
+      if (error) {
+        const ctx = (error as unknown as { context?: Response }).context;
+        let msg = error.message;
+        try { const j = await ctx?.json?.(); if (j?.error) msg = j.error; } catch { /* not JSON */ }
+        if (ctx?.status === 404) msg = 'AI capture is not set up on the server yet. Enter the values by hand.';
+        else if (/Failed to send|Failed to fetch|NetworkError/i.test(msg)) msg = 'Could not reach the AI service. Check your connection, or enter the values by hand.';
+        throw new Error(msg);
+      }
+      if ((data as { error?: string })?.error) throw new Error((data as { error: string }).error);
+      return data;
     },
   };
 }
@@ -145,7 +164,7 @@ async function start(client: SupabaseClient, userId: string) {
   const db = createHubDb(client, { canWellbeing: me.canWellbeing, names });
   W.claude = { use: async (n: string) => (n === 'db' ? db : n === 'downloads' ? { save: download } : null) };
   W.__HUB_USER__ = me;
-  W.__HUB_PLATFORM__ = { signOut: () => client.auth.signOut(), admin: me.isAdmin ? adminApi(client) : null, download };
+  W.__HUB_PLATFORM__ = { signOut: () => client.auth.signOut(), admin: me.isAdmin ? adminApi(client) : null, download, ai: aiApi(client) };
   // @ts-ignore -- the hub is plain JavaScript; importing it starts it.
   await import('../hub/app.js');
 }

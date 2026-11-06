@@ -33,7 +33,7 @@ test('every title has its own section with Team, Scrims, Scrim reports and Compe
   const want = { mlbb: ['MLBB', true], 't-mlbbw': ['MLBB Women', true], 't-efootball': ['eFootball', false], 't-cs2': ['CS2', false], 't-cs2w': ['CS2 Women', false] };
   for (const [team, [title, draft]] of Object.entries(want)) {
     await h.go(team); const tabs = [...h.d.querySelectorAll('#tabs a')].map((a) => a.textContent);
-    assert.deepEqual(tabs, ['Team', 'Scrims & practice', 'Scrim reports', 'Competitors', ...(draft ? ['Draft Lab'] : [])], title);
+    assert.deepEqual(tabs, ['Team', 'Scrims & practice', 'Scrim reports', ...(draft ? ['Patterns'] : []), 'Competitors', ...(draft ? ['Draft Lab'] : [])], title); // V1.13: MLBB titles have screenshot capture, so a Patterns tab
     assert.match(h.text(), new RegExp(title));
     await h.go(`${team}-scrims`); assert.match(h.text(), new RegExp(`Scrims & practice — ${title}`));
     await h.go(`${team}-reports`); assert.match(h.text(), new RegExp(`Scrim reports — ${title}`));

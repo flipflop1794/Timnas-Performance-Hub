@@ -9,6 +9,8 @@ export const TABLES: Record<string, string> = {
   rival_tiers: 'rival_tiers', rival_rosters: 'rival_rosters', vods: 'rival_vods', opp_cards: 'opponent_cards',
   partners: 'sparring_partners', wec_matches: 'wec_matches', player_plans: 'player_plans', pubgm_logs: 'pubgm_logs',
   dota_matches: 'dota_matches', dota_pools: 'dota_pools', wellbeing_checkins: 'wellbeing_checkins', wellbeing_load: 'wellbeing_loads',
+  // V1.13 AI capture
+  scrim_games: 'scrim_games', scrim_captures: 'scrim_captures', pattern_findings: 'pattern_findings', player_aliases: 'player_aliases',
 };
 const WELLBEING = new Set(['wellbeing_checkins', 'wellbeing_load']);
 const CONFIG_KEYS = new Set(['runbooks', 'rules']);

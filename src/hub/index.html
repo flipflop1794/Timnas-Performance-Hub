@@ -136,8 +136,15 @@ textarea{font-family:var(--f-mono);font-size:12px;min-height:110px;resize:vertic
 .seg{display:grid;grid-template-columns:repeat(5,1fr);gap:6px;margin-top:4px}
 .seg button{font:inherit;font-size:12px;min-height:44px;border-radius:8px;border:1px solid var(--line-2);background:var(--sunk);color:var(--ink-2);cursor:pointer;padding:4px 2px;display:flex;flex-direction:column;align-items:center;justify-content:center;line-height:1.15}
 .seg button b{font-size:16px;color:var(--ink)}.seg button[aria-pressed="true"]{background:var(--gold);border-color:var(--gold);color:var(--gold-ink)}.seg button[aria-pressed="true"] b{color:var(--gold-ink)}
-details.more{margin:12px 0 4px;border-top:1px solid var(--line-2);padding-top:10px}details.more>summary{cursor:pointer;font-weight:600;font-size:13px;color:var(--ink-2);margin-bottom:8px}
+details.more,details.capdump{margin:12px 0 4px;border-top:1px solid var(--line-2);padding-top:10px}details.more>summary,details.capdump>summary{cursor:pointer;font-weight:600;font-size:13px;color:var(--ink-2);margin-bottom:8px}
 [aria-invalid="true"]{border-color:var(--bad)!important;box-shadow:0 0 0 2px var(--bad-soft)}
+.capedit{border:1px solid var(--gold-line);border-radius:10px;padding:12px;margin:8px 0;background:var(--sunk)}
+.capgrid input,.capgrid select,.capdraft input,.capdraft select{width:100%;min-width:56px;font:inherit;font-size:13px;padding:5px 6px}
+.capgrid td,.capdraft td{padding:3px 4px}.capgrid input[type=number]{width:74px;min-width:58px;text-align:right}
+.capgrid td:nth-child(1) select{min-width:84px}.capgrid td:nth-child(2) input{min-width:124px}.capgrid td:nth-child(3) select{min-width:104px}.capgrid td:last-child input{min-width:112px}
+.capdraft td:nth-child(2) select{min-width:96px}.capdraft td:nth-child(4) input{min-width:140px}
+.capgrid .flag,.capdraft .flag{border-color:var(--warn)!important;box-shadow:0 0 0 2px var(--warn-soft);background:var(--warn-soft)}
+.filebtn{position:relative;cursor:pointer}.capgames li{margin:4px 0}
 .auth{max-width:440px;margin:24px auto}.auth .form1{display:flex;flex-direction:column;gap:12px;margin-top:12px}.titles .me{font-weight:600;color:var(--ink-2);padding:0 6px}
 .trends{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:16px}
 .trend{margin:0}.trend figcaption{font-size:12.5px;font-weight:600;color:var(--ink-2);margin-bottom:4px}.trend svg{width:100%;height:auto;display:block;overflow:visible}
@@ -241,7 +248,7 @@ fieldset.objpick{border:1px solid var(--line-2);border-radius:8px;padding:8px 12
 <header class="top"><div class="wrap">
   <div class="bar1">
     <div class="brand"><span class="flag" aria-hidden="true"><i></i><i></i></span>Timnas <span>Performance Hub</span></div>
-    <div class="edition">IESF WEC 2026 · V1.12</div>
+    <div class="edition">IESF WEC 2026 · V1.13</div>
     <div class="spacer"></div>
     <div class="titles" id="titles" role="group" aria-label="Title"></div>
   </div>

@@ -1,0 +1,992 @@
+{
+ "source": "https://mlbbhub.com/heroes",
+ "retrieved": "2026-11-06",
+ "count": 133,
+ "heroes": [
+  {
+   "name": "Aamon",
+   "roles": [
+    "Assassin"
+   ],
+   "aliases": []
+  },
+  {
+   "name": "Akai",
+   "roles": [
+    "Tank"
+   ],
+   "aliases": []
+  },
+  {
+   "name": "Aldous",
+   "roles": [
+    "Fighter"
+   ],
+   "aliases": []
+  },
+  {
+   "name": "Alice",
+   "roles": [
+    "Tank",
+    "Mage"
+   ],
+   "aliases": []
+  },
+  {
+   "name": "Alpha",
+   "roles": [
+    "Fighter"
+   ],
+   "aliases": []
+  },
+  {
+   "name": "Alucard",
+   "roles": [
+    "Fighter",
+    "Assassin"
+   ],
+   "aliases": []
+  },
+  {
+   "name": "Angela",
+   "roles": [
+    "Support"
+   ],
+   "aliases": []
+  },
+  {
+   "name": "Argus",
+   "roles": [
+    "Fighter"
+   ],
+   "aliases": []
+  },
+  {
+   "name": "Arlott",
+   "roles": [
+    "Fighter",
+    "Assassin"
+   ],
+   "aliases": []
+  },
+  {
+   "name": "Atlas",
+   "roles": [
+    "Tank"
+   ],
+   "aliases": []
+  },
+  {
+   "name": "Aulus",
+   "roles": [
+    "Fighter"
+   ],
+   "aliases": []
+  },
+  {
+   "name": "Aurora",
+   "roles": [
+    "Mage"
+   ],
+   "aliases": []
+  },
+  {
+   "name": "Badang",
+   "roles": [
+    "Fighter"
+   ],
+   "aliases": []
+  },
+  {
+   "name": "Balmond",
+   "roles": [
+    "Fighter"
+   ],
+   "aliases": []
+  },
+  {
+   "name": "Bane",
+   "roles": [
+    "Fighter",
+    "Mage"
+   ],
+   "aliases": []
+  },
+  {
+   "name": "Barats",
+   "roles": [
+    "Tank",
+    "Fighter"
+   ],
+   "aliases": []
+  },
+  {
+   "name": "Baxia",
+   "roles": [
+    "Tank"
+   ],
+   "aliases": []
+  },
+  {
+   "name": "Beatrix",
+   "roles": [
+    "Marksman"
+   ],
+   "aliases": []
+  },
+  {
+   "name": "Belerick",
+   "roles": [
+    "Tank"
+   ],
+   "aliases": []
+  },
+  {
+   "name": "Benedetta",
+   "roles": [
+    "Assassin",
+    "Fighter"
+   ],
+   "aliases": []
+  },
+  {
+   "name": "Brody",
+   "roles": [
+    "Marksman"
+   ],
+   "aliases": []
+  },
+  {
+   "name": "Bruno",
+   "roles": [
+    "Marksman"
+   ],
+   "aliases": []
+  },
+  {
+   "name": "Carmilla",
+   "roles": [
+    "Support",
+    "Tank"
+   ],
+   "aliases": []
+  },
+  {
+   "name": "Cecilion",
+   "roles": [
+    "Mage"
+   ],
+   "aliases": []
+  },
+  {
+   "name": "Chang'e",
+   "roles": [
+    "Mage"
+   ],
+   "aliases": [
+    "Change",
+    "Chang e"
+   ]
+  },
+  {
+   "name": "Chip",
+   "roles": [
+    "Support",
+    "Tank"
+   ],
+   "aliases": []
+  },
+  {
+   "name": "Chou",
+   "roles": [
+    "Fighter"
+   ],
+   "aliases": []
+  },
+  {
+   "name": "Cici",
+   "roles": [
+    "Fighter"
+   ],
+   "aliases": []
+  },
+  {
+   "name": "Claude",
+   "roles": [
+    "Marksman"
+   ],
+   "aliases": []
+  },
+  {
+   "name": "Clint",
+   "roles": [
+    "Marksman"
+   ],
+   "aliases": []
+  },
+  {
+   "name": "Cyclops",
+   "roles": [
+    "Mage"
+   ],
+   "aliases": []
+  },
+  {
+   "name": "Diggie",
+   "roles": [
+    "Support"
+   ],
+   "aliases": []
+  },
+  {
+   "name": "Dyrroth",
+   "roles": [
+    "Fighter"
+   ],
+   "aliases": []
+  },
+  {
+   "name": "Edith",
+   "roles": [
+    "Tank",
+    "Marksman"
+   ],
+   "aliases": []
+  },
+  {
+   "name": "Esmeralda",
+   "roles": [
+    "Tank",
+    "Mage"
+   ],
+   "aliases": []
+  },
+  {
+   "name": "Estes",
+   "roles": [
+    "Support"
+   ],
+   "aliases": []
+  },
+  {
+   "name": "Eudora",
+   "roles": [
+    "Mage"
+   ],
+   "aliases": []
+  },
+  {
+   "name": "Fanny",
+   "roles": [
+    "Assassin"
+   ],
+   "aliases": []
+  },
+  {
+   "name": "Faramis",
+   "roles": [
+    "Support",
+    "Mage"
+   ],
+   "aliases": []
+  },
+  {
+   "name": "Floryn",
+   "roles": [
+    "Support"
+   ],
+   "aliases": []
+  },
+  {
+   "name": "Franco",
+   "roles": [
+    "Tank"
+   ],
+   "aliases": []
+  },
+  {
+   "name": "Fredrinn",
+   "roles": [
+    "Fighter",
+    "Tank"
+   ],
+   "aliases": []
+  },
+  {
+   "name": "Freya",
+   "roles": [
+    "Fighter"
+   ],
+   "aliases": []
+  },
+  {
+   "name": "Gatotkaca",
+   "roles": [
+    "Tank",
+    "Fighter"
+   ],
+   "aliases": []
+  },
+  {
+   "name": "Gloo",
+   "roles": [
+    "Tank"
+   ],
+   "aliases": []
+  },
+  {
+   "name": "Gord",
+   "roles": [
+    "Mage"
+   ],
+   "aliases": []
+  },
+  {
+   "name": "Granger",
+   "roles": [
+    "Marksman"
+   ],
+   "aliases": []
+  },
+  {
+   "name": "Grock",
+   "roles": [
+    "Tank",
+    "Fighter"
+   ],
+   "aliases": []
+  },
+  {
+   "name": "Guinevere",
+   "roles": [
+    "Fighter"
+   ],
+   "aliases": []
+  },
+  {
+   "name": "Gusion",
+   "roles": [
+    "Assassin"
+   ],
+   "aliases": []
+  },
+  {
+   "name": "Hanabi",
+   "roles": [
+    "Marksman"
+   ],
+   "aliases": []
+  },
+  {
+   "name": "Hanzo",
+   "roles": [
+    "Assassin"
+   ],
+   "aliases": []
+  },
+  {
+   "name": "Harith",
+   "roles": [
+    "Mage"
+   ],
+   "aliases": []
+  },
+  {
+   "name": "Harley",
+   "roles": [
+    "Assassin",
+    "Mage"
+   ],
+   "aliases": []
+  },
+  {
+   "name": "Hayabusa",
+   "roles": [
+    "Assassin"
+   ],
+   "aliases": []
+  },
+  {
+   "name": "Helcurt",
+   "roles": [
+    "Assassin"
+   ],
+   "aliases": []
+  },
+  {
+   "name": "Hilda",
+   "roles": [
+    "Fighter",
+    "Tank"
+   ],
+   "aliases": []
+  },
+  {
+   "name": "Hirara",
+   "roles": [
+    "Assassin"
+   ],
+   "aliases": []
+  },
+  {
+   "name": "Hylos",
+   "roles": [
+    "Tank"
+   ],
+   "aliases": []
+  },
+  {
+   "name": "Irithel",
+   "roles": [
+    "Marksman"
+   ],
+   "aliases": []
+  },
+  {
+   "name": "Ixia",
+   "roles": [
+    "Marksman"
+   ],
+   "aliases": []
+  },
+  {
+   "name": "Jawhead",
+   "roles": [
+    "Fighter"
+   ],
+   "aliases": []
+  },
+  {
+   "name": "Johnson",
+   "roles": [
+    "Tank",
+    "Support"
+   ],
+   "aliases": []
+  },
+  {
+   "name": "Joy",
+   "roles": [
+    "Assassin"
+   ],
+   "aliases": []
+  },
+  {
+   "name": "Julian",
+   "roles": [
+    "Assassin",
+    "Fighter"
+   ],
+   "aliases": []
+  },
+  {
+   "name": "Kadita",
+   "roles": [
+    "Mage",
+    "Assassin"
+   ],
+   "aliases": []
+  },
+  {
+   "name": "Kagura",
+   "roles": [
+    "Mage"
+   ],
+   "aliases": []
+  },
+  {
+   "name": "Kaja",
+   "roles": [
+    "Support"
+   ],
+   "aliases": []
+  },
+  {
+   "name": "Kalea",
+   "roles": [
+    "Support",
+    "Fighter"
+   ],
+   "aliases": []
+  },
+  {
+   "name": "Karina",
+   "roles": [
+    "Assassin"
+   ],
+   "aliases": []
+  },
+  {
+   "name": "Karrie",
+   "roles": [
+    "Marksman"
+   ],
+   "aliases": []
+  },
+  {
+   "name": "Khaleed",
+   "roles": [
+    "Fighter"
+   ],
+   "aliases": []
+  },
+  {
+   "name": "Khufra",
+   "roles": [
+    "Tank"
+   ],
+   "aliases": []
+  },
+  {
+   "name": "Kimmy",
+   "roles": [
+    "Marksman",
+    "Mage"
+   ],
+   "aliases": []
+  },
+  {
+   "name": "Lancelot",
+   "roles": [
+    "Assassin"
+   ],
+   "aliases": []
+  },
+  {
+   "name": "Lapu-Lapu",
+   "roles": [
+    "Fighter"
+   ],
+   "aliases": [
+    "Lapu Lapu",
+    "Lapu"
+   ]
+  },
+  {
+   "name": "Layla",
+   "roles": [
+    "Marksman"
+   ],
+   "aliases": []
+  },
+  {
+   "name": "Leomord",
+   "roles": [
+    "Fighter"
+   ],
+   "aliases": []
+  },
+  {
+   "name": "Lesley",
+   "roles": [
+    "Marksman",
+    "Assassin"
+   ],
+   "aliases": []
+  },
+  {
+   "name": "Ling",
+   "roles": [
+    "Assassin"
+   ],
+   "aliases": []
+  },
+  {
+   "name": "Lolita",
+   "roles": [
+    "Support",
+    "Tank"
+   ],
+   "aliases": []
+  },
+  {
+   "name": "Lukas",
+   "roles": [
+    "Fighter"
+   ],
+   "aliases": []
+  },
+  {
+   "name": "Lunox",
+   "roles": [
+    "Mage"
+   ],
+   "aliases": []
+  },
+  {
+   "name": "Luo Yi",
+   "roles": [
+    "Mage"
+   ],
+   "aliases": [
+    "Luoyi"
+   ]
+  },
+  {
+   "name": "Lylia",
+   "roles": [
+    "Mage"
+   ],
+   "aliases": []
+  },
+  {
+   "name": "Marcel",
+   "roles": [
+    "Support"
+   ],
+   "aliases": []
+  },
+  {
+   "name": "Martis",
+   "roles": [
+    "Fighter"
+   ],
+   "aliases": []
+  },
+  {
+   "name": "Masha",
+   "roles": [
+    "Fighter",
+    "Tank"
+   ],
+   "aliases": []
+  },
+  {
+   "name": "Mathilda",
+   "roles": [
+    "Support",
+    "Assassin"
+   ],
+   "aliases": []
+  },
+  {
+   "name": "Melissa",
+   "roles": [
+    "Marksman"
+   ],
+   "aliases": []
+  },
+  {
+   "name": "Minotaur",
+   "roles": [
+    "Tank",
+    "Support"
+   ],
+   "aliases": []
+  },
+  {
+   "name": "Minsitthar",
+   "roles": [
+    "Fighter"
+   ],
+   "aliases": []
+  },
+  {
+   "name": "Miya",
+   "roles": [
+    "Marksman"
+   ],
+   "aliases": []
+  },
+  {
+   "name": "Moskov",
+   "roles": [
+    "Marksman"
+   ],
+   "aliases": []
+  },
+  {
+   "name": "Nana",
+   "roles": [
+    "Mage"
+   ],
+   "aliases": []
+  },
+  {
+   "name": "Natalia",
+   "roles": [
+    "Assassin"
+   ],
+   "aliases": []
+  },
+  {
+   "name": "Natan",
+   "roles": [
+    "Marksman"
+   ],
+   "aliases": []
+  },
+  {
+   "name": "Nolan",
+   "roles": [
+    "Assassin"
+   ],
+   "aliases": []
+  },
+  {
+   "name": "Novaria",
+   "roles": [
+    "Mage"
+   ],
+   "aliases": []
+  },
+  {
+   "name": "Obsidia",
+   "roles": [
+    "Marksman"
+   ],
+   "aliases": []
+  },
+  {
+   "name": "Odette",
+   "roles": [
+    "Mage"
+   ],
+   "aliases": []
+  },
+  {
+   "name": "Paquito",
+   "roles": [
+    "Fighter",
+    "Assassin"
+   ],
+   "aliases": []
+  },
+  {
+   "name": "Pharsa",
+   "roles": [
+    "Mage"
+   ],
+   "aliases": []
+  },
+  {
+   "name": "Phoveus",
+   "roles": [
+    "Fighter"
+   ],
+   "aliases": []
+  },
+  {
+   "name": "Popol and Kupa",
+   "roles": [
+    "Marksman"
+   ],
+   "aliases": [
+    "Popol & Kupa",
+    "Popol"
+   ]
+  },
+  {
+   "name": "Rafaela",
+   "roles": [
+    "Support"
+   ],
+   "aliases": []
+  },
+  {
+   "name": "Roger",
+   "roles": [
+    "Fighter",
+    "Marksman"
+   ],
+   "aliases": []
+  },
+  {
+   "name": "Ruby",
+   "roles": [
+    "Fighter"
+   ],
+   "aliases": []
+  },
+  {
+   "name": "Saber",
+   "roles": [
+    "Assassin"
+   ],
+   "aliases": []
+  },
+  {
+   "name": "Selena",
+   "roles": [
+    "Assassin",
+    "Mage"
+   ],
+   "aliases": []
+  },
+  {
+   "name": "Silvanna",
+   "roles": [
+    "Fighter"
+   ],
+   "aliases": []
+  },
+  {
+   "name": "Sora",
+   "roles": [
+    "Fighter",
+    "Assassin"
+   ],
+   "aliases": []
+  },
+  {
+   "name": "Sun",
+   "roles": [
+    "Fighter"
+   ],
+   "aliases": []
+  },
+  {
+   "name": "Suyou",
+   "roles": [
+    "Assassin",
+    "Fighter"
+   ],
+   "aliases": []
+  },
+  {
+   "name": "Terizla",
+   "roles": [
+    "Fighter",
+    "Tank"
+   ],
+   "aliases": []
+  },
+  {
+   "name": "Thamuz",
+   "roles": [
+    "Fighter"
+   ],
+   "aliases": []
+  },
+  {
+   "name": "Tigreal",
+   "roles": [
+    "Tank"
+   ],
+   "aliases": []
+  },
+  {
+   "name": "Uranus",
+   "roles": [
+    "Tank"
+   ],
+   "aliases": []
+  },
+  {
+   "name": "Vale",
+   "roles": [
+    "Mage"
+   ],
+   "aliases": []
+  },
+  {
+   "name": "Valentina",
+   "roles": [
+    "Mage"
+   ],
+   "aliases": []
+  },
+  {
+   "name": "Valir",
+   "roles": [
+    "Mage"
+   ],
+   "aliases": []
+  },
+  {
+   "name": "Vexana",
+   "roles": [
+    "Mage"
+   ],
+   "aliases": []
+  },
+  {
+   "name": "Wanwan",
+   "roles": [
+    "Marksman"
+   ],
+   "aliases": []
+  },
+  {
+   "name": "X.Borg",
+   "roles": [
+    "Fighter"
+   ],
+   "aliases": [
+    "X Borg",
+    "XBorg"
+   ]
+  },
+  {
+   "name": "Xavier",
+   "roles": [
+    "Mage"
+   ],
+   "aliases": []
+  },
+  {
+   "name": "Yi Sun-shin",
+   "roles": [
+    "Assassin",
+    "Marksman"
+   ],
+   "aliases": [
+    "YSS",
+    "Yi Sun Shin"
+   ]
+  },
+  {
+   "name": "Yin",
+   "roles": [
+    "Fighter",
+    "Assassin"
+   ],
+   "aliases": []
+  },
+  {
+   "name": "Yu Zhong",
+   "roles": [
+    "Fighter"
+   ],
+   "aliases": [
+    "YZ"
+   ]
+  },
+  {
+   "name": "Yve",
+   "roles": [
+    "Mage"
+   ],
+   "aliases": []
+  },
+  {
+   "name": "Zetian",
+   "roles": [
+    "Mage"
+   ],
+   "aliases": []
+  },
+  {
+   "name": "Zhask",
+   "roles": [
+    "Mage"
+   ],
+   "aliases": []
+  },
+  {
+   "name": "Zhuxin",
+   "roles": [
+    "Mage"
+   ],
+   "aliases": []
+  },
+  {
+   "name": "Zilong",
+   "roles": [
+    "Fighter",
+    "Assassin"
+   ],
+   "aliases": []
+  }
+ ]
+}

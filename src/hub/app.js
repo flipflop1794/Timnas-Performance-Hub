@@ -40,6 +40,9 @@ import { readinessView } from '../readiness/view.js';
 import { translateDom, tr as trId } from './i18n.js';
 import { autoCard, cardPlan, approveCard, cardMarkdown } from '../core/oppcard.js';
 import { checkin, session as loadSession, teamDay, ITEMS, ITEM_LABEL, THRESHOLDS, MIN_BASELINE_DAYS } from '../core/wellbeing.js';
+import { captureUi } from './capture_ui.js';
+import { gameOf } from '../core/capture.js';
+import { statGoal } from '../core/patterns.js';
 
 // ---------- state ----------
 const SHIPPED = '2026-11-03';
@@ -63,6 +66,11 @@ const S = {
   well: { checkins: [], loads: [] }, wellTitle: 'Dota 2', wellDate: localDay(),
   selMatch: 9057681759, selNation: 'MGL', selDay: null, freshPools: {}, importReport: null, lastFlag: null,
 };
+// V1.13 AI capture, debrief, patterns and trails (src/hub/capture_ui.js). Created on first use, once
+// every helper below exists.
+let CAP = null;
+const capUi = () => (CAP ||= captureUi({ S, esc, tag, banner, setMsg, val, render, meName, sid, fillReport, localToday: localDay, shiftDay, PLATFORM,
+  staffObservation, recommendationRecord, propose, saveObj, owner, rulesFor: (title) => snapshot(S.rules, title === 'PUBG Mobile' ? ['pubgm-scoring'] : title === 'Dota 2' ? ['dota-patch'] : []) }));
 const heroByName = () => Object.fromEntries(Object.values(S.heroes).map((h) => [h.name.toLowerCase(), h.id]));
 const accounts = () => Object.values(S.players).map((p) => p.account);
 const WEC_DOTA = ['Greece', 'South Africa', 'Egypt', 'Venezuela', 'Argentina', 'Kazakhstan', 'Mongolia', 'Iran', 'Belarus', 'North Macedonia', 'New Zealand'];
@@ -163,6 +171,7 @@ async function initCaps() {
     db.collection('rival_tiers').onSnapshot((snap) => { S.tiers = Object.fromEntries(snap.docs.map((d) => { const x = d.data(); return [`${x.title}|${x.nation}`, x]; })); render(); }, () => {});
     db.collection('scrims').onSnapshot((snap) => { S.scrims = snap.docs.map((d) => d.data()).filter((x) => x?.origin === 'operational'); render(); }, () => {});
     db.collection('scrim_reports').onSnapshot((snap) => { S.reports = snap.docs.map((d) => d.data()).filter((x) => x?.origin === 'operational'); render(); }, () => {});
+    try { capUi().subscribe(db); } catch { /* older store without the V1.13 collections */ }
     db.collection('wec_matches').onSnapshot((snap) => { S.wecMatches = snap.docs.map((d) => d.data()).filter((x) => x?.origin === 'operational'); render(); }, () => {});
     db.doc('config/runbooks').onSnapshot((d) => { const x = d.data(); if (x?.runbooks) S.runbooks = x.runbooks; render(); }, () => {});
     db.collection('vods').onSnapshot((snap) => { S.vods = snap.docs.map((d) => ({ ...d.data(), id: d.id })).filter((x) => x?.origin === 'operational'); render(); }, () => {});
@@ -219,12 +228,12 @@ const GAME_HUBS = [
   { id: 'cs2', label: 'CS2', title: 'CS2', team: 't-cs2' },
   { id: 'cs2w', label: 'CS2 Women', title: 'CS2 Women', team: 't-cs2w' },
 ];
-const hubTabs = (h) => [[h.team, 'Team'], [`${h.team}-scrims`, 'Scrims & practice'], [`${h.team}-reports`, 'Scrim reports'], [`${h.team}-rivals`, 'Competitors'], ...(h.draft ? [[`${h.team}-draft`, 'Draft Lab']] : [])];
+const hubTabs = (h) => [[h.team, 'Team'], [`${h.team}-scrims`, 'Scrims & practice'], [`${h.team}-reports`, 'Scrim reports'], ...(gameOf(h.title) ? [[`${h.team}-patterns`, 'Patterns']] : []), [`${h.team}-rivals`, 'Competitors'], ...(h.draft ? [[`${h.team}-draft`, 'Draft Lab']] : [])];
 const TITLES = [
   { id: 'home', label: 'Today', tabs: [['today', 'My day'], ['board', 'Juara Umum board'], ['reports-all', 'Scrim reports'], ['brief', 'Weekly brief']] },
   { id: 'comp', label: 'Competitors', tabs: [['comp-overview', 'All nations'], ['comp-nation', 'Nation profile'], ['comp-rosters', 'Rosters & players'], ['comp-card', 'Opponent card'], ['comp-coverage', 'Scouting coverage']] },
   { id: 'tour', label: 'Tournament', tabs: [['tour-runbook', 'Match-day runbook'], ['tour-series', 'Between games']] },
-  { id: 'dota', label: 'Dota 2', tabs: [['dota-team', 'Team'], ['dota-scrims', 'Scrims & practice'], ['dota-reports', 'Scrim reports'], ['dota-post', 'Post-match'], ['dota-scout', 'Competitors'], ['dota-draft', 'Draft room'], ['dota-review', 'Series review']] },
+  { id: 'dota', label: 'Dota 2', tabs: [['dota-team', 'Team'], ['dota-scrims', 'Scrims & practice'], ['dota-reports', 'Scrim reports'], ['dota-patterns', 'Patterns'], ['dota-post', 'Post-match'], ['dota-scout', 'Competitors'], ['dota-draft', 'Draft room'], ['dota-review', 'Series review']] },
   { id: 'pubgm', label: 'PUBG Mobile', tabs: [['pubgm-team', 'Team'], ['pubgm-scrims', 'Scrims & practice'], ['pubgm-reports', 'Scrim reports'], ['pubgm-log', 'Log & import'], ['pubgm-rivals', 'Competitors'], ['pubgm-sim', 'Strategy sim'], ['pubgm-review', 'Match-day review']] },
   ...GAME_HUBS.map((h) => ({ id: h.id, label: h.label, tabs: hubTabs(h) })),
   { id: 'well', label: 'Performance', tabs: [['readiness', 'Athlete readiness (preview)'], ['players', 'Player plans'], ['well-day', 'Wellbeing check'], ['well-log', 'Log check-in & load']] },
@@ -567,12 +576,15 @@ function reportForm(title, { fid, spec, pts, unit, planned, t0 }) {
       <label class="field" for="rp-${fid}-partner">Sparring partner<input type="text" id="rp-${fid}-partner" list="pbList-${fid}" placeholder="Team name, or internal" value="${esc(dv('partner'))}"></label>
     </div><datalist id="pbList-${fid}">${S.partners.filter((p) => p.title === title).map((p) => `<option value="${esc(p.name)}">${esc(p.level)}${p.resembles ? ` · like ${esc(p.resembles)}` : ''}</option>`).join('')}</datalist>
     ${plannedToday.length || partners.length ? `<div class="chips"><span class="note">Quick pick:</span>${plannedToday.map((x) => chip(fid, { partner: x.partner, scrim: x.id, format: x.format, level: x.partnerLevel }, `Planned today: ${x.partner}`, ' planned')).join('')}${partners.map((p) => chip(fid, { partner: p }, p)).join('')}</div>` : ''}
+    ${capUi().gamesSection(title, fid)}
     <div class="h3">Result</div>
-    ${pts ? '' : `<div class="chips"><span class="note">Quick score:</span>${scores.map(([l, w, lo, dr]) => chip(fid, { won: String(w), lost: String(lo), drawn: dr ? String(dr) : '' }, l)).join('')}</div>`}
+    ${gameOf(title) && (S.cap[fid]?.ready || []).length ? '<p class="note">Filled from the confirmed games above.</p>' : ''}
+    ${pts || (gameOf(title) && (S.cap[fid]?.ready || []).length) ? '' : `<div class="chips"><span class="note">Quick score:</span>${scores.map(([l, w, lo, dr]) => chip(fid, { won: String(w), lost: String(lo), drawn: dr ? String(dr) : '' }, l)).join('')}</div>`}
     <div class="form">
     ${pts ? `${num('played', 'Matches played')}${num('points', 'Total points')}` : `${num('won', `${esc(cap(unit))} won`)}${num('lost', `${esc(cap(unit))} lost`)}`}
     </div>
     <div class="h3">Progress</div>
+    ${capUi().debriefSection(title, fid)}
     ${txt('focus', 'What was this session meant to practise?', 'e.g. Early rotations; fallback drop; set-piece defending')}
     ${focuses.length ? `<div class="chips"><span class="note">Recent and active objectives:</span>${focuses.map((f) => chip(fid, { focus: f }, f.length > 48 ? `${f.slice(0, 46)}…` : f)).join('')}</div>` : ''}
     <div class="field"><span id="rp-${fid}-proglabel">How closely did the team follow the plan?</span><input type="hidden" id="rp-${fid}-progress" value="${esc(prog)}">
@@ -661,11 +673,13 @@ for (const h of GAME_HUBS) {
   V[h.team] = () => teamPage(h.title);
   V[`${h.team}-scrims`] = () => scrimsPanel(h.title);
   V[`${h.team}-reports`] = () => reportsPanel(h.title);
+  if (gameOf(h.title)) V[`${h.team}-patterns`] = () => capUi().patternsPage(h.title);
   V[`${h.team}-rivals`] = () => competitorsPanel(h.title);
   if (h.draft) V[`${h.team}-draft`] = () => draftLabPage(h.title);
 }
 V['dota-scrims'] = () => scrimsPanel('Dota 2');
 V['dota-reports'] = () => reportsPanel('Dota 2');
+V['dota-patterns'] = () => capUi().patternsPage('Dota 2');
 V['pubgm-scrims'] = () => scrimsPanel('PUBG Mobile');
 V['pubgm-reports'] = () => reportsPanel('PUBG Mobile');
 V['pubgm-rivals'] = () => competitorsPanel('PUBG Mobile');
@@ -1126,7 +1140,7 @@ V.players = () => {
   const overview = roster.map((x) => { const g = S.plans[planKey(t, x)]?.goals || []; return { x, n: g.filter((y) => !['done', 'dropped'].includes(y.status)).length, risk: g.filter((y) => y.status === 'at risk').length, done: g.filter((y) => y.status === 'done').length }; });
   return `${head}<div class="panel"><h2>${esc(t)} — all players</h2><div class="tw"><table><thead><tr><th>Player</th><th class="n">Open goals</th><th class="n">At risk</th><th class="n">Done</th></tr></thead><tbody>${overview.map((r) => `<tr class="${r.x === p ? 'me' : ''}"><td><b>${esc(r.x)}</b></td><td class="n">${r.n}</td><td class="n">${r.risk}</td><td class="n">${r.done}</td></tr>`).join('')}</tbody></table></div></div>
   <div class="cols"><div class="panel"><h2>${esc(p)}</h2>${AREAS.map((a) => { const gs = pl.goals.filter((g) => g.area === a); return `<div class="h3">${esc(a[0].toUpperCase() + a.slice(1))}</div>${gs.map((g) => `<div class="obj"><header><div><span class="note">Owner ${esc(g.owner)}${g.due ? ` · due ${esc(g.due)}` : ''}</span><h3>${esc(g.goal)}</h3></div>${tag(g.status === 'done' ? 'c-High' : g.status === 'at risk' ? 'c-Blocked' : g.status === 'on track' ? 'c-Medium' : 'c-Low', g.status)}</header>
-      <p class="note">Measured by: ${esc(g.measure)}</p>${g.updates.length ? `<p class="note">Last update: ${esc(g.updates.at(-1).note || g.updates.at(-1).status)} — ${esc(g.updates.at(-1).by)}, ${esc(g.updates.at(-1).at.slice(0, 10))}</p>` : ''}
+      <p class="note">Measured by: ${esc(g.measure)}</p>${capUi().goalStatNote(t, p, g)}${g.updates.length ? `<p class="note">Last update: ${esc(g.updates.at(-1).note || g.updates.at(-1).status)} — ${esc(g.updates.at(-1).by)}, ${esc(g.updates.at(-1).at.slice(0, 10))}</p>` : ''}
       <div class="form"><label class="field" for="guS-${g.id}">Status<select id="guS-${g.id}">${GOAL_STATUS.map((s) => `<option ${s === g.status ? 'selected' : ''}>${s}</option>`).join('')}</select></label><label class="field" for="guN-${g.id}">Note<input type="text" id="guN-${g.id}"></label></div>
       <div class="toolbar"><button class="btn small" type="button" data-goal-upd="${esc(g.id)}">Update</button><span class="msg" id="guMsg-${g.id}"></span></div></div>`).join('') || '<p class="note">No goal.</p>'}`; }).join('')}</div>
   <div class="panel"><h2>Add a goal</h2><div class="form">
@@ -1134,7 +1148,9 @@ V.players = () => {
     <label class="field" for="gaD">Due<input type="date" id="gaD"></label><label class="field" for="gaO">Owner<input type="text" id="gaO" value="${esc(meName())}"></label></div>
     <label class="field" for="gaG">Goal<input type="text" id="gaG" placeholder="${t === 'Dota 2' ? 'e.g. two more established heroes for pos 4' : 'e.g. widen hero/agent pool by two'}"></label>
     <label class="field" for="gaM">How it is measured<input type="text" id="gaM" placeholder="e.g. 6+ scrim games on each by 1 Dec, coach sign-off"></label>
-    <div class="toolbar"><button class="btn primary" type="button" id="gaAdd">Add goal</button><span class="msg" id="gaMsg"></span></div></div></div>`;
+    ${capUi().goalStatFields(t)}
+    <div class="toolbar"><button class="btn primary" type="button" id="gaAdd">Add goal</button><span class="msg" id="gaMsg"></span></div></div></div>
+  ${capUi().trailPanel(t, p)}`;
 };
 
 // Decisions still open (decision log, 3 Nov). Edit here when they are settled.
@@ -1285,6 +1301,7 @@ function oppCardHtml(a, plan, ours) {
     <div class="h3">What we know · staff tier: ${esc(a.tier)}</div>${a.tierWhy ? `<p class="note">${esc(a.tierBy)}: ${esc(a.tierWhy)}</p>` : ''}
     ${a.observed.length || a.hypotheses.length || a.vods.length ? `<ul class="plain">${a.observed.map((n) => `<li>${tag('k-observed', 'observed')} ${esc(n.note)} <span class="note">— ${esc(n.source)}, ${esc(n.date)}</span></li>`).join('')}${a.hypotheses.map((n) => `<li>${tag('k-hypothesis', 'unconfirmed')} ${esc(n.note)} <span class="note">— ${esc(n.source)}</span></li>`).join('')}${a.vods.map((v) => `<li>${tag('k-observed', 'VOD')} <a href="${esc(v.url)}" target="_blank" rel="noopener">${esc(v.event)}</a>: ${esc(v.takeaway)}</li>`).join('')}</ul>` : '<p class="note">No notes or reviewed VODs yet.</p>'}
     ${a.standIns.length || a.scrimsDone ? `<p class="note">Practised against their style: ${a.scrimsDone} stand-in scrim(s)${a.standIns.length ? ` with ${a.standIns.map(esc).join(', ')}` : ''}.</p>` : ''}
+    ${capUi().standInLine(a.title, a.nation)}
     ${a.gaps.length ? `<div class="noprint">${banner('block', `<div><b>Gaps before this card is match-ready:</b> ${a.gaps.map(esc).join(' ')}</div>`)}</div>` : ''}
     <p class="note">Our players: ${ours.length ? ours.map(esc).join(', ') : 'roster not entered'}.</p></article>`;
 }
@@ -1374,6 +1391,8 @@ async function cycleAct(act, id) {
 async function onClick(e) {
   const t = e.target.closest('button, [data-go]'); if (!t) return;
   if (t.dataset.go) { location.hash = t.dataset.go; return; }
+  // V1.13 capture / patterns buttons only, so every other click stays synchronous until its own first await.
+  if (Object.keys(t.dataset).some((k) => /^(cap|pat)[A-Z]/.test(k)) && await capUi().onClick(t)) return;
   const id = t.id;
   if (id === 'langBtn') { S.lang = S.lang === 'id' ? 'en' : 'id'; try { localStorage.setItem('hub-lang', S.lang); } catch { /* per-viewer convenience only */ } render(); return; }
   if (id === 'modeBtn' || id === 'modeBtn2') { S.mode = S.mode === 'demo' ? 'live' : 'demo'; S.pubgm.team = null; S.pubgm.sim = null; render(); return; }
@@ -1503,7 +1522,7 @@ async function onClick(e) {
     const ti = S.planTitle, roster = S.roster[ti] || []; const p = roster.includes(S.planPlayer) ? S.planPlayer : roster[0]; if (!p) return;
     const key = planKey(ti, p); const pl = JSON.parse(JSON.stringify(S.plans[key] || newPlan(ti, p)));
     try {
-      if (id === 'gaAdd') pl.goals.push(goalRec({ area: val('gaA'), goal: val('gaG'), measure: val('gaM'), due: val('gaD'), owner: val('gaO') }));
+      if (id === 'gaAdd') { const gr = goalRec({ area: val('gaA'), goal: val('gaG'), measure: val('gaM'), due: val('gaD'), owner: val('gaO') }); if (val('gaSK')) gr.stat = statGoal({ key: val('gaSK'), op: val('gaSO'), target: val('gaST') }, gameOf(ti)); pl.goals.push(gr); }
       else { const gid = t.dataset.goalUpd; pl.goals = pl.goals.map((g) => (g.id === gid ? updateGoal(g, { status: val(`guS-${gid}`), note: val(`guN-${gid}`), by: meName() || S.me }) : g)); }
       S.plans = { ...S.plans, [key]: pl };
       if (S.db) await S.db.collection('player_plans').doc(key).set(pl);
@@ -1616,6 +1635,8 @@ async function onClick(e) {
   if (t.dataset.reportSave) {
     const title = t.dataset.reportSave; const fid = sid(title); const g = (k) => val(`rp-${fid}-${k}`);
     try {
+      const fromGames = capUi().beforeSave(title, fid);
+      if (fromGames) fillReport(fid, { won: String(fromGames.won), lost: String(fromGames.lost) });
       const r = scrimReport({ title, date: g('date'), time: g('time'), by: g('by'), partner: g('partner'), partnerLevel: g('level'), format: g('format'), roster: g('roster'), scrimId: g('scrim'),
         won: g('won'), lost: g('lost'), drawn: g('drawn'), played: g('played'), points: g('points'), avgPlacement: g('avg'), chicken: g('chicken'),
         focus: g('focus'), progress: g('progress'), worked: g('worked'), failed: g('failed'), detail: g('detail'), playerNotes: g('players'), adjust: g('adjust'), vod: g('vod'), asOf: localToday() });
@@ -1624,9 +1645,11 @@ async function onClick(e) {
       const done = sc ? completeScrim(sc, { score: resultText(r.result), notes: r.worked || r.failed, by: r.by, matchIds: [], perObjective: {} }) : null;
       if (S.db) { await S.db.collection('scrim_reports').doc(r.id).set(r); if (done) await S.db.collection('scrims').doc(sc.id).set(done); }
       else { S.reports.push(r); if (done) Object.assign(sc, done); }
+      const nGames = (S.cap[fid]?.ready || []).length;
+      try { await capUi().afterSave(title, fid, r); } catch (err) { render(); return setMsg(`rpMsg-${fid}`, `Report saved, but its games were not (${err.message}). They are kept on this device: use "Retry saving games" under Games.`, 'err'); }
       const keep = Object.fromEntries(RP_KEEP_AFTER_SAVE.map((k) => [k, g(k)]).filter(([, v]) => v));
       storeDraft(fid, { ...keep, at: new Date().toISOString() });
-      render(); setMsg(`rpMsg-${fid}`, `Report saved (${resultText(r.result)} vs ${r.partner}). Next partner? The setup is kept.`, 'ok');
+      render(); setMsg(`rpMsg-${fid}`, `Report saved (${resultText(r.result)} vs ${r.partner}${nGames ? `, ${nGames} game${nGames > 1 ? 's' : ''} with stats` : ''}). Next partner? The setup is kept.`, 'ok');
     } catch (err) { setMsg(`rpMsg-${fid}`, err.message, 'err'); markInvalid(fid, err.message); }
     return;
   }
@@ -1723,6 +1746,7 @@ document.addEventListener('click', async (e) => {
 for (const ev of ['input', 'change']) document.addEventListener(ev, (e) => draftField(e.target));
 
 document.addEventListener('change', (e) => {
+  if (e.target.dataset?.capShot || e.target.dataset?.capDraft || e.target.dataset?.patPeriod) { capUi().onChange(e); return; }
   const id = e.target.id;
   if (id === 'meSel') { S.me = e.target.value; try { localStorage.setItem('hub-me', S.me); } catch { /* per-viewer convenience only */ } render(); }
   if (id === 'wT') { S.wellTitle = e.target.value; render(); }

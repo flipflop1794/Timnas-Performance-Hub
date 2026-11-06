@@ -3,7 +3,8 @@
 const WELL = new Set(['wellbeing_checkins', 'wellbeing_loads']);
 const FIXED = { pubgm_logs: 'PUBG Mobile', dota_matches: 'Dota 2', dota_pools: 'Dota 2' };
 const DOC_TABLES = ['scrim_sessions', 'scrim_reports', 'coaching_objectives', 'scouting_notes', 'rival_tiers', 'rival_rosters', 'rival_vods', 'opponent_cards',
-  'sparring_partners', 'wec_matches', 'player_plans', 'pubgm_logs', 'dota_matches', 'dota_pools', 'wellbeing_checkins', 'wellbeing_loads'];
+  'sparring_partners', 'wec_matches', 'player_plans', 'pubgm_logs', 'dota_matches', 'dota_pools', 'wellbeing_checkins', 'wellbeing_loads',
+  'scrim_games', 'scrim_captures', 'pattern_findings', 'player_aliases'];
 
 export function backend() {
   const B = { users: [], tables: {}, channels: new Set(), log: [] };
@@ -27,6 +28,8 @@ export function backend() {
   B.write = (uid, table, op, row, old) => {
     if (!uid) return deny;
     if (WELL.has(table)) return canWell(uid) ? null : deny;
+    if (table === 'scrim_games' && op === 'update') return { code: '42501', message: 'Submitted records cannot be changed. Add a correction instead.' };
+    if (table === 'scrim_games' && op === 'insert' && !B.tables.scrim_reports.some((r) => r.id === row.data?.reportId && r.title === row.data?.title)) return { code: '23503', message: 'The scrim report for this game was not found. Save the report first.' };
     if (table === 'scrim_reports' && op === 'update') return { code: '42501', message: 'Submitted records cannot be changed. Add a correction instead.' };
     if (DOC_TABLES.includes(table)) {
       if (row.data?.origin !== 'operational') return { code: '22023', message: 'Only operational records can be stored (origin must be "operational").' };
@@ -122,6 +125,13 @@ function client(B, sessionUserId) {
       updateUser: async ({ password }) => { const u = B.users.find((x) => x.id === uid()); if (u) u.password = password; return { error: null }; },
     },
     from: (t) => query(t),
+    // The scrim-ai server function: tests set B.ai = async (body, userId) => ({ data } | { status, error }).
+    functions: { invoke: async (name, { body }) => {
+      if (name !== 'scrim-ai' || !B.ai) return { data: null, error: Object.assign(new Error('Edge Function returned a non-2xx status code'), { context: { status: 404, json: async () => ({}) } }) };
+      const out = await B.ai(structuredClone(body), uid());
+      if (out.error) return { data: null, error: Object.assign(new Error('Edge Function returned a non-2xx status code'), { context: { status: out.status || 400, json: async () => ({ error: out.error }) } }) };
+      return { data: out.data, error: null };
+    } },
     rpc: async (name, args) => {
       if (name !== 'set_roster') return { error: { message: 'unknown rpc' } };
       const err = B.write(uid(), 'roster_players', 'insert', {}); if (err) return { error: err };

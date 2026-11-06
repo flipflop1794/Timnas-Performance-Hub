@@ -1,4 +1,4 @@
-# Known limitations and post-launch backlog (V1.12)
+# Known limitations and post-launch backlog (V1.12, + V1.13 AI capture)
 
 ## Limitations at launch
 1. **Not yet run against the live Supabase project or Vercel** from the build environment: their APIs are outside its network.
@@ -14,6 +14,18 @@
 8. Drafts (half-typed reports) are kept per device and are not synced.
 9. ~~Unassigned title tabs visible to title coaches~~ — fixed in V1.12: they see only their games (a direct link still shows the notice).
 10. The Claude artifact remains online; it does not share data with the website.
+
+## V1.13 AI capture (branch feature/ai-scrim-capture, not deployed)
+11. **Screen reading is unproven on real pelatnas screenshots.** No real screenshot was available when it was built; the
+    prompts follow the published end-screen layouts. MLBB and Dota end screens show heroes as portraits, not names, so
+    hero recognition is the weakest field: the check screen flags unsure heroes, and a draft screenshot helps.
+    Measure with `tools/eval_screenshots.mjs` on 20+ real screenshots per game before relying on it.
+12. **Dota match ID** is stored with the game but not used yet; whether lobby games can be pulled from a match API is untested.
+13. **Screenshot retention (90 days)** is a policy, not automated: delete old files in Supabase Storage by hand or add a
+    scheduled job. Storage policies were not tested locally (the test database has no Storage).
+14. **Supabase Free storage is 1 GB**: about a month of compressed screenshots at ~18 games a day.
+15. **Patterns need volume**: under 5 games per split every number is labelled an early sign; problems on such splits are refused.
+16. Half-checked games are kept per device (like report drafts), not synced.
 
 ## Backlog (in order)
 1. Custom SMTP sender for invites and resets.

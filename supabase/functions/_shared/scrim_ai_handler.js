@@ -1,0 +1,134 @@
+// The scrim-ai server function's logic, in plain JavaScript so it is tested in Node with fakes
+// (tests/scrim_ai_handler.test.js) and run unchanged in the Supabase Edge Function (scrim-ai/index.ts).
+//
+// Every request runs AS THE SIGNED-IN COACH: the Supabase client carries their session, so storage
+// uploads, capture rows and usage rows pass the same Row Level Security as the website. There is no
+// service-role key in this function. The AI key lives only in the function's secrets.
+//
+// Actions:
+//   scoreboard / draft  { title, image: { data: base64, mediaType }, day }  -> { captureId, raw, model }
+//   debrief             { title, text, roster: [names] }                   -> { raw, model }
+//   digest              { title, facts: [...], excerpts: [...] }           -> { raw, model }
+import {
+  PROMPT_VERSION, DEFAULT_MODEL, LIMITS, gameOf, scoreboardSchema, draftSchema, debriefSchema, digestSchema,
+  scoreboardPrompt, draftPrompt, debriefPrompt, digestPrompt, messagesRequest, imageBlock, parseModelJson, usageOf, capturePath,
+} from './scrim_spec.js';
+
+const ACTIONS = ['scoreboard', 'draft', 'debrief', 'digest'];
+const json = (status, body) => ({ status, body });
+const fail = (status, error) => json(status, { error });
+
+// base64 -> bytes, refusing anything that is not plain base64.
+function decode(b64) {
+  if (typeof b64 !== 'string' || !/^[A-Za-z0-9+/]+={0,2}$/.test(b64)) throw new Error('bad image');
+  const bin = atob(b64); const out = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i);
+  return out;
+}
+// Magic bytes, so a renamed file of another kind is refused before it reaches storage or the AI.
+function sniff(bytes) {
+  if (bytes[0] === 0xff && bytes[1] === 0xd8 && bytes[2] === 0xff) return 'image/jpeg';
+  if (bytes[0] === 0x89 && bytes[1] === 0x50 && bytes[2] === 0x4e && bytes[3] === 0x47) return 'image/png';
+  if (String.fromCharCode(...bytes.slice(0, 4)) === 'RIFF' && String.fromCharCode(...bytes.slice(8, 12)) === 'WEBP') return 'image/webp';
+  return '';
+}
+
+// deps: { env: { ANTHROPIC_API_KEY, SCRIM_AI_MODEL?, DAILY_CALL_CAP? }, fetch, clientFor(authHeader), uuid(), heroes: { mlbb: [...], dota: [...] }, now() }
+export async function handle(req, deps) {
+  if (req.method !== 'POST') return fail(405, 'Use POST.');
+  const auth = req.headers.authorization || req.headers.Authorization || '';
+  if (!/^Bearer\s+\S+/.test(auth)) return fail(401, 'Sign in first.');
+  if (!deps.env.ANTHROPIC_API_KEY) return fail(503, 'AI capture is not switched on yet (the AI key is not set on the server). Enter the values by hand.');
+  let body; try { body = await req.json(); } catch { return fail(400, 'Bad request.'); }
+  const { action, title } = body || {};
+  if (!ACTIONS.includes(action)) return fail(400, 'Unknown action.');
+  const game = gameOf(title);
+  if (['scoreboard', 'draft'].includes(action) && !game) return fail(400, `Screenshot capture is not set up for ${title}.`);
+  if (typeof title !== 'string' || !title) return fail(400, 'Title is required.');
+
+  const db = deps.clientFor(auth);
+  const { data: who, error: authErr } = await db.auth.getUser();
+  if (authErr || !who?.user) return fail(401, 'Your session has ended. Sign in again.');
+  const { data: canWrite, error: permErr } = await db.rpc('can_write_title', { t: title });
+  if (permErr || canWrite !== true) return fail(403, `You are not assigned to ${title}. Ask the admin for access.`);
+  const cap = Number(deps.env.DAILY_CALL_CAP || 300);
+  const { data: used } = await db.rpc('ai_calls_today');
+  if (Number(used) >= cap) return fail(429, `Daily AI limit reached (${cap} calls). Enter the values by hand today, or ask the admin to raise the limit.`);
+
+  const model = deps.env.SCRIM_AI_MODEL || DEFAULT_MODEL;
+  let request; let bytes = null; let mediaType = '';
+  try {
+    if (action === 'scoreboard' || action === 'draft') {
+      bytes = decode(body.image?.data);
+      if (bytes.length > LIMITS.imageBytes) return fail(413, 'The screenshot is too large (over 2.5 MB). Take it again or crop it.');
+      mediaType = sniff(bytes);
+      if (!mediaType) return fail(415, 'This file is not a WebP, JPEG or PNG image.');
+      const names = deps.heroes[game] || [];
+      request = messagesRequest({
+        model, system: action === 'scoreboard' ? scoreboardPrompt(game, names) : draftPrompt(game, names),
+        schema: action === 'scoreboard' ? scoreboardSchema(game) : draftSchema(game),
+        content: [imageBlock(body.image.data, mediaType), { type: 'text', text: `Title: ${title}. Read this ${action === 'scoreboard' ? 'end-of-game screen' : 'draft screen'}.` }],
+      });
+    } else if (action === 'debrief') {
+      const text = String(body.text || '').trim();
+      if (!text) return fail(400, 'Type or dictate the note first.');
+      if (text.length > LIMITS.debriefChars) return fail(413, `Keep the note under ${LIMITS.debriefChars} characters.`);
+      const roster = (Array.isArray(body.roster) ? body.roster : []).map(String).slice(0, 12);
+      request = messagesRequest({ model, system: debriefPrompt(title, roster), schema: debriefSchema(), maxTokens: 2048, content: [{ type: 'text', text }] });
+    } else {
+      const facts = (Array.isArray(body.facts) ? body.facts : []).slice(0, LIMITS.digestFacts);
+      const excerpts = (Array.isArray(body.excerpts) ? body.excerpts : []).slice(0, LIMITS.digestExcerpts);
+      if (!facts.length) return fail(400, 'No confirmed games yet: nothing to look for patterns in.');
+      const payload = JSON.stringify({ FACTS: facts, EXCERPTS: excerpts });
+      if (payload.length > 120000) return fail(413, 'Too much data for one digest. Pick a shorter period.');
+      request = messagesRequest({ model, system: digestPrompt(title), schema: digestSchema(), maxTokens: 3000, content: [{ type: 'text', text: payload }] });
+    }
+  } catch (e) { return fail(400, e.message === 'bad image' ? 'The screenshot could not be read. Upload it again.' : e.message); }
+
+  // Upload first: the screenshot is kept (90 days) so any extracted number can be traced back.
+  const id = deps.uuid();
+  let storagePath = '';
+  if (bytes) {
+    const day = /^\d{4}-\d{2}-\d{2}$/.test(body.day || '') ? body.day : deps.now().toISOString().slice(0, 10);
+    storagePath = capturePath(title, day, id, mediaType);
+    const up = await db.storage.from('scrim-captures').upload(storagePath, bytes, { contentType: mediaType, upsert: false });
+    if (up.error) return fail(403, `The screenshot could not be stored (${up.error.message}).`);
+  }
+
+  let resp; let raw; let errText = '';
+  try {
+    const r = await deps.fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', 'x-api-key': deps.env.ANTHROPIC_API_KEY, 'anthropic-version': '2023-06-01' },
+      body: JSON.stringify(request),
+    });
+    resp = await r.json();
+    if (!r.ok) throw new Error(r.status === 429 || r.status === 529 ? 'The AI service is busy. Try again in a minute.' : `The AI service returned an error: ${resp?.error?.message || r.status}.`);
+    raw = parseModelJson(resp);
+  } catch (e) { errText = e.message || 'AI call failed.'; }
+
+  const u = usageOf(resp);
+  await db.from('ai_usage').insert({ title, action, model, input_tokens: u.input_tokens, output_tokens: u.output_tokens, ok: !errText, error: errText.slice(0, 300) });
+  if (errText) return fail(502, `${errText} You can enter the values by hand.`);
+
+  if (bytes) {
+    const rec = { title, kind: action, storagePath, mediaType, model, promptVersion: PROMPT_VERSION, raw, status: 'extracted', origin: 'operational', createdAt: deps.now().toISOString() };
+    const ins = await db.from('scrim_captures').insert({ id, data: rec });
+    if (ins.error) return fail(403, `The reading could not be saved (${ins.error.message}).`);
+    return json(200, { captureId: id, raw, model, promptVersion: PROMPT_VERSION });
+  }
+  return json(200, { raw, model, promptVersion: PROMPT_VERSION });
+}
+
+// CORS: only the hub's own site(s) may call the function from a browser.
+export function corsHeaders(origin, allowed) {
+  const list = String(allowed || '').split(',').map((s) => s.trim()).filter(Boolean);
+  const ok = list.includes(origin);
+  return {
+    ...(ok ? { 'Access-Control-Allow-Origin': origin } : {}),
+    Vary: 'Origin',
+    'Access-Control-Allow-Methods': 'POST, OPTIONS',
+    'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+    'Access-Control-Max-Age': '600',
+  };
+}
