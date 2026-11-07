@@ -8,8 +8,8 @@ Put real end-of-game screenshots from pelatnas scrims here, one folder per game:
 Next to each image (`g1.png`) put the correct answer as `g1.json`, typed by hand from the screenshot:
 
 ```json
-{ "ourSide": "blue", "result": "win", "durationS": 1122,
-  "players": [ { "side": "blue", "slot": 1, "player": "Aran", "hero": "Fredrinn", "kills": 3, "deaths": 1, "assists": 9, "gold": 9000 } ] }
+{ "ourSide": "left", "mapSide": "blue", "result": "win", "durationS": 1122,
+  "players": [ { "side": "left", "slot": 1, "player": "Aran", "hero": "Fredrinn", "kills": 3, "deaths": 1, "assists": 9, "gold": 9000 } ] }
 ```
 
 Then run `ANTHROPIC_API_KEY=... node tools/eval_screenshots.mjs mlbb`. Aim for 20+ screenshots per game, taken the way

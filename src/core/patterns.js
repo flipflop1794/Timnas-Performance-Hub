@@ -38,7 +38,8 @@ export function facts(games, ctx = {}) {
     out.push({ id, group, label, n: gs.length, won, lost: gs.length - won, winRate: pct(won, gs.length), lowSample: gs.length < MIN_SAMPLE, games: ids(gs), ...extra });
   };
   wl('all', 'All scrim games', 'overall', games);
-  for (const s of [...new Set(games.map((g) => g.ourSide))]) wl(`side:${s}`, `Played on ${s} side`, 'side', games.filter((g) => g.ourSide === s));
+  // Map side: Dota from the screen; MLBB only where the coach set it (the result screen does not show it).
+  for (const s of [...new Set(games.map((g) => g.mapSide).filter(Boolean))]) wl(`side:${s}`, `Played on ${s} side`, 'side', games.filter((g) => g.mapSide === s));
   for (const [lo, hi, label] of LENGTH_BUCKETS[game]) wl(`length:${label}`, `Games ${label}`, 'length', games.filter((g) => g.durationS != null && g.durationS >= lo && g.durationS < hi));
   // Our heroes (played 2+ times).
   const ourHero = {};
@@ -85,9 +86,11 @@ const factNumbers = (f) => new Set([...FACT_NUMS.map((k) => f[k]).filter((v) => 
 export function checkFindings(raw, factList, { reportIds = [] } = {}) {
   const byId = new Map(factList.map((f) => [f.id, f]));
   const kept = []; const dropped = [];
-  for (const x of (raw?.findings || []).slice(0, LIMITS.findings * 2)) {
-    const cited = (x.fact_ids || []).filter((id) => byId.has(id));
-    const text = `${x.claim || ''} ${x.why_it_matters || ''}`;
+  const list = Array.isArray(raw?.findings) ? raw.findings.filter((x) => x && typeof x === 'object') : [];
+  for (const x of list.slice(0, LIMITS.findings * 2)) {
+    const cited = (Array.isArray(x.fact_ids) ? x.fact_ids : []).filter((id) => typeof id === 'string' && byId.has(id));
+    if (typeof x.claim !== 'string' || !x.claim.trim()) { dropped.push({ claim: '', why: 'no claim text' }); continue; }
+    const text = `${x.claim} ${typeof x.why_it_matters === 'string' ? x.why_it_matters : ''}`;
     if (!cited.length) { dropped.push({ claim: x.claim, why: 'cites no fact the hub computed' }); continue; }
     const allowed = new Set(cited.flatMap((id) => [...factNumbers(byId.get(id))]));
     for (const id of reportIds) for (const n of numbersIn(id)) allowed.add(n);
@@ -95,7 +98,7 @@ export function checkFindings(raw, factList, { reportIds = [] } = {}) {
     if (stray.length) { dropped.push({ claim: x.claim, why: `uses numbers not in the cited facts (${stray.join(', ')})` }); continue; }
     const fs = cited.map((id) => byId.get(id));
     if (x.kind === 'problem' && fs.every((f) => f.lowSample)) { dropped.push({ claim: x.claim, why: 'a problem resting only on low-sample facts' }); continue; }
-    kept.push({ kind: FINDING_KINDS.includes(x.kind) ? x.kind : 'tendency', claim: String(x.claim || '').slice(0, 500), why: String(x.why_it_matters || '').slice(0, 300), factIds: cited,
+    kept.push({ kind: FINDING_KINDS.includes(x.kind) ? x.kind : 'tendency', claim: String(x.claim || '').slice(0, 500), why: typeof x.why_it_matters === 'string' ? x.why_it_matters.slice(0, 300) : '', factIds: cited,
       sampleN: Math.max(...fs.map((f) => f.n)), lowSample: fs.every((f) => f.lowSample), games: [...new Set(fs.flatMap((f) => f.games))] });
     if (kept.length >= LIMITS.findings) break;
   }

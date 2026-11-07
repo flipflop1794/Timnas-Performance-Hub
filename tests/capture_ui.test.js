@@ -1,20 +1,23 @@
-// V1.13 screens end to end in a headless DOM, with a fake AI service: screenshot → check → confirm,
-// draft screenshot, debrief dump, report save with games, Patterns tab, findings, promotion, trails.
+// V1.13 screens end to end in a headless DOM, with a fake AI service fed with REAL MLBB result screens
+// (tests/fixtures/mlbb_real_screens.json): screenshot → check (hero picks) → confirm; second screenshot;
+// draft; duplicates; debrief; report save with games; fixing a saved game; Patterns; findings; trails.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { JSDOM } from 'jsdom';
 
 const html = readFileSync(new URL('../dist/hub.html', import.meta.url), 'utf8');
+const REAL = JSON.parse(readFileSync(new URL('./fixtures/mlbb_real_screens.json', import.meta.url), 'utf8'));
 const wait = (ms = 30) => new Promise((r) => setTimeout(r, ms));
-const p = (side, slot, name, hero, k, d, a) => ({ side, slot, name_seen: name, hero, kills: k, deaths: d, assists: a, gold: 9000, hero_damage: 60000, tower_damage: 3000, damage_taken: 40000, last_hits: -1, denies: -1, gpm: -1, xpm: -1, rating: 8, mvp: false, uncertain_fields: [] });
-const board = (kMisread = 3) => ({ screen_kind: 'scoreboard', readable: true, winner_side: 'blue', duration_seconds: 1122, score: { blue: 18, red: 9 }, notes: '',
-  players: [p('blue', 1, 'TLID Aran', 'Fredrinn', kMisread, 1, 9), p('blue', 2, 'TLID Kevin', 'Valentina', 6, 2, 8), p('blue', 3, 'TLID Drichel', 'Granger', 7, 1, 5), p('blue', 4, 'TLID Lyoni', 'Lapu-Lapu', 2, 3, 6), p('blue', 5, 'TLID Jull.', 'Chip', 0, 2, 12),
-    p('red', 1, 'ONIC Kiboy', 'Hilda', 2, 4, 3), p('red', 2, 'ONIC Sanz', 'Pharsa', 3, 4, 2), p('red', 3, 'ONIC CW', 'Beatrix', 2, 3, 3), p('red', 4, 'ONIC Lutpi', 'Lukas', 1, 4, 2), p('red', 5, 'ONIC Kairi', 'Joy', 1, 3, 4)] });
-const draft = { screen_kind: 'draft', readable: true, first_pick_side: 'blue', notes: '', actions: [
-  { order: 1, side: 'red', action: 'ban', hero: 'Fanny', player_name: '', uncertain: false }, { order: 2, side: 'blue', action: 'ban', hero: 'Ling', player_name: '', uncertain: false },
-  ...['Fredrinn', 'Valentina', 'Granger', 'Lapu-Lapu', 'Chip'].map((h, i) => ({ order: 3 + i, side: 'blue', action: 'pick', hero: h, player_name: '', uncertain: false })),
-  ...['Hilda', 'Pharsa', 'Beatrix', 'Lukas', 'Joy'].map((h, i) => ({ order: 8 + i, side: 'red', action: 'pick', hero: h, player_name: '', uncertain: false }))] };
+const clone = (x) => JSON.parse(JSON.stringify(x));
+// The fake AI returns a real screen; heroes "sure" only where the reading was sure.
+const screen = (i, { allSure = false, killsMisread = null } = {}) => {
+  const r = clone(REAL[i].raw);
+  if (allSure) r.players.forEach((p) => { p.hero = REAL[i].truthHeroes[p.side][p.slot - 1]; p.hero_sure = true; p.hero_candidates = []; });
+  if (killsMisread != null) r.players[0].kills = killsMisread;
+  return r;
+};
+const dataTab = (i) => { const r = clone(REAL[i].raw); r.screen_kind = 'stats_detail'; r.players.forEach((p) => { p.kills = -1; p.deaths = -1; p.assists = -1; p.gold = -1; p.rating = -1; p.hero_damage = 50000 + p.slot; p.damage_taken = 30000; p.tower_damage = 1000; }); return r; };
 
 async function hub(aiImpl) {
   const calls = [];
@@ -34,7 +37,9 @@ async function hub(aiImpl) {
     Object.defineProperty(input, 'files', { value: [file] });
     input.dispatchEvent(new dom.window.Event('change', { bubbles: true })); await wait(80);
   };
-  return { dom, d, go, click, set, upload, calls, text: () => d.getElementById('main').textContent };
+  const pickAllHeroes = (i) => { for (let r = 0; r < 10; r++) { const el = d.getElementById(`cg-MLBB-${r}-hero`); if (!el.value) set(`cg-MLBB-${r}-hero`, REAL[i].truthHeroes[r < 5 ? 'left' : 'right'][r % 5]); } };
+  const fillReport = (partner) => { set('rp-MLBB-partner', partner); set('rp-MLBB-focus', 'Lord setups'); set('rp-MLBB-worked', 'early game'); set('rp-MLBB-adjust', 'vision before lord'); set('rp-MLBB-progress', '3'); };
+  return { dom, d, go, click, set, upload, calls, pickAllHeroes, fillReport, text: () => d.getElementById('main').textContent };
 }
 
 test('without the website AI, games are typed by hand and still feed the report result', async () => {
@@ -42,72 +47,87 @@ test('without the website AI, games are typed by hand and still feed the report 
   assert.match(h.text(), /AI screenshot reading works on the website/); assert.equal(h.d.querySelector('[data-cap-shot]'), null);
   await h.click('[data-cap-manual="MLBB"]');
   assert.equal(h.d.getElementById('cg-MLBB-0-player').value, 'Aran', 'roster pre-filled on our side');
-  h.set('cg-MLBB-result', 'win'); h.set('cg-MLBB-dur', '14:05');
-  for (let i = 0; i < 10; i++) { h.set(`cg-MLBB-${i}-hero`, ['Fredrinn', 'Valentina', 'Granger', 'Lapu-Lapu', 'Chip', 'Hilda', 'Pharsa', 'Beatrix', 'Lukas', 'Joy'][i]); if (i < 5) for (const k of ['kills', 'deaths', 'assists']) h.set(`cg-MLBB-${i}-${k}`, '1'); }
+  assert.equal(h.d.getElementById('cg-MLBB-our').value, 'left');
+  h.set('cg-MLBB-result', 'win'); h.set('cg-MLBB-dur', '14:05'); h.set('cg-MLBB-map', 'blue');
+  h.pickAllHeroes(0);
+  for (let i = 0; i < 5; i++) for (const k of ['kills', 'deaths', 'assists']) h.set(`cg-MLBB-${i}-${k}`, '1');
   await h.click('[data-cap-confirm="MLBB"]');
   assert.match(h.d.getElementById('capMsg-MLBB').textContent, /Game 1 confirmed \(win\)/);
   assert.equal(h.d.getElementById('rp-MLBB-won').value, '1'); assert.equal(h.d.getElementById('rp-MLBB-lost').value, '0');
-  assert.match(h.text(), /typed/);
+  assert.match(h.text(), /Blue side/); assert.match(h.text(), /typed/);
 });
 
-test('screenshot → flagged check → confirm; draft screenshot; debrief fills the fields; report saved with its games', async () => {
-  let shots = 0;
+test('real screen → only sure heroes filled → coach taps suggestions → Data tab merged → draft → duplicate warned → report saved with games', async () => {
+  let n = 0;
   const h = await hub(async (b) => {
-    if (b.action === 'scoreboard') return { captureId: `cap-${Math.random()}`, raw: board(shots++ ? 3 : 8), model: 'm' };
-    if (b.action === 'draft') return { captureId: 'cap-d', raw: draft, model: 'm' };
+    if (b.action === 'scoreboard') { n++; return { captureId: `cap-${n}`, raw: n === 2 ? dataTab(1) : n === 1 ? screen(1, { killsMisread: 8 }) : screen(1), model: 'm' }; }
+    if (b.action === 'draft') return { captureId: 'cap-d', raw: { screen_kind: 'draft', readable: true, first_pick_side: 'left', notes: '', actions: [
+      { order: 1, side: 'right', action: 'ban', hero: 'Fanny', hero_sure: true, hero_candidates: [], player_name: '', order_sure: true },
+      { order: 2, side: 'left', action: 'ban', hero: 'Ling', hero_sure: true, hero_candidates: [], player_name: '', order_sure: true }] }, model: 'm' };
     if (b.action === 'debrief') return { raw: { focus: 'rotasi early ke turtle', worked: 'Draft bagus, Kevin rotasi cepat', failed: 'Lord fight masih telat', adjust: 'set up vision sebelum lord', player_notes: 'Kevin: rotasi cepat', detail: '', not_placed: '' }, model: 'm' };
     throw new Error('unexpected');
   });
   await h.upload('[data-cap-shot="MLBB"]');
-  assert.equal(h.calls[0].action, 'scoreboard'); assert.equal(h.calls[0].image.mediaType, 'image/png'); assert.ok(h.calls[0].image.data.length > 4);
-  assert.match(h.text(), /Blue kills add up to 23, but the score shows 18/, 'the misread K is caught');
-  assert.equal(h.d.getElementById('cg-MLBB-our').value, 'blue'); assert.equal(h.d.getElementById('cg-MLBB-result').value, 'win');
-  assert.equal(h.d.getElementById('cg-MLBB-3-hero').value, 'Lapu-Lapu'); assert.equal(h.d.getElementById('cg-MLBB-1-player').value, 'Kevin');
-  await h.upload('[data-cap-draft="MLBB"]');
-  assert.equal(h.d.getElementById('cd-MLBB-first').value, 'blue'); assert.equal(h.d.getElementById('cd-MLBB-0-hero').value, 'Fanny');
-  h.set('cg-MLBB-0-kills', '3');   // the coach fixes the misread value
+  assert.equal(h.calls[0].action, 'scoreboard'); assert.equal(h.calls[0].image.mediaType, 'image/png');
+  assert.match(h.text(), /Left team kills add up to 36, but the score shows 35/, 'a misread K is caught');
+  assert.equal(h.d.getElementById('cg-MLBB-our').value, 'left'); assert.equal(h.d.getElementById('cg-MLBB-result').value, 'win');
+  assert.match(h.text(), /8 heroes to pick/, 'only the two heroes read as sure are filled');
+  assert.equal(h.d.getElementById('cg-MLBB-2-hero').value, 'Lancelot', 'a sure reading is filled even when wrong — the coach must still look');
+  // Suggestions under an unsure hero: the AI's best guess first.
+  const chip = h.d.querySelector('[data-cap-hero^="MLBB|4|"]'); assert.equal(chip.textContent, 'Wanwan');
+  await h.click('[data-cap-hero="MLBB|4|Wanwan"]'); assert.equal(h.d.getElementById('cg-MLBB-4-hero').value, 'Wanwan');
+  h.set('cg-MLBB-0-kills', '7');          // the coach fixes the misread value (7 on the screen)
+  // Data tab: fills damage, keeps what the coach typed.
+  await h.upload('[data-cap-more="MLBB"]');
+  assert.match(h.d.getElementById('capMsg-MLBB').textContent, /Second screenshot added/);
+  assert.equal(h.d.getElementById('cg-MLBB-0-hero_damage').value, '50001'); assert.equal(h.d.getElementById('cg-MLBB-0-kills').value, '7', 'typed value kept');
+  assert.equal(h.d.getElementById('cg-MLBB-4-hero').value, 'Wanwan', 'picked hero kept');
+  await h.upload('[data-cap-draft="MLBB"]'); assert.equal(h.d.getElementById('cd-MLBB-0-hero').value, 'Fanny');
+  h.set('cg-MLBB-2-hero', 'Alucard'); h.pickAllHeroes(1); h.set('cg-MLBB-map', 'red');
   await h.click('[data-cap-confirm="MLBB"]');
-  assert.match(h.text(), /Game 1/); assert.match(h.text(), /from screenshot, 1 value corrected/); assert.match(h.text(), /draft 12 actions/);
-  // second game straight from a clean screenshot
-  await h.upload('[data-cap-shot="MLBB"]'); assert.match(h.text(), /Read cleanly/);
-  await h.click('[data-cap-confirm="MLBB"]');
-  assert.equal(h.d.getElementById('rp-MLBB-won').value, '2');
-  // debrief dump
+  assert.match(h.text(), /Game 1/); assert.match(h.text(), /Red side/); assert.match(h.text(), /draft 2 actions/);
+  // The same screenshot again: warned as a duplicate.
+  await h.upload('[data-cap-shot="MLBB"]'); assert.match(h.text(), /looks like a game already added \(.*game 1\)/);
+  await h.click('[data-cap-discard="MLBB"]');
+  // Debrief dump and save.
   h.set('rp-MLBB-dump', 'Fokus rotasi early ke turtle. Draft bagus, Kevin rotasi cepat. Lord fight masih telat. Next set up vision sebelum lord.');
   await h.click('[data-cap-debrief="MLBB"]');
-  assert.equal(h.d.getElementById('rp-MLBB-focus').value, 'rotasi early ke turtle'); assert.equal(h.d.getElementById('rp-MLBB-adjust').value, 'set up vision sebelum lord');
-  assert.equal(h.d.getElementById('rp-MLBB-players').value, 'Kevin: rotasi cepat');
-  // save the report
+  assert.equal(h.d.getElementById('rp-MLBB-focus').value, 'rotasi early ke turtle'); assert.equal(h.d.getElementById('rp-MLBB-players').value, 'Kevin: rotasi cepat');
   h.set('rp-MLBB-partner', 'ONIC'); h.set('rp-MLBB-progress', '4');
   await h.click('[data-report-save="MLBB"]');
-  assert.match(h.d.getElementById('rpMsg-MLBB').textContent, /Report saved \(2-0 vs ONIC, 2 games with stats\)/);
-  assert.doesNotMatch(h.text(), /Game 1 ·/, 'capture state cleared after saving');
-  // Patterns tab: facts from the two games
+  assert.match(h.d.getElementById('rpMsg-MLBB').textContent, /Report saved \(1-0 vs ONIC, 1 game with stats\)/);
+  // The saved report lists its game with a Fix button; fixing writes a new version and a correction note.
+  assert.match(h.text(), /Alucard/);
+  await h.click('[data-cap-fix]');
+  assert.match(h.text(), /Fixing game 1 of the report vs ONIC/);
+  h.set('cg-MLBB-0-deaths', '2');
+  await h.click('[data-cap-confirm="MLBB"]');
+  assert.match(h.d.getElementById('capMsg-MLBB').textContent, /Game 1 fixed \(Aran deaths 2 → 2|Game 1 fixed/);
+  assert.match(h.text(), /Correction .* Game 1 corrected/);
+  assert.match(h.text(), /1 game version\(s\) corrected/);
+  // Patterns: one game (the fix replaced the old version), map side from the coach.
   await h.go('mlbb-patterns');
-  assert.match(h.text(), /Patterns — MLBB/); assert.match(h.text(), /Confirmed games2/); assert.match(h.text(), /From screenshots2/);
-  assert.match(h.text(), /Only 2 game\(s\): every split below is an early sign/); assert.match(h.text(), /Fanny/);
-  // Player trail on the plan page
+  assert.match(h.text(), /Confirmed games1/); assert.match(h.text(), /Played on red side/); assert.match(h.text(), /Fanny/);
   await h.click('[data-pat-player="MLBB|Kevin"]');
   assert.match(h.text(), /Scrim trail — Kevin/); assert.match(h.text(), /Fewer than 5 games/);
 });
 
-test('report save is refused while a game is still being checked', async () => {
-  const h = await hub(async () => ({ captureId: 'c', raw: board(), model: 'm' }));
+test('report save is refused while a game is still being checked; a voided game cannot be confirmed', async () => {
+  const h = await hub(async () => ({ captureId: 'c', raw: { ...screen(0), outcome: 'invalid' }, model: 'm' }));
   await h.upload('[data-cap-shot="MLBB"]');
-  h.set('rp-MLBB-partner', 'ONIC'); h.set('rp-MLBB-focus', 'f'); h.set('rp-MLBB-worked', 'w'); h.set('rp-MLBB-adjust', 'a'); h.set('rp-MLBB-progress', '3'); h.set('rp-MLBB-won', '1');
+  assert.match(h.text(), /voided/); assert.equal(h.d.querySelector('[data-cap-confirm]'), null);
+  h.fillReport('ONIC'); h.set('rp-MLBB-won', '1');
   await h.click('[data-report-save="MLBB"]');
   assert.match(h.d.getElementById('rpMsg-MLBB').textContent, /Confirm or discard the game/);
-  await h.click('[data-cap-discard="MLBB"]'); assert.doesNotMatch(h.text(), /Our side/);
+  await h.click('[data-cap-discard="MLBB"]'); assert.doesNotMatch(h.text(), /Our team/);
 });
 
 test('findings: checked against the facts, marked by the coach, promoted into a coaching proposal', async () => {
-  let digestAnswer;
-  const h = await hub(async (b) => (b.action === 'digest' ? { raw: digestAnswer, model: 'claude-sonnet-5-5' } : { captureId: `c${Math.random()}`, raw: board(), model: 'm' }));
-  // six confirmed games over three reports
+  let digestAnswer; let k = 0;
+  const h = await hub(async (b) => (b.action === 'digest' ? { raw: digestAnswer, model: 'claude-sonnet-5-5' } : { captureId: `c${k}`, raw: screen(k++ % REAL.length, { allSure: true }), model: 'm' }));
   for (let r = 0; r < 3; r++) {
-    for (let g = 0; g < 2; g++) { await h.upload('[data-cap-shot="MLBB"]'); if (r === 2) h.set('cg-MLBB-result', 'loss'); await h.click('[data-cap-confirm="MLBB"]'); }
-    h.set('rp-MLBB-partner', `Team ${r}`); h.set('rp-MLBB-focus', 'f'); h.set('rp-MLBB-worked', 'w'); h.set('rp-MLBB-adjust', 'a'); h.set('rp-MLBB-progress', '3');
-    await h.click('[data-report-save="MLBB"]');
+    for (let g = 0; g < 2; g++) { await h.upload('[data-cap-shot="MLBB"]'); h.set('cg-MLBB-result', r === 2 ? 'loss' : 'win'); await h.click('[data-cap-confirm="MLBB"]'); }
+    h.fillReport(`Team ${r}`); await h.click('[data-report-save="MLBB"]');
   }
   await h.go('mlbb-patterns');
   assert.match(h.text(), /Confirmed games6/);

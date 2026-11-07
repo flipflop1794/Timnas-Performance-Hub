@@ -1,3 +1,4 @@
+import { hasContactNumber } from './pii.js';
 // Daily scrim reports: what a coach writes after a scrim session. One report = one session
 // (one sparring partner). The daily roll-up groups the day's sessions. Reports are never edited
 // or deleted: a mistake is fixed with a dated correction note, so the record stays trustworthy.
@@ -25,7 +26,7 @@ const num = (v) => (v === '' || v == null ? null : Number(v));
 const int = (v, label) => { const n = num(v); if (n == null) return null; need(Number.isInteger(n) && n >= 0 && n <= 999, `${label} must be a whole number from 0 to 999.`); return n; };
 // Phone-like numbers do not belong in a performance note.
 // Applied to free text about people only; round scores and formations in game notes are allowed.
-const clean = (s, label) => { const t = (s || '').trim(); need(!/(?:\d[\s().-]*){9,}/.test(t), `${label}: remove phone or ID numbers; keep performance notes only.`); return t; };
+const clean = (s, label) => { const t = (s || '').trim(); need(!hasContactNumber(t), `${label}: remove phone or ID numbers; keep performance notes only.`); return t; };
 const plain = (s) => (s || '').trim();
 
 export function scrimReport(x) {

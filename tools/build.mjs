@@ -37,7 +37,9 @@ if (mode) {
   const url = test ? 'https://test.supabase.co' : (process.env.SUPABASE_URL || '').trim().replace(/\/+$/, '');
   const key = test ? 'test-anon-key' : (process.env.SUPABASE_ANON_KEY || '').trim();
   if (!test) {
-    if (!/^https:\/\/[a-z0-9-]+\.supabase\.co$/.test(url)) throw new Error('SUPABASE_URL must look like https://<project-ref>.supabase.co (set it in Vercel → Settings → Environment Variables).');
+    // HUB_LOCAL_STACK=1: a local test stack (tools/local-stack) on http://127.0.0.1:<port>. Never set on Vercel.
+    const local = process.env.HUB_LOCAL_STACK === '1' && /^http:\/\/127\.0\.0\.1:\d+$/.test(url);
+    if (!local && !/^https:\/\/[a-z0-9-]+\.supabase\.co$/.test(url)) throw new Error('SUPABASE_URL must look like https://<project-ref>.supabase.co (set it in Vercel → Settings → Environment Variables).');
     if (!key) throw new Error('SUPABASE_ANON_KEY is missing (Supabase → Project Settings → API → anon / publishable key).');
     // Never ship a secret key to browsers.
     if (/^sb_secret_/.test(key)) throw new Error('SUPABASE_ANON_KEY is a secret key. Use the anon / publishable key.');

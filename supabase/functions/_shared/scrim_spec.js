@@ -7,7 +7,7 @@
 // Rules the prompts enforce: read only what is on the screen, never guess a number, mark what is
 // unclear. The coach confirms every value before it is saved; nothing here writes a record by itself.
 
-export const PROMPT_VERSION = 'scrim-ai-2026-11-07.1';
+export const PROMPT_VERSION = 'scrim-ai-2026-11-07.3';
 export const DEFAULT_MODEL = 'claude-sonnet-5-5';
 
 // Titles with screenshot capture. MLBB Women plays the same game client as MLBB.
@@ -16,12 +16,17 @@ export const CAPTURE_GAMES = {
   'MLBB Women': 'mlbb',
   'Dota 2': 'dota',
 };
-export const GAME_SIDES = { mlbb: ['blue', 'red'], dota: ['radiant', 'dire'] };
+// How the end screens group the two teams. MLBB's result screen always puts the screenshot owner's team
+// on the LEFT (blue header) and the other team on the RIGHT, whatever map side they played; Dota labels
+// Radiant and Dire. The MLBB map side (blue / red base) is not on the result screen: the coach sets it.
+export const GAME_SIDES = { mlbb: ['left', 'right'], dota: ['radiant', 'dire'] };
+export const MAP_SIDES = { mlbb: ['blue', 'red'], dota: ['radiant', 'dire'] };
+export const OUTCOMES = ['victory', 'defeat', 'invalid', 'radiant_victory', 'dire_victory', 'not_shown'];
 export const gameOf = (title) => CAPTURE_GAMES[title] || null;
 
 // Fields a player row may carry. -1 means "not shown on this screen" (never 0 as a guess).
 export const PLAYER_FIELDS = ['kills', 'deaths', 'assists', 'gold', 'hero_damage', 'tower_damage', 'damage_taken', 'last_hits', 'denies', 'gpm', 'xpm', 'rating'];
-export const UNCERTAIN_FIELDS = ['side', 'name', 'hero', ...PLAYER_FIELDS];
+export const UNCERTAIN_FIELDS = ['side', 'name', ...PLAYER_FIELDS];
 
 export const LIMITS = {
   imageBytes: 2_500_000,          // decoded image size; the hub sends ~150 KB WebP
@@ -37,6 +42,8 @@ const int = { type: 'integer' };
 const obj = (properties) => ({ type: 'object', properties, required: Object.keys(properties), additionalProperties: false });
 
 // One schema for both MOBA titles: fields a game does not show come back as -1.
+// Heroes: both games show portraits (often skins), so the model gives its best guess, says whether it is
+// sure, and lists up to 3 candidates; the hub fills only sure answers and offers the rest as choices.
 export function scoreboardSchema(game) {
   const sides = GAME_SIDES[game];
   if (!sides) throw new Error(`No screenshot capture for ${game}.`);
@@ -45,16 +52,19 @@ export function scoreboardSchema(game) {
     slot: int,
     name_seen: str,
     hero: str,
+    hero_sure: { type: 'boolean' },
+    hero_candidates: { type: 'array', items: str },
     ...Object.fromEntries(PLAYER_FIELDS.map((k) => [k, k === 'rating' ? { type: 'number' } : int])),
     mvp: { type: 'boolean' },
     uncertain_fields: { type: 'array', items: { type: 'string', enum: UNCERTAIN_FIELDS } },
   });
   return obj({
-    screen_kind: { type: 'string', enum: ['scoreboard', 'data_tab', 'draft_or_loading', 'other'] },
+    screen_kind: { type: 'string', enum: ['result', 'stats_detail', 'draft_or_loading', 'other'] },
     readable: { type: 'boolean' },
-    winner_side: { type: 'string', enum: [...sides, 'unknown'] },
+    outcome: { type: 'string', enum: OUTCOMES },
     duration_seconds: int,
     score: obj(Object.fromEntries(sides.map((s) => [s, int]))),
+    team_names: obj(Object.fromEntries(sides.map((s) => [s, str]))),
     players: { type: 'array', items: player },
     notes: str,
   });
@@ -64,12 +74,12 @@ export function draftSchema(game) {
   const sides = GAME_SIDES[game];
   if (!sides) throw new Error(`No screenshot capture for ${game}.`);
   return obj({
-    screen_kind: { type: 'string', enum: ['draft', 'loading', 'scoreboard', 'other'] },
+    screen_kind: { type: 'string', enum: ['draft', 'loading', 'result', 'other'] },
     readable: { type: 'boolean' },
     first_pick_side: { type: 'string', enum: [...sides, 'unknown'] },
     actions: {
       type: 'array',
-      items: obj({ order: int, side: { type: 'string', enum: [...sides, 'unknown'] }, action: { type: 'string', enum: ['pick', 'ban'] }, hero: str, player_name: str, uncertain: { type: 'boolean' } }),
+      items: obj({ order: int, side: { type: 'string', enum: [...sides, 'unknown'] }, action: { type: 'string', enum: ['pick', 'ban'] }, hero: str, hero_sure: { type: 'boolean' }, hero_candidates: { type: 'array', items: str }, player_name: str, order_sure: { type: 'boolean' } }),
     },
     notes: str,
   });
@@ -86,8 +96,17 @@ export const digestSchema = () => obj({
 // ---------------------------------------------------------------- prompts
 const GAME_NAME = { mlbb: 'Mobile Legends: Bang Bang (MLBB)', dota: 'Dota 2' };
 const FIELD_HELP = {
-  mlbb: 'MLBB end screen: Victory/Defeat, team kill score, match duration, per player name, hero portrait, K/D/A, gold, rating and MVP medal. The Data tab adds hero damage, damage taken and turret (tower) damage. Last hits, denies, GPM and XPM do not exist in MLBB: always -1.',
-  dota: 'Dota 2 post-game scoreboard: Radiant/Dire victory, kill score, duration, per player name, hero portrait, level, K/D/A, net worth (put it in gold), last hits / denies, GPM / XPM, hero damage, building damage (tower_damage), items. damage_taken and rating do not exist on this screen: always -1. mvp is false unless the screen marks one.',
+  mlbb: [
+    'MLBB has two post-game screens. RESULT screen (screen_kind "result"): VICTORY / DEFEAT / INVALID at the top with each team\'s kill score beside it, "Duration mm:ss" under it, and two teams of five: the LEFT team (blue header) is always the team of the person who took the screenshot, the RIGHT team (red header) is the other team. Per player: hero portrait (no hero name is printed), player name with a team tag in front, K, D, A, gold, a medal with a rating number, MVP on one player per team.',
+    'IMPORTANT: on the right team the columns are mirrored: gold comes FIRST, then K, D, A. On the left team the order is K, D, A, gold.',
+    'outcome: "victory" or "defeat" exactly as printed (it is from the LEFT team\'s point of view), "invalid" if the game was voided. side: "left" or "right". score: left = number left of the title, right = number right of it.',
+    'DATA tab (screen_kind "stats_detail"): per player hero damage, damage taken, turret damage (tower_damage) and team-fight participation; fill those and leave the rest -1.',
+    'Last hits, denies, GPM and XPM do not exist in MLBB: always -1. team_names: "" (not shown).',
+  ].join('\n'),
+  dota: [
+    'Dota 2 has two post-game screens. OVERVIEW (screen_kind "result"): "Radiant Victory" / "Dire Victory", kill score, duration, team names, and a card per hero with hero name, player name, level, K/D/A and net worth. SCOREBOARD tab (screen_kind "stats_detail"): per player last hits / denies, GPM / XPM, hero damage, healing, building damage, sometimes after a sideways scroll.',
+    'outcome: "radiant_victory" or "dire_victory" as printed. side: "radiant" (top / left group) or "dire". Put net worth in gold, building damage in tower_damage. damage_taken and rating do not exist: always -1. mvp: false unless the screen marks one. A tooltip covering numbers: mark those fields uncertain.',
+  ].join('\n'),
 };
 
 export function scoreboardPrompt(game, heroNames) {
@@ -96,13 +115,12 @@ export function scoreboardPrompt(game, heroNames) {
     FIELD_HELP[game],
     'Rules:',
     '- Read only what is visible. Never estimate, complete or infer a number. If a value is not on this screen or cannot be read, use -1 and add the field to uncertain_fields.',
-    `- hero: the hero's name exactly as in this list, or "" if you cannot identify the portrait with confidence (then add "hero" to uncertain_fields). Heroes: ${heroNames.join(', ')}.`,
+    `- hero: your best guess, spelled exactly as in this list ("" if you have no idea). hero_sure: true only if you are certain (the name is printed, or the portrait is unmistakable); portraits are often skins, so when in doubt say false. hero_candidates: up to 3 likely heroes from the list when not sure, else []. Heroes: ${heroNames.join(', ')}.`,
     '- name_seen: the player name exactly as printed, including team tags; "" if unreadable.',
-    '- side: which team the row belongs to. If the screen does not show which side is which, use "unknown". slot: 1-5 in the order shown within the team.',
-    '- score: kills per side as printed at the top; -1 if not shown. duration_seconds: game length; -1 if not shown.',
-    '- winner_side: only if the screen says who won; otherwise "unknown".',
-    '- screen_kind: what the screenshot is. If it is not a scoreboard or data tab, return readable=false and an empty players list.',
-    '- notes: one short sentence about anything the coach must check (cropped, blurred, overlapping text). Empty if none.',
+    '- slot: 1-5, top to bottom within the team.',
+    '- duration_seconds: game length in seconds; -1 if not shown. outcome "not_shown" if the screen does not say.',
+    '- screen_kind: what the screenshot is. If it is not one of the post-game screens, return readable=false and an empty players list.',
+    '- notes: one short sentence about anything the coach must check (cropped, blurred, overlapping text, tooltip). Empty if none.',
     'Return all 10 players when visible, in screen order.',
   ].join('\n');
 }
@@ -110,11 +128,12 @@ export function scoreboardPrompt(game, heroNames) {
 export function draftPrompt(game, heroNames) {
   return [
     `You read one screenshot of a ${GAME_NAME[game]} draft (pick/ban) or loading screen from a national-team scrim and return the picks and bans as JSON.`,
+    game === 'mlbb' ? 'side: "left" for the team shown on the left (the screenshot owner\'s team), "right" for the other.' : 'side: "radiant" or "dire".',
     'Rules:',
     '- Report only heroes you can see as picked or banned. Do not complete a draft from knowledge of the meta.',
-    `- hero: exactly as in this list; "" with uncertain=true when a portrait is not recognisable. Heroes: ${heroNames.join(', ')}.`,
-    '- order: the order of the action in the draft when the screen shows it (ban and pick slots read left to right per phase); otherwise the order shown per team, and set uncertain=true.',
-    '- side: the team that made the pick or ban; "unknown" if not shown. player_name: for picks, the player shown with the hero, else "".',
+    `- hero: best guess spelled exactly as in this list; hero_sure true only when certain (name printed or portrait unmistakable); hero_candidates up to 3 when not sure. Heroes: ${heroNames.join(', ')}.`,
+    '- order: the order of the action in the draft when the screen shows it; otherwise the order shown per team, with order_sure=false.',
+    '- player_name: for picks, the player shown with the hero, else "".',
     '- first_pick_side: only if the screen shows it.',
     '- notes: one short sentence about anything the coach must check. Empty if none.',
   ].join('\n');
@@ -138,7 +157,7 @@ export function digestPrompt(title) {
     'You receive FACTS computed by the hub from coach-confirmed scrim games (each with an id, a label, a sample size and numbers) and EXCERPTS from coach reports (each with a report id).',
     `Write at most ${LIMITS.findings} findings a coach could act on in the next week of practice.`,
     'Rules:',
-    '- Each finding cites the fact ids it rests on in fact_ids (at least one). Use only numbers that appear in those facts; copy them exactly. Never compute new percentages.',
+    '- Each finding cites the fact ids it rests on in fact_ids (at least one). Every digit you write must be copied exactly from a cited fact (n, won, lost, winRate, count, share, averages, or the numbers in its label). Write no other digits at all: no game numbers, minutes, timings, rankings ("top 1"), differences or ratios you worked out. Findings with any other number are discarded automatically.',
     '- Facts marked low_sample=true may be mentioned only as "early sign" and never as the basis of a problem on their own.',
     '- Report excerpts may support a finding (quote at most a few words, with the report id in brackets) but cannot replace a fact.',
     '- No predictions of WEC results, no player rankings, no comments on health or wellbeing.',
@@ -169,7 +188,9 @@ export function parseModelJson(resp) {
   if (resp.stop_reason === 'refusal') throw new Error('The AI declined to read this input. Enter the values by hand.');
   if (resp.stop_reason === 'max_tokens') throw new Error('The AI answer was cut off. Try again, or enter the values by hand.');
   const text = (resp.content || []).filter((b) => b.type === 'text').map((b) => b.text).join('');
-  try { return JSON.parse(text); } catch { throw new Error('The AI answer could not be read. Try again, or enter the values by hand.'); }
+  let out; try { out = JSON.parse(text); } catch { throw new Error('The AI answer could not be read. Try again, or enter the values by hand.'); }
+  if (!out || typeof out !== 'object' || Array.isArray(out)) throw new Error('The AI answer was not in the expected form. Try again, or enter the values by hand.');
+  return out;
 }
 
 export const usageOf = (resp) => ({ input_tokens: resp?.usage?.input_tokens || 0, output_tokens: resp?.usage?.output_tokens || 0 });

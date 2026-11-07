@@ -97,7 +97,8 @@ export async function handle(req, deps) {
 
   let resp; let raw; let errText = '';
   try {
-    const r = await deps.fetch('https://api.anthropic.com/v1/messages', {
+    const base = (deps.env.ANTHROPIC_BASE_URL || 'https://api.anthropic.com').replace(/\/+$/, '');
+    const r = await deps.fetch(`${base}/v1/messages`, {
       method: 'POST',
       headers: { 'content-type': 'application/json', 'x-api-key': deps.env.ANTHROPIC_API_KEY, 'anthropic-version': '2023-06-01' },
       body: JSON.stringify(request),

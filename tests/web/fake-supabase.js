@@ -54,17 +54,19 @@ function client(B, sessionUserId) {
   const uid = () => session?.user.id || null;
   let tick = 0;
   const stamp = (table, row, old) => {
-    const now = new Date(Date.now() + ++tick).toISOString();
+    const now = new Date(Date.now() + (B.skew || 0) + ++tick).toISOString();
     if (DOC_TABLES.includes(table)) return { ...row, title: FIXED[table] || row.data?.title || null, created_by: old ? old.created_by : uid(), created_at: old ? old.created_at : now, updated_by: uid(), updated_at: now };
     if (table === 'scrim_report_corrections') return { ...row, id: B.tables[table].length + 1, created_by: uid(), created_at: now };
     return { ...row, updated_by: uid(), updated_at: now };
   };
+  B.selected ||= {};
   function query(table) {
     let returning = false; const written = [];
     const filters = []; let range = null; let single = false; let action = 'select'; let payload = null; let conflict = 'id';
     const q = {
       select() { if (action !== 'select') returning = true; return q; }, order() { return q; },
       eq(c, v) { filters.push([c, v]); return q; },
+      gte(c, v) { filters.push([c, v, 'gte']); return q; },
       range(a, b) { range = [a, b]; return q; },
       maybeSingle() { single = true; return q; },
       insert(rows) { action = 'insert'; payload = Array.isArray(rows) ? rows : [rows]; return q; },
@@ -73,12 +75,13 @@ function client(B, sessionUserId) {
       delete() { action = 'delete'; return q; },
       then(res, rej) { return Promise.resolve().then(run).then(res, rej); },
     };
-    const match = (r) => filters.every(([c, v]) => r[c] === v);
+    const match = (r) => filters.every(([c, v, op]) => (op === 'gte' ? String(r[c]) >= String(v) : r[c] === v));
     function run() {
       const T = B.tables[table]; const id = uid();
       if (action === 'select') {
         let rows = T.filter((r) => match(r) && B.readable(id, table, r)).map((r) => structuredClone(r));
         if (range) rows = rows.slice(range[0], range[1] + 1);
+        B.selected[table] = (B.selected[table] || 0) + rows.length;
         return { data: single ? rows[0] || null : rows, error: null };
       }
       if (action === 'insert' || action === 'upsert') {

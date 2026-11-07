@@ -66,11 +66,39 @@ Do these on a **staging** Supabase project first, not the live one:
 
 Rollback: revert the merge on `main` (Vercel redeploys V1.12). The new tables can stay; nothing in V1.12 reads them.
 
-## Tests
+## Testing (6–7 Nov 2026)
 
-`npm test`: 130 pass (106 from V1.12, 24 new), including 3 database tests on Postgres 16, 5 server-function tests with a
-fake AI service, 4 headless screen tests and 3 website tests with several accounts. Checked in Chrome at 1280 px and
-390 px (no page-level horizontal scroll; the check table scrolls sideways on a phone).
+`npm test`: **139 pass**. On top of the unit tests:
 
-Not tested here: the real AI on real screenshots (no key and no screenshots in the build environment), the storage
-policies (the test database has no Supabase Storage), and the Edge Function running on Supabase.
+- **Real MLBB result screens.** Six random screenshots from a public dataset of 2,600 labelled MLBB result screens
+  (`r-n/ml_yolo_dataset`, MIT) were read by eye, blind, then scored against the dataset's hero labels
+  (`tests/fixtures/mlbb_real_screens.json`). Heroes read as "sure": 12 of 13 right. Unsure: 47, of which the best
+  guess was right in 8. This is why only sure heroes are filled and the rest are offered as suggestions.
+- **Local stack** (`tools/local-stack/`): real Postgres rules, real Supabase Storage schema, PostgREST, the real
+  function under Deno, the real website build in Chrome with production security headers. Function: 9/9 steps.
+  Website: 16/16 checks (capture, second screenshot, debrief, save, fix, patterns, findings, other accounts), no
+  console errors.
+- **Fuzz**: about 7,000 random or broken AI answers through every check; nothing crashes, nothing unreadable is filled.
+
+### Changed by the tests
+
+| What the test showed | Change |
+|---|---|
+| MLBB's result screen puts the screenshot owner's team on the LEFT, not "blue"; VICTORY/DEFEAT is from that team's view; the map side is not on screen | Teams are left/right; result from the printed outcome; map side set by the coach (optional); blue/red splits only where set |
+| Right team's columns are mirrored (gold first) | Said in the prompt; a misread is caught by the range and kill-score checks |
+| Heroes are portraits, often skins (13 sure, 47 unsure in 60 rows) | Only sure heroes filled; tap-to-pick suggestions (AI guesses, earlier corrections, the player's usual heroes); a draft screenshot fills them |
+| Dota spreads one game over two screens, in different orders, tags shown on one only | "Add another screenshot": merged by name, then hero, then position (flagged); disagreements highlighted |
+| INVALID games exist | Refused with a plain sentence |
+| No way to fix a saved game | Fix button under each saved report: new version supersedes, the report gets a correction note, draft kept |
+| Same screenshot added twice | Duplicate warning (same kill score, duration within 5 s) |
+| Screenshot "confirmed" status needed a second write that failed silently when live updates lagged | Confirmation now = listed by a saved game; unconfirmed screenshots shown on the reports page |
+| New games and findings did not appear until the page refocused when live updates lagged | Own saves shown at once |
+| Every new game re-downloaded every game to every open browser (~3 KB each, ~1,000 by WEC) | Games, screenshots and findings load only rows changed since the last load (full reload on focus) |
+| **Live-site bug (V1.9+)**: "no phone numbers" refused stat notes such as "gold 10485 10105 9820" | New rule for real Indonesian phone / NIK / account numbers (`src/core/pii.js`), used by reports and debriefs |
+| One health remark removed a whole debrief field | Only that sentence or player note is left out |
+| A malformed AI list crashed the findings check; an object in a debrief field showed "[object Object]" | Guarded |
+| Models tend to add numbers of their own ("at 8 minutes", "top 1") | Such findings are dropped (5/5 faithful kept, 4/4 with added numbers dropped); the prompt now forbids any other digit |
+| "Read cleanly" shown while heroes still needed picking; team box cut off on phones | Fixed |
+
+Still not tested: the real AI model on real screenshots (needs an API key), Dota screenshots (no real images
+found that could be downloaded; the two-screen merge is tested with a constructed pair), live updates on Supabase.

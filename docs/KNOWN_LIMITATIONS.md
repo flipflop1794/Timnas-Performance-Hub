@@ -16,10 +16,10 @@
 10. The Claude artifact remains online; it does not share data with the website.
 
 ## V1.13 AI capture (branch feature/ai-scrim-capture, not deployed)
-11. **Screen reading is unproven on real pelatnas screenshots.** No real screenshot was available when it was built; the
-    prompts follow the published end-screen layouts. MLBB and Dota end screens show heroes as portraits, not names, so
-    hero recognition is the weakest field: the check screen flags unsure heroes, and a draft screenshot helps.
-    Measure with `tools/eval_screenshots.mjs` on 20+ real screenshots per game before relying on it.
+11. **Hero portraits are the weak field.** On six real MLBB result screens, 13 of 60 heroes could be read with certainty
+    (12 right); the rest are left for the coach with suggestions. Coaches will pick about 4 of 5 heroes per game by
+    hand until a draft screenshot is added. A hero filled as "sure" can still be wrong (1 in 13 in the test): the
+    coach must look. The real model's accuracy is unmeasured: run `tools/eval_screenshots.mjs` on 20+ pelatnas screenshots.
 12. **Dota match ID** is stored with the game but not used yet; whether lobby games can be pulled from a match API is untested.
 13. **Screenshot retention (90 days)** is a policy, not automated: delete old files in Supabase Storage by hand or add a
     scheduled job. Storage policies were not tested locally (the test database has no Storage).

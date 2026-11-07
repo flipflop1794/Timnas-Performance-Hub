@@ -35,10 +35,11 @@ async function open(B, who, hash = 'today') {
 }
 
 
-const p = (side, slot, name, hero, k, d, a) => ({ side, slot, name_seen: name, hero, kills: k, deaths: d, assists: a, gold: 9000, hero_damage: 60000, tower_damage: 3000, damage_taken: 40000, last_hits: -1, denies: -1, gpm: -1, xpm: -1, rating: 8, mvp: false, uncertain_fields: [] });
-const board = { screen_kind: 'scoreboard', readable: true, winner_side: 'red', duration_seconds: 1500, score: { blue: 9, red: 18 }, notes: '',
-  players: [p('blue', 1, 'ONIC Kiboy', 'Hilda', 2, 4, 3), p('blue', 2, 'ONIC Sanz', 'Pharsa', 3, 4, 2), p('blue', 3, 'ONIC CW', 'Beatrix', 2, 3, 3), p('blue', 4, 'ONIC Lutpi', 'Lukas', 1, 4, 2), p('blue', 5, 'ONIC Kairi', 'Joy', 1, 3, 4),
-    p('red', 1, 'Aran', 'Fredrinn', 3, 1, 9), p('red', 2, 'Kevin', 'Valentina', 6, 2, 8), p('red', 3, 'Drichel', 'Granger', 7, 1, 5), p('red', 4, 'Lyoni', 'Lapu-Lapu', 2, 3, 6), p('red', 5, 'Jull.', 'Chip', 0, 2, 12)] };
+const REAL = JSON.parse(readFileSync(new URL('../fixtures/mlbb_real_screens.json', import.meta.url), 'utf8'));
+// A real screen where OUR five are on the right: the screenshot came from the partner's phone (VICTORY is theirs).
+const board = JSON.parse(JSON.stringify(REAL[3].raw));
+board.players.forEach((x) => { x.side = x.side === 'left' ? 'right' : 'left'; x.name_seen = x.side === 'right' ? ['Aran', 'Kevin', 'Drichel', 'Lyoni', 'Jull.'][x.slot - 1] : `Opp${x.slot}`; x.hero = REAL[3].truthHeroes[x.side === 'right' ? 'left' : 'right'][x.slot - 1]; x.hero_sure = true; });
+board.score = { left: REAL[3].raw.score.right, right: REAL[3].raw.score.left };
 async function upload(P) {
   const input = P.d.querySelector('[data-cap-shot="MLBB"]'); assert.ok(input, 'upload button');
   const file = new P.w.File([new Uint8Array([0x89, 0x50, 0x4e, 0x47, 9])], 'shot.png', { type: 'image/png' });
@@ -51,11 +52,11 @@ test('website: a coach captures a game from a screenshot, saves the report; the 
   const P = await open(B, 'indra', 'mlbb-reports');
   await upload(P);
   assert.deepEqual(seen[0], { action: 'scoreboard', title: 'MLBB', uid: 'u-indra' });
-  assert.equal(P.d.getElementById('cg-MLBB-our').value, 'red', 'our side found from the roster names'); assert.equal(P.d.getElementById('cg-MLBB-result').value, 'win');
+  assert.equal(P.d.getElementById('cg-MLBB-our').value, 'right', 'our team found from the roster names'); assert.equal(P.d.getElementById('cg-MLBB-result').value, 'loss', 'VICTORY on the partner\'s screen = our loss');
   await P.click('[data-cap-confirm="MLBB"]');
   P.set('rp-MLBB-partner', 'ONIC'); P.set('rp-MLBB-focus', 'Lord setups'); P.set('rp-MLBB-worked', 'early game'); P.set('rp-MLBB-adjust', 'vision before lord'); P.set('rp-MLBB-progress', '3');
   await P.click('[data-report-save="MLBB"]'); await sleep(100);
-  assert.match(P.d.getElementById('rpMsg-MLBB').textContent, /1-0 vs ONIC, 1 game with stats/);
+  assert.match(P.d.getElementById('rpMsg-MLBB').textContent, /0-1 vs ONIC, 1 game with stats/);
   assert.equal(B.tables.scrim_games.length, 1);
   const g = B.tables.scrim_games[0]; const rep = B.tables.scrim_reports[0];
   assert.equal(g.data.reportId, rep.id); assert.equal(g.title, 'MLBB'); assert.equal(g.data.players.filter((x) => x.team === 'ours').map((x) => x.player).join(','), 'Aran,Kevin,Drichel,Lyoni,Jull.');
@@ -75,4 +76,24 @@ test('website: AI refusals reach the coach as plain sentences', async () => {
   const B = world(); B.ai = async () => ({ status: 429, error: 'Daily AI limit reached (300 calls). Enter the values by hand today, or ask the admin to raise the limit.' });
   const P = await open(B, 'indra', 'mlbb-reports'); await upload(P);
   assert.match(P.d.getElementById('capMsg-MLBB').textContent, /Daily AI limit reached/);
+});
+
+test('website: after the first load, a new game fetches only new rows, not every game again', async () => {
+  const B = world(); B.ai = async () => ({ data: { captureId: `cap-${Math.random()}`, raw: board, model: 'm' } });
+  const P = await open(B, 'indra', 'mlbb-reports');
+  for (let r = 0; r < 3; r++) {
+    B.skew = r * 3600_000;   // sessions an hour apart
+    await upload(P); await P.click('[data-cap-confirm="MLBB"]');
+    P.set('rp-MLBB-partner', `P${r}`); P.set('rp-MLBB-focus', 'f'); P.set('rp-MLBB-worked', 'w'); P.set('rp-MLBB-adjust', 'a'); P.set('rp-MLBB-progress', '3');
+    await P.click('[data-report-save="MLBB"]'); await sleep(400);
+  }
+  assert.equal(B.tables.scrim_games.length, 3);
+  B.skew = 3 * 3600_000;
+  const before = B.selected.scrim_games || 0;
+  await upload(P); await P.click('[data-cap-confirm="MLBB"]');
+  P.set('rp-MLBB-partner', 'P9'); P.set('rp-MLBB-focus', 'f'); P.set('rp-MLBB-worked', 'w'); P.set('rp-MLBB-adjust', 'a'); P.set('rp-MLBB-progress', '3');
+  await P.click('[data-report-save="MLBB"]'); await sleep(600);
+  const fetched = (B.selected.scrim_games || 0) - before;
+  assert.ok(fetched >= 1 && fetched <= 2, `fetched ${fetched} game rows for one new game (would be 4 with full reloads)`);
+  await P.go('mlbb-patterns'); assert.match(P.text(), /Confirmed games4/);
 });

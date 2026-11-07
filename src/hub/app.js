@@ -69,7 +69,7 @@ const S = {
 // V1.13 AI capture, debrief, patterns and trails (src/hub/capture_ui.js). Created on first use, once
 // every helper below exists.
 let CAP = null;
-const capUi = () => (CAP ||= captureUi({ S, esc, tag, banner, setMsg, val, render, meName, sid, fillReport, localToday: localDay, shiftDay, PLATFORM,
+const capUi = () => (CAP ||= captureUi({ S, esc, tag, banner, setMsg, val, render, meName, sid, fillReport, localToday: localDay, shiftDay, PLATFORM, reportNote,
   staffObservation, recommendationRecord, propose, saveObj, owner, rulesFor: (title) => snapshot(S.rules, title === 'PUBG Mobile' ? ['pubgm-scoring'] : title === 'Dota 2' ? ['dota-patch'] : []) }));
 const heroByName = () => Object.fromEntries(Object.values(S.heroes).map((h) => [h.name.toLowerCase(), h.id]));
 const accounts = () => Object.values(S.players).map((p) => p.account);
@@ -422,7 +422,7 @@ function reportCard(r) {
     <p><b>${esc(resultText(r.result))}</b> · <span class="note">Practised: ${esc(r.focus)} · ${esc(pl)}</span></p>
     ${r.worked ? `<p><b>Worked:</b> ${esc(r.worked)}</p>` : ''}${r.failed ? `<p><b>Failed:</b> ${esc(r.failed)}</p>` : ''}
     ${r.detail ? `<p><b>${esc(spec.detail)}:</b> ${esc(r.detail)}</p>` : ''}${r.playerNotes ? `<p><b>Player notes:</b> ${esc(r.playerNotes)}</p>` : ''}
-    <p><b>Next session:</b> ${esc(r.adjust)}</p>${safeUrl(r.vod) ? `<p class="note">VOD: <a href="${esc(safeUrl(r.vod))}" target="_blank" rel="noopener">${esc(r.vod)}</a></p>` : r.vod ? `<p class="note">VOD: ${esc(r.vod)}</p>` : ''}
+    <p><b>Next session:</b> ${esc(r.adjust)}</p>${capUi().reportGames(r)}${safeUrl(r.vod) ? `<p class="note">VOD: <a href="${esc(safeUrl(r.vod))}" target="_blank" rel="noopener">${esc(r.vod)}</a></p>` : r.vod ? `<p class="note">VOD: ${esc(r.vod)}</p>` : ''}
     ${(r.notes || []).map((n) => `<p class="note">Correction ${esc(n.at.slice(0, 10))} — ${esc(n.by)}: ${esc(n.text)}</p>`).join('')}
     ${S.mode === 'demo' ? '' : `<details><summary class="note">Add a correction</summary><div class="form"><label class="field" for="rpN-${r.id}">Correction or follow-up<input type="text" id="rpN-${r.id}" placeholder="e.g. Score was 2-0, not 2-1"></label></div>
       <div class="toolbar"><button class="btn" type="button" data-report-note="${esc(r.id)}">Add note</button><span class="msg" id="rpNMsg-${r.id}"></span></div></details>`}</div>`;
@@ -484,6 +484,7 @@ function reportsPanel(title) {
     <div class="stat"><span class="k">Plan followed (average, 1–5)</span><span class="v">${Sm.progress ?? '—'}</span>${trendTag(Sm.trend)}</div>
     <div class="stat"><span class="k">Last report</span><span class="v">${Sm.last ? (Sm.daysSince === 0 ? 'today' : `${Sm.daysSince} d ago`) : '—'}</span></div></div>
     ${stale ? banner('synth', `<div><b>No report for ${Sm.daysSince} days.</b> If sessions took place, please file them.</div>`) : ''}
+    ${(() => { const n = gameOf(title) ? capUi().waitingCount(title) : 0; return n ? banner('synth', `<div><b>${n} screenshot${n > 1 ? 's were' : ' was'} read but never confirmed into a game.</b> If ${n > 1 ? 'they were' : 'it was'} a real game, add ${n > 1 ? 'them' : 'it'} again under Games and confirm; a discarded or duplicate screenshot can be ignored.</div>`) : ''; })()}
     ${!mine.length ? '<p class="empty">No report yet.</p>' : ''}
     <p class="note">Progress is the coach's rating of how closely the team followed the plan of the day. It is not computed, and ratings from different coaches are not directly comparable.</p></div>
   ${reportTrends(title)}${ready}${form}
@@ -1338,7 +1339,10 @@ function captureForms() {
 }
 function restoreForms(st) {
   const m = $('#main');
+  // After the check screen took in new data (second screenshot, draft), its boxes come from the state, not the old page.
+  const fresh = S.capFresh; S.capFresh = false;
   for (const [id, x] of Object.entries(st.vals)) {
+    if (fresh && /^c[gd]-/.test(id)) continue;
     const el = document.getElementById(id); if (!el || !m.contains(el)) continue;
     if ('c' in x) el.checked = x.c;
     else if (el.value !== x.v && !(el.tagName === 'SELECT' && ![...el.options].some((o) => o.value === x.v))) el.value = x.v;
@@ -1746,7 +1750,7 @@ document.addEventListener('click', async (e) => {
 for (const ev of ['input', 'change']) document.addEventListener(ev, (e) => draftField(e.target));
 
 document.addEventListener('change', (e) => {
-  if (e.target.dataset?.capShot || e.target.dataset?.capDraft || e.target.dataset?.patPeriod) { capUi().onChange(e); return; }
+  if (e.target.dataset?.capShot || e.target.dataset?.capDraft || e.target.dataset?.capMore || e.target.dataset?.patPeriod) { capUi().onChange(e); return; }
   const id = e.target.id;
   if (id === 'meSel') { S.me = e.target.value; try { localStorage.setItem('hub-me', S.me); } catch { /* per-viewer convenience only */ } render(); }
   if (id === 'wT') { S.wellTitle = e.target.value; render(); }

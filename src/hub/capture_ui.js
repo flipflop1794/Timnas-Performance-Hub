@@ -3,7 +3,7 @@
 // through the website's platform hook (PLATFORM.ai), so the Claude-artifact build and the tests run
 // without it: every AI step has a by-hand path.
 import { DATA } from './data.gen.js';
-import { heroIndex, gameOf, proposeGame, proposeDraft, confirmGame, blankGame, STAT_DEFS, SIDE_LABEL, durationText, parseDuration, latestGames, gamesResult, extractionAccuracy, learnAliases } from '../core/capture.js';
+import { heroIndex, gameOf, proposeGame, proposeDraft, confirmGame, blankGame, gameToProposal, mergeGames, heroesFromDraft, heroChoices, heroMemory, playerHeroes, findDuplicate, STAT_DEFS, SIDE_LABEL, MAP_SIDES, durationText, parseDuration, latestGames, gamesResult, extractionAccuracy, learnAliases } from '../core/capture.js';
 import { checkDebriefInput, checkDebriefSplit } from '../core/debrief.js';
 import { facts, checkFindings, findingRecord, markFinding, statTrail, digestPayload, MIN_SAMPLE, standInRecord, statGoalProgress } from '../core/patterns.js';
 import { GAME_SIDES, LIMITS } from '../../supabase/functions/_shared/scrim_spec.js';
@@ -26,6 +26,13 @@ export function captureUi(ctx) {
     return S.cap[fid];
   }
   function keep(fid) { try { const x = S.cap[fid]; if (x && (x.pending || x.ready.length)) localStorage.setItem(capKey(fid), JSON.stringify(x)); else localStorage.removeItem(capKey(fid)); } catch { /* per-device convenience only */ } }
+  // Save a record and show it on this device at once (the shared copy arrives by live update, which can
+  // lag or drop on a sleeping phone; the next load replaces the local copy with the stored one).
+  async function put(coll, rec) {
+    if (S.db) await S.db.collection(coll).doc(rec.id).set(rec);
+    const list = coll === 'scrim_games' ? S.games : S.findings; const i = list.findIndex((x) => x.id === rec.id);
+    if (i >= 0) list[i] = rec; else list.push(rec);
+  }
   const rosterOf = (title) => (S.roster[title] || []).filter(Boolean);
   const aliasesOf = (title) => S.aliases[title]?.aliases || {};
   const gamesOf = (title) => latestGames(S.games.filter((g) => g.title === title));
@@ -50,57 +57,102 @@ export function captureUi(ctx) {
   function gamesSection(title, fid) {
     if (!gameOf(title)) return '';
     const s = st(fid); const on = !!ai();
-    const list = s.ready.map((g, i) => `<li><b>Game ${i + 1}</b> · ${g.result === 'win' ? tag('c-Verified', 'win') : tag('c-Blocked', 'loss')} · ${esc(durationText(g.durationS))} · ${esc(SIDE_LABEL[g.ourSide])} · <span class="note">${g.players.filter((p) => p.team === 'ours').map((p) => esc(`${p.player === 'stand-in' ? 'stand-in' : p.player} (${p.hero})`)).join(', ')}${g.draft.length ? ` · draft ${g.draft.length} actions` : ''}${g.source === 'screenshot' ? ` · from screenshot${g.corrections.length ? `, ${g.corrections.length} value${g.corrections.length > 1 ? 's' : ''} corrected` : ''}` : ' · typed'}</span>
+    const list = s.ready.map((g, i) => `<li><b>Game ${i + 1}</b> · ${g.result === 'win' ? tag('c-Verified', 'win') : tag('c-Blocked', 'loss')} · ${esc(durationText(g.durationS))}${g.mapSide ? ` · ${esc(SIDE_LABEL[g.mapSide])} side` : ''} · <span class="note">${g.players.filter((p) => p.team === 'ours').map((p) => esc(`${p.player === 'stand-in' ? 'stand-in' : p.player} (${p.hero})`)).join(', ')}${g.draft.length ? ` · draft ${g.draft.length} actions` : ''}${g.source === 'screenshot' ? ` · from screenshot${g.corrections.length ? `, ${g.corrections.length} value${g.corrections.length > 1 ? 's' : ''} corrected` : ''}` : ' · typed'}</span>
       <button type="button" class="linkbtn" data-cap-remove="${esc(`${fid}|${i}`)}">Remove</button></li>`).join('');
     if (s.savedFor) return `<div class="h3">Games</div>${banner('block', `<div><b>${s.ready.length} game(s) of the report vs ${esc(s.savedFor.partner)} (${esc(s.savedFor.date)}) are not saved yet.</b> The report itself is saved.</div>`)}<div class="toolbar"><button class="btn primary" type="button" data-cap-retry="${esc(title)}">Retry saving games</button><span class="msg" id="capMsg-${fid}" role="status"></span></div>`;
     return `<div class="h3">Games</div>
-      <p class="note">${on ? 'Upload the end-of-game screenshot of each game: the AI reads it and you check every value before it counts. A draft screenshot is optional.' : 'AI screenshot reading works on the website. Here you can type each game by hand.'} Confirmed games fill the result above and feed the Patterns tab and player trails.</p>
+      <p class="note">${on ? 'Upload the end-of-game screenshot of each game: the AI reads it and you check every value before it counts.' : 'AI screenshot reading works on the website. Here you can type each game by hand.'} Confirmed games fill the result above and feed the Patterns tab and player trails.</p>
       ${list ? `<ul class="plain capgames">${list}</ul>` : ''}
       ${s.pending ? editorHtml(title, fid, s.pending) : `<div class="toolbar">${on ? `<label class="btn primary filebtn">Add game from screenshot<input type="file" accept="image/*" data-cap-shot="${esc(title)}" hidden></label>` : ''}<button class="btn" type="button" data-cap-manual="${esc(title)}">Add game by hand</button><span class="msg" id="capMsg-${fid}" role="status"></span></div>`}`;
   }
   const flagOf = (p, field) => (p.flags || []).find((f) => f.field === field);
   const cell = (p, field) => { const f = flagOf(p, field); return f ? ` class="flag" title="${esc(f.reason)}" aria-invalid="true"` : ''; };
+  const heroHelp = (title) => { const gs = gamesOf(title); return { memory: heroMemory(gs), playerHeroes: playerHeroes(gs) }; };
   function editorHtml(title, fid, pend) {
     const g = pend.base; const game = gameOf(title); const sides = GAME_SIDES[game]; const defs = STAT_DEFS[game]; const roster = rosterOf(title);
     const block = g.issues.some((i) => i.level === 'block');
-    const iss = g.issues.length ? banner(block ? 'block' : 'synth', `<div><b>${block ? 'Cannot use this screenshot.' : 'Check before confirming:'}</b><ul class="plain">${g.issues.map((i) => `<li>${esc(i.text)}</li>`).join('')}</ul></div>`) : (pend.fromScreenshot ? banner('real', '<div>Read cleanly. Still check each value against the screenshot.</div>') : '');
+    const iss = g.issues.length ? banner(block ? 'block' : 'synth', `<div><b>${block ? 'Cannot use this screenshot.' : 'Check before confirming:'}</b><ul class="plain">${g.issues.map((i) => `<li>${esc(i.text)}</li>`).join('')}</ul></div>`) : (pend.fromScreenshot && !g.players.some((p) => p.flags.length) ? banner('real', '<div>Read cleanly. Still check each value against the screenshot.</div>') : '');
     const dl = `<datalist id="capHeroes-${fid}">${heroesFor(title).names.map((n) => `<option value="${esc(n)}">`).join('')}</datalist>`;
-    const sideSel = (id, cur, extra = '') => `<select id="${id}"${extra}><option value=""></option>${sides.map((s) => `<option value="${s}" ${s === cur ? 'selected' : ''}>${SIDE_LABEL[s]}</option>`).join('')}</select>`;
+    // Short words in the boxes (phone width); full words in messages.
+    const SHORT = { left: 'Left', right: 'Right', blue: 'Blue', red: 'Red', radiant: 'Radiant', dire: 'Dire' };
+    const sideSel = (id, cur, extra = '', list = sides, words = SIDE_LABEL) => `<select id="${id}"${extra}><option value=""></option>${list.map((x) => `<option value="${x}" ${x === cur ? 'selected' : ''}>${words[x]}</option>`).join('')}</select>`;
+    const help = heroHelp(title);
+    const chips = (p, i) => { const c = heroChoices(p, help); return c.length ? `<div class="herochips">${c.map((h) => `<button type="button" class="hchip" data-cap-hero="${esc(`${fid}|${i}|${h}`)}">${esc(h)}</button>`).join('')}</div>` : ''; };
+    const heroBlank = g.players.filter((p) => !p.hero).length;
     // Phone first: hero, player and K/D/A come before the wider columns.
-    const rows = g.players.map((p, i) => `<tr><td>${sideSel(`cg-${fid}-${i}-side`, p.side, cell(p, 'side'))}</td>
-      <td><input type="text" id="cg-${fid}-${i}-hero" list="capHeroes-${fid}" value="${esc(p.hero)}"${cell(p, 'hero')} size="10"></td>
+    const rows = g.players.map((p, i) => `<tr><td>${sideSel(`cg-${fid}-${i}-side`, p.side, cell(p, 'side'), sides, SHORT)}</td>
+      <td><input type="text" id="cg-${fid}-${i}-hero" list="capHeroes-${fid}" value="${esc(p.hero)}"${cell(p, 'hero')} size="10" placeholder="${p.hero ? '' : 'pick'}">${p.hero ? '' : chips(p, i)}</td>
       <td><select id="cg-${fid}-${i}-player"><option value="">${p.side && p.side !== g.ourSide ? '(partner)' : ''}</option>${roster.map((r) => `<option ${r === p.player ? 'selected' : ''}>${esc(r)}</option>`).join('')}<option value="stand-in" ${p.player === 'stand-in' ? 'selected' : ''}>stand-in</option></select></td>
       ${defs.map((d) => `<td><input type="number" inputmode="${d.decimal ? 'decimal' : 'numeric'}" step="${d.decimal ? '0.1' : '1'}" min="0" id="cg-${fid}-${i}-${d.key}" value="${p.stats[d.key] ?? ''}"${cell(p, d.key)}></td>`).join('')}
       <td><input type="text" id="cg-${fid}-${i}-name" value="${esc(p.nameSeen)}"${cell(p, 'name')} size="10"></td></tr>`).join('');
     const dr = pend.draft;
     const draftHtml = dr ? `<div class="h3">Draft</div>${dr.issues.length ? banner('synth', `<div><ul class="plain">${dr.issues.map((i) => `<li>${esc(i.text)}</li>`).join('')}</ul></div>`) : ''}
       <label class="field" for="cd-${fid}-first">First pick${sideSel(`cd-${fid}-first`, dr.firstPick)}</label>
-      <div class="tw"><table class="capdraft"><thead><tr><th class="n">#</th><th>Team</th><th>Action</th><th>Hero</th></tr></thead><tbody>${dr.actions.map((a, i) => `<tr><td class="n">${a.order}</td><td>${sideSel(`cd-${fid}-${i}-side`, a.side)}</td><td><select id="cd-${fid}-${i}-action"><option ${a.action === 'pick' ? 'selected' : ''}>pick</option><option ${a.action === 'ban' ? 'selected' : ''}>ban</option></select></td><td><input type="text" id="cd-${fid}-${i}-hero" list="capHeroes-${fid}" value="${esc(a.hero)}"${a.flags.length ? ` class="flag" title="${esc(a.flags.map((f) => f.reason).join('; '))}" aria-invalid="true"` : ''}></td></tr>`).join('')}</tbody></table></div>
+      <div class="tw"><table class="capdraft"><thead><tr><th class="n">#</th><th>Team</th><th>Action</th><th>Hero</th></tr></thead><tbody>${dr.actions.map((a, i) => `<tr><td class="n">${a.order}</td><td>${sideSel(`cd-${fid}-${i}-side`, a.side, '', sides, SHORT)}</td><td><select id="cd-${fid}-${i}-action"><option ${a.action === 'pick' ? 'selected' : ''}>pick</option><option ${a.action === 'ban' ? 'selected' : ''}>ban</option></select></td><td><input type="text" id="cd-${fid}-${i}-hero" list="capHeroes-${fid}" value="${esc(a.hero)}" placeholder="${a.hero ? '' : esc(a.candidates.slice(0, 2).join(' / ') || 'pick')}"${a.flags.length ? ` class="flag" title="${esc(a.flags.map((f) => f.reason).join('; '))}" aria-invalid="true"` : ''}></td></tr>`).join('')}</tbody></table></div>
       <p class="note">Clear a hero to drop a row you cannot read.</p>` : '';
+    const names = Object.entries(g.teamNames || {}).filter(([, v]) => v);
     return `<div class="capedit" role="group" aria-label="Check the game">
+      ${pend.fix ? banner('synth', `<div><b>Fixing game ${pend.fix.gameNo} of the report vs ${esc(pend.fix.partner)} (${esc(pend.fix.date)}).</b> The old version is kept in the history; the report gets a correction note.</div>`) : ''}
       ${iss}${dl}
+      ${names.length ? `<p class="note">Teams on screen: ${names.map(([k, v]) => `${esc(SIDE_LABEL[k])}: ${esc(v)}`).join(' · ')}</p>` : ''}
       <div class="form">
-        <label class="field" for="cg-${fid}-our">Our side${sideSel(`cg-${fid}-our`, g.ourSide)}</label>
+        <label class="field" for="cg-${fid}-our">Our team${sideSel(`cg-${fid}-our`, g.ourSide)}</label>
         <label class="field" for="cg-${fid}-result">Result<select id="cg-${fid}-result"><option value=""></option><option value="win" ${g.result === 'win' ? 'selected' : ''}>Win</option><option value="loss" ${g.result === 'loss' ? 'selected' : ''}>Loss</option></select></label>
         <label class="field" for="cg-${fid}-dur">Duration (mm:ss)<input type="text" inputmode="numeric" id="cg-${fid}-dur" value="${g.durationS == null ? '' : esc(durationText(g.durationS))}" placeholder="18:42"></label>
+        ${game === 'mlbb' ? `<label class="field" for="cg-${fid}-map">Our map side (optional)${sideSel(`cg-${fid}-map`, g.mapSide, '', MAP_SIDES.mlbb)}</label>` : ''}
         ${game === 'dota' ? `<label class="field" for="cg-${fid}-mid">Match ID (optional)<input type="text" inputmode="numeric" id="cg-${fid}-mid" value="${esc(pend.matchId || '')}"></label>` : ''}
       </div>
+      ${game === 'mlbb' ? '<p class="note">The MLBB result screen does not show which base (blue or red) a team played; set it from the draft or your notes, or leave it empty. Blue/red splits on the Patterns tab use only games where it is set.</p>' : ''}
+      ${heroBlank ? `<p class="note"><b>${heroBlank} hero${heroBlank > 1 ? 'es' : ''} to pick.</b> Hero portraits are often skins, so the AI fills only heroes it is sure of. Tap a suggestion under the box (the AI's guesses, earlier corrections and the player's usual heroes) or type the name.${ai() && !dr ? ' A draft screenshot fills them too.' : ''}</p>` : ''}
       <div class="tw"><table class="capgrid"><thead><tr><th>Team</th><th>Hero</th><th>Our player</th>${defs.map((d) => `<th class="n">${esc(d.label)}</th>`).join('')}<th>Name on screen</th></tr></thead><tbody>${rows}</tbody></table></div>
       <p class="note">Highlighted cells are ones the AI was unsure of or that failed a check: hover or tap for the reason. Empty = not shown on the screen. On a phone, swipe the table sideways for the numbers.</p>
       ${draftHtml}
-      <div class="toolbar">${block ? '' : `<button class="btn primary" type="button" data-cap-confirm="${esc(title)}">Confirm game</button>`}
-        ${ai() && !dr ? `<label class="btn filebtn">Add draft screenshot<input type="file" accept="image/*" data-cap-draft="${esc(title)}" hidden></label>` : ''}
-        <button class="btn" type="button" data-cap-discard="${esc(title)}">Discard</button><span class="msg" id="capMsg-${fid}" role="status"></span></div></div>`;
+      <div class="toolbar">${block ? '' : `<button class="btn primary" type="button" data-cap-confirm="${esc(title)}">${pend.fix ? 'Save the fix' : 'Confirm game'}</button>`}
+        ${ai() && !block && !pend.fix ? `<label class="btn filebtn">Add another screenshot of this game<input type="file" accept="image/*" data-cap-more="${esc(title)}" hidden></label>` : ''}
+        ${ai() && !dr && !block ? `<label class="btn filebtn">Add draft screenshot<input type="file" accept="image/*" data-cap-draft="${esc(title)}" hidden></label>` : ''}
+        <button class="btn" type="button" data-cap-discard="${esc(title)}">${pend.fix ? 'Cancel' : 'Discard'}</button><span class="msg" id="capMsg-${fid}" role="status"></span></div>
+      ${ai() && !block && !pend.fix ? `<p class="note">${game === 'dota' ? 'Dota spreads a game over two screens: add the Scoreboard tab to the Overview (or the other way round) with "Add another screenshot".' : 'The Data tab adds hero damage, damage taken and turret damage: "Add another screenshot".'}</p>` : ''}</div>`;
   }
   function readEditor(title, fid, pend) {
     const game = gameOf(title); const defs = STAT_DEFS[game];
     const edited = JSON.parse(JSON.stringify(pend.base));
     edited.ourSide = val(`cg-${fid}-our`); edited.result = val(`cg-${fid}-result`); edited.durationS = parseDuration(val(`cg-${fid}-dur`));
+    edited.mapSide = game === 'mlbb' ? val(`cg-${fid}-map`) : edited.ourSide;
     edited.players = edited.players.map((p, i) => ({ ...p, side: val(`cg-${fid}-${i}-side`), nameSeen: val(`cg-${fid}-${i}-name`).trim(), player: val(`cg-${fid}-${i}-player`), hero: val(`cg-${fid}-${i}-hero`).trim(),
       stats: Object.fromEntries(defs.map((d) => [d.key, val(`cg-${fid}-${i}-${d.key}`)])) }));
     let draft = null;
     if (pend.draft) draft = { firstPick: val(`cd-${fid}-first`), actions: pend.draft.actions.map((a, i) => ({ order: a.order, side: val(`cd-${fid}-${i}-side`), action: val(`cd-${fid}-${i}-action`), hero: val(`cd-${fid}-${i}-hero`).trim() })).filter((a) => a.hero) };
     return { edited, draft, matchId: game === 'dota' ? val(`cg-${fid}-mid`) : '' };
+  }
+  // Keep what was typed on the check screen when it is redrawn with new data (second screenshot, draft).
+  function syncPending(title, fid) {
+    const s = st(fid); if (!s.pending || !document.getElementById(`cg-${fid}-our`)) return;
+    let r; try { r = readEditor(title, fid, s.pending); } catch { r = null; }   // a half-typed duration: keep the earlier values
+    if (!r) return;
+    const num = (v) => (v === '' || v == null || !Number.isFinite(Number(v)) ? null : Number(v));   // empty box = "not shown", not a value
+    r.edited.players.forEach((p, i) => { p.stats = Object.fromEntries(Object.entries(p.stats).map(([k, v]) => [k, num(v)])); p.flags = s.pending.base.players[i]?.flags || []; });
+    s.pending.base = { ...s.pending.base, ...r.edited, issues: s.pending.base.issues }; s.pending.matchId = r.matchId;
+  }
+
+  // One line for the report's correction note: what changed between two versions of a game.
+  function describeFix(a, b) {
+    const out = [];
+    if (a.result !== b.result) out.push(`result ${a.result} → ${b.result}`);
+    if (a.durationS !== b.durationS) out.push(`duration ${durationText(a.durationS)} → ${durationText(b.durationS)}`);
+    if ((a.mapSide || '') !== (b.mapSide || '')) out.push(`map side ${a.mapSide || '—'} → ${b.mapSide || '—'}`);
+    b.players.forEach((p, i) => { const q = a.players[i]; if (!q) return; const who = p.player || p.nameSeen || `row ${i + 1}`;
+      if (q.hero !== p.hero) out.push(`${who} hero ${q.hero || '—'} → ${p.hero || '—'}`);
+      if (q.player !== p.player) out.push(`row ${i + 1} player ${q.player || '—'} → ${p.player || '—'}`);
+      for (const [k, v] of Object.entries(p.stats)) if (q.stats[k] !== v) out.push(`${who} ${k} ${q.stats[k] ?? '—'} → ${v ?? '—'}`); });
+    return out.length ? out.slice(0, 8).join('; ') + (out.length > 8 ? `; +${out.length - 8} more` : '') : 'no value changed';
+  }
+  // Under a saved report: its games, each with a Fix button.
+  function reportGames(r) {
+    if (!gameOf(r.title)) return '';
+    const gs = gamesOf(r.title).filter((g) => g.reportId === r.id).sort((a, b) => a.gameNo - b.gameNo);
+    if (!gs.length) return '';
+    const fixed = S.games.filter((g) => g.reportId === r.id && g.supersedes).length;
+    return `<div class="tw"><table class="repgames"><thead><tr><th>Game</th><th>Result</th><th>Time</th><th>Our heroes (K/D/A)</th>${S.mode === 'demo' ? '' : '<th></th>'}</tr></thead><tbody>${gs.map((g) => `<tr><td>${g.gameNo}${g.mapSide ? ` <span class="note">${esc(g.mapSide)}</span>` : ''}</td><td>${g.result === 'win' ? 'W' : 'L'}</td><td>${esc(durationText(g.durationS))}</td><td>${g.players.filter((p) => p.team === 'ours').map((p) => `${esc(p.hero)} <span class="note">${p.stats.kills}/${p.stats.deaths}/${p.stats.assists}</span>`).join(', ')}</td>${S.mode === 'demo' ? '' : `<td><button type="button" class="linkbtn" data-cap-fix="${esc(`${g.title}|${g.id}`)}">Fix</button></td>`}</tr>`).join('')}</tbody></table></div>${fixed ? `<p class="note">${fixed} game version(s) corrected; earlier versions are kept in the history.</p>` : ''}`;
   }
 
   // ---------------------------------------------------------------- debrief dump
@@ -127,11 +179,9 @@ export function captureUi(ctx) {
     s.savedFor = { id: report.id, date: report.date, partner: report.partner, by: report.by, partnerLabel: report.partner }; s.savedIds ||= []; keep(fid);
     const saved = s.ready.map((g, i) => ({ ...g, reportId: report.id, date: report.date, partner: report.partner, gameNo: i + 1, by: report.by }));
     for (const g of saved) {
-      if (!s.savedIds.includes(g.id)) { if (S.db) await S.db.collection('scrim_games').doc(g.id).set(g); else S.games.push(g); s.savedIds.push(g.id); keep(fid); }
-      for (const cid of g.captureIds || []) {
-        const c = S.captures[cid];
-        if (c && S.db) { try { await S.db.collection('scrim_captures').doc(cid).set({ ...c, status: 'confirmed', gameId: g.id, confirmedAt: new Date().toISOString() }); } catch { /* the game is saved; the capture status is bookkeeping */ } }
-      }
+      // A screenshot counts as confirmed once a saved game lists it (captureIds): no second write that
+      // could fail on a stale copy.
+      if (!s.savedIds.includes(g.id)) { await put('scrim_games', g); s.savedIds.push(g.id); keep(fid); }
     }
     let al = aliasesOf(title); for (const g of saved) al = learnAliases(al, g);
     if (JSON.stringify(al) !== JSON.stringify(aliasesOf(title))) {
@@ -219,30 +269,49 @@ export function captureUi(ctx) {
   // Today / reports overview: screenshots read but not yet confirmed (older than an hour).
   function waitingCount(title) {
     const hour = Date.now() - 3600_000;
-    return Object.values(S.captures).filter((c) => c.title === title && c.status === 'extracted' && Date.parse(c.createdAt) < hour).length;
+    const used = new Set(S.games.flatMap((g) => g.captureIds || []));
+    const open = new Set(Object.values(S.cap).flatMap((x) => [...(x.pending?.captureIds || []), ...x.ready.flatMap((g) => g.captureIds || [])]));
+    return Object.entries(S.captures).filter(([id, c]) => c.title === title && !used.has(id) && !open.has(id) && Date.parse(c.createdAt) < hour).length;
   }
 
   // ---------------------------------------------------------------- events
   async function onChange(e) {
     const t = e.target;
     if (t.dataset?.patPeriod) { S.patPeriod[t.dataset.patPeriod] = t.value; render(); return true; }
-    const shot = t.dataset?.capShot; const drft = t.dataset?.capDraft;
-    if (!shot && !drft) return false;
-    const title = shot || drft; const fid = sid(title); const file = t.files?.[0]; if (!file) return true;
+    const shot = t.dataset?.capShot; const drft = t.dataset?.capDraft; const more = t.dataset?.capMore;
+    if (!shot && !drft && !more) return false;
+    const title = shot || drft || more; const fid = sid(title); const file = t.files?.[0]; if (!file) return true;
+    const heroes = heroesFor(title);
     try {
+      syncPending(title, fid);
       setMsg(`capMsg-${fid}`, drft ? 'Reading the draft… (10–20 s)' : 'Reading the screenshot… (10–20 s)');
       const image = await prepImage(file);
       const out = await ai().call({ action: drft ? 'draft' : 'scoreboard', title, day: val(`rp-${fid}-date`) || localToday(), image });
       const s = st(fid);
       if (drft) {
         if (!s.pending) return true;
-        s.pending.draft = proposeDraft({ title, raw: out.raw, heroes: heroesFor(title) });
+        const d = proposeDraft({ title, raw: out.raw, heroes });
+        if (d.issues.some((i) => i.level === 'block')) { keep(fid); render(); setMsg(`capMsg-${fid}`, d.issues[0].text, 'err'); return true; }
+        s.pending.draft = d; s.pending.captureIds = [...(s.pending.captureIds || []), out.captureId];
+        s.pending.base = heroesFromDraft(s.pending.base, d, heroes);
+        if (s.pending.ai) s.pending.ai = heroesFromDraft(s.pending.ai, d, heroes);
+      } else if (more) {
+        if (!s.pending) return true;
+        const b = proposeGame({ title, raw: out.raw, roster: rosterOf(title), aliases: aliasesOf(title), heroes });
+        if (b.issues.some((i) => i.level === 'block')) { keep(fid); render(); setMsg(`capMsg-${fid}`, b.issues[0].text, 'err'); return true; }
+        const m = mergeGames(s.pending.base, b);
+        s.pending.base = { ...m.game, issues: m.game.issues };
+        if (s.pending.ai) s.pending.ai = mergeGames(s.pending.ai, b).game;
         s.pending.captureIds = [...(s.pending.captureIds || []), out.captureId];
-        if (s.pending.draft.issues.some((i) => i.level === 'block')) { const msg = s.pending.draft.issues[0].text; s.pending.draft = null; keep(fid); render(); setMsg(`capMsg-${fid}`, msg, 'err'); return true; }
       } else {
-        s.pending = { base: proposeGame({ title, raw: out.raw, roster: rosterOf(title), aliases: aliasesOf(title), heroes: heroesFor(title) }), captureIds: [out.captureId], draft: null, fromScreenshot: true };
+        const p = proposeGame({ title, raw: out.raw, roster: rosterOf(title), aliases: aliasesOf(title), heroes });
+        // The same game twice (already added, or already saved)?
+        const dup = findDuplicate(p, [...s.ready, ...gamesOf(title).filter((g) => g.date === (val(`rp-${fid}-date`) || localToday()))]);
+        if (dup) p.issues.unshift({ level: 'check', text: `This looks like a game already added (${dup}): same kill score and duration. Discard it if it is the same game.` });
+        s.pending = { base: p, ai: JSON.parse(JSON.stringify(p)), captureIds: [out.captureId], draft: null, fromScreenshot: true };
       }
-      keep(fid); render();
+      keep(fid); S.capFresh = true; render();
+      if (more) setMsg(`capMsg-${fid}`, 'Second screenshot added: empty values filled, disagreements highlighted.', 'ok');
     } catch (err) { setMsg(`capMsg-${fid}`, err.message, 'err'); }
     finally { if (t) t.value = ''; }
     return true;
@@ -253,12 +322,39 @@ export function captureUi(ctx) {
     if (d.capManual) { const title = d.capManual; const fid = sid(title); const s = st(fid); s.pending = { base: blankGame(title, rosterOf(title), s.ready.at(-1)?.ourSide), captureIds: [], draft: null, fromScreenshot: false }; keep(fid); render(); return true; }
     if (d.capDiscard) { const fid = sid(d.capDiscard); st(fid).pending = null; keep(fid); render(); return true; }
     if (d.capRemove) { const [fid, i] = d.capRemove.split('|'); const s = st(fid); s.ready.splice(Number(i), 1); keep(fid); const r = gamesResult(s.ready); fillReport(fid, s.ready.length ? { won: String(r.won), lost: String(r.lost) } : { won: '', lost: '' }); render(); return true; }
+    if (d.capHero) {
+      const [fid, i, hero] = d.capHero.split('|'); const el = document.getElementById(`cg-${fid}-${i}-hero`);
+      if (el) { el.value = hero; el.classList.remove('flag'); el.removeAttribute('aria-invalid'); el.closest('td')?.querySelector('.herochips')?.remove(); }
+      return true;
+    }
+    if (d.capFix) {
+      const g = gamesOf(d.capFix.split('|')[0]).find((x) => x.id === d.capFix.split('|')[1]); if (!g) return true;
+      const fid = sid(g.title); const s = st(fid);
+      if (s.pending) { setMsg(`capMsg-${fid}`, 'Finish or discard the game you are checking first, then press Fix again.', 'err'); document.getElementById(`capMsg-${fid}`)?.scrollIntoView?.({ block: 'center' }); return true; }
+      s.pending = { base: gameToProposal(g), captureIds: [], draft: null, fromScreenshot: false, fix: { gameId: g.id, reportId: g.reportId, date: g.date, partner: g.partner, gameNo: g.gameNo, by: g.by } };
+      keep(fid); render();
+      document.getElementById(`cg-${fid}-our`)?.closest('.capedit')?.scrollIntoView?.({ block: 'start' });
+      return true;
+    }
     if (d.capConfirm) {
       const title = d.capConfirm; const fid = sid(title); const s = st(fid); if (!s.pending) return true;
       try {
         const { edited, draft, matchId } = readEditor(title, fid, s.pending);
-        const rec = confirmGame(edited, { date: val(`rp-${fid}-date`) || localToday(), partner: val(`rp-${fid}-partner`), gameNo: s.ready.length + 1, by: val(`rp-${fid}-by`) || meName(),
-          base: s.pending.fromScreenshot ? s.pending.base : null, captureIds: s.pending.captureIds || [], heroes: heroesFor(title), draft, externalMatchId: matchId });
+        const fx = s.pending.fix;
+        const rec = confirmGame(edited, { date: fx ? fx.date : (val(`rp-${fid}-date`) || localToday()), partner: fx ? fx.partner : val(`rp-${fid}-partner`), gameNo: fx ? fx.gameNo : s.ready.length + 1, by: fx ? fx.by : (val(`rp-${fid}-by`) || meName()),
+          base: s.pending.fromScreenshot ? (s.pending.ai || s.pending.base) : null, captureIds: s.pending.captureIds || [], heroes: heroesFor(title), draft, externalMatchId: matchId });
+        if (fx) {
+          const old = gamesOf(title).find((x) => x.id === fx.gameId);
+          rec.reportId = fx.reportId; rec.supersedes = fx.gameId; rec.fixedBy = meName() || S.me; rec.source = old?.source || rec.source; rec.captureIds = old?.captureIds || []; rec.corrections = old?.corrections || [];
+          if (old && !draft) { rec.draft = old.draft || []; rec.firstPick = old.firstPick || ''; }   // a fix of the numbers keeps the draft
+          if (old && !rec.externalMatchId) rec.externalMatchId = old.externalMatchId || '';
+          await put('scrim_games', rec);
+          const rep = S.reports.find((r) => r.id === fx.reportId);
+          const changed = old ? describeFix(old, rec) : 'values updated';
+          if (rep) { const n = ctx.reportNote(rep, { text: `Game ${fx.gameNo} corrected: ${changed}`, by: meName() || S.me }); if (S.db) await S.db.collection('scrim_reports').doc(rep.id).set(n); else Object.assign(rep, n); }
+          s.pending = null; keep(fid); render(); setMsg(`capMsg-${fid}`, `Game ${fx.gameNo} fixed (${changed}). A correction note was added to the report.`, 'ok');
+          return true;
+        }
         s.ready.push(rec); s.pending = null; keep(fid);
         const r = gamesResult(s.ready); render(); fillReport(fid, { won: String(r.won), lost: String(r.lost) });
         setMsg(`capMsg-${fid}`, `Game ${s.ready.length} confirmed (${rec.result}). Result above updated to ${r.won}-${r.lost}.`, 'ok');
@@ -291,7 +387,7 @@ export function captureUi(ctx) {
         const { kept, dropped } = checkFindings(res.raw, F, { reportIds: [...repIds] });
         const period = per === 'all' ? 'all games' : `last ${per} days`;
         const recs = kept.map((f) => findingRecord({ title, period, f, factList: F, model: res.model, by: meName() }));
-        for (const r of recs) { if (S.db) await S.db.collection('pattern_findings').doc(r.id).set(r); else S.findings.push(r); }
+        for (const r of recs) await put('pattern_findings', r);
         S.patDropped[title] = dropped; render();
         setMsg(`patRunMsg-${fid}`, kept.length ? `${kept.length} finding(s) added${dropped.length ? `, ${dropped.length} dropped by the checks` : ''}. Mark each one.` : `No finding passed the checks${dropped.length ? ` (${dropped.length} dropped)` : ''}. Nothing new to act on.`, kept.length ? 'ok' : '');
       } catch (err) { setMsg(`patRunMsg-${fid}`, err.message, 'err'); }
@@ -299,7 +395,7 @@ export function captureUi(ctx) {
     }
     if (d.patMark) {
       const [fidId, status] = d.patMark.split('|'); const x = S.findings.find((f) => f.id === fidId); if (!x) return true;
-      try { const n = markFinding(x, { status, by: meName() || S.me }); if (S.db) await S.db.collection('pattern_findings').doc(x.id).set(n); else Object.assign(x, n); render(); }
+      try { await put('pattern_findings', markFinding(x, { status, by: meName() || S.me })); render(); }
       catch (err) { setMsg(`patMsg-${fidId}`, err.message, 'err'); }
       return true;
     }
@@ -313,7 +409,7 @@ export function captureUi(ctx) {
         const obj = ctx.propose(rec, { title: x.title, by: meName() || S.me, rulesSnapshot: ctx.rulesFor(x.title) });
         await ctx.saveObj(obj);
         const n = markFinding(x, { status: 'promoted', by: meName() || S.me, promotedTo: obj.id });
-        if (S.db) await S.db.collection('pattern_findings').doc(x.id).set(n); else Object.assign(x, n);
+        await put('pattern_findings', n);
         render(); setMsg(`patMsg-${x.id}`, `Sent to ${ctx.owner(x.title).name} for review.`, 'ok');
       } catch (err) { setMsg(`patMsg-${x.id}`, err.message, 'err'); }
       return true;
@@ -330,5 +426,5 @@ export function captureUi(ctx) {
     db.collection('player_aliases').onSnapshot((snap) => { S.aliases = Object.fromEntries(snap.docs.map((x) => x.data()).filter((x) => x?.origin === 'operational' && x.title).map((x) => [x.title, x])); }, () => {});
   }
 
-  return { gamesSection, debriefSection, beforeSave, afterSave, patternsPage, trailPanel, goalStatNote, goalStatFields, standInLine, waitingCount, onChange, onClick, subscribe };
+  return { gamesSection, reportGames, debriefSection, beforeSave, afterSave, patternsPage, trailPanel, goalStatNote, goalStatFields, standInLine, waitingCount, onChange, onClick, subscribe };
 }

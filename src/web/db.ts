@@ -42,15 +42,19 @@ export function friendlyError(e: { code?: string; message?: string } | null | un
   const err = new Error(text) as Error & { code: string }; err.code = code; return err;
 }
 
-async function selectAll(client: SupabaseClient, table: string, cols: string) {
+async function selectAll(client: SupabaseClient, table: string, cols: string, since = '') {
   const out: Doc[] = [];
   for (let from = 0; ; from += PAGE) {
-    const { data, error } = await client.from(table).select(cols).order('created_at', { ascending: true }).range(from, from + PAGE - 1);
+    let q = client.from(table).select(cols);
+    if (since) q = q.gte('updated_at', since);
+    const { data, error } = await q.order('created_at', { ascending: true }).range(from, from + PAGE - 1);
     if (error) throw error;
     out.push(...((data || []) as unknown as Doc[]));
     if (!data || data.length < PAGE) return out;
   }
 }
+
+const INCREMENTAL = new Set(['scrim_games', 'scrim_captures', 'pattern_findings']);
 
 export function createHubDb(client: SupabaseClient, opts: HubDbOptions) {
   const names = opts.names || {};
@@ -63,13 +67,14 @@ export function createHubDb(client: SupabaseClient, opts: HubDbOptions) {
   let seq = 0;
 
   // One subscription per table, shared by every listener on it.
-  function watch(tables: string[], reload: () => void): () => void {
-    let timer: ReturnType<typeof setTimeout> | null = null;
-    const kick = () => { if (timer) clearTimeout(timer); timer = setTimeout(reload, wait); };
+  function watch(tables: string[], reload: (full?: boolean) => void): () => void {
+    let timer: ReturnType<typeof setTimeout> | null = null; let full = false;
+    const go = (f: boolean) => { full = full || f; if (timer) clearTimeout(timer); timer = setTimeout(() => { const x = full; full = false; reload(x); }, wait); };
+    const kick = () => go(false);
     const ch: RealtimeChannel = client.channel(`hub-${tables.join('-')}-${++seq}`);
     for (const t of tables) ch.on('postgres_changes' as never, { event: '*', schema: 'public', table: t } as never, kick as never);
     ch.subscribe();
-    const onFocus = () => kick();
+    const onFocus = () => go(true);
     if (typeof window !== 'undefined') { window.addEventListener('focus', onFocus); window.addEventListener('online', onFocus); }
     return () => { if (timer) clearTimeout(timer); client.removeChannel(ch); if (typeof window !== 'undefined') { window.removeEventListener('focus', onFocus); window.removeEventListener('online', onFocus); } };
   }
@@ -91,11 +96,23 @@ export function createHubDb(client: SupabaseClient, opts: HubDbOptions) {
       }),
     };
   }
-  async function loadTable(table: string): Promise<QuerySnap> {
-    const rows = await selectAll(client, table, 'id, data, updated_at');
-    for (const r of rows) versions.set(`${table}:${r.id}`, String(r.updated_at));
+  // V1.13: tables that only grow (scrim games, screenshots, findings) are fetched in full once, then only
+  // the rows changed since the newest one seen; every live update otherwise re-downloaded every game
+  // (~3 KB each, ~1,000 games by WEC) to every open browser. A full reload still runs when the window
+  // regains focus, so an admin's delete is picked up.
+  const cache = new Map<string, { rows: Map<string, Doc>; newest: string }>();
+  async function loadTable(table: string, full = true): Promise<QuerySnap> {
+    const c = cache.get(table);
+    // 5 s overlap: a save that committed a moment after a later-stamped one is not missed.
+    const since = !full && c && c.newest ? new Date(Date.parse(c.newest) - 5000).toISOString() : '';
+    const rows = await selectAll(client, table, 'id, data, updated_at', since);
+    const keep = !full && c ? c.rows : new Map<string, Doc>();
+    let newest = !full && c ? c.newest : '';
+    for (const r of rows) { keep.set(String(r.id), r); versions.set(`${table}:${r.id}`, String(r.updated_at)); if (String(r.updated_at) > newest) newest = String(r.updated_at); }
+    if (INCREMENTAL.has(table)) cache.set(table, { rows: keep, newest });
     loaded.add(table);
-    return { docs: rows.map((r) => ({ id: String(r.id), exists: true, data: () => r.data as Doc })) };
+    const all = [...keep.values()].sort((a, b) => String(a.updated_at).localeCompare(String(b.updated_at)));
+    return { docs: all.map((r) => ({ id: String(r.id), exists: true, data: () => r.data as Doc })) };
   }
 
   async function writeReport(id: string, data: Doc) {
@@ -186,7 +203,7 @@ export function createHubDb(client: SupabaseClient, opts: HubDbOptions) {
     const table = TABLES[name];
     if (!table) throw new Error(`Unknown collection: ${name}`);
     const denied = WELLBEING.has(name) && !opts.canWellbeing;
-    const load = name === 'scrim_reports' ? loadReports : () => loadTable(table);
+    const load = name === 'scrim_reports' ? loadReports : (full = true) => loadTable(table, full);
     const set = (id: string, d: Doc) => (denied ? Promise.reject(friendlyError({ code: '42501', message: 'permission denied' })) : name === 'scrim_reports' ? writeReport(id, d) : writeRow(table, id, d));
     return {
       doc: (id: string) => ({ set: (d: Doc) => set(id, d) }),
@@ -194,7 +211,7 @@ export function createHubDb(client: SupabaseClient, opts: HubDbOptions) {
       onSnapshot(next: Next<QuerySnap>, fail?: Fail) {
         // Wellbeing is refused up front for people without access (the database would also return nothing).
         if (denied) { setTimeout(() => fail?.({ code: 'permission_denied', message: 'Wellbeing records are limited to the readiness owner and admins.' }), 0); return () => {}; }
-        const run = async () => { try { next(await load()); } catch (e) { fail?.(friendlyError(e as Doc, 'read')); } };
+        const run = async (full = true) => { try { next(await load(full)); } catch (e) { fail?.(friendlyError(e as Doc, 'read')); } };
         run();
         return watch(name === 'scrim_reports' ? ['scrim_reports', 'scrim_report_corrections'] : [table], run);
       },
