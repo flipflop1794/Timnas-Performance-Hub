@@ -36,3 +36,6 @@
 
 17. Balance review (7 Nov 2026) re-checked the engines' statistics; it did not re-validate the thresholds themselves (rule-of-thumb load ratio 1.5, wellness 1 SD, 5-game pattern bar) against Indonesian team data. Revisit after the first two pelatnas weeks.
 18. The role-by-role website sweep was last run in Chrome for the V1.13 flows; the full 58-screen sweep this time ran on the artifact build (one role, demo data).
+19. Prompt caching only helps when screenshots follow each other within 5 minutes (the cache lifetime); a lone call costs 25% more on its cached part. Check the cache share on the admin page after the first pelatnas week.
+20. AI cost on the admin page uses a price table in `src/core/ai_cost.js` (Sonnet 5.5, read 7 Nov 2026); a new model or price needs that file updated.
+21. Rival rosters were last read on wec.iesf.org on 3 Nov; this workspace could not reach the site on 7 Nov.

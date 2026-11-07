@@ -15,6 +15,13 @@ import {
 } from './scrim_spec.js';
 
 const ACTIONS = ['scoreboard', 'draft', 'debrief', 'digest'];
+export const RETRIES = 2;
+const RETRYABLE = [429, 500, 502, 503, 504, 529];
+export function backoff(attempt, retryAfter) {
+  const ra = Number(retryAfter);
+  if (Number.isFinite(ra) && ra > 0) return Math.min(8000, ra * 1000);
+  return attempt === 1 ? 1000 : 3000;
+}
 const json = (status, body) => ({ status, body });
 const fail = (status, error) => json(status, { error });
 
@@ -77,9 +84,10 @@ export async function handle(req, deps) {
       request = messagesRequest({ model, system: debriefPrompt(title, roster), schema: debriefSchema(), maxTokens: 2048, content: [{ type: 'text', text }] });
     } else {
       const facts = (Array.isArray(body.facts) ? body.facts : []).slice(0, LIMITS.digestFacts);
+      const feedback = (Array.isArray(body.feedback) ? body.feedback : []).slice(0, LIMITS.digestFeedback);
       const excerpts = (Array.isArray(body.excerpts) ? body.excerpts : []).slice(0, LIMITS.digestExcerpts);
       if (!facts.length) return fail(400, 'No confirmed games yet: nothing to look for patterns in.');
-      const payload = JSON.stringify({ FACTS: facts, EXCERPTS: excerpts });
+      const payload = JSON.stringify({ FACTS: facts, EXCERPTS: excerpts, FEEDBACK: feedback });
       if (payload.length > 120000) return fail(413, 'Too much data for one digest. Pick a shorter period.');
       request = messagesRequest({ model, system: digestPrompt(title), schema: digestSchema(), maxTokens: 3000, content: [{ type: 'text', text: payload }] });
     }
@@ -95,21 +103,35 @@ export async function handle(req, deps) {
     if (up.error) return fail(403, `The screenshot could not be stored (${up.error.message}).`);
   }
 
-  let resp; let raw; let errText = '';
+  let resp; let raw; let errText = ''; let attempts = 0;
+  const sleep = deps.sleep || ((ms) => new Promise((r) => setTimeout(r, ms)));
   try {
     const base = (deps.env.ANTHROPIC_BASE_URL || 'https://api.anthropic.com').replace(/\/+$/, '');
-    const r = await deps.fetch(`${base}/v1/messages`, {
-      method: 'POST',
-      headers: { 'content-type': 'application/json', 'x-api-key': deps.env.ANTHROPIC_API_KEY, 'anthropic-version': '2023-06-01' },
-      body: JSON.stringify(request),
-    });
-    resp = await r.json();
-    if (!r.ok) throw new Error(r.status === 429 || r.status === 529 ? 'The AI service is busy. Try again in a minute.' : `The AI service returned an error: ${resp?.error?.message || r.status}.`);
+    // Busy or passing server errors are retried twice (about 1 s, then 3 s; the service's retry-after is
+    // followed up to 8 s) so a coach at the pelatnas does not have to press again.
+    for (;;) {
+      attempts++;
+      let r;
+      try {
+        r = await deps.fetch(`${base}/v1/messages`, {
+          method: 'POST',
+          headers: { 'content-type': 'application/json', 'x-api-key': deps.env.ANTHROPIC_API_KEY, 'anthropic-version': '2023-06-01' },
+          body: JSON.stringify(request),
+        });
+      } catch (netErr) {
+        if (attempts <= RETRIES) { await sleep(backoff(attempts, null)); continue; }
+        throw new Error('The AI service could not be reached. Check the connection and try again.');
+      }
+      resp = await r.json().catch(() => null);
+      if (!r.ok && RETRYABLE.includes(r.status) && attempts <= RETRIES) { await sleep(backoff(attempts, r.headers?.get?.('retry-after'))); continue; }
+      if (!r.ok) throw new Error(r.status === 429 || r.status === 529 ? 'The AI service is busy. Try again in a minute.' : `The AI service returned an error: ${resp?.error?.message || r.status}.`);
+      break;
+    }
     raw = parseModelJson(resp);
   } catch (e) { errText = e.message || 'AI call failed.'; }
 
   const u = usageOf(resp);
-  await db.from('ai_usage').insert({ title, action, model, input_tokens: u.input_tokens, output_tokens: u.output_tokens, ok: !errText, error: errText.slice(0, 300) });
+  await db.from('ai_usage').insert({ title, action, model, input_tokens: u.input_tokens, output_tokens: u.output_tokens, cache_read_tokens: u.cache_read_tokens, cache_write_tokens: u.cache_write_tokens, attempts, ok: !errText, error: errText.slice(0, 300) });
   if (errText) return fail(502, `${errText} You can enter the values by hand.`);
 
   if (bytes) {

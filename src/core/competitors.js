@@ -91,16 +91,22 @@ export function crossTitle(data = {}, { includeEfootballUnscouted = false } = {}
   return rows;
 }
 
-// Scouting coverage per title and the next nations to scout: unscouted first, multi-title nations first
-// (one scouting effort serves several title coaches), then tier.
-export function coverage(data = {}) {
+// Scouting coverage per title and the next nations to scout. Order: unscouted before stale (newest note
+// older than STALE_DAYS); within each, the staff's tier first (an unscouted main threat beats a
+// three-title "watch"), then multi-title nations (one effort serves several title coaches).
+export const STALE_DAYS = 21;
+export function coverage(data = {}, asOf = localDay()) {
   return TITLE_ORDER.map((title) => {
     const field = FIELDS[title] || [];
     const ps = field.map((n) => ({ nation: n, ...nationProfile(n, data).per.find((x) => x.title === title) }));
     const noted = ps.filter((x) => x.notes.length).length;
     const tiered = ps.filter((x) => x.tier !== 'not assessed').length;
     const vodRev = ps.filter((x) => x.vodsReviewed).length;
-    const next = ps.filter((x) => !x.notes.length).sort((a, b) => titleCount(b.nation) - titleCount(a.nation) || TIERS.indexOf(a.tier) - TIERS.indexOf(b.tier) || a.nation.localeCompare(b.nation)).slice(0, 3).map((x) => x.nation);
-    return { title, field: field.length, noted, tiered, vodRev, next };
+    const ageOf = (x) => (x.updated ? Math.round((Date.parse(asOf) - Date.parse(x.updated)) / 86400000) : Infinity);
+    const stale = ps.filter((x) => x.notes.length && ageOf(x) > STALE_DAYS);
+    const rank = (x) => (TIERS.indexOf(x.tier) === 3 ? 2.5 : TIERS.indexOf(x.tier)); // not assessed sits between watch and below
+    const by = (a, b) => rank(a) - rank(b) || titleCount(b.nation) - titleCount(a.nation) || a.nation.localeCompare(b.nation);
+    const next = [...ps.filter((x) => !x.notes.length).sort(by), ...stale.sort(by)].slice(0, 3).map((x) => x.nation);
+    return { title, field: field.length, noted, tiered, vodRev, stale: stale.map((x) => x.nation), next };
   });
 }

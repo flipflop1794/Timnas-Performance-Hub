@@ -146,3 +146,12 @@ test('title coach lands on his own scrim reports; Head Coach sees all seven game
   for (const t of ['Dota 2', 'PUBG Mobile', 'MLBB', 'MLBB Women', 'eFootball', 'CS2', 'CS2 Women']) assert.match(fayad.nav(), new RegExp(t));
   await indra.go('reports-all'); assert.doesNotMatch(indra.text(), /PUBG Mobile/);
 });
+
+test('admin page: AI use this month with an estimated cost', async () => {
+  const B = world();
+  const at = new Date().toISOString();
+  B.tables.ai_usage = [{ id: 1, at, user_id: 'u-indra', title: 'MLBB', action: 'scoreboard', model: 'claude-sonnet-5-5', input_tokens: 1600, output_tokens: 900, cache_read_tokens: 2000, cache_write_tokens: 0, attempts: 1, ok: true }];
+  const aufa = await open(B, 'aufa', 'admin-users');
+  for (let i = 0; i < 40 && !/AI use this month/.test(aufa.text()); i++) await sleep(50);
+  assert.match(aufa.text(), /AI use this month/); assert.match(aufa.text(), /Game screenshots1—\$0\.012/);
+});

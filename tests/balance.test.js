@@ -56,3 +56,34 @@ test('PUBGM: one early exit in two matches is not a survival finding', async () 
   const f = perfFindings(rows, 'INA', sc);
   assert.ok(!f.some((x) => x.tags.includes('early-exit') || x.tags.includes('zone34')));
 });
+
+test('findings the staff marked known or wrong are not raised again until 5 more games back them', async () => {
+  const { checkFindings, digestPayload } = await import('../src/core/patterns.js');
+  const fact = (n) => ({ id: 'side:left', group: 'side', label: 'Games on the left', n, won: 4, lost: n - 4, winRate: Math.round(400 / n), lowSample: false, games: [] });
+  const raw = { findings: [{ kind: 'problem', claim: `We lose on the left: 4 of ${8} won.`, why_it_matters: 'Practise left-side starts.', fact_ids: ['side:left'] }] };
+  const earlier = [{ title: 'MLBB', kind: 'problem', factIds: ['side:left'], facts: [{ id: 'side:left', n: 8 }], status: 'wrong', statusBy: 'Indra', statusAt: '2026-11-06T10:00:00Z', claim: 'old' }];
+  const r1 = checkFindings(raw, [fact(8)], { earlier });
+  assert.equal(r1.kept.length, 0); assert.match(r1.dropped[0].why, /already marked wrong by Indra/);
+  // Five more games: the same reading may come back.
+  const raw13 = { findings: [{ ...raw.findings[0], claim: 'We lose on the left: 4 of 13 won.' }] };
+  assert.equal(checkFindings(raw13, [fact(13)], { earlier }).kept.length, 1);
+  // A finding marked useful is never blocked, and the marks go to the AI.
+  assert.equal(checkFindings(raw, [fact(8)], { earlier: [{ ...earlier[0], status: 'useful' }] }).kept.length, 1);
+  assert.equal(digestPayload([fact(8)], [], { earlier }).feedback[0].status, 'wrong');
+});
+
+test('AI cost estimate: cache reads priced at a tenth or less, unknown models not guessed', async () => {
+  const { usageSummary, callCost } = await import('../src/core/ai_cost.js');
+  const m = 'claude-sonnet-5-5';
+  // First screenshot writes the cache, the second reads it.
+  const rows = [
+    { model: m, action: 'scoreboard', title: 'MLBB', ok: true, input_tokens: 1600, output_tokens: 900, cache_write_tokens: 2000, cache_read_tokens: 0 },
+    { model: m, action: 'scoreboard', title: 'MLBB', ok: true, input_tokens: 1600, output_tokens: 900, cache_write_tokens: 0, cache_read_tokens: 2000 },
+    { model: 'other-model', action: 'digest', title: 'Dota 2', ok: false, input_tokens: 10, output_tokens: 0 },
+  ];
+  assert.ok(Math.abs(callCost(rows[1]) - (1600 * 2 + 900 * 10 + 2000 * 0.1) / 1e6) < 1e-12);
+  const u = usageSummary(rows);
+  assert.equal(u.total.calls, 3); assert.equal(u.total.failed, 1); assert.equal(u.total.unpriced, 1);
+  assert.ok(u.byAction.scoreboard.cost < 0.04); assert.ok(u.cacheShare > 0.2);
+  assert.ok(u.perScreenshot > 0.01 && u.perScreenshot < 0.02);
+});

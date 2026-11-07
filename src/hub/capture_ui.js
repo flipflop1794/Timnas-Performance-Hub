@@ -37,15 +37,17 @@ export function captureUi(ctx) {
   const aliasesOf = (title) => S.aliases[title]?.aliases || {};
   const gamesOf = (title) => latestGames(S.games.filter((g) => g.title === title));
 
-  // Shrink a screenshot to WebP (max 1600 px wide) before upload; fall back to the original file.
+  // Shrink a screenshot to WebP before upload: long edge at most 1568 px, the size above which the AI
+  // scales images down anyway (so no detail is lost, and upload and reading are faster). Quality 0.92
+  // keeps small digits sharp. Falls back to the original file.
   async function prepImage(file) {
     if (!/^image\//.test(file.type || '')) throw new Error('Pick an image (a screenshot).');
     let blob = file;
     try {
-      const bmp = await createImageBitmap(file); const scale = Math.min(1, 1600 / bmp.width);
+      const bmp = await createImageBitmap(file); const scale = Math.min(1, 1568 / Math.max(bmp.width, bmp.height));
       const c = document.createElement('canvas'); c.width = Math.round(bmp.width * scale); c.height = Math.round(bmp.height * scale);
       c.getContext('2d').drawImage(bmp, 0, 0, c.width, c.height);
-      const webp = await new Promise((res) => c.toBlob(res, 'image/webp', 0.85));
+      const webp = await new Promise((res) => c.toBlob(res, 'image/webp', 0.92));
       if (webp && webp.type === 'image/webp') blob = webp;
     } catch { /* browser without canvas or bitmap support: send the original */ }
     if (blob.size > LIMITS.imageBytes) throw new Error('The screenshot is over 2.5 MB. Take it again, or crop it to the scoreboard.');
@@ -382,9 +384,10 @@ export function captureUi(ctx) {
       const repIds = new Set(gs.map((g) => g.reportId));
       try {
         setMsg(`patRunMsg-${fid}`, 'Looking for patterns… (20–40 s)');
-        const pay = digestPayload(F, S.reports.filter((r) => repIds.has(r.id)));
+        const earlier = S.findings.filter((f) => f.title === title);
+        const pay = digestPayload(F, S.reports.filter((r) => repIds.has(r.id)), { earlier });
         const res = await ai().call({ action: 'digest', title, ...pay });
-        const { kept, dropped } = checkFindings(res.raw, F, { reportIds: [...repIds] });
+        const { kept, dropped } = checkFindings(res.raw, F, { reportIds: [...repIds], earlier });
         const period = per === 'all' ? 'all games' : `last ${per} days`;
         const recs = kept.map((f) => findingRecord({ title, period, f, factList: F, model: res.model, by: meName() }));
         for (const r of recs) await put('pattern_findings', r);

@@ -32,8 +32,8 @@ await step('MLBB coach: real JPEG screenshot → stored under mlbb/, read by the
   const { rows: [o] } = await db.query(`select name, owner, metadata->>'mimetype' as t from storage.objects where bucket_id = 'scrim-captures'`);
   assert.equal(o.name, `mlbb/2026-11-16/${r.data.captureId}.jpg`); assert.equal(o.owner, indra.u.id); assert.equal(o.t, 'image/jpeg');
   const { rows: [cap] } = await db.query('select title, created_by, data from scrim_captures where id = $1', [r.data.captureId]);
-  assert.equal(cap.title, 'MLBB'); assert.equal(cap.created_by, indra.u.id); assert.equal(cap.data.status, 'extracted'); assert.equal(cap.data.promptVersion, 'scrim-ai-2026-11-07.3');
-  const { rows: [u] } = await db.query('select user_id, action, input_tokens, ok from ai_usage'); assert.deepEqual([u.user_id, u.action, u.input_tokens, u.ok], [indra.u.id, 'scoreboard', 1800, true]);
+  assert.equal(cap.title, 'MLBB'); assert.equal(cap.created_by, indra.u.id); assert.equal(cap.data.status, 'extracted'); assert.equal(cap.data.promptVersion, 'scrim-ai-2026-11-07.4');
+  const { rows: [u] } = await db.query('select user_id, action, input_tokens, ok, attempts from ai_usage'); assert.deepEqual([u.user_id, u.action, u.input_tokens, u.ok, u.attempts], [indra.u.id, 'scoreboard', 1800, true, 1]);
   const log = readFileSync('/opt/stack/ai_log.jsonl', 'utf8').trim().split('\n').map(JSON.parse).at(-1);
   assert.equal(log.key, 'sk-local-test'); assert.equal(log.hasImage, true); assert.ok(log.schemaKeys.includes('outcome'));
 });

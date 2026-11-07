@@ -76,6 +76,9 @@ create table public.ai_usage (
   model text not null default '',
   input_tokens int not null default 0 check (input_tokens >= 0),
   output_tokens int not null default 0 check (output_tokens >= 0),
+  cache_read_tokens int not null default 0 check (cache_read_tokens >= 0),
+  cache_write_tokens int not null default 0 check (cache_write_tokens >= 0),
+  attempts int not null default 1 check (attempts between 1 and 5),
   ok boolean not null,
   error text not null default ''
 );

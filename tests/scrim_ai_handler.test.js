@@ -8,8 +8,8 @@ import { HEROES } from '../supabase/functions/_shared/catalog.gen.js';
 const WEBP = Buffer.from('UklGRiIAAABXRUJQVlA4IBYAAAAwAQCdASoBAAEADsD+JaQAA3AAAAAA', 'base64').toString('base64');
 const FAKE = Buffer.from('hello, not an image at all').toString('base64');
 
-function setup({ assigned = true, used = 0, ai = null, aiStatus = 200, key = 'sk-test', uploadError = null } = {}) {
-  const log = { uploads: [], inserts: [], calls: [] };
+function setup({ assigned = true, used = 0, ai = null, aiStatus = 200, statuses = null, key = 'sk-test', uploadError = null } = {}) {
+  const log = { uploads: [], inserts: [], calls: [], waits: [] };
   const db = {
     auth: { getUser: async () => ({ data: { user: { id: 'u1' } }, error: null }) },
     rpc: async (fn) => (fn === 'can_write_title' ? { data: assigned, error: null } : { data: used, error: null }),
@@ -19,9 +19,11 @@ function setup({ assigned = true, used = 0, ai = null, aiStatus = 200, key = 'sk
   const fetch = async (url, init) => {
     log.calls.push({ url, body: JSON.parse(init.body), headers: init.headers });
     const body = ai ?? { content: [{ type: 'text', text: JSON.stringify({ screen_kind: 'scoreboard', readable: true, players: [] }) }], stop_reason: 'end_turn', usage: { input_tokens: 1500, output_tokens: 400 } };
-    return { ok: aiStatus === 200, status: aiStatus, json: async () => body };
+    const st = statuses ? statuses[Math.min(log.calls.length - 1, statuses.length - 1)] : aiStatus;
+    if (st === 'net') throw new Error('socket hang up');
+    return { ok: st === 200, status: st, headers: { get: () => null }, json: async () => (st === 200 ? body : { type: 'error', error: { message: 'overloaded' } }) };
   };
-  const deps = { env: { ANTHROPIC_API_KEY: key }, fetch, clientFor: () => db, uuid: () => 'cap-1', heroes: HEROES, now: () => new Date('2026-11-16T05:00:00Z') };
+  const deps = { env: { ANTHROPIC_API_KEY: key }, fetch, clientFor: () => db, uuid: () => 'cap-1', heroes: HEROES, now: () => new Date('2026-11-16T05:00:00Z'), sleep: async (ms) => { log.waits.push(ms); } };
   const call = (body, headers = { authorization: 'Bearer abc' }) => handle({ method: 'POST', headers, json: async () => body }, deps);
   return { call, log };
 }
@@ -33,7 +35,7 @@ test('scoreboard: stored under the title folder, read as the coach, usage logged
   assert.deepEqual(log.uploads[0], { b: 'scrim-captures', path: 'mlbb-women/2026-11-16/cap-1.webp', n: Buffer.from(WEBP, 'base64').length, type: 'image/webp' });
   const req = log.calls[0].body;
   assert.equal(req.model, 'claude-sonnet-5-5'); assert.equal(req.output_config.format.type, 'json_schema');
-  assert.equal(req.messages[0].content[0].type, 'image'); assert.match(req.system, /Never estimate/); assert.match(req.system, /Valentina/);
+  assert.equal(req.messages[0].content[0].type, 'image'); assert.match(req.system[0].text, /Never estimate/); assert.match(req.system[0].text, /Valentina/); assert.deepEqual(req.system[0].cache_control, { type: 'ephemeral' });
   assert.equal(log.calls[0].headers['x-api-key'], 'sk-test');
   assert.deepEqual(log.inserts.map((i) => i.t), ['ai_usage', 'scrim_captures']);
   assert.equal(log.inserts[0].row.input_tokens, 1500); assert.equal(log.inserts[1].row.data.status, 'extracted'); assert.equal(log.inserts[1].row.data.origin, 'operational');
@@ -65,15 +67,39 @@ test('debrief and digest: text only, nothing stored, roster passed to the prompt
   const d = setup({ ai: { stop_reason: 'end_turn', content: [{ type: 'text', text: '{"focus":"a"}' }], usage: {} } });
   const r = await d.call({ action: 'debrief', title: 'MLBB', text: 'fokus rotasi', roster: ['Aran', 'Kevin'] });
   assert.equal(r.status, 200); assert.deepEqual(r.body.raw, { focus: 'a' }); assert.equal(d.log.uploads.length, 0);
-  assert.match(d.log.calls[0].body.system, /Aran, Kevin/); assert.match(d.log.calls[0].body.system, /Performance only/);
+  assert.match(d.log.calls[0].body.system[0].text, /Aran, Kevin/); assert.match(d.log.calls[0].body.system[0].text, /Performance only/);
   assert.equal((await setup().call({ action: 'debrief', title: 'MLBB', text: 'x'.repeat(4001) })).status, 413);
   assert.match((await setup().call({ action: 'digest', title: 'MLBB', facts: [] })).body.error, /No confirmed games/);
   const g = setup({ ai: { stop_reason: 'end_turn', content: [{ type: 'text', text: '{"findings":[]}' }], usage: {} } });
   assert.equal((await g.call({ action: 'digest', title: 'MLBB', facts: [{ id: 'all', n: 3 }], excerpts: [] })).status, 200);
-  assert.match(g.log.calls[0].body.system, /cites the fact ids/);
+  assert.match(g.log.calls[0].body.system[0].text, /cites the fact ids/);
 });
 
 test('CORS: only listed origins', () => {
   assert.equal(corsHeaders('https://hub.example', 'https://hub.example, https://x.example')['Access-Control-Allow-Origin'], 'https://hub.example');
   assert.equal(corsHeaders('https://evil.example', 'https://hub.example')['Access-Control-Allow-Origin'], undefined);
+});
+
+test('AI busy or a passing network error: retried twice with backoff, attempts and cache tokens logged', async () => {
+  const ok = { content: [{ type: 'text', text: JSON.stringify({ findings: [] }) }], stop_reason: 'end_turn', usage: { input_tokens: 120, output_tokens: 30, cache_read_input_tokens: 1400, cache_creation_input_tokens: 0 } };
+  const a = setup({ statuses: [529, 'net', 200], ai: ok });
+  const r = await a.call({ action: 'digest', title: 'MLBB', facts: [{ id: 'side:left', n: 6 }] });
+  assert.equal(r.status, 200); assert.equal(a.log.calls.length, 3); assert.deepEqual(a.log.waits, [1000, 3000]);
+  const u = a.log.inserts.find((i) => i.t === 'ai_usage').row;
+  assert.equal(u.attempts, 3); assert.equal(u.cache_read_tokens, 1400); assert.equal(u.ok, true);
+  // Still busy after the retries: a plain message, and no fourth call.
+  const b = setup({ statuses: [529] });
+  const r2 = await b.call({ action: 'digest', title: 'MLBB', facts: [{ id: 'side:left', n: 6 }] });
+  assert.equal(r2.status, 502); assert.match(r2.body.error, /busy/); assert.equal(b.log.calls.length, 3);
+  // A bad request is not retried.
+  const c = setup({ statuses: [400] });
+  await c.call({ action: 'digest', title: 'MLBB', facts: [{ id: 'side:left', n: 6 }] });
+  assert.equal(c.log.calls.length, 1);
+});
+
+test('digest: staff marks on earlier findings travel with the request', async () => {
+  const a = setup({ ai: { content: [{ type: 'text', text: '{"findings":[]}' }], stop_reason: 'end_turn', usage: {} } });
+  await a.call({ action: 'digest', title: 'MLBB', facts: [{ id: 'side:left', n: 6 }], feedback: [{ status: 'wrong', kind: 'problem', fact_ids: ['side:left'], claim: 'x' }] });
+  const sent = JSON.parse(a.log.calls[0].body.messages[0].content[0].text);
+  assert.equal(sent.FEEDBACK[0].status, 'wrong'); assert.match(a.log.calls[0].body.system[0].text, /FEEDBACK lists earlier findings/);
 });

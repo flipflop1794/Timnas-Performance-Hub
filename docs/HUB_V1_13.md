@@ -116,3 +116,30 @@ Every rule and threshold in the V1.0–V1.12 engines was re-read for small-sampl
 | Wellbeing: lower than own baseline | A player who reported the same score every day (spread 0) could never be flagged, however big the drop; a very steady player was flagged on a 1-point dip | Spread floored at 1.5 points: a 2+ point drop on a steady baseline flags, a 1-point dip does not |
 | Scrim reports: "improving / slipping" tag | Shown from one report this week against one last week | Needs 3+ reports in each week; otherwise no tag |
 | PUBGM: early exits and zone 3–4 eliminations | Could become a "problem" finding from 1–2 matches | Needs 5+ matches (same bar as scrim patterns) |
+
+## AI and competitor improvements (7 Nov 2026)
+
+`npm test`: **151 pass**; function on the local stack 9/9; all 58 screens swept again with no errors.
+
+**AI**
+
+| Change | Why |
+|---|---|
+| Instructions and hero list sent as one cacheable block (prompt caching) | Every screenshot repeats them. A second screenshot within 5 minutes reads them at $0.10 instead of $2 per million tokens (Sonnet 5.5 list price) |
+| Busy (429/529) and passing server or network errors retried twice (1 s, then 3 s; the service's retry-after up to 8 s) | A coach at the pelatnas should not have to press again; a bad request is never retried |
+| `ai_usage` also stores cache-read and cache-write tokens and the number of attempts | Real cost per call, and how often the service was busy |
+| *Look for patterns* sends the staff's marks on earlier findings (useful / known / wrong / promoted) to the AI, and the hub drops a finding the staff marked known or wrong on the same facts until 5 more games back it | Stops the AI telling the coach the same thing every week, or repeating a reading the coach rejected |
+| Screenshots shrunk to a 1568 px long edge (was 1600 px wide), WebP quality 0.92 (was 0.85) | 1568 px is the size above which the AI shrinks images anyway; tall screenshots were not shrunk before; higher quality keeps small digits sharp |
+| Admin page: *AI use this month*, calls, failures and estimated cost per kind of call, cost per game screenshot and share read from cache | To set the monthly spend limit in the Claude Console from real use. An estimate from list prices read 7 Nov 2026; the Console bill is the real figure |
+
+**Competitor analysis**
+
+| Change | Why |
+|---|---|
+| Opponent card (Dota 2): *Heroes both sides play*, each rival player's top heroes with 4+ club games that one of ours also plays 4+ times | A first-phase ban-or-take-first decision, shown as such (not "who plays it better") |
+| Notes older than 21 days marked *re-check* on the card; a gap line when the newest note is older than that, or when the staff hold only hypotheses | Rosters, patches and form move faster than a month; the 29 Oct notes on MLBB rivals turn "re-check" on 19 Nov |
+| Scouting coverage: *Scout next* puts the staff's threat tier before multi-title count, and brings back nations whose notes are over 21 days old after the unscouted ones; a column counts them | An unscouted main threat was ranked below a three-title "watch" nation |
+
+Not done: re-reading the 58 rival rosters on wec.iesf.org. The site cannot be reached from this workspace this time,
+and news found by search (esports.id, 28 Oct) adds nothing newer than the 3 Nov record. The weekly roster check
+in the hub stays the way to catch changes.

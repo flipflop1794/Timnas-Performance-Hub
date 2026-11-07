@@ -99,3 +99,17 @@ test('page: rosters tab, weekly check, opponent card write → approve → downl
   d.querySelector('[data-card="MLBB|Myanmar"]').click(); await wait(); dom.window.dispatchEvent(new dom.window.HashChangeEvent('hashchange')); await wait();
   assert.match(main(), /Indonesia vs Myanmar/); assert.match(main(), /Asian Games/);
 });
+
+test('opponent card: heroes both sides play, old notes marked for a re-check, hypotheses-only flagged', () => {
+  const R = seedRosters(DATA.rivalRosters);
+  const per = nationProfile('Belarus', {}).per.find((x) => x.title === 'Dota 2');
+  const heroes = { 13: { name: 'Puck' }, 69: { name: 'Doom' }, 106: { name: 'Ember Spirit' } };
+  const ours = [{ player: 'Mikoto', pool: [{ hero: 13, name: 'Puck', games: 22 }, { hero: 106, name: 'Ember Spirit', games: 3 }] }];
+  const a = autoCard({ title: 'Dota 2', nation: 'Belarus', per, team: R['Dota 2|Belarus'], data: DATA, heroes, ours, asOf: '2026-11-07' });
+  assert.deepEqual(a.contested, [{ hero: 'Puck', them: 'young G', theirGames: 38, us: 'Mikoto', ourGames: 22 }]); // Ember Spirit: only 3 of ours
+  assert.match(cardMarkdown(a, null), /Puck: young G 38 games, our Mikoto 22/);
+  const old = { ...per, notes: [{ kind: 'hypothesis', note: 'They draft greedy', source: 'VOD', date: '2026-10-01' }] };
+  const b = autoCard({ title: 'Dota 2', nation: 'Belarus', per: old, team: R['Dota 2|Belarus'], data: DATA, heroes, asOf: '2026-11-07' });
+  assert.ok(b.gaps.some((g) => /Newest note is 37 days old/.test(g)));
+  assert.ok(b.gaps.some((g) => /Only hypotheses/.test(g)));
+});

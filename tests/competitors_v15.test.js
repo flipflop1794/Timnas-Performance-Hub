@@ -47,3 +47,12 @@ test('page: competitors tab — overview, nation profile, coverage', async () =>
   dom.window.location.hash = 'comp-coverage'; dom.window.dispatchEvent(new dom.window.HashChangeEvent('hashchange')); await wait();
   assert.match(main(), /Scout next/);
 });
+
+test('scout next: an unscouted main threat comes before multi-title nations; old notes come back as re-checks', async () => {
+  const { coverage } = await import('../src/core/competitors.js');
+  const c = coverage({ tiers: { 'Dota 2|New Zealand': { tier: 'main threat', by: 'Aufa', why: 'x' } } }, '2026-11-07').find((x) => x.title === 'Dota 2');
+  assert.equal(c.next[0], 'New Zealand'); assert.equal(c.next[1], 'Egypt');
+  // By 1 Dec the 3 Nov notes on Greece and Mongolia are stale.
+  const late = coverage({}, '2026-12-01').find((x) => x.title === 'Dota 2');
+  assert.deepEqual(late.stale.sort(), ['Greece', 'Mongolia']);
+});

@@ -83,7 +83,14 @@ const numbersIn = (text) => (String(text).match(/\d+(?:[.,]\d+)?/g) || []).map((
 const factNumbers = (f) => new Set([...FACT_NUMS.map((k) => f[k]).filter((v) => v != null).map((v) => String(v)), ...numbersIn(f.label), ...numbersIn(f.id)]);
 
 // raw: the model's answer (scrim_spec.digestSchema). Returns kept findings and why others were dropped.
-export function checkFindings(raw, factList, { reportIds = [] } = {}) {
+// earlier: findings already saved for this title. One the staff marked "already known" or "wrong" is not
+// raised again on the same facts until at least MIN_SAMPLE more games stand behind it.
+export function repeatOf(x, cited, byId, earlier = []) {
+  const key = [...cited].sort().join('|');
+  return earlier.find((e) => ['known', 'wrong'].includes(e.status) && e.kind === x.kind && [...(e.factIds || [])].sort().join('|') === key
+    && cited.every((id) => { const was = (e.facts || []).find((f) => f.id === id); return !was || byId.get(id).n < was.n + MIN_SAMPLE; })) || null;
+}
+export function checkFindings(raw, factList, { reportIds = [], earlier = [] } = {}) {
   const byId = new Map(factList.map((f) => [f.id, f]));
   const kept = []; const dropped = [];
   const list = Array.isArray(raw?.findings) ? raw.findings.filter((x) => x && typeof x === 'object') : [];
@@ -98,6 +105,8 @@ export function checkFindings(raw, factList, { reportIds = [] } = {}) {
     if (stray.length) { dropped.push({ claim: x.claim, why: `uses numbers not in the cited facts (${stray.join(', ')})` }); continue; }
     const fs = cited.map((id) => byId.get(id));
     if (x.kind === 'problem' && fs.every((f) => f.lowSample)) { dropped.push({ claim: x.claim, why: 'a problem resting only on low-sample facts' }); continue; }
+    const rep = repeatOf(x, cited, byId, earlier);
+    if (rep) { dropped.push({ claim: x.claim, why: `already marked ${rep.status === 'wrong' ? 'wrong' : 'already known'} by ${rep.statusBy || 'staff'}, and fewer than ${MIN_SAMPLE} new games since` }); continue; }
     kept.push({ kind: FINDING_KINDS.includes(x.kind) ? x.kind : 'tendency', claim: String(x.claim || '').slice(0, 500), why: typeof x.why_it_matters === 'string' ? x.why_it_matters.slice(0, 300) : '', factIds: cited,
       sampleN: Math.max(...fs.map((f) => f.n)), lowSample: fs.every((f) => f.lowSample), games: [...new Set(fs.flatMap((f) => f.games))] });
     if (kept.length >= LIMITS.findings) break;
@@ -119,12 +128,15 @@ export function markFinding(rec, { status, by, promotedTo = '' }) {
 }
 
 // What goes to the AI: facts without game ids, and short excerpts of the reports behind the games.
-export function digestPayload(factList, reports, { excerptChars = LIMITS.excerptChars, maxExcerpts = LIMITS.digestExcerpts } = {}) {
+// earlier: saved findings with the staff's marks, so the AI learns what this staff already knows or rejected.
+export function digestPayload(factList, reports, { excerptChars = LIMITS.excerptChars, maxExcerpts = LIMITS.digestExcerpts, earlier = [] } = {}) {
   const fs = factList.slice(0, LIMITS.digestFacts).map(({ games, ...f }) => f);
   const ex = [...reports].sort((a, b) => b.date.localeCompare(a.date)).slice(0, maxExcerpts)
     .map((r) => ({ report_id: r.id, date: r.date, partner: r.partner, worked: r.worked, failed: r.failed, adjust: r.adjust }))
     .map((r) => ({ ...r, worked: String(r.worked || '').slice(0, excerptChars / 3), failed: String(r.failed || '').slice(0, excerptChars / 3), adjust: String(r.adjust || '').slice(0, excerptChars / 3) }));
-  return { facts: fs, excerpts: ex };
+  const feedback = earlier.filter((e) => e.status && e.status !== 'new').sort((a, b) => String(b.statusAt).localeCompare(String(a.statusAt))).slice(0, LIMITS.digestFeedback)
+    .map((e) => ({ status: e.status, kind: e.kind, fact_ids: e.factIds || [], claim: String(e.claim || '').slice(0, 200) }));
+  return { facts: fs, excerpts: ex, feedback };
 }
 
 // ---------------------------------------------------------------- player stat trail

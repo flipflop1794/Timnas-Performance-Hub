@@ -110,6 +110,16 @@ function adminApi(client: SupabaseClient) {
       const errs = [...first, ...(await Promise.all(ops))].map((x) => x.error).filter(Boolean);
       if (errs.length) throw new Error(errs[0]!.message);
     },
+    // AI calls since a date (admins read every row), for the cost panel.
+    async aiUsage(since: string) {
+      const rows: unknown[] = [];
+      for (let from = 0; ; from += 1000) {
+        const { data, error } = await client.from('ai_usage').select('at, title, action, model, input_tokens, output_tokens, cache_read_tokens, cache_write_tokens, attempts, ok').gte('at', since).order('at').range(from, from + 999);
+        if (error) throw new Error(error.message);
+        rows.push(...(data || [])); if (!data || data.length < 1000) break;
+      }
+      return rows;
+    },
     // Everything this account can read, as one JSON file (admins can read every table).
     async exportAll() {
       const tables = ['profiles', 'user_roles', 'user_titles', 'disciplines', 'roster_players', 'app_config', 'scrim_sessions', 'scrim_reports', 'scrim_report_corrections',

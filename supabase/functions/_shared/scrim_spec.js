@@ -7,7 +7,7 @@
 // Rules the prompts enforce: read only what is on the screen, never guess a number, mark what is
 // unclear. The coach confirms every value before it is saved; nothing here writes a record by itself.
 
-export const PROMPT_VERSION = 'scrim-ai-2026-11-07.3';
+export const PROMPT_VERSION = 'scrim-ai-2026-11-07.4';
 export const DEFAULT_MODEL = 'claude-sonnet-5-5';
 
 // Titles with screenshot capture. MLBB Women plays the same game client as MLBB.
@@ -35,6 +35,7 @@ export const LIMITS = {
   digestExcerpts: 60,
   excerptChars: 600,
   findings: 5,
+  digestFeedback: 30,             // staff marks on earlier findings sent with a digest
 };
 
 const str = { type: 'string' };
@@ -162,6 +163,7 @@ export function digestPrompt(title) {
     '- Report excerpts may support a finding (quote at most a few words, with the report id in brackets) but cannot replace a fact.',
     '- No predictions of WEC results, no player rankings, no comments on health or wellbeing.',
     '- claim: one or two plain sentences with the numbers. why_it_matters: one sentence on what to practise or check. kind: problem, strength, tendency, or opponent (about partners or rival stand-ins).',
+    '- FEEDBACK lists earlier findings and how the staff marked them: useful, known (they already knew it), wrong (they judged it a misreading), promoted (turned into a coaching proposal). Do not raise again what is marked known or promoted; for one marked wrong, do not repeat that reading of the same facts. Prefer findings of the kinds the staff marked useful.',
     '- If the facts show nothing worth acting on, return an empty findings list.',
   ].join('\n');
 }
@@ -171,7 +173,9 @@ export function messagesRequest({ model = DEFAULT_MODEL, system, content, schema
   return {
     model,
     max_tokens: maxTokens,
-    system,
+    // One cacheable block: the instructions and hero list repeat for every screenshot, so calls after the
+    // first within 5 minutes read them from the prompt cache (about a tenth of the input price or less).
+    system: [{ type: 'text', text: system, cache_control: { type: 'ephemeral' } }],
     messages: [{ role: 'user', content }],
     output_config: { format: { type: 'json_schema', schema } },
   };
@@ -193,7 +197,8 @@ export function parseModelJson(resp) {
   return out;
 }
 
-export const usageOf = (resp) => ({ input_tokens: resp?.usage?.input_tokens || 0, output_tokens: resp?.usage?.output_tokens || 0 });
+export const usageOf = (resp) => ({ input_tokens: resp?.usage?.input_tokens || 0, output_tokens: resp?.usage?.output_tokens || 0,
+  cache_read_tokens: resp?.usage?.cache_read_input_tokens || 0, cache_write_tokens: resp?.usage?.cache_creation_input_tokens || 0 });
 
 // Storage path for a screenshot: <title-slug>/<YYYY-MM-DD>/<id>.<ext>. The title folder is what the
 // storage access policy checks.

@@ -39,6 +39,7 @@ import { mockProvider, MOCK_TITLES } from '../readiness/mockProvider.js';
 import { readinessView } from '../readiness/view.js';
 import { translateDom, tr as trId } from './i18n.js';
 import { autoCard, cardPlan, approveCard, cardMarkdown } from '../core/oppcard.js';
+import { usageSummary, PRICES_READ } from '../core/ai_cost.js';
 import { checkin, session as loadSession, teamDay, ITEMS, ITEM_LABEL, THRESHOLDS, MIN_BASELINE_DAYS } from '../core/wellbeing.js';
 import { captureUi } from './capture_ui.js';
 import { gameOf } from '../core/capture.js';
@@ -612,7 +613,18 @@ const ROLES = [['admin', 'Admin'], ['head_coach', 'Head Coach'], ['assistant_coa
 async function loadAdminUsers() {
   S.admin = { ...(S.admin || {}), loading: true, error: '' };
   try { S.admin.users = await PLATFORM.admin.listUsers(); } catch (e) { S.admin.error = e.message; }
+  // AI usage this calendar month (WIB); a missing table (AI not set up yet) just hides the panel.
+  if (PLATFORM.admin.aiUsage) { try { S.admin.usage = await PLATFORM.admin.aiUsage(`${localDay().slice(0, 8)}01T00:00:00+07:00`); } catch { S.admin.usage = null; } }
   S.admin.loading = false; render();
+}
+function usagePanel(rows) {
+  if (!rows) return '';
+  const u = usageSummary(rows); const usd = (x) => `$${x < 1 ? x.toFixed(3) : x.toFixed(2)}`;
+  const ACT = { scoreboard: 'Game screenshots', draft: 'Draft screenshots', debrief: 'Say it once', digest: 'Look for patterns' };
+  const line = ([k, a]) => `<tr><td>${esc(ACT[k] || k)}</td><td class="n">${a.calls}</td><td class="n">${a.failed || '—'}</td><td class="n">${usd(a.cost)}</td></tr>`;
+  return `<div class="panel"><h2>AI use this month</h2>${u.total.calls ? `<div class="tw"><table><thead><tr><th>What</th><th class="n">Calls</th><th class="n">Failed</th><th class="n">Estimated cost</th></tr></thead><tbody>${Object.entries(u.byAction).map(line).join('')}
+    <tr><td><b>Total</b></td><td class="n"><b>${u.total.calls}</b></td><td class="n">${u.total.failed || '—'}</td><td class="n"><b>${usd(u.total.cost)}</b></td></tr></tbody></table></div>
+    <p class="note">${u.perScreenshot != null ? `About ${usd(u.perScreenshot)} per game screenshot. ` : ''}${Math.round(u.cacheShare * 100)}% of input read from the prompt cache (cheaper).${u.total.unpriced ? ` ${u.total.unpriced} call(s) on a model without a price here are not counted.` : ''} Estimate from token counts and list prices read ${PRICES_READ}; the Claude Console bill is the real figure. Set the monthly spend limit there.</p>` : '<p class="empty">No AI calls this month.</p>'}</div>`;
 }
 V['admin-users'] = () => {
   if (!HUB_USER?.isAdmin || !PLATFORM?.admin) return `<div class="panel">${banner('block', '<div>Admins only.</div>')}</div>`;
@@ -632,6 +644,7 @@ V['admin-users'] = () => {
     <p class="note">To add someone: Supabase dashboard → Authentication → Users → Invite user (their email). They set a password from the email, then appear here with no access until you tick a role.</p>
     <div class="toolbar"><button class="btn" type="button" id="adReload">Reload list</button><button class="btn" type="button" id="adExport">Export all data (JSON)</button><span class="msg" id="adExportMsg" role="status"></span></div>
     ${S.admin.error ? banner('block', `<div>${esc(S.admin.error)}</div>`) : ''}</div>
+  ${usagePanel(S.admin.usage)}
   <div class="panel"><h2>People (${users.length})</h2>${S.admin.loading && !users.length ? '<p>Loading…</p>' : users.map(row).join('') || '<p class="empty">Nobody yet.</p>'}</div>`;
 };
 // Title coaches and analysts see only their assigned games (the database hides the rest anyway).
@@ -1231,9 +1244,9 @@ V['comp-nation'] = () => {
 V['comp-coverage'] = () => {
   if (S.mode === 'demo') return `<div class="panel">${DEMO_BANNER}<p class="empty">Operational records only.</p></div>`;
   const C = coverage(compData());
-  return `${compHead('How much of each field the staff have scouted, and who to scout next. Suggestions favour nations we meet in several titles, so one piece of work helps more coaches.')}
-  <div class="panel"><div class="tw"><table><thead><tr><th>Title</th><th>Focus owner</th><th class="n">Field</th><th class="n">With notes</th><th class="n">Tier set</th><th class="n">VOD reviewed</th><th>Scout next (suggestion)</th></tr></thead><tbody>
-  ${C.map((c) => `<tr><td><b>${esc(c.title)}</b></td><td>${esc(owner(c.title).name)}</td><td class="n">${c.field}</td><td class="n">${c.noted} (${c.field ? Math.round((c.noted / c.field) * 100) : 0}%)</td><td class="n">${c.tiered}</td><td class="n">${c.vodRev}</td><td>${c.next.map((x) => `<button class="linkbtn" type="button" data-nation="${esc(x)}">${esc(x)}</button>`).join(', ') || 'Field covered'}</td></tr>`).join('')}</tbody></table></div>
+  return `${compHead('How much of each field the staff have scouted, and who to scout next. Suggestions: nations with no notes first, then notes older than 21 days; within each, the staff\'s threat tier first, then nations we meet in several titles (one piece of work helps more coaches).')}
+  <div class="panel"><div class="tw"><table><thead><tr><th>Title</th><th>Focus owner</th><th class="n">Field</th><th class="n">With notes</th><th class="n">Tier set</th><th class="n">VOD reviewed</th><th class="n">Notes over 21 days old</th><th>Scout next (suggestion)</th></tr></thead><tbody>
+  ${C.map((c) => `<tr><td><b>${esc(c.title)}</b></td><td>${esc(owner(c.title).name)}</td><td class="n">${c.field}</td><td class="n">${c.noted} (${c.field ? Math.round((c.noted / c.field) * 100) : 0}%)</td><td class="n">${c.tiered}</td><td class="n">${c.vodRev}</td><td class="n">${c.stale.length || '—'}</td><td>${c.next.map((x) => `<button class="linkbtn" type="button" data-nation="${esc(x)}">${esc(x)}</button>`).join(', ') || 'Field covered'}</td></tr>`).join('')}</tbody></table></div>
   <p class="note">eFootball's finals format is not published; its 96-nation list is the entry list, not the bracket.</p></div>`;
 };
 
@@ -1298,9 +1311,10 @@ function oppCardHtml(a, plan, ours) {
       ${Object.keys(plan.focus).length ? `<div class="h3">One focus per player</div><ul class="plain">${Object.entries(plan.focus).map(([k, v]) => `<li><b>${esc(k)}</b>: ${esc(v)}</li>`).join('')}</ul>` : ''}` : `<p class="empty">The title coach writes three key points and our answer (form on this page).</p>`}
     <div class="h3">Their roster${a.coach ? ` · coach ${esc(a.coach)}` : ''}</div>
     <div class="tw"><table><thead><tr><th>Player</th><th>Role / club</th>${a.title === 'Dota 2' ? '<th>Most played (club games since 7.41)</th>' : ''}</tr></thead><tbody>${a.roster.map((p) => `<tr><td><b>${esc(p.ign)}</b>${p.captain ? ' (C)' : ''}${p.flags.length ? ' <span class="note">⚠</span>' : ''}</td><td>${esc([p.role, p.club].filter(Boolean).join(' · ') || '—')}${p.pool?.lane ? `<div class="note">${esc(p.pool.lane)}</div>` : ''}</td>${a.title === 'Dota 2' ? `<td>${p.pool?.n ? `${p.pool.top.map((h) => `${esc(h.name)} <span class="note">${h.games}</span>`).join(', ')}<div class="note">${p.pool.n} games${p.pool.probable ? ' · account probable' : ''}</div>` : '<span class="note">no data</span>'}</td>` : ''}</tr>`).join('')}</tbody></table></div>
+    ${a.contested.length ? `<div class="h3">Heroes both sides play (club data)</div><p class="note">A first-phase decision: ban it, or take it first. Not a verdict on who plays it better.</p><ul class="plain">${a.contested.map((c) => `<li><b>${esc(c.hero)}</b> — ${esc(c.them)} ${c.theirGames} games · our ${esc(c.us)} ${c.ourGames}</li>`).join('')}</ul>` : ''}
     ${a.banCandidates.length ? `<div class="h3">Most-played heroes — ban candidates</div><ul class="plain">${a.banCandidates.map((b) => `<li><b>${esc(b.hero)}</b> — ${esc(b.player)}, ${b.games} of ${b.of} games${b.probable ? ' <span class="note">(account probable)</span>' : ''}</li>`).join('')}</ul><p class="note">Presence in club games, not proof they will draft it for the national team.</p>` : ''}
     <div class="h3">What we know · staff tier: ${esc(a.tier)}</div>${a.tierWhy ? `<p class="note">${esc(a.tierBy)}: ${esc(a.tierWhy)}</p>` : ''}
-    ${a.observed.length || a.hypotheses.length || a.vods.length ? `<ul class="plain">${a.observed.map((n) => `<li>${tag('k-observed', 'observed')} ${esc(n.note)} <span class="note">— ${esc(n.source)}, ${esc(n.date)}</span></li>`).join('')}${a.hypotheses.map((n) => `<li>${tag('k-hypothesis', 'unconfirmed')} ${esc(n.note)} <span class="note">— ${esc(n.source)}</span></li>`).join('')}${a.vods.map((v) => `<li>${tag('k-observed', 'VOD')} <a href="${esc(v.url)}" target="_blank" rel="noopener">${esc(v.event)}</a>: ${esc(v.takeaway)}</li>`).join('')}</ul>` : '<p class="note">No notes or reviewed VODs yet.</p>'}
+    ${a.observed.length || a.hypotheses.length || a.vods.length ? `<ul class="plain">${a.observed.map((n) => `<li>${tag('k-observed', 'observed')} ${esc(n.note)} <span class="note">— ${esc(n.source)}, ${esc(n.date)}</span>${n.stale ? ` ${tag('c-Low', `${n.ageDays} days old · re-check`)}` : ''}</li>`).join('')}${a.hypotheses.map((n) => `<li>${tag('k-hypothesis', 'unconfirmed')} ${esc(n.note)} <span class="note">— ${esc(n.source)}</span></li>`).join('')}${a.vods.map((v) => `<li>${tag('k-observed', 'VOD')} <a href="${esc(v.url)}" target="_blank" rel="noopener">${esc(v.event)}</a>: ${esc(v.takeaway)}</li>`).join('')}</ul>` : '<p class="note">No notes or reviewed VODs yet.</p>'}
     ${a.standIns.length || a.scrimsDone ? `<p class="note">Practised against their style: ${a.scrimsDone} stand-in scrim(s)${a.standIns.length ? ` with ${a.standIns.map(esc).join(', ')}` : ''}.</p>` : ''}
     ${capUi().standInLine(a.title, a.nation)}
     ${a.gaps.length ? `<div class="noprint">${banner('block', `<div><b>Gaps before this card is match-ready:</b> ${a.gaps.map(esc).join(' ')}</div>`)}</div>` : ''}
@@ -1310,7 +1324,7 @@ V['comp-card'] = () => {
   if (S.mode === 'demo') return `<div class="panel">${DEMO_BANNER}<p class="empty">Operational records only.</p></div>`;
   const t = S.ocTitle; const field = FIELDS[t] || []; const n = field.includes(S.ocNation) ? S.ocNation : field[0];
   const per = nationProfile(n, compData()).per.find((x) => x.title === t);
-  const a = autoCard({ title: t, nation: n, per, team: rosterOf(t, n), data: DATA, heroes: S.heroes });
+  const a = autoCard({ title: t, nation: n, per, team: rosterOf(t, n), data: DATA, heroes: S.heroes, ours: t === 'Dota 2' ? dotaTeam().pools : [], asOf: today() });
   const plan = S.oppCards[rosterKey(t, n)] || null; const ours = S.roster[t] || [];
   return `<div class="noprint">${compHead('One page per opponent for the opponent brief two hours before a match. The hub fills in what the staff already hold; the title coach writes three key points and our answer, and the focus owner approves it.')}
     <div class="panel"><div class="form"><label class="field" for="ocT">Title${titleOpts('ocT', t, WEC_TITLES.map((x) => x.id))}</label><label class="field" for="ocN">Opponent<select id="ocN">${field.map((x) => `<option ${x === n ? 'selected' : ''}>${esc(x)}</option>`).join('')}</select></label></div>
@@ -1425,7 +1439,7 @@ async function onClick(e) {
       if (id === 'ocPrint') { window.print(); return; }
       if (id === 'ocDl') {
         const per = nationProfile(na, compData()).per.find((x) => x.title === ti);
-        const md = cardMarkdown(autoCard({ title: ti, nation: na, per, team: rosterOf(ti, na), data: DATA, heroes: S.heroes }), S.oppCards[key] || null);
+        const md = cardMarkdown(autoCard({ title: ti, nation: na, per, team: rosterOf(ti, na), data: DATA, heroes: S.heroes, ours: ti === 'Dota 2' ? dotaTeam().pools : [], asOf: today() }), S.oppCards[key] || null);
         const dl = await window.claude?.use?.('downloads'); if (!dl) throw new Error('Downloads are not available in this view; use Print.');
         await dl.save({ filename: `opponent-card-${sid(ti)}-${sid(na)}.md`, data: md }); setMsg('ocMsg', 'Saved.', 'ok'); return;
       }
