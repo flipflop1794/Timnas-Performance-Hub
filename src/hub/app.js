@@ -42,6 +42,7 @@ import { autoCard, cardPlan, approveCard, cardMarkdown } from '../core/oppcard.j
 import { usageSummary, PRICES_READ } from '../core/ai_cost.js';
 import { checkin, session as loadSession, teamDay, ITEMS, ITEM_LABEL, THRESHOLDS, MIN_BASELINE_DAYS } from '../core/wellbeing.js';
 import { captureUi } from './capture_ui.js';
+import { draftRoomUi } from './draftroom_ui.js';
 import { gameOf } from '../core/capture.js';
 import { statGoal } from '../core/patterns.js';
 
@@ -72,6 +73,8 @@ const S = {
 let CAP = null;
 const capUi = () => (CAP ||= captureUi({ S, esc, tag, banner, setMsg, val, render, meName, sid, fillReport, localToday: localDay, shiftDay, PLATFORM, reportNote,
   staffObservation, recommendationRecord, propose, saveObj, owner, rulesFor: (title) => snapshot(S.rules, title === 'PUBG Mobile' ? ['pubgm-scoring'] : title === 'Dota 2' ? ['dota-patch'] : []) }));
+let DR = null;
+const drUi = () => (DR ||= draftRoomUi({ S, esc, tag, banner, setMsg, val, render, meName, sid }));
 const heroByName = () => Object.fromEntries(Object.values(S.heroes).map((h) => [h.name.toLowerCase(), h.id]));
 const accounts = () => Object.values(S.players).map((p) => p.account);
 const WEC_DOTA = ['Greece', 'South Africa', 'Egypt', 'Venezuela', 'Argentina', 'Kazakhstan', 'Mongolia', 'Iran', 'Belarus', 'North Macedonia', 'New Zealand'];
@@ -173,6 +176,7 @@ async function initCaps() {
     db.collection('scrims').onSnapshot((snap) => { S.scrims = snap.docs.map((d) => d.data()).filter((x) => x?.origin === 'operational'); render(); }, () => {});
     db.collection('scrim_reports').onSnapshot((snap) => { S.reports = snap.docs.map((d) => d.data()).filter((x) => x?.origin === 'operational'); render(); }, () => {});
     try { capUi().subscribe(db); } catch { /* older store without the V1.13 collections */ }
+    try { drUi().subscribe(db); } catch { /* older store without the V1.14 collections */ }
     db.collection('wec_matches').onSnapshot((snap) => { S.wecMatches = snap.docs.map((d) => d.data()).filter((x) => x?.origin === 'operational'); render(); }, () => {});
     db.doc('config/runbooks').onSnapshot((d) => { const x = d.data(); if (x?.runbooks) S.runbooks = x.runbooks; render(); }, () => {});
     db.collection('vods').onSnapshot((snap) => { S.vods = snap.docs.map((d) => ({ ...d.data(), id: d.id })).filter((x) => x?.origin === 'operational'); render(); }, () => {});
@@ -223,13 +227,13 @@ const dotaTeam = () => dotaTeamPipeline(S.players, S.heroes, S.asOf, Object.keys
 // ---------- routing ----------
 // Every title outside the two engine-backed ones (Dota 2, PUBG Mobile) gets the same four tabs.
 const GAME_HUBS = [
-  { id: 'mlbb', label: 'MLBB', title: 'MLBB', team: 'mlbb' },
-  { id: 'mlbbw', label: 'MLBB Women', title: 'MLBB Women', team: 't-mlbbw' },
+  { id: 'mlbb', label: 'MLBB', title: 'MLBB', team: 'mlbb', draftRoom: true },
+  { id: 'mlbbw', label: 'MLBB Women', title: 'MLBB Women', team: 't-mlbbw', draftRoom: true },
   { id: 'efootball', label: 'eFootball', title: 'eFootball', team: 't-efootball' },
   { id: 'cs2', label: 'CS2', title: 'CS2', team: 't-cs2' },
   { id: 'cs2w', label: 'CS2 Women', title: 'CS2 Women', team: 't-cs2w' },
 ];
-const hubTabs = (h) => [[h.team, 'Team'], [`${h.team}-scrims`, 'Scrims & practice'], [`${h.team}-reports`, 'Scrim reports'], ...(gameOf(h.title) ? [[`${h.team}-patterns`, 'Patterns']] : []), [`${h.team}-rivals`, 'Competitors']];
+const hubTabs = (h) => [[h.team, 'Team'], [`${h.team}-scrims`, 'Scrims & practice'], [`${h.team}-reports`, 'Scrim reports'], ...(gameOf(h.title) ? [[`${h.team}-patterns`, 'Patterns']] : []), [`${h.team}-rivals`, 'Competitors'], ...(h.draftRoom ? [[`${h.team}-draft`, 'Draft Room']] : [])];
 const TITLES = [
   { id: 'home', label: 'Today', tabs: [['today', 'My day'], ['board', 'Juara Umum board'], ['reports-all', 'Scrim reports'], ['brief', 'Weekly brief']] },
   { id: 'comp', label: 'Competitors', tabs: [['comp-overview', 'All nations'], ['comp-nation', 'Nation profile'], ['comp-rosters', 'Rosters & players'], ['comp-card', 'Opponent card'], ['comp-coverage', 'Scouting coverage']] },
@@ -680,6 +684,7 @@ for (const h of GAME_HUBS) {
   V[`${h.team}-scrims`] = () => scrimsPanel(h.title);
   V[`${h.team}-reports`] = () => reportsPanel(h.title);
   if (gameOf(h.title)) V[`${h.team}-patterns`] = () => capUi().patternsPage(h.title);
+  if (h.draftRoom) V[`${h.team}-draft`] = () => drUi().page(h.title);
   V[`${h.team}-rivals`] = () => competitorsPanel(h.title);
 }
 V['dota-scrims'] = () => scrimsPanel('Dota 2');
@@ -1302,6 +1307,7 @@ function oppCardHtml(a, plan, ours) {
       ${Object.keys(plan.focus).length ? `<div class="h3">One focus per player</div><ul class="plain">${Object.entries(plan.focus).map(([k, v]) => `<li><b>${esc(k)}</b>: ${esc(v)}</li>`).join('')}</ul>` : ''}` : `<p class="empty">The title coach writes three key points and our answer (form on this page).</p>`}
     <div class="h3">Their roster${a.coach ? ` · coach ${esc(a.coach)}` : ''}</div>
     <div class="tw"><table><thead><tr><th>Player</th><th>Role / club</th>${a.title === 'Dota 2' ? '<th>Most played (club games since 7.41)</th>' : ''}</tr></thead><tbody>${a.roster.map((p) => `<tr><td><b>${esc(p.ign)}</b>${p.captain ? ' (C)' : ''}${p.flags.length ? ' <span class="note">⚠</span>' : ''}</td><td>${esc([p.role, p.club].filter(Boolean).join(' · ') || '—')}${p.pool?.lane ? `<div class="note">${esc(p.pool.lane)}</div>` : ''}</td>${a.title === 'Dota 2' ? `<td>${p.pool?.n ? `${p.pool.top.map((h) => `${esc(h.name)} <span class="note">${h.games}</span>`).join(', ')}<div class="note">${p.pool.n} games${p.pool.probable ? ' · account probable' : ''}</div>` : '<span class="note">no data</span>'}</td>` : ''}</tr>`).join('')}</tbody></table></div>
+    ${(() => { const bk = ['MLBB', 'MLBB Women'].includes(a.title) ? drUi().bookFor(a.title, a.nation) : null; return bk ? `<div class="h3">Draft book (Draft Room, v${bk.version}, ${bk.status === 'approved' ? `approved by ${esc(bk.approvedBy)}` : 'draft, not approved'})</div><ul class="plain"><li>Bans: ${esc(bk.bans.join(', ') || '—')}</li><li>Protect: ${esc(bk.protect.join(', ') || '—')}</li><li>Flex: ${esc(bk.flex.join(', ') || '—')}</li>${bk.blue ? `<li>Blue: ${esc(bk.blue)}</li>` : ''}${bk.red ? `<li>Red: ${esc(bk.red)}</li>` : ''}</ul>` : ''; })()}
     ${a.contested.length ? `<div class="h3">Heroes both sides play (club data)</div><p class="note">A first-phase decision: ban it, or take it first. Not a verdict on who plays it better.</p><ul class="plain">${a.contested.map((c) => `<li><b>${esc(c.hero)}</b> — ${esc(c.them)} ${c.theirGames} games · our ${esc(c.us)} ${c.ourGames}</li>`).join('')}</ul>` : ''}
     ${a.banCandidates.length ? `<div class="h3">Most-played heroes — ban candidates</div><ul class="plain">${a.banCandidates.map((b) => `<li><b>${esc(b.hero)}</b> — ${esc(b.player)}, ${b.games} of ${b.of} games${b.probable ? ' <span class="note">(account probable)</span>' : ''}</li>`).join('')}</ul><p class="note">Presence in club games, not proof they will draft it for the national team.</p>` : ''}
     <div class="h3">What we know · staff tier: ${esc(a.tier)}</div>${a.tierWhy ? `<p class="note">${esc(a.tierBy)}: ${esc(a.tierWhy)}</p>` : ''}
@@ -1372,6 +1378,7 @@ function render() {
   }
   if (kept) restoreForms(kept);
   LAST_VIEW = view;
+  if (document.getElementById('drClock')) drUi().startTicker();
 }
 // Views that show engine findings or data notes, which stay in English.
 const ORIGINAL_LANG_VIEWS = /^(dota-team|dota-post|dota-scout|dota-draft|dota-review|pubgm-(team|log|rivals|sim|review)|comp-nation|comp-card|comp-rosters|staff-sources|staff-rules)/;
@@ -1402,6 +1409,7 @@ async function onClick(e) {
   if (t.dataset.go) { location.hash = t.dataset.go; return; }
   // V1.13 capture / patterns buttons only, so every other click stays synchronous until its own first await.
   if (Object.keys(t.dataset).some((k) => /^(cap|pat)[A-Z]/.test(k)) && await capUi().onClick(t)) return;
+  if (Object.keys(t.dataset).some((k) => /^dr[A-Z]/.test(k)) && await drUi().onClick(t)) return;
   const id = t.id;
   if (id === 'langBtn') { S.lang = S.lang === 'id' ? 'en' : 'id'; try { localStorage.setItem('hub-lang', S.lang); } catch { /* per-viewer convenience only */ } render(); return; }
   if (id === 'modeBtn' || id === 'modeBtn2') { S.mode = S.mode === 'demo' ? 'live' : 'demo'; S.pubgm.team = null; S.pubgm.sim = null; render(); return; }
@@ -1755,6 +1763,7 @@ document.addEventListener('click', async (e) => {
 for (const ev of ['input', 'change']) document.addEventListener(ev, (e) => draftField(e.target));
 
 document.addEventListener('change', (e) => {
+  if (e.target.dataset?.drBookopp || e.target.dataset?.drCsvfile) { drUi().onChange(e); return; }
   if (e.target.dataset?.capShot || e.target.dataset?.capDraft || e.target.dataset?.capMore || e.target.dataset?.patPeriod) { capUi().onChange(e); return; }
   const id = e.target.id;
   if (id === 'meSel') { S.me = e.target.value; try { localStorage.setItem('hub-me', S.me); } catch { /* per-viewer convenience only */ } render(); }
@@ -1782,7 +1791,7 @@ document.addEventListener('change', (e) => {
   if (id === 'mFile') { const f = e.target.files?.[0]; if (!f) return; const r = new FileReader(); r.onload = () => doImport(String(r.result), `OpenDota JSON file ${f.name}`); r.readAsText(f); }
   if (id === 'lMatchFile' || id === 'lFightFile') { const f = e.target.files?.[0]; if (!f) return; const r = new FileReader(); r.onload = () => { (id === 'lMatchFile' ? $('#lMatches') : $('#lFights')).value = r.result; }; r.readAsText(f); }
 });
-document.addEventListener('keydown', (e) => { if (e.key === 'Enter' && e.target.id === 'dHero') $('#dLock')?.click(); });
+document.addEventListener('keydown', (e) => { if (e.key === 'Enter' && e.target.id === 'dHero') $('#dLock')?.click(); else if (/^drHero$|^drDrillHero$/.test(e.target.id)) drUi().onKey(e); });
 window.addEventListener('hashchange', render);
 if (restricted() && HUB_USER.titles[0] && (!location.hash || location.hash === '#')) history.replaceState(null, '', `#${REPORT_TAB[HUB_USER.titles[0]]}`);
 render();

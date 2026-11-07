@@ -39,3 +39,7 @@
 19. Prompt caching only helps when screenshots follow each other within 5 minutes (the cache lifetime); a lone call costs 25% more on its cached part. Check the cache share on the admin page after the first pelatnas week.
 20. AI cost on the admin page uses a price table in `src/core/ai_cost.js` (Sonnet 5.5, read 7 Nov 2026); a new model or price needs that file updated.
 21. Rival rosters were last read on wec.iesf.org on 3 Nov; this workspace could not reach the site on 7 Nov.
+22. Draft Room order is MPL's 10-ban order and 30 s a step; IESF has not published WEC draft rules. Change when they do.
+23. No public pro games are preloaded (see HUB_V1_14.md); pro patterns appear once an analyst imports a CSV.
+24. Draft book approval (another coach than the writer, from the title's approvers) is checked by the hub, not the database, as for opponent cards.
+25. Brand colours approximate the public PB ESI logo (red and white); official hex codes not yet received. Fonts load from Google Fonts; offline, system fonts are used.

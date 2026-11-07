@@ -4,7 +4,8 @@ const WELL = new Set(['wellbeing_checkins', 'wellbeing_loads']);
 const FIXED = { pubgm_logs: 'PUBG Mobile', dota_matches: 'Dota 2', dota_pools: 'Dota 2' };
 const DOC_TABLES = ['scrim_sessions', 'scrim_reports', 'coaching_objectives', 'scouting_notes', 'rival_tiers', 'rival_rosters', 'rival_vods', 'opponent_cards',
   'sparring_partners', 'wec_matches', 'player_plans', 'pubgm_logs', 'dota_matches', 'dota_pools', 'wellbeing_checkins', 'wellbeing_loads',
-  'scrim_games', 'scrim_captures', 'pattern_findings', 'player_aliases'];
+  'scrim_games', 'scrim_captures', 'pattern_findings', 'player_aliases',
+  'draft_pools', 'draft_books', 'mock_drafts', 'draft_drills', 'pro_games'];
 
 export function backend() {
   const B = { users: [], tables: {}, channels: new Set(), log: [] };

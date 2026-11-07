@@ -11,6 +11,8 @@ export const TABLES: Record<string, string> = {
   dota_matches: 'dota_matches', dota_pools: 'dota_pools', wellbeing_checkins: 'wellbeing_checkins', wellbeing_load: 'wellbeing_loads',
   // V1.13 AI capture
   scrim_games: 'scrim_games', scrim_captures: 'scrim_captures', pattern_findings: 'pattern_findings', player_aliases: 'player_aliases',
+  // V1.14 Draft Room
+  draft_pools: 'draft_pools', draft_books: 'draft_books', mock_drafts: 'mock_drafts', draft_drills: 'draft_drills', pro_games: 'pro_games',
 };
 const WELLBEING = new Set(['wellbeing_checkins', 'wellbeing_load']);
 const CONFIG_KEYS = new Set(['runbooks', 'rules']);
@@ -54,7 +56,7 @@ async function selectAll(client: SupabaseClient, table: string, cols: string, si
   }
 }
 
-const INCREMENTAL = new Set(['scrim_games', 'scrim_captures', 'pattern_findings']);
+const INCREMENTAL = new Set(['scrim_games', 'scrim_captures', 'pattern_findings', 'pro_games', 'mock_drafts']);
 
 export function createHubDb(client: SupabaseClient, opts: HubDbOptions) {
   const names = opts.names || {};
