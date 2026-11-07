@@ -26,19 +26,19 @@ async function page(hash, db) {
 
 const localDay = () => { const d = new Date(); d.setMinutes(d.getMinutes() - d.getTimezoneOffset()); return d.toISOString().slice(0, 10); };
 
-test('every title has its own section with Team, Scrims, Scrim reports and Competitors; MLBB titles add Draft Lab', async () => {
+test('every title has its own section with Team, Scrims, Scrim reports and Competitors; no outside draft tool links', async () => {
   const h = await page('today', mock());
   const nav = h.d.getElementById('titles').textContent;
   for (const t of ['Dota 2', 'PUBG Mobile', 'MLBB', 'MLBB Women', 'eFootball', 'CS2', 'CS2 Women']) assert.match(nav, new RegExp(t), `${t} in the top menu`);
   const want = { mlbb: ['MLBB', true], 't-mlbbw': ['MLBB Women', true], 't-efootball': ['eFootball', false], 't-cs2': ['CS2', false], 't-cs2w': ['CS2 Women', false] };
   for (const [team, [title, draft]] of Object.entries(want)) {
     await h.go(team); const tabs = [...h.d.querySelectorAll('#tabs a')].map((a) => a.textContent);
-    assert.deepEqual(tabs, ['Team', 'Scrims & practice', 'Scrim reports', 'Competitors', ...(draft ? ['Draft Lab'] : [])], title);
+    assert.deepEqual(tabs, ['Team', 'Scrims & practice', 'Scrim reports', 'Competitors'], title); void draft;
     assert.match(h.text(), new RegExp(title));
     await h.go(`${team}-scrims`); assert.match(h.text(), new RegExp(`Scrims & practice — ${title}`));
     await h.go(`${team}-reports`); assert.match(h.text(), new RegExp(`Scrim reports — ${title}`));
     await h.go(`${team}-rivals`); assert.match(h.text(), new RegExp(`Competitors — ${title}`));
-    if (draft) { await h.go(`${team}-draft`); assert.match(h.text(), /Open Draft Lab Pelatnas/); }
+    assert.doesNotMatch(h.d.body.innerHTML, /claude\.ai\/(code\/)?artifact|Draft Lab/i, `${title}: no link to an outside personal tool`);
   }
   for (const v of ['dota-reports', 'pubgm-reports']) { await h.go(v); assert.match(h.text(), /Scrim reports —/); }
   await h.go('t-cs2w-rivals'); assert.match(h.text(), /Field: 11 nations/);

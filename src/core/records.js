@@ -75,13 +75,13 @@ export function recommendationRecord(rec, evidences) {
   };
 }
 
-// A coach's own observation as evidence (titles without an engine, VOD notes, Draft Lab findings).
+// A coach's own observation as evidence (titles without an engine, VOD notes).
 import { confidenceFromN } from './evidence.js';
 import { localDay } from './dates.js';
 let obsSeq = 0;
 export function staffObservation({ title, observation, source, kind = 'observed', n, context, by, date }) {
   if (!observation || !observation.trim()) throw new Error('Write the observation.');
-  if (!source || !source.trim()) throw new Error('Name the source (scrim ID, VOD link, Draft Lab view, match).');
+  if (!source || !source.trim()) throw new Error('Name the source (scrim ID, VOD link, match).');
   if (!by || !by.trim()) throw new Error('Who observed it is required.');
   if (!CONTEXTS.includes(context) || context === 'demo') throw new Error('Choose national, mixed or club context.');
   const games = n === '' || n == null ? null : +n;

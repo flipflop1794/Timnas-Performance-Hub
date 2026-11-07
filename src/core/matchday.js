@@ -20,8 +20,8 @@ const COMMON = [
 ];
 const BY_TITLE = {
   'Dota 2': [{ t: -90, item: 'Draft book: first-phase bans and three opening plans per side', owner: 'Aufa / Dota 2 coach' }],
-  MLBB: [{ t: -90, item: 'Draft book from Draft Lab: bans, flex picks, side plans', owner: 'Aufa / MLBB coach' }],
-  'MLBB Women': [{ t: -90, item: 'Draft book from Draft Lab: bans, flex picks, side plans', owner: 'MLBB Women coach' }],
+  MLBB: [{ t: -90, item: 'Draft book: bans, flex picks, side plans', owner: 'Aufa / MLBB coach' }],
+  'MLBB Women': [{ t: -90, item: 'Draft book: bans, flex picks, side plans', owner: 'MLBB Women coach' }],
   'PUBG Mobile': [{ t: -90, item: 'Drop and rotation plan per map; fallback drop agreed', owner: 'Fayad / PUBGM coach' }],
   eFootball: [{ t: -90, item: 'Opponent formation notes and in-game tactics presets saved', owner: 'eFootball coach (TBD)' }],
   CS2: [{ t: -90, item: 'Map veto plan and side preferences', owner: 'CS2 coach' }],
