@@ -1,7 +1,7 @@
 // Player hero proficiency for Dota 2.
 // Deliberately NOT a public hero win rate: it measures how much and how recently THIS player
 // has played a hero in tournament games, with the win rate shrunk hard toward the player's
-// own average (small samples say little about hero strength - same lesson as Draft Lab R-002).
+// own average (small samples say little about hero strength).
 
 import { recencyWeight, shrink, wilson } from '../core/stats.js';
 

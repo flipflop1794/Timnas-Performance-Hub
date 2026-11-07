@@ -52,7 +52,7 @@ test('V1.9 report pages and title hubs are translated; data and option values st
   assert.match(main(), /Detail lainnya \(opsional\)/); assert.match(main(), /Skor cepat/);
   await go('pubgm-reports'); assert.match(main(), /Total poin/);
   await go('t-efootball'); assert.match(main(), /Skuad/); assert.match(main(), /Laporan scrim, 7 hari terakhir/);
-  await go('t-mlbbw-draft'); assert.match(main(), /Draft Lab adalah alat analisis MLBB/);
+  await go('t-mlbbw'); assert.doesNotMatch(main(), /Draft Lab/);
   assert.doesNotMatch(main(), /Catatan: temuan analisis otomatis/, 'no engine-data note on report pages');
   const t = d.getElementById('titles').textContent; for (const x of ['MLBB Women', 'eFootball', 'CS2 Women']) assert.match(t, new RegExp(x));
 });

@@ -223,13 +223,13 @@ const dotaTeam = () => dotaTeamPipeline(S.players, S.heroes, S.asOf, Object.keys
 // ---------- routing ----------
 // Every title outside the two engine-backed ones (Dota 2, PUBG Mobile) gets the same four tabs.
 const GAME_HUBS = [
-  { id: 'mlbb', label: 'MLBB', title: 'MLBB', team: 'mlbb', draft: true },
-  { id: 'mlbbw', label: 'MLBB Women', title: 'MLBB Women', team: 't-mlbbw', draft: true },
+  { id: 'mlbb', label: 'MLBB', title: 'MLBB', team: 'mlbb' },
+  { id: 'mlbbw', label: 'MLBB Women', title: 'MLBB Women', team: 't-mlbbw' },
   { id: 'efootball', label: 'eFootball', title: 'eFootball', team: 't-efootball' },
   { id: 'cs2', label: 'CS2', title: 'CS2', team: 't-cs2' },
   { id: 'cs2w', label: 'CS2 Women', title: 'CS2 Women', team: 't-cs2w' },
 ];
-const hubTabs = (h) => [[h.team, 'Team'], [`${h.team}-scrims`, 'Scrims & practice'], [`${h.team}-reports`, 'Scrim reports'], ...(gameOf(h.title) ? [[`${h.team}-patterns`, 'Patterns']] : []), [`${h.team}-rivals`, 'Competitors'], ...(h.draft ? [[`${h.team}-draft`, 'Draft Lab']] : [])];
+const hubTabs = (h) => [[h.team, 'Team'], [`${h.team}-scrims`, 'Scrims & practice'], [`${h.team}-reports`, 'Scrim reports'], ...(gameOf(h.title) ? [[`${h.team}-patterns`, 'Patterns']] : []), [`${h.team}-rivals`, 'Competitors']];
 const TITLES = [
   { id: 'home', label: 'Today', tabs: [['today', 'My day'], ['board', 'Juara Umum board'], ['reports-all', 'Scrim reports'], ['brief', 'Weekly brief']] },
   { id: 'comp', label: 'Competitors', tabs: [['comp-overview', 'All nations'], ['comp-nation', 'Nation profile'], ['comp-rosters', 'Rosters & players'], ['comp-card', 'Opponent card'], ['comp-coverage', 'Scouting coverage']] },
@@ -294,7 +294,7 @@ V.today = () => {
     if (title === 'Dota 2') { const L = todayList(S.cycle, d.recs, 'Dota 2'); return `<div class="panel"><h2>Dota 2</h2>${CLUB_BANNER}${L.length ? `<ul class="plain today">${L.map(todayCard).join('')}</ul>` : '<p class="empty">No proposals with enough evidence.</p>'}<div class="toolbar"><a class="btn" href="#dota-team">Evidence</a></div></div>`; }
     if (title === 'PUBG Mobile') { const L = todayList(S.cycle, p.insufficient ? [] : p.recs, 'PUBG Mobile'); return `<div class="panel"><h2>PUBG Mobile</h2>${p.insufficient ? banner('block', `<div><b>Not enough operational evidence.</b> ${esc(p.insufficient)} <a href="#pubgm-log">Log scrims</a>.</div>`) : ''}${L.length ? `<ul class="plain today">${L.map(todayCard).join('')}</ul>` : ''}</div>`; }
     const L = todayList(S.cycle, [], title);
-    return `<div class="panel"><h2>${esc(title)}</h2>${L.length ? `<ul class="plain today">${L.map(todayCard).join('')}</ul>` : `<p class="empty">No objectives yet. Add a staff observation from Draft Lab, VOD or scrims.</p>`}<div class="toolbar"><a class="btn" href="#${TEAM_TAB[title] || 'mlbb'}">Add observation</a></div></div>`;
+    return `<div class="panel"><h2>${esc(title)}</h2>${L.length ? `<ul class="plain today">${L.map(todayCard).join('')}</ul>` : `<p class="empty">No objectives yet. Add a staff observation from VOD or scrims.</p>`}<div class="toolbar"><a class="btn" href="#${TEAM_TAB[title] || 'mlbb'}">Add observation</a></div></div>`;
   };
   const titles = me.id === 'donny' ? [] : me.id === 'fayad' ? ['PUBG Mobile', 'eFootball', 'MLBB Women', 'Dota 2', 'MLBB'] : me.focus;
   return `<div class="panel"><div class="lead">What do we <em>train today</em>?</div>
@@ -325,7 +325,6 @@ V.board = () => {
     let evidence;
     if (t.id === 'Dota 2') { const nat = Object.values(S.matches).filter((r) => { try { return dotaMatchPipeline(r, accounts(), S.heroes).context.context === 'national'; } catch { return false; } }).length; evidence = nat ? `${nat} national match(es) imported` : 'Club data only — no national scrims yet'; }
     else if (t.id === 'PUBG Mobile') { const n = new Set(S.pubgm.logged.matches.map((r) => r.match_id)).size; evidence = n ? `${n} scrim match(es) logged` : 'No scrims logged'; }
-    else if (t.engine === 'draftlab') evidence = t.id === 'MLBB' ? 'Draft Lab: MPL ID S18 (TLID club data)' : 'Draft Lab: no women\'s data yet';
     else evidence = 'Staff observations only';
     const blockers = [...provisional(S.rules, t.id === 'Dota 2' ? 'dota-draft' : t.id === 'PUBG Mobile' ? 'pubgm-team' : 'none').filter((r) => r.status === 'blocked' || r.status === 'unverified').map((r) => r.label)];
     if (!roster.length) blockers.push('Roster not entered in hub');
@@ -403,7 +402,7 @@ const OBS_TITLES = ['MLBB', 'MLBB Women', 'eFootball', 'CS2', 'CS2 Women', 'Dota
 function observationForm(defTitle) {
   return `<div class="form"><label class="field" for="obT">Title<select id="obT">${OBS_TITLES.map((t) => `<option ${t === defTitle ? 'selected' : ''}>${esc(t)}</option>`).join('')}</select></label>
     <label class="field" for="obBy">Observed by<input type="text" id="obBy" list="staffNames" value="${esc(STAFF.find((x) => x.id === S.me)?.name || '')}"></label>
-    <label class="field" for="obSrc">Source<input type="text" id="obSrc" placeholder="Scrim ID, VOD link, Draft Lab view"></label>
+    <label class="field" for="obSrc">Source<input type="text" id="obSrc" placeholder="Scrim ID, VOD link, match"></label>
     <label class="field" for="obN">Games it is based on<input type="number" id="obN" min="1" placeholder="e.g. 4"></label>
     <label class="field" for="obK">Kind<select id="obK"><option value="observed">Observed (seen in the games)</option><option value="hypothesis">Hypothesis (needs checking)</option></select></label>
     <label class="field" for="obC">Roster context<select id="obC"><option value="national">National team</option><option value="mixed">Partial roster</option><option value="club">Club games</option></select></label></div>
@@ -662,13 +661,13 @@ function viewTitle(view) {
 // ---------- title hubs (MLBB, MLBB Women, eFootball, CS2, CS2 Women) ----------
 function teamPage(title) {
   const objs = S.cycle.filter((o) => o.title === title && !['retired', 'rejected'].includes(o.status));
-  const hub = GAME_HUBS.find((h) => h.title === title); const dl = !!hub?.draft; const t0 = localToday();
+  const hub = GAME_HUBS.find((h) => h.title === title); const t0 = localToday();
   const wt = WEC_TITLES.find((t) => t.id === title); const squad = S.roster[title] || [];
   const Sm = reportSummary(S.reports, title, t0); const spec = GAME_SPEC[title];
   const matches = S.wecMatches.filter((m) => m.title === title && m.date >= t0 && !m.result).sort((a, b) => a.date.localeCompare(b.date));
   return `<div class="panel"><div class="lead">${esc(title)}</div>
-    <p class="note">Focus owner: ${esc(ownerNote(title))} · title coach: ${esc(wt?.coach || 'TBD')}. No analysis engine in the hub${dl ? '; Draft Lab is the MLBB engine' : ''}. What staff see in ${dl ? 'Draft Lab, ' : ''}VOD or scrims enters the coaching cycle as a staff observation.</p>
-    ${dl ? `<div class="toolbar"><a class="btn" href="${DRAFT_LAB.pelatnas}" target="_blank" rel="noopener">Open Draft Lab Pelatnas</a><a class="btn" href="${DRAFT_LAB.v19}" target="_blank" rel="noopener">Open Draft Lab MLBB v19</a></div>` : ''}</div>
+    <p class="note">Focus owner: ${esc(ownerNote(title))} · title coach: ${esc(wt?.coach || 'TBD')}. No analysis engine in the hub. What staff see in VOD or scrims enters the coaching cycle as a staff observation.</p>
+</div>
   <div class="cols"><div class="panel"><h2>Squad</h2>${squad.length ? `<p>${squad.map(esc).join(' · ')}</p><p class="note">Names as listed on the WEC site or in the decision log. Roles and details are not stored here.</p>` : '<p class="empty">Roster not entered in the hub yet (TBD: confirm with the title coach).</p>'}</div>
     <div class="panel"><h2>Scrim reports, last 7 days</h2>${Sm.sessions ? `<p><b>${spec.mode === 'points' ? `${Sm.points} points in ${Sm.matches} matches` : `${Sm.won}-${Sm.lost}${Sm.drawn ? `-${Sm.drawn}` : ''}`}</b> over ${Sm.sessions} session${Sm.sessions > 1 ? 's' : ''} · plan followed ${Sm.progress}/5 ${trendTag(Sm.trend)}</p>` : '<p class="empty">No report in the last 7 days.</p>'}
       ${Sm.carryOver ? `<p class="note">Next session starts from: ${esc(Sm.carryOver.adjust)} (${esc(Sm.carryOver.by)}, ${esc(Sm.carryOver.date)})</p>` : ''}<div class="toolbar"><a class="btn" href="#${hub.team}-reports">${S.mode === 'demo' ? 'Open reports' : 'File or read reports'}</a></div></div></div>
@@ -676,20 +675,12 @@ function teamPage(title) {
   <div class="panel"><h2>Objectives</h2>${objs.length ? `<ul class="plain">${objs.map((o) => `<li>${tag(`s-${o.status}`, o.status)} ${esc(o.rec.problem)} <span class="note">— ${esc(nextStep(o, S.rules))}</span></li>`).join('')}</ul>` : '<p class="empty">No objectives yet.</p>'}
     ${S.mode === 'demo' ? '' : `<details><summary class="btn">Add a staff observation</summary>${observationForm(title)}</details>`}</div>`;
 }
-const DRAFT_LAB = { pelatnas: 'https://claude.ai/code/artifact/2b3103c5-81c9-4ad4-ba3e-3303778a8259', v19: 'https://claude.ai/artifact/VatjYMhyVs5DLHgp8Yx4Rj' };
-function draftLabPage(title) {
-  return `<div class="panel"><div class="lead">Draft <em>Lab</em> — ${esc(title)}</div>
-    <p>Draft Lab is the MLBB analysis tool the staff already use. It stays a separate page, so its data and licence terms are untouched. Use it for the draft book; bring what you learn back here as a staff observation or in a scrim report.</p>
-    <div class="toolbar"><a class="btn primary" href="${DRAFT_LAB.pelatnas}" target="_blank" rel="noopener">Open Draft Lab Pelatnas</a><a class="btn" href="${DRAFT_LAB.v19}" target="_blank" rel="noopener">Open Draft Lab MLBB v19</a></div>
-    <p class="note">${title === 'MLBB Women' ? 'No women\'s data is loaded in Draft Lab yet (see the Juara Umum board). Draft observations from scrims go into the scrim reports meanwhile.' : 'Draft Lab data: MPL ID S18 (club data, not national-team games). Treat its findings as club context until national scrims are logged.'}</p></div>`;
-}
 for (const h of GAME_HUBS) {
   V[h.team] = () => teamPage(h.title);
   V[`${h.team}-scrims`] = () => scrimsPanel(h.title);
   V[`${h.team}-reports`] = () => reportsPanel(h.title);
   if (gameOf(h.title)) V[`${h.team}-patterns`] = () => capUi().patternsPage(h.title);
   V[`${h.team}-rivals`] = () => competitorsPanel(h.title);
-  if (h.draft) V[`${h.team}-draft`] = () => draftLabPage(h.title);
 }
 V['dota-scrims'] = () => scrimsPanel('Dota 2');
 V['dota-reports'] = () => reportsPanel('Dota 2');

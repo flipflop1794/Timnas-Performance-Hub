@@ -11,8 +11,8 @@ export const STAFF = [
 // WEC finals entries. Title coaches as published on wec.iesf.org (29 Oct–3 Nov); TBD where none listed.
 export const TITLES = [
   { id: 'Dota 2', coach: 'Gregorius Arvindra Prasetyo', engine: 'dota' },
-  { id: 'MLBB', coach: 'Coach Indra', engine: 'draftlab' },
-  { id: 'MLBB Women', coach: 'Coach Ilyas', engine: 'draftlab' },
+  { id: 'MLBB', coach: 'Coach Indra', engine: null },
+  { id: 'MLBB Women', coach: 'Coach Ilyas', engine: null },
   { id: 'PUBG Mobile', coach: 'Christie Onibala', engine: 'pubgm' },
   { id: 'eFootball', coach: 'TBD (not named)', engine: null },
   { id: 'CS2', coach: 'see WEC roster', engine: null },

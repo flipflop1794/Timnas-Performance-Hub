@@ -51,7 +51,7 @@ export function scoutingReport(agg, heroes, ourPools = []) {
   }
 
   // Ban plan: each player's most-played hero (presence, not win rate: small-sample win rates
-  // are mostly noise - the Draft Lab S18 lesson), ordered by games.
+  // are mostly noise), ordered by games.
   const banPlan = players.filter((p) => p.games >= 15).map((p) => {
     const top = [...p.pool].sort((a, b) => b.games - a.games)[0];
     return { hero: top.hero, name: top.name, player: p.player, games: top.games, wins: top.wins, share: top.games / p.games };
