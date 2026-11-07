@@ -51,8 +51,8 @@ export function perfFindings(rows, team, sc) {
   const early = mine.filter((r) => r.died_phase > 0 && r.died_phase <= 2).length;
   const p3 = mine.filter((r) => r.died_phase >= 3 && r.died_phase <= 4).length;
   const reached3 = mine.filter((r) => r.died_phase === 0 || r.died_phase >= 3).length;
-  if (early / n >= 0.2) F.push(finding({ title: `Out before zone 3 in ${early}/${n} matches`, kind: 'inferred', area: 'survival', lens: 'execution', severity: -2, n, sources: src, tags: ['early-exit'] }));
-  if (reached3 && p3 / reached3 >= 0.35) F.push(finding({ title: `Eliminated in zone 3–4 in ${p3} of ${reached3} matches that reached zone 3`, kind: 'inferred', area: 'survival', lens: 'strategic', severity: -2, n: reached3, sources: src, tags: ['zone34'] }));
+  if (n >= 5 && early / n >= 0.2) F.push(finding({ title: `Out before zone 3 in ${early}/${n} matches`, kind: 'inferred', area: 'survival', lens: 'execution', severity: -2, n, sources: src, tags: ['early-exit'] }));
+  if (reached3 >= 5 && p3 / reached3 >= 0.35) F.push(finding({ title: `Eliminated in zone 3–4 in ${p3} of ${reached3} matches that reached zone 3`, kind: 'inferred', area: 'survival', lens: 'strategic', severity: -2, n: reached3, sources: src, tags: ['zone34'] }));
   // Consistency.
   const cv = S.sdPts / S.ppm;
   F.push(finding({ title: `Consistency: ${S.top8}/${n} top-8 finishes, points SD ${round(S.sdPts, 1)}`, kind: 'inferred', area: 'consistency', lens: 'strategic', severity: cv > 1 ? -1 : cv < 0.6 && S.relLobby > 0 ? 1 : 0, n, sources: src, tags: [], detail: `${round(S.relLobby, 1)} pts/match vs the lobby average.` }));

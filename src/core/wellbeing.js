@@ -9,7 +9,8 @@
 export const ITEMS = ['sleepQ', 'fatigue', 'soreness', 'stress', 'mood'];
 export const ITEM_LABEL = { sleepQ: 'Sleep quality', fatigue: 'Freshness (low = tired)', soreness: 'Body (low = sore)', stress: 'Stress (low = stressed)', mood: 'Mood' };
 export const MIN_BASELINE_DAYS = 7;
-export const THRESHOLDS = { wellnessSD: 1.0, shortSleepH: 6, shortSleepDays: 2, loadRatio: 1.5, loadWeeksBaseline: 3 };
+// minSD: a player who scores the same every day has SD 0; without a floor a big drop would never flag.
+export const THRESHOLDS = { wellnessSD: 1.0, minSD: 1.5, shortSleepH: 6, shortSleepDays: 2, loadRatio: 1.5, loadWeeksBaseline: 3 };
 
 const need = (c, m) => { if (!c) throw new Error(m); };
 const mean = (a) => a.reduce((s, x) => s + x, 0) / a.length;
@@ -44,8 +45,8 @@ export function flags(player, date, checkins, sessions) {
   const prior = mine.filter((c) => c.date < date && days(c.date, date) <= 28);
   if (prior.length < MIN_BASELINE_DAYS) out.push({ level: 'info', text: `Baseline building: ${prior.length} of ${MIN_BASELINE_DAYS} earlier check-ins in the last 28 days. Personal comparisons start after that.` });
   else {
-    const m = mean(prior.map((c) => c.wellness)), s = sd(prior.map((c) => c.wellness));
-    if (s > 0 && today.wellness <= m - THRESHOLDS.wellnessSD * s) {
+    const m = mean(prior.map((c) => c.wellness)), s = Math.max(THRESHOLDS.minSD, sd(prior.map((c) => c.wellness)));
+    if (today.wellness <= m - THRESHOLDS.wellnessSD * s) {
       const low = ITEMS.filter((k) => today[k] <= Math.round(mean(prior.map((c) => c[k]))) - 1).map((k) => ITEM_LABEL[k]);
       out.push({ level: 'check', text: `Wellness ${today.wellness}/25 vs own 28-day average ${m.toFixed(1)} (±${s.toFixed(1)}).${low.length ? ` Lower on: ${low.join(', ')}.` : ''} Talk to the player before training.` });
     }

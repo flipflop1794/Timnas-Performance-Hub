@@ -66,7 +66,7 @@ test('summary: seven-day totals, trend, days since last report, carry-over adjus
   const mk = (date, won, lost, progress, adjust) => scrimReport({ ...base, date, won, lost, progress, adjust });
   const rs = [mk('2026-11-10', 2, 1, 4, 'A'), mk('2026-11-09', 1, 1, 4, 'B'), mk('2026-11-02', 0, 2, 2, 'C')];
   const s = reportSummary(rs, 'MLBB', '2026-11-12');
-  assert.equal(s.sessions, 2); assert.equal(s.won, 3); assert.equal(s.lost, 2); assert.equal(s.winRate, 60); assert.equal(s.progress, 4); assert.equal(s.progressPrev, 2); assert.equal(s.trend, 'up');
+  assert.equal(s.sessions, 2); assert.equal(s.won, 3); assert.equal(s.lost, 2); assert.equal(s.winRate, 60); assert.equal(s.progress, 4); assert.equal(s.progressPrev, 2); assert.equal(s.trend, null); // 2 reports vs 1: too few for a trend (balance review, 7 Nov 2026)
   assert.equal(s.daysSince, 2); assert.equal(s.carryOver.adjust, 'A'); assert.equal(s.daysCovered, 2);
   const none = reportSummary([], 'MLBB', '2026-11-12'); assert.equal(none.sessions, 0); assert.equal(none.winRate, null); assert.equal(none.last, null); assert.equal(none.trend, null);
 });

@@ -102,3 +102,17 @@ Rollback: revert the merge on `main` (Vercel redeploys V1.12). The new tables ca
 
 Still not tested: the real AI model on real screenshots (needs an API key), Dota screenshots (no real images
 found that could be downloaded; the two-screen merge is tested with a constructed pair), live updates on Supabase.
+
+## Balance review of the existing modules (7 Nov 2026)
+
+Every rule and threshold in the V1.0–V1.12 engines was re-read for small-sample and edge-case behaviour, and all
+58 screens of the artifact build were opened with every non-destructive button pressed once (no errors, no
+"NaN"/"undefined" on screen). `tests/balance.test.js` pins each change. `npm test`: **144 pass**.
+
+| Rule | Problem | Change |
+|---|---|---|
+| Measurement: win-rate change between two windows | Plain (Wald) interval: zero width at 0/8 vs 8/8, too narrow on scrim-size samples, so "better" came too easily | Agresti–Caffo interval (adds one win and one loss per window) |
+| Measurement: change in an average (net worth at 10:00, points per match…) | 1.96 used at any sample size (too narrow under ~30 games); two constant windows claimed a certain change | Welch t value for the real sample size; constant windows give "no clear change" |
+| Wellbeing: lower than own baseline | A player who reported the same score every day (spread 0) could never be flagged, however big the drop; a very steady player was flagged on a 1-point dip | Spread floored at 1.5 points: a 2+ point drop on a steady baseline flags, a 1-point dip does not |
+| Scrim reports: "improving / slipping" tag | Shown from one report this week against one last week | Needs 3+ reports in each week; otherwise no tag |
+| PUBGM: early exits and zone 3–4 eliminations | Could become a "problem" finding from 1–2 matches | Needs 5+ matches (same bar as scrim patterns) |

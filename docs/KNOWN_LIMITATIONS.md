@@ -33,3 +33,6 @@
 3. Coach Donny's readiness system: API provider or embed (docs/READINESS_INTEGRATION.md).
 4. Restore drill: restore last night's backup into a scratch project once, and time it.
 5. Decide wellbeing visibility (Head Coach) and widen the rule if agreed.
+
+17. Balance review (7 Nov 2026) re-checked the engines' statistics; it did not re-validate the thresholds themselves (rule-of-thumb load ratio 1.5, wellness 1 SD, 5-game pattern bar) against Indonesian team data. Revisit after the first two pelatnas weeks.
+18. The role-by-role website sweep was last run in Chrome for the V1.13 flows; the full 58-screen sweep this time ran on the artifact build (one role, demo data).

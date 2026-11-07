@@ -35,19 +35,32 @@ export function recencyWeight(ageDays, halfLifeDays = 60) {
 }
 
 // Difference of two proportions with a normal-approximation 95% interval.
+// Agresti–Caffo interval (add one win and one loss to each side): the plain Wald interval has zero
+// width at 0/8 vs 8/8 and is too narrow on the small samples scrims give.
 export function diffProportions(k1, n1, k2, n2) {
+  if (!n1 || !n2) return { d: NaN, lo: -1, hi: 1, p1: n1 ? k1 / n1 : NaN, p2: n2 ? k2 / n2 : NaN };
   const p1 = k1 / n1, p2 = k2 / n2;
-  const se = Math.sqrt(p1 * (1 - p1) / n1 + p2 * (1 - p2) / n2);
-  const d = p2 - p1;
-  return { d, lo: d - 1.96 * se, hi: d + 1.96 * se, p1, p2 };
+  const a1 = (k1 + 1) / (n1 + 2), a2 = (k2 + 1) / (n2 + 2);
+  const se = Math.sqrt(a1 * (1 - a1) / (n1 + 2) + a2 * (1 - a2) / (n2 + 2));
+  const d = p2 - p1, da = a2 - a1;
+  return { d, lo: Math.max(-1, da - 1.96 * se), hi: Math.min(1, da + 1.96 * se), p1, p2 };
 }
+// Two-sided 95% t critical value (Welch degrees of freedom); 1.96 is too narrow below ~30 games.
+const T95 = [12.71, 4.30, 3.18, 2.78, 2.57, 2.45, 2.36, 2.31, 2.26, 2.23, 2.20, 2.18, 2.16, 2.14, 2.13, 2.12, 2.11, 2.10, 2.09, 2.09, 2.08, 2.07, 2.07, 2.06, 2.06, 2.06, 2.05, 2.05, 2.05, 2.04];
+export function t95(df) { return !(df >= 1) ? Infinity : df >= 30 ? 1.96 + 2.4 / df : T95[Math.floor(df) - 1]; }
 
 // Difference of two means (Welch) with a 95% interval.
 export function diffMeans(a, b) {
   const ma = mean(a), mb = mean(b);
-  const se = Math.sqrt((sd(a) ** 2) / a.length + (sd(b) ** 2) / b.length);
+  if (a.length < 2 || b.length < 2) return { d: mb - ma, lo: -Infinity, hi: Infinity, ma, mb };
+  const va = sd(a) ** 2 / a.length, vb = sd(b) ** 2 / b.length;
+  const se = Math.sqrt(va + vb);
   const d = mb - ma;
-  return { d, lo: d - 1.96 * se, hi: d + 1.96 * se, ma, mb };
+  // Both windows constant: no spread to measure, so no claim either way.
+  if (!se) return { d, lo: d === 0 ? 0 : -Infinity, hi: d === 0 ? 0 : Infinity, ma, mb };
+  const df = (va + vb) ** 2 / ((va ** 2) / (a.length - 1) + (vb ** 2) / (b.length - 1));
+  const t = t95(df);
+  return { d, lo: d - t * se, hi: d + t * se, ma, mb };
 }
 
 // Deterministic PRNG so simulations and tests are reproducible.

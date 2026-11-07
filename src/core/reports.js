@@ -93,6 +93,8 @@ export function byDay(reports, title) {
   });
 }
 
+// A trend needs a few reports each week; one report against one report is noise.
+export const TREND_MIN = 3;
 export function reportSummary(reports, title, asOf, windowDays = 7) {
   const mine = reports.filter((r) => r.title === title).sort((a, b) => b.date.localeCompare(a.date) || b.createdAt.localeCompare(a.createdAt));
   const inWin = mine.filter((r) => dayDiff(r.date, asOf) >= 0 && dayDiff(r.date, asOf) < windowDays);
@@ -106,7 +108,7 @@ export function reportSummary(reports, title, asOf, windowDays = 7) {
     total: mine.length, sessions: inWin.length, daysCovered: new Set(inWin.map((r) => r.date)).size, won, lost, drawn,
     played: wl.length ? won + lost + drawn : 0, winRate: won + lost + drawn ? Math.round((won / (won + lost + drawn)) * 100) : null,
     points: pr.reduce((s, r) => s + r.result.points, 0), matches: pr.reduce((s, r) => s + r.result.played, 0),
-    progress: prog, progressPrev: progPrev, trend: prog != null && progPrev != null ? (prog > progPrev + 0.2 ? 'up' : prog < progPrev - 0.2 ? 'down' : 'steady') : null,
+    progress: prog, progressPrev: progPrev, trend: inWin.length >= TREND_MIN && prev.length >= TREND_MIN && prog != null && progPrev != null ? (prog > progPrev + 0.2 ? 'up' : prog < progPrev - 0.2 ? 'down' : 'steady') : null,
     last, daysSince: last ? dayDiff(last.date, asOf) : null,
     // The most recent adjustment is what the next session should start from.
     carryOver: last ? { date: last.date, by: last.by, adjust: last.adjust } : null,
