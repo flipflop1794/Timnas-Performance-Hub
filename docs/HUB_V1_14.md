@@ -39,3 +39,13 @@ body Plus Jakarta Sans. Light mode follows the device. Colours are set as tokens
 `npm test` (with database): **164 pass** (new: 8 Draft Room rules, 3 Draft Room screens, 2 database access).
 All 58 screens opened with every safe button pressed: no errors. Desktop 1280 px and phone 412 px: no
 sideways scrolling, no console errors.
+
+## Coach Donny's readiness system (8 Nov 2026)
+
+Performance → Athlete readiness now opens on Coach Donny's own system (his GitHub Pages app, framed, with *Open
+in a new tab*), shown to people with wellbeing access only. The *Hub view* tab keeps the hub's board; it switches
+from dummy data to his data when his system gets a read API (`src/readiness/donnyProvider.js`, ready and tested).
+Checked by serving his built app in place of GitHub Pages: it loads inside the hub with no errors. Details:
+`docs/READINESS_INTEGRATION.md`. Brand red tuned to the PB ESI logo in his repository (#E41824; gold #FFC940).
+`npm test`: **169 pass**.
+

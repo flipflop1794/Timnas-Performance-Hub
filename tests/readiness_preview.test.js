@@ -38,6 +38,12 @@ test('page: Performance → Athlete readiness (preview) loads, filters by title 
   const dom = new JSDOM(`<!doctype html><html><body>${html}</body></html>`, { runScripts: 'dangerously', url: 'https://example.test/#readiness', beforeParse(w) { w.claude = { use: async () => null }; w.console.error = (...a) => { throw new Error(a.join(' ')); }; } });
   const wait = () => new Promise((r) => setTimeout(r, 30)); await wait();
   const d = dom.window.document; const main = () => d.getElementById('main').textContent;
+  // V1.14: opens on Coach Donny's own system, embedded; the hub view is the second tab.
+  const frame = d.querySelector('.rd-frame iframe');
+  assert.equal(frame.getAttribute('src'), 'https://donnyakusuma.github.io/esportsindonesiamonitoring/');
+  assert.match(frame.getAttribute('sandbox'), /allow-scripts/); assert.equal(frame.getAttribute('referrerpolicy'), 'no-referrer');
+  assert.match(main(), /Stage 1 prototype/); assert.match(main(), /nothing in it is a real athlete's data yet/);
+  d.querySelector('[data-rd-mode="hub"]').click(); await wait();
   assert.match(main(), /Preview — Coach Donny's Athlete Readiness System \(Future Integration\)\./);
   assert.match(d.getElementById('titles').textContent, /Performance/);
   d.getElementById('rdT').value = 'CS2 Women'; d.getElementById('rdT').dispatchEvent(new dom.window.Event('change', { bubbles: true })); await wait();

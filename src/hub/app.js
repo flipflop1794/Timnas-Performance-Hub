@@ -36,6 +36,7 @@ import { scrimReport, addNote as reportNote, byDay as reportDays, reportSummary,
 import { seedRosters, effective, editPlayers, recordCheck, checkStatus, dotaPool, ACCOUNT_KIND, ROLE_HINT, rosterKey, CHECK_EVERY_DAYS } from '../core/rosters.js';
 import { loadReadiness, READINESS_SLOT } from '../readiness/contract.js';
 import { mockProvider, MOCK_TITLES } from '../readiness/mockProvider.js';
+import { donnyProvider, httpSource, DONNY_REPO } from '../readiness/donnyProvider.js';
 import { readinessView } from '../readiness/view.js';
 import { translateDom, tr as trId } from './i18n.js';
 import { autoCard, cardPlan, approveCard, cardMarkdown } from '../core/oppcard.js';
@@ -241,7 +242,7 @@ const TITLES = [
   { id: 'dota', label: 'Dota 2', tabs: [['dota-team', 'Team'], ['dota-scrims', 'Scrims & practice'], ['dota-reports', 'Scrim reports'], ['dota-patterns', 'Patterns'], ['dota-post', 'Post-match'], ['dota-scout', 'Competitors'], ['dota-draft', 'Draft room'], ['dota-review', 'Series review']] },
   { id: 'pubgm', label: 'PUBG Mobile', tabs: [['pubgm-team', 'Team'], ['pubgm-scrims', 'Scrims & practice'], ['pubgm-reports', 'Scrim reports'], ['pubgm-log', 'Log & import'], ['pubgm-rivals', 'Competitors'], ['pubgm-sim', 'Strategy sim'], ['pubgm-review', 'Match-day review']] },
   ...GAME_HUBS.map((h) => ({ id: h.id, label: h.label, tabs: hubTabs(h) })),
-  { id: 'well', label: 'Performance', tabs: [['readiness', 'Athlete readiness (preview)'], ['players', 'Player plans'], ['well-day', 'Wellbeing check'], ['well-log', 'Log check-in & load']] },
+  { id: 'well', label: 'Performance', tabs: [['readiness', 'Athlete readiness'], ['players', 'Player plans'], ['well-day', 'Wellbeing check'], ['well-log', 'Log check-in & load']] },
   { id: 'staff', label: 'Staff', tabs: [['staff-cycle', 'Coaching cycle'], ['staff-measure', 'Is it working?'], ['staff-rules', 'Rules & decisions'], ['staff-sources', 'Sources & limits'], ...(HUB_USER?.isAdmin ? [['admin-users', 'Users & access']] : [])] },
 ];
 const viewOf = () => { const h = location.hash.slice(1); return TITLES.some((t) => t.tabs.some(([id]) => id === h)) ? h : 'today'; };
@@ -1248,14 +1249,29 @@ V['comp-coverage'] = () => {
 
 // ---------- V1.7: Athlete readiness — UI preview of Coach Donny's system (src/readiness) ----------
 // The hub only renders; the provider supplies everything. Swap the provider in READINESS_SLOT later.
-const READINESS_PROVIDERS = { mock: mockProvider };
+const READINESS_PROVIDERS = { mock: mockProvider, ...(READINESS_SLOT.apiUrl ? { donny: donnyProvider(httpSource(READINESS_SLOT.apiUrl)) } : {}) };
 function ensureReadiness() {
   const key = `${S.rd.title}|${S.rd.date}`; if (S.rd.key === key) return;
   S.rd.key = key; S.rd.data = null;
-  const provider = READINESS_PROVIDERS[READINESS_SLOT.use] || mockProvider;
+  const provider = READINESS_PROVIDERS[READINESS_SLOT.apiUrl ? 'donny' : READINESS_SLOT.use] || mockProvider;
   loadReadiness(provider, { title: S.rd.title, date: S.rd.date }).then((d) => { if (S.rd.key === key) { S.rd.data = d; if (viewOf() === 'readiness') render(); } }).catch((e) => { S.rd.error = e.message; render(); });
 }
-V.readiness = () => { ensureReadiness(); return readinessView({ data: S.rd.data, titles: MOCK_TITLES, title: S.rd.title, date: S.rd.date }); };
+// V1.14: Coach Donny's own system, embedded (his app, his sign-in), beside the hub's view of the same contract.
+function donnyPanel() {
+  if (HUB_USER && S.wellAccess === 'denied') return `<div class="panel">${banner('block', '<div><b>Restricted.</b> Athlete readiness is limited to the readiness owner (Coach Donny) and admins until the Head Coach decides who else may see it.</div>')}</div>`;
+  const url = READINESS_SLOT.embedUrl;
+  return `<div class="panel rd-donny"><h2>Coach Donny's Athlete Readiness System</h2>
+    <p class="note">His system, shown inside the hub: check-ins, session RPE, wellness and readiness scores (formula v1.1, red below 35, amber below 45), team board, notes and follow-ups, consent and audit log. The hub does not score readiness. <b>Stage 1 prototype:</b> it runs in the browser with demo data that is rebuilt on every load, so nothing in it is a real athlete's data yet.</p>
+    <div class="toolbar"><a class="btn" href="${esc(url)}" target="_blank" rel="noopener noreferrer">Open in a new tab</a><a class="btn ghost" href="${esc(DONNY_REPO)}" target="_blank" rel="noopener noreferrer">Source (GitHub)</a></div>
+    <div class="rd-frame"><iframe src="${esc(url)}" title="Coach Donny's Athlete Readiness System" loading="lazy" referrerpolicy="no-referrer" sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-downloads"></iframe></div>
+    <p class="note">If the frame stays empty, use <i>Open in a new tab</i>. When his system has a read API, the hub's own board below switches from the dummy preview to his data (src/readiness/donnyProvider.js).</p></div>`;
+}
+V.readiness = () => {
+  const mode = S.rd.mode || 'donny';
+  const seg = `<div class="drseg" role="tablist"><button type="button" role="tab" aria-selected="${mode === 'donny'}" data-rd-mode="donny">Coach Donny's system</button><button type="button" role="tab" aria-selected="${mode === 'hub'}" data-rd-mode="hub">Hub view ${READINESS_SLOT.apiUrl ? '(his data)' : '(preview)'}</button></div>`;
+  if (mode === 'donny') return `<div class="panel">${seg}</div>${donnyPanel()}`;
+  ensureReadiness(); return `<div class="panel">${seg}</div>${readinessView({ data: S.rd.data, titles: MOCK_TITLES, title: S.rd.title, date: S.rd.date })}`;
+};
 
 // ---------- V1.6: rival rosters & player tracker, pre-match opponent card ----------
 const rosterOf = (title, nation) => effective(S.rivalSeed, S.rosterEdits, rosterKey(title, nation));
@@ -1410,6 +1426,7 @@ async function onClick(e) {
   // V1.13 capture / patterns buttons only, so every other click stays synchronous until its own first await.
   if (Object.keys(t.dataset).some((k) => /^(cap|pat)[A-Z]/.test(k)) && await capUi().onClick(t)) return;
   if (Object.keys(t.dataset).some((k) => /^dr[A-Z]/.test(k)) && await drUi().onClick(t)) return;
+  if (t.dataset.rdMode) { S.rd.mode = t.dataset.rdMode; render(); return; }
   const id = t.id;
   if (id === 'langBtn') { S.lang = S.lang === 'id' ? 'en' : 'id'; try { localStorage.setItem('hub-lang', S.lang); } catch { /* per-viewer convenience only */ } render(); return; }
   if (id === 'modeBtn' || id === 'modeBtn2') { S.mode = S.mode === 'demo' ? 'live' : 'demo'; S.pubgm.team = null; S.pubgm.sim = null; render(); return; }

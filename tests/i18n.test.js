@@ -19,7 +19,8 @@ test('page in Bahasa Indonesia: toggle, stable redraws, option values kept, logi
   const dom = new JSDOM(`<!doctype html><html><body>${html}</body></html>`, { runScripts: 'dangerously', url: 'https://example.test/#readiness', beforeParse(w) { w.claude = { use: async () => null }; w.console.error = (...a) => { throw new Error(a.join(' ')); }; } });
   const wait = () => new Promise((r) => setTimeout(r, 30)); await wait();
   const d = dom.window.document; const main = () => d.getElementById('main').textContent;
-  assert.match(main(), /Athlete readiness|Preview/);
+  assert.match(main(), /Athlete readiness|Preview|Coach Donny/);
+  d.querySelector('[data-rd-mode="hub"]').click(); await wait();
   d.getElementById('langBtn').click(); await wait();
   assert.equal(d.documentElement.lang, 'id');
   assert.match(main(), /Pratinjau — Sistem Kesiapan Atlet Coach Donny \(Integrasi Mendatang\)\./); assert.match(main(), /Perlu tindak lanjut/);

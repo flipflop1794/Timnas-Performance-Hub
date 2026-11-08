@@ -24,8 +24,11 @@
  *   embedUrl?:string }} ReadinessProvider
  */
 
-// Which provider the hub uses. 'mock' until Donny's system is connected (decision: Donny + Fayad).
-export const READINESS_SLOT = { use: 'mock', embedUrl: null };
+// Which provider the hub uses (V1.14, 8 Nov 2026: Coach Donny's system connected).
+//   embedUrl: his live app, shown in Performance → Athlete readiness (his sign-in, his data).
+//   apiUrl:   his read API once it exists; then the hub's own view switches from the dummy preview to his data.
+// Who may see readiness data is still open (Donny + Fayad): the page shows it only to people with wellbeing access.
+export const READINESS_SLOT = { use: 'mock', embedUrl: 'https://donnyakusuma.github.io/esportsindonesiamonitoring/', apiUrl: null };
 
 export const PREVIEW_LABEL = 'Preview — Coach Donny\'s Athlete Readiness System (Future Integration).';
 
