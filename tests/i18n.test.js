@@ -23,7 +23,7 @@ test('page in Bahasa Indonesia: toggle, stable redraws, option values kept, logi
   d.querySelector('[data-rd-mode="hub"]').click(); await wait();
   d.getElementById('langBtn').click(); await wait();
   assert.equal(d.documentElement.lang, 'id');
-  assert.match(main(), /Pratinjau — Sistem Kesiapan Atlet Coach Donny \(Integrasi Mendatang\)\./); assert.match(main(), /Perlu tindak lanjut/);
+  assert.match(main(), /Kesiapan atlet/); assert.match(main(), /Perlu tindak lanjut/); // V1.15: his data, so no preview label
   assert.match(d.getElementById('titles').textContent, /Kompetitor/); assert.match(d.getElementById('titles').textContent, /Performa/);
   const size = d.body.innerHTML.length;
   for (let i = 0; i < 5; i++) { d.getElementById('meSel').dispatchEvent(new dom.window.Event('change', { bubbles: true })); }
@@ -32,7 +32,7 @@ test('page in Bahasa Indonesia: toggle, stable redraws, option values kept, logi
   const opt = [...d.getElementById('rdT').options].find((o) => o.value === 'All titles');
   assert.equal(opt.textContent, 'Semua title');
   d.getElementById('rdT').value = 'CS2'; d.getElementById('rdT').dispatchEvent(new dom.window.Event('change', { bubbles: true })); await wait();
-  assert.match(main(), /CS2 · Atlet 1/);
+  await wait(); assert.match(main(), /Achmad Rismana Handachnie/); assert.doesNotMatch(main(), /Risalma/); // his CS2 list only
   dom.window.location.hash = 'tour-runbook'; dom.window.dispatchEvent(new dom.window.HashChangeEvent('hashchange')); await wait();
   assert.match(main(), /Runbook hari pertandingan — Dota 2/); assert.match(main(), /Pekan turnamen/);
   d.getElementById('wmD').value = '2026-12-01'; d.getElementById('wmAdd').click(); await wait();

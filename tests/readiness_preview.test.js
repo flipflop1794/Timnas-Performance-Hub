@@ -38,16 +38,17 @@ test('page: Performance → Athlete readiness (preview) loads, filters by title 
   const dom = new JSDOM(`<!doctype html><html><body>${html}</body></html>`, { runScripts: 'dangerously', url: 'https://example.test/#readiness', beforeParse(w) { w.claude = { use: async () => null }; w.console.error = (...a) => { throw new Error(a.join(' ')); }; } });
   const wait = () => new Promise((r) => setTimeout(r, 30)); await wait();
   const d = dom.window.document; const main = () => d.getElementById('main').textContent;
-  // V1.14: opens on Coach Donny's own system, embedded; the hub view is the second tab.
-  const frame = d.querySelector('.rd-frame iframe');
-  assert.equal(frame.getAttribute('src'), 'https://donnyakusuma.github.io/esportsindonesiamonitoring/');
-  assert.match(frame.getAttribute('sandbox'), /allow-scripts/); assert.equal(frame.getAttribute('referrerpolicy'), 'no-referrer');
-  assert.match(main(), /Stage 1 prototype/); assert.match(main(), /nothing in it is a real athlete's data yet/);
-  d.querySelector('[data-rd-mode="hub"]').click(); await wait();
-  assert.match(main(), /Preview — Coach Donny's Athlete Readiness System \(Future Integration\)\./);
+  // V1.15: opens on Coach Donny's own system, running inside the hub (his screens in a shadow root).
+  const host = d.querySelector('#donnyMount .donny-host'); assert.ok(host, 'his screens are mounted');
+  assert.match(host.shadowRoot.textContent, /Papan Tim/); assert.match(main(), /Built by Coach Donny/);
+  assert.equal(d.querySelector('iframe'), null);
+  d.querySelector('[data-rd-mode="hub"]').click(); await wait(); await wait();
+  // The hub board now reads his scores (no dummy athletes); his real team list is there, nobody checked in yet.
+  assert.doesNotMatch(main(), /Preview — Coach Donny's Athlete Readiness System \(Future Integration\)\./);
+  assert.match(main(), /Scores, statuses and thresholds are Coach Donny's/); assert.match(main(), /0 of 30 athletes checked in/);
   assert.match(d.getElementById('titles').textContent, /Performance/);
   d.getElementById('rdT').value = 'CS2 Women'; d.getElementById('rdT').dispatchEvent(new dom.window.Event('change', { bubbles: true })); await wait();
-  assert.match(main(), /CS2 Women · Athlete/); assert.doesNotMatch(main(), /Dota 2 · Athlete/);
+  await wait(); assert.match(main(), /Risalma Agnia Lukman/); assert.doesNotMatch(main(), /Matthew Filemon/); // his CS2 Women list, not Dota
   d.getElementById('rdD').value = '2026-12-15'; d.getElementById('rdD').dispatchEvent(new dom.window.Event('change', { bubbles: true })); await wait();
   assert.equal(d.getElementById('rdD').value, '2026-12-15');
 });

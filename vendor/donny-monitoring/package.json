@@ -1,0 +1,29 @@
+{
+  "name": "esport-monitoring",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Sistem Monitoring Readiness & Wellness Atlet Esport — Tahap 1",
+  "scripts": {
+    "dev": "vite --config web/vite.config.ts",
+    "build": "tsc -p tsconfig.json",
+    "build:web": "tsc -p web/tsconfig.json && vite build --config web/vite.config.ts",
+    "deploy:pages": "bash scripts/deploy-pages.sh",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "typecheck": "tsc -p tsconfig.json --noEmit && tsc -p web/tsconfig.json"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.2",
+    "@types/react": "^18.3.31",
+    "@types/react-dom": "^18.3.7",
+    "@vitejs/plugin-react": "^4.7.0",
+    "typescript": "^5.7.2",
+    "vite": "^5.4.21",
+    "vitest": "^2.1.8"
+  },
+  "dependencies": {
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1"
+  }
+}

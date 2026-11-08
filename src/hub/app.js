@@ -37,6 +37,9 @@ import { seedRosters, effective, editPlayers, recordCheck, checkStatus, dotaPool
 import { loadReadiness, READINESS_SLOT } from '../readiness/contract.js';
 import { mockProvider, MOCK_TITLES } from '../readiness/mockProvider.js';
 import { donnyProvider, httpSource, DONNY_REPO } from '../readiness/donnyProvider.js';
+import { mountDonny, staffActors, actorFor } from '../readiness/donny/mount.tsx';
+import { localSource } from '../readiness/donny/source.ts';
+import { SKOR_FORMULA_VERSION as DONNY_FORMULA } from '../../vendor/donny-monitoring/src/modules/skor.ts';
 import { readinessView } from '../readiness/view.js';
 import { translateDom, tr as trId } from './i18n.js';
 import { autoCard, cardPlan, approveCard, cardMarkdown } from '../core/oppcard.js';
@@ -1247,31 +1250,58 @@ V['comp-coverage'] = () => {
   <p class="note">eFootball's finals format is not published; its 96-nation list is the entry list, not the bracket.</p></div>`;
 };
 
-// ---------- V1.7: Athlete readiness — UI preview of Coach Donny's system (src/readiness) ----------
-// The hub only renders; the provider supplies everything. Swap the provider in READINESS_SLOT later.
-const READINESS_PROVIDERS = { mock: mockProvider, ...(READINESS_SLOT.apiUrl ? { donny: donnyProvider(httpSource(READINESS_SLOT.apiUrl)) } : {}) };
-function ensureReadiness() {
-  const key = `${S.rd.title}|${S.rd.date}`; if (S.rd.key === key) return;
-  S.rd.key = key; S.rd.data = null;
-  const provider = READINESS_PROVIDERS[READINESS_SLOT.apiUrl ? 'donny' : READINESS_SLOT.use] || mockProvider;
-  loadReadiness(provider, { title: S.rd.title, date: S.rd.date }).then((d) => { if (S.rd.key === key) { S.rd.data = d; if (viewOf() === 'readiness') render(); } }).catch((e) => { S.rd.error = e.message; render(); });
+// ---------- Athlete readiness: Coach Donny's system, running inside the hub (V1.15) ----------
+// His code (vendor/donny-monitoring, unchanged) runs in the page; its data lives in the hub database
+// (readiness_store, readiness owner and admins only). The hub board ("Hub view") reads his scores through the
+// same provider contract as before; the dummy preview is shown only when his system cannot be reached.
+const DONNY_MOUNTS = {};
+const donnyPerson = () => (HUB_USER ? { staffKey: HUB_USER.staffKey, name: HUB_USER.name, isAdmin: HUB_USER.isAdmin } : { staffKey: S.me, name: meName(), isAdmin: true });
+function donnyMounted() {
+  // One mount per mode, user and database connection (the page may draw before the database is connected).
+  const key = `${S.mode}|${HUB_USER ? HUB_USER.id : S.me}|${S.db ? 'db' : 'local'}`;
+  if (!DONNY_MOUNTS[key]) {
+    for (const k of Object.keys(DONNY_MOUNTS)) if (k.startsWith(`${S.mode}|`)) { DONNY_MOUNTS[k].unmount(); delete DONNY_MOUNTS[k]; }
+    DONNY_MOUNTS[key] = mountDonny({ db: S.mode === 'demo' ? null : S.db, sid, person: donnyPerson(), demo: S.mode === 'demo',
+      onError: (e) => { S.rd.donnyError = e?.message || String(e); if (viewOf() === 'readiness') render(); } });
+    const st = DONNY_MOUNTS[key].store; const persist = st.persist;
+    // His data changed: the hub board reloads next time it is drawn (and now, if it is on screen).
+    st.persist = (...a) => { S.rd.ver = (S.rd.ver || 0) + 1; if (viewOf() === 'readiness' && S.rd.mode === 'hub') queueMicrotask(render); return persist(...a); };
+  }
+  return DONNY_MOUNTS[key];
 }
-// V1.14: Coach Donny's own system, embedded (his app, his sign-in), beside the hub's view of the same contract.
+function donnyProviderNow() {
+  const m = donnyMounted();
+  return donnyProvider(localSource(m.store, () => {
+    const staff = staffActors(m.store); return actorFor(donnyPerson(), staff) || staff.find((a) => a.peran === 'staf_pelatih' && a.admin) || null;
+  }), { label: "Coach Donny's Athlete Readiness System" });
+}
+function ensureReadiness() {
+  const key = `${S.rd.title}|${S.rd.date}|${S.mode}|${S.rd.ver || 0}`; if (S.rd.key === key) return;
+  S.rd.key = key; S.rd.data = null; S.rd.error = '';
+  const provider = READINESS_SLOT.apiUrl ? donnyProvider(httpSource(READINESS_SLOT.apiUrl)) : donnyProviderNow();
+  loadReadiness(provider, { title: S.rd.title, date: S.rd.date }).then((d) => { if (S.rd.key === key) { S.rd.data = d; if (viewOf() === 'readiness') render(); } })
+    .catch((e) => { S.rd.error = e.message; loadReadiness(mockProvider, { title: S.rd.title, date: S.rd.date }).then((d) => { S.rd.data = d; if (viewOf() === 'readiness') render(); }); });
+}
+const readinessRestricted = () => HUB_USER && S.wellAccess === 'denied';
 function donnyPanel() {
-  if (HUB_USER && S.wellAccess === 'denied') return `<div class="panel">${banner('block', '<div><b>Restricted.</b> Athlete readiness is limited to the readiness owner (Coach Donny) and admins until the Head Coach decides who else may see it.</div>')}</div>`;
-  const url = READINESS_SLOT.embedUrl;
   return `<div class="panel rd-donny"><h2>Coach Donny's Athlete Readiness System</h2>
-    <p class="note">His system, shown inside the hub: check-ins, session RPE, wellness and readiness scores (formula v1.1, red below 35, amber below 45), team board, notes and follow-ups, consent and audit log. The hub does not score readiness. <b>Stage 1 prototype:</b> it runs in the browser with demo data that is rebuilt on every load, so nothing in it is a real athlete's data yet.</p>
-    <div class="toolbar"><a class="btn" href="${esc(url)}" target="_blank" rel="noopener noreferrer">Open in a new tab</a><a class="btn ghost" href="${esc(DONNY_REPO)}" target="_blank" rel="noopener noreferrer">Source (GitHub)</a></div>
-    <div class="rd-frame"><iframe src="${esc(url)}" title="Coach Donny's Athlete Readiness System" loading="lazy" referrerpolicy="no-referrer" sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-downloads"></iframe></div>
-    <p class="note">If the frame stays empty, use <i>Open in a new tab</i>. When his system has a read API, the hub's own board below switches from the dummy preview to his data (src/readiness/donnyProvider.js).</p></div>`;
+    <p class="note">Coach Donny's own system, running inside the hub: team board, athletes, check-ins and session RPE, wellness and readiness (his formula ${esc(DONNY_FORMULA)}; red below 35, amber below 45), notes and follow-ups, consent, score settings, audit log. Built by Coach Donny (<a href="${esc(DONNY_REPO)}" target="_blank" rel="noopener noreferrer">source</a>); the hub stores its data and signs you in. Staff only: check-ins are entered by staff.${S.mode === 'demo' ? ' <b>Demo sandbox: his sample data, not saved.</b>' : ''}</p>
+    ${S.rd.donnyError ? banner('warn', `<div><b>Not saved:</b> ${esc(S.rd.donnyError)}</div>`) : ''}
+    <div id="donnyMount" class="donny-mount"></div></div>`;
 }
 V.readiness = () => {
+  if (readinessRestricted()) return `<div class="panel">${banner('block', '<div><b>Restricted.</b> Athlete readiness is limited to the readiness owner (Coach Donny) and admins until the Head Coach decides who else may see it.</div>')}</div>`;
   const mode = S.rd.mode || 'donny';
-  const seg = `<div class="drseg" role="tablist"><button type="button" role="tab" aria-selected="${mode === 'donny'}" data-rd-mode="donny">Coach Donny's system</button><button type="button" role="tab" aria-selected="${mode === 'hub'}" data-rd-mode="hub">Hub view ${READINESS_SLOT.apiUrl ? '(his data)' : '(preview)'}</button></div>`;
+  const seg = `<div class="drseg" role="tablist"><button type="button" role="tab" aria-selected="${mode === 'donny'}" data-rd-mode="donny">Coach Donny's system</button><button type="button" role="tab" aria-selected="${mode === 'hub'}" data-rd-mode="hub">Hub view</button></div>`;
   if (mode === 'donny') return `<div class="panel">${seg}</div>${donnyPanel()}`;
-  ensureReadiness(); return `<div class="panel">${seg}</div>${readinessView({ data: S.rd.data, titles: MOCK_TITLES, title: S.rd.title, date: S.rd.date })}`;
+  ensureReadiness();
+  return `<div class="panel">${seg}</div>${S.rd.error ? banner('warn', `<div>Coach Donny's data could not be read (${esc(S.rd.error)}); showing the dummy preview.</div>`) : ''}${readinessView({ data: S.rd.data, titles: MOCK_TITLES, title: S.rd.title, date: S.rd.date })}`;
 };
+// After each hub redraw, put his (still running) screens back into the page.
+function attachDonny() {
+  const slot = document.getElementById('donnyMount'); if (!slot) return;
+  const m = donnyMounted(); if (m.node.parentNode !== slot) slot.appendChild(m.node);
+}
 
 // ---------- V1.6: rival rosters & player tracker, pre-match opponent card ----------
 const rosterOf = (title, nation) => effective(S.rivalSeed, S.rosterEdits, rosterKey(title, nation));
@@ -1395,6 +1425,7 @@ function render() {
   if (kept) restoreForms(kept);
   LAST_VIEW = view;
   if (document.getElementById('drClock')) drUi().startTicker();
+  attachDonny();
 }
 // Views that show engine findings or data notes, which stay in English.
 const ORIGINAL_LANG_VIEWS = /^(dota-team|dota-post|dota-scout|dota-draft|dota-review|pubgm-(team|log|rivals|sim|review)|comp-nation|comp-card|comp-rosters|staff-sources|staff-rules)/;
@@ -1426,7 +1457,7 @@ async function onClick(e) {
   // V1.13 capture / patterns buttons only, so every other click stays synchronous until its own first await.
   if (Object.keys(t.dataset).some((k) => /^(cap|pat)[A-Z]/.test(k)) && await capUi().onClick(t)) return;
   if (Object.keys(t.dataset).some((k) => /^dr[A-Z]/.test(k)) && await drUi().onClick(t)) return;
-  if (t.dataset.rdMode) { S.rd.mode = t.dataset.rdMode; render(); return; }
+  if (t.dataset.rdMode) { S.rd.mode = t.dataset.rdMode; S.rd.key = null; render(); return; }
   const id = t.id;
   if (id === 'langBtn') { S.lang = S.lang === 'id' ? 'en' : 'id'; try { localStorage.setItem('hub-lang', S.lang); } catch { /* per-viewer convenience only */ } render(); return; }
   if (id === 'modeBtn' || id === 'modeBtn2') { S.mode = S.mode === 'demo' ? 'live' : 'demo'; S.pubgm.team = null; S.pubgm.sim = null; render(); return; }

@@ -43,3 +43,4 @@
 23. No public pro games are preloaded (see HUB_V1_14.md); pro patterns appear once an analyst imports a CSV.
 24. Draft book approval (another coach than the writer, from the title's approvers) is checked by the hub, not the database, as for opponent cards.
 25. Brand colours approximate the public PB ESI logo (red and white); official hex codes not yet received. Fonts load from Google Fonts; offline, system fonts are used.
+26. Coach Donny's system (V1.15): staff-only entry; his audit log names the athlete for staff entries (the hub audit names the staff member); concurrent edits of the same record: last save wins; audit and notification lists grow one row per item. Updating his code is a manual copy (vendor/donny-monitoring/UPSTREAM.md).

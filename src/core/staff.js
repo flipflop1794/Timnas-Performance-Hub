@@ -3,7 +3,7 @@
 // oversees everything, and a title coach may review proposals for his own title.
 
 export const STAFF = [
-  { id: 'fayad', name: 'Fayad', role: 'Head Coach', focus: ['PUBG Mobile', 'eFootball', 'MLBB Women'], oversight: 'all titles' },
+  { id: 'fayad', name: 'Fayad', realName: 'Muslih Wahyudi Rahman', role: 'Head Coach', focus: ['PUBG Mobile', 'eFootball', 'MLBB Women'], oversight: 'all titles' },
   { id: 'aufa', name: 'Aufa Bassam', role: 'Assistant Coach 2', focus: ['Dota 2', 'MLBB'] },
   { id: 'donny', name: 'Donny Ardy Kusuma', role: 'Assistant Coach 1 — sport scientist', focus: ['Wellbeing'], oversight: 'physical and mental preparation, all titles' },
 ];

@@ -155,3 +155,23 @@ test('admin page: AI use this month with an estimated cost', async () => {
   for (let i = 0; i < 40 && !/AI use this month/.test(aufa.text()); i++) await sleep(50);
   assert.match(aufa.text(), /AI use this month/); assert.match(aufa.text(), /Game screenshots1—\$0\.012/);
 });
+
+test("Coach Donny's system inside the hub: staff sign-in, team saved once in the database, other devices load it, title coaches kept out", async () => {
+  const B = world();
+  const donny = await open(B, 'donny', 'readiness');
+  const shadow = () => donny.d.querySelector('#donnyMount .donny-host')?.shadowRoot?.textContent || '';
+  for (let i = 0; i < 40 && !/Papan Tim/.test(shadow()); i++) await sleep(50);
+  assert.match(shadow(), /Papan Tim/); assert.match(shadow(), /Dr\. Donny Ardy Kusuma/); assert.match(shadow(), /Saved in the Timnas Hub database/);
+  for (let i = 0; i < 40 && !(B.tables.readiness_store || []).length; i++) await sleep(50);
+  const n = B.tables.readiness_store.length;
+  assert.ok(n > 60, `his team structure saved (${n} rows)`);
+  assert.ok(B.tables.readiness_store.every((r) => r.created_by === 'u-donny'), 'saved under the hub user who made the change');
+  assert.ok(B.tables.readiness_store.some((r) => r.data.map === 'athletes' && r.data.value.nama === 'Matthew Filemon'));
+  // Fayad (Muslih Wahyudi Rahman) is the Head Coach in his list too; Aufa opens it on another device: loaded, not created again.
+  const aufa = await open(B, 'aufa', 'readiness'); await sleep(300);
+  assert.match(aufa.d.querySelector('#donnyMount .donny-host').shadowRoot.textContent, /Aufa Bassam/);
+  assert.equal(B.tables.readiness_store.length, n);
+  // A title coach without wellbeing access sees nothing of it.
+  const indra = await open(B, 'indra', 'readiness'); await sleep(100);
+  assert.match(indra.text(), /Restricted/); assert.equal(indra.d.querySelector('.donny-host'), null);
+});

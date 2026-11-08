@@ -57,7 +57,7 @@ test('proposed HTTP source: read-only calls with his sign-in token; refusals exp
   await assert.rejects(s.konfigurasiSkor(), /refused access/);
 });
 
-test('website security headers allow framing only his site', () => {
-  const v = JSON.parse(readFileSync(new URL('../vercel.json', import.meta.url), 'utf8'));
-  const csp = JSON.stringify(v); assert.match(csp, /frame-src https:\/\/donnyakusuma\.github\.io;/); assert.match(csp, /frame-ancestors 'none'/);
+test('website security headers: no outside frames (his system runs inside the hub, not in a frame)', () => {
+  const v = JSON.stringify(JSON.parse(readFileSync(new URL('../vercel.json', import.meta.url), 'utf8')));
+  assert.doesNotMatch(v, /frame-src/); assert.match(v, /frame-ancestors 'none'/);
 });

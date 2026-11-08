@@ -1,6 +1,11 @@
 # Athlete Readiness — integration guide (for Coach Donny's system)
 
-## Update 8 Nov 2026 (V1.14): connected
+## Update 8 Nov 2026 (V1.15): his code runs inside the hub
+
+Superseded the frame below: his engine and screens are vendored (`vendor/donny-monitoring`), stored in the hub
+database and signed in with the hub account. See docs/HUB_V1_15.md.
+
+## Earlier update 8 Nov 2026 (V1.14): connected by frame
 
 Coach Donny's system: github.com/donnyakusuma/esportsindonesiamonitoring (main @ 56d88c2, 6 Nov), published on
 GitHub Pages at https://donnyakusuma.github.io/esportsindonesiamonitoring/. Stage 1 of his PRD (30 Oct): daily

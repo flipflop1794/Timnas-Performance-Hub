@@ -124,7 +124,7 @@ function adminApi(client: SupabaseClient) {
     async exportAll() {
       const tables = ['profiles', 'user_roles', 'user_titles', 'disciplines', 'roster_players', 'app_config', 'scrim_sessions', 'scrim_reports', 'scrim_report_corrections',
         'coaching_objectives', 'scouting_notes', 'rival_tiers', 'rival_rosters', 'rival_vods', 'opponent_cards', 'sparring_partners', 'wec_matches', 'player_plans',
-        'pubgm_logs', 'dota_matches', 'dota_pools', 'wellbeing_checkins', 'wellbeing_loads', 'scrim_games', 'scrim_captures', 'pattern_findings', 'player_aliases', 'ai_usage', 'draft_pools', 'draft_books', 'mock_drafts', 'draft_drills', 'pro_games'];
+        'pubgm_logs', 'dota_matches', 'dota_pools', 'wellbeing_checkins', 'wellbeing_loads', 'scrim_games', 'scrim_captures', 'pattern_findings', 'player_aliases', 'ai_usage', 'draft_pools', 'draft_books', 'mock_drafts', 'draft_drills', 'pro_games', 'readiness_store'];
       const out: Record<string, unknown> = { exported_at: new Date().toISOString(), note: 'Timnas Performance Hub export. Contains wellbeing data if exported by an admin: store securely.' };
       for (const tb of tables) {
         const rows: unknown[] = [];
