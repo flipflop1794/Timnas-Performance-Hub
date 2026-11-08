@@ -65,11 +65,22 @@ test('website: a coach captures a game from a screenshot, saves the report; the 
   const C = await open(B, 'christie', 'mlbb-patterns'); assert.match(C.text(), /not assigned to MLBB/); assert.match(C.text(), /Confirmed games0/);
 });
 
-test('website: when the AI function is not deployed, the coach is told to type the game by hand', async () => {
+test('website: when the AI function is not deployed, AI buttons are hidden and the by-hand path stays', async () => {
   const B = world(); const P = await open(B, 'indra', 'mlbb-reports');
-  await upload(P);
-  assert.match(P.d.getElementById('capMsg-MLBB').textContent, /AI capture is not set up on the server yet/);
+  assert.equal(P.d.querySelector('[data-cap-shot="MLBB"]'), null, 'no screenshot upload without AI');
   assert.ok(P.d.querySelector('[data-cap-manual="MLBB"]'), 'by-hand path still there');
+});
+
+test('website updated before the database (V1.13–V1.15 tables missing): the hub works as before, new parts hidden, admin sees what is pending', async () => {
+  const B = world(); B.missing = new Set(['scrim_games', 'scrim_captures', 'pattern_findings', 'player_aliases', 'ai_usage', 'draft_pools', 'draft_books', 'mock_drafts', 'draft_drills', 'pro_games', 'readiness_store']);
+  const P = await open(B, 'indra', 'mlbb-reports');
+  assert.doesNotMatch(P.text(), /Something failed/); assert.match(P.text(), /No report yet|Scrim reports/);
+  const tabs = [...P.d.querySelectorAll('#tabs a')].map((a) => a.textContent);
+  assert.ok(!tabs.includes('Patterns') && !tabs.includes('Draft Room'), tabs.join());
+  assert.equal(P.d.querySelector('[data-cap-manual="MLBB"]'), null);
+  const A = await open(B, 'aufa', 'admin-users'); for (let i = 0; i < 30 && !/What is switched on/.test(A.text()); i++) await sleep(50);
+  assert.match(A.text(), /What is switched on/); assert.match(A.text(), /pending Scrim capture/); assert.match(A.text(), /RUN_ON_LIVE_V1_13_TO_V1_15\.sql/);
+  await A.go('readiness'); assert.match(A.text(), /switches on after the V1.15 database update/); assert.doesNotMatch(A.text(), /Something failed/);
 });
 
 test('website: AI refusals reach the coach as plain sentences', async () => {
@@ -96,4 +107,26 @@ test('website: after the first load, a new game fetches only new rows, not every
   const fetched = (B.selected.scrim_games || 0) - before;
   assert.ok(fetched >= 1 && fetched <= 2, `fetched ${fetched} game rows for one new game (would be 4 with full reloads)`);
   await P.go('mlbb-patterns'); assert.match(P.text(), /Confirmed games4/);
+});
+
+test('website before the database update: every screen opens for the admin and a title coach without an error', async () => {
+  const B = world(); B.missing = new Set(['scrim_games', 'scrim_captures', 'pattern_findings', 'player_aliases', 'ai_usage', 'draft_pools', 'draft_books', 'mock_drafts', 'draft_drills', 'pro_games', 'readiness_store']);
+  for (const who of ['aufa', 'indra']) {
+    const P = await open(B, who, 'today'); const seen = new Set(); const queue = ['today'];
+    const collect = () => { for (const a of P.d.querySelectorAll('a[href^="#"]')) { const h = a.getAttribute('href').slice(1); if (h && !seen.has(h) && !queue.includes(h)) queue.push(h); } };
+    collect();
+    while (queue.length) { const v = queue.shift(); seen.add(v); await P.go(v); collect(); assert.doesNotMatch(P.text(), /Something failed/, `${who} ${v}`); }
+    assert.ok(seen.size > (who === "aufa" ? 20 : 5), `${who} visited ${seen.size} screens`); // a title coach has the short coach menu
+  }
+});
+
+test('website with everything switched on: every screen opens for admin, Head Coach, Coach Donny and a title coach', async () => {
+  const B = world(); B.ai = async () => ({ data: { ok: true } });
+  for (const who of ['aufa', 'fayad', 'donny', 'indra']) {
+    const P = await open(B, who, 'today'); const seen = new Set(); const queue = ['today'];
+    const collect = () => { for (const a of P.d.querySelectorAll('a[href^="#"]')) { const h = a.getAttribute('href').slice(1); if (h && !seen.has(h) && !queue.includes(h)) queue.push(h); } };
+    collect();
+    while (queue.length) { const v = queue.shift(); seen.add(v); await P.go(v); collect(); assert.doesNotMatch(P.text(), /Something failed|NaN|undefined|\[object Object\]/, `${who} ${v}`); }
+    assert.ok(seen.size > 5, `${who} visited ${seen.size} screens`);
+  }
 });

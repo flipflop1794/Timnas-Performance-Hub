@@ -21,6 +21,8 @@ import { STAFF, TITLES as WEC_TITLES, WELLBEING, owner, ownerNote, reviewersFor,
 // Website build: the signed-in account (src/web/main.ts). Absent in the Claude artifact build.
 const HUB_USER = (typeof window !== 'undefined' && window.__HUB_USER__) || null;
 const PLATFORM = (typeof window !== 'undefined' && window.__HUB_PLATFORM__) || null;
+// V1.15: newer parts switch on only when the live database / server has them (all on in the artifact build).
+const FEAT = { capture: true, draftRoom: true, donny: true, ai: true, ...(PLATFORM?.features || {}) };
 if (HUB_USER && !HUB_USER.staffKey) {
   const ROLE_LABEL = { admin: 'Admin', head_coach: 'Head Coach', assistant_coach: 'Assistant coach', readiness_owner: 'Readiness owner', title_coach: 'Title coach', analyst: 'Analyst' };
   STAFF.push({ id: 'user', name: HUB_USER.name, role: HUB_USER.roles.map((r) => ROLE_LABEL[r] || r).join(', '), focus: HUB_USER.titles.length ? HUB_USER.titles : WEC_TITLES.map((t) => t.id) });
@@ -47,6 +49,7 @@ import { usageSummary, PRICES_READ } from '../core/ai_cost.js';
 import { checkin, session as loadSession, teamDay, ITEMS, ITEM_LABEL, THRESHOLDS, MIN_BASELINE_DAYS } from '../core/wellbeing.js';
 import { captureUi } from './capture_ui.js';
 import { draftRoomUi } from './draftroom_ui.js';
+import { guidePage } from './guide.js';
 import { gameOf } from '../core/capture.js';
 import { statGoal } from '../core/patterns.js';
 
@@ -75,8 +78,12 @@ const S = {
 // V1.13 AI capture, debrief, patterns and trails (src/hub/capture_ui.js). Created on first use, once
 // every helper below exists.
 let CAP = null;
-const capUi = () => (CAP ||= captureUi({ S, esc, tag, banner, setMsg, val, render, meName, sid, fillReport, localToday: localDay, shiftDay, PLATFORM, reportNote,
+const capUiReal = () => (CAP ||= captureUi({ S, esc, tag, banner, setMsg, val, render, meName, sid, fillReport, localToday: localDay, shiftDay, PLATFORM: PLATFORM && !FEAT.ai ? { ...PLATFORM, ai: null } : PLATFORM, reportNote,
   staffObservation, recommendationRecord, propose, saveObj, owner, rulesFor: (title) => snapshot(S.rules, title === 'PUBG Mobile' ? ['pubgm-scoring'] : title === 'Dota 2' ? ['dota-patch'] : []) }));
+// Scrim capture switched off (its tables are not in the database yet): the hub works as V1.12 did.
+const CAP_OFF = { gamesSection: () => '', reportGames: () => '', debriefSection: () => '', beforeSave: () => null, afterSave: async () => {}, trailPanel: () => '', goalStatNote: () => '', goalStatFields: () => '', standInLine: () => '', waitingCount: () => 0, onChange: () => false, onClick: async () => false, subscribe: () => {},
+  patternsPage: () => `<div class="panel">${banner('warn', '<div>Patterns switch on after the V1.13 database update (Staff → Users & access lists what is pending).</div>')}</div>` };
+const capUi = () => (FEAT.capture ? capUiReal() : CAP_OFF);
 let DR = null;
 const drUi = () => (DR ||= draftRoomUi({ S, esc, tag, banner, setMsg, val, render, meName, sid }));
 const heroByName = () => Object.fromEntries(Object.values(S.heroes).map((h) => [h.name.toLowerCase(), h.id]));
@@ -179,8 +186,8 @@ async function initCaps() {
     db.collection('rival_tiers').onSnapshot((snap) => { S.tiers = Object.fromEntries(snap.docs.map((d) => { const x = d.data(); return [`${x.title}|${x.nation}`, x]; })); render(); }, () => {});
     db.collection('scrims').onSnapshot((snap) => { S.scrims = snap.docs.map((d) => d.data()).filter((x) => x?.origin === 'operational'); render(); }, () => {});
     db.collection('scrim_reports').onSnapshot((snap) => { S.reports = snap.docs.map((d) => d.data()).filter((x) => x?.origin === 'operational'); render(); }, () => {});
-    try { capUi().subscribe(db); } catch { /* older store without the V1.13 collections */ }
-    try { drUi().subscribe(db); } catch { /* older store without the V1.14 collections */ }
+    if (FEAT.capture) try { capUi().subscribe(db); } catch { /* older store without the V1.13 collections */ }
+    if (FEAT.draftRoom) try { drUi().subscribe(db); } catch { /* older store without the V1.14 collections */ }
     db.collection('wec_matches').onSnapshot((snap) => { S.wecMatches = snap.docs.map((d) => d.data()).filter((x) => x?.origin === 'operational'); render(); }, () => {});
     db.doc('config/runbooks').onSnapshot((d) => { const x = d.data(); if (x?.runbooks) S.runbooks = x.runbooks; render(); }, () => {});
     db.collection('vods').onSnapshot((snap) => { S.vods = snap.docs.map((d) => ({ ...d.data(), id: d.id })).filter((x) => x?.origin === 'operational'); render(); }, () => {});
@@ -237,15 +244,16 @@ const GAME_HUBS = [
   { id: 'cs2', label: 'CS2', title: 'CS2', team: 't-cs2' },
   { id: 'cs2w', label: 'CS2 Women', title: 'CS2 Women', team: 't-cs2w' },
 ];
-const hubTabs = (h) => [[h.team, 'Team'], [`${h.team}-scrims`, 'Scrims & practice'], [`${h.team}-reports`, 'Scrim reports'], ...(gameOf(h.title) ? [[`${h.team}-patterns`, 'Patterns']] : []), [`${h.team}-rivals`, 'Competitors'], ...(h.draftRoom ? [[`${h.team}-draft`, 'Draft Room']] : [])];
+const hubTabs = (h) => [[h.team, 'Team'], [`${h.team}-scrims`, 'Scrims & practice'], [`${h.team}-reports`, 'Scrim reports'], ...(gameOf(h.title) && FEAT.capture ? [[`${h.team}-patterns`, 'Patterns']] : []), [`${h.team}-rivals`, 'Competitors'], ...(h.draftRoom && FEAT.draftRoom ? [[`${h.team}-draft`, 'Draft Room']] : [])];
 const TITLES = [
   { id: 'home', label: 'Today', tabs: [['today', 'My day'], ['board', 'Juara Umum board'], ['reports-all', 'Scrim reports'], ['brief', 'Weekly brief']] },
   { id: 'comp', label: 'Competitors', tabs: [['comp-overview', 'All nations'], ['comp-nation', 'Nation profile'], ['comp-rosters', 'Rosters & players'], ['comp-card', 'Opponent card'], ['comp-coverage', 'Scouting coverage']] },
   { id: 'tour', label: 'Tournament', tabs: [['tour-runbook', 'Match-day runbook'], ['tour-series', 'Between games']] },
-  { id: 'dota', label: 'Dota 2', tabs: [['dota-team', 'Team'], ['dota-scrims', 'Scrims & practice'], ['dota-reports', 'Scrim reports'], ['dota-patterns', 'Patterns'], ['dota-post', 'Post-match'], ['dota-scout', 'Competitors'], ['dota-draft', 'Draft room'], ['dota-review', 'Series review']] },
+  { id: 'dota', label: 'Dota 2', tabs: [['dota-team', 'Team'], ['dota-scrims', 'Scrims & practice'], ['dota-reports', 'Scrim reports'], ...(FEAT.capture ? [['dota-patterns', 'Patterns']] : []), ['dota-post', 'Post-match'], ['dota-scout', 'Competitors'], ['dota-draft', 'Draft room'], ['dota-review', 'Series review']] },
   { id: 'pubgm', label: 'PUBG Mobile', tabs: [['pubgm-team', 'Team'], ['pubgm-scrims', 'Scrims & practice'], ['pubgm-reports', 'Scrim reports'], ['pubgm-log', 'Log & import'], ['pubgm-rivals', 'Competitors'], ['pubgm-sim', 'Strategy sim'], ['pubgm-review', 'Match-day review']] },
   ...GAME_HUBS.map((h) => ({ id: h.id, label: h.label, tabs: hubTabs(h) })),
   { id: 'well', label: 'Performance', tabs: [['readiness', 'Athlete readiness'], ['players', 'Player plans'], ['well-day', 'Wellbeing check'], ['well-log', 'Log check-in & load']] },
+  { id: 'guide', label: 'Guide', tabs: [['guide', 'How to use the hub']] },
   { id: 'staff', label: 'Staff', tabs: [['staff-cycle', 'Coaching cycle'], ['staff-measure', 'Is it working?'], ['staff-rules', 'Rules & decisions'], ['staff-sources', 'Sources & limits'], ...(HUB_USER?.isAdmin ? [['admin-users', 'Users & access']] : [])] },
 ];
 const viewOf = () => { const h = location.hash.slice(1); return TITLES.some((t) => t.tabs.some(([id]) => id === h)) ? h : 'today'; };
@@ -587,8 +595,8 @@ function reportForm(title, { fid, spec, pts, unit, planned, t0 }) {
     ${plannedToday.length || partners.length ? `<div class="chips"><span class="note">Quick pick:</span>${plannedToday.map((x) => chip(fid, { partner: x.partner, scrim: x.id, format: x.format, level: x.partnerLevel }, `Planned today: ${x.partner}`, ' planned')).join('')}${partners.map((p) => chip(fid, { partner: p }, p)).join('')}</div>` : ''}
     ${capUi().gamesSection(title, fid)}
     <div class="h3">Result</div>
-    ${gameOf(title) && (S.cap[fid]?.ready || []).length ? '<p class="note">Filled from the confirmed games above.</p>' : ''}
-    ${pts || (gameOf(title) && (S.cap[fid]?.ready || []).length) ? '' : `<div class="chips"><span class="note">Quick score:</span>${scores.map(([l, w, lo, dr]) => chip(fid, { won: String(w), lost: String(lo), drawn: dr ? String(dr) : '' }, l)).join('')}</div>`}
+    ${gameOf(title) && (S.cap?.[fid]?.ready || []).length ? '<p class="note">Filled from the confirmed games above.</p>' : ''}
+    ${pts || (gameOf(title) && (S.cap?.[fid]?.ready || []).length) ? '' : `<div class="chips"><span class="note">Quick score:</span>${scores.map(([l, w, lo, dr]) => chip(fid, { won: String(w), lost: String(lo), drawn: dr ? String(dr) : '' }, l)).join('')}</div>`}
     <div class="form">
     ${pts ? `${num('played', 'Matches played')}${num('points', 'Total points')}` : `${num('won', `${esc(cap(unit))} won`)}${num('lost', `${esc(cap(unit))} lost`)}`}
     </div>
@@ -624,6 +632,18 @@ async function loadAdminUsers() {
   if (PLATFORM.admin.aiUsage) { try { S.admin.usage = await PLATFORM.admin.aiUsage(`${localDay().slice(0, 8)}01T00:00:00+07:00`); } catch { S.admin.usage = null; } }
   S.admin.loading = false; render();
 }
+// V1.15: what the live database and server already have; the rest stays hidden until switched on.
+function featuresPanel() {
+  if (!PLATFORM?.features) return '';
+  const row = (on, name, what) => `<li>${on ? tag('s-done', 'on') : tag('s-proposed', 'pending')} <b>${esc(name)}</b>${on ? '' : ` <span class="note">— ${what}</span>`}</li>`;
+  const f = FEAT;
+  return `<div class="panel"><h2>What is switched on</h2><ul class="plain">
+    ${row(f.capture, 'Scrim capture, Patterns, player trail (V1.13)', 'run <code>supabase/RUN_ON_LIVE_V1_13_TO_V1_15.sql</code> once in Supabase → SQL Editor')}
+    ${row(f.draftRoom, 'Draft Room (V1.14)', 'same SQL file')}
+    ${row(f.donny, "Coach Donny's readiness system (V1.15)", 'same SQL file')}
+    ${row(f.ai, 'AI: read screenshots, Say it once, Look for patterns', 'deploy the <code>scrim-ai</code> function and set the Claude API key (docs/HUB_V1_13.md, steps 2–3)')}
+  </ul><p class="note">Pending parts are hidden for everyone, and the rest of the hub works as before. Reload after switching something on.</p></div>`;
+}
 function usagePanel(rows) {
   if (!rows) return '';
   const u = usageSummary(rows); const usd = (x) => `$${x < 1 ? x.toFixed(3) : x.toFixed(2)}`;
@@ -651,6 +671,7 @@ V['admin-users'] = () => {
     <p class="note">To add someone: Supabase dashboard → Authentication → Users → Invite user (their email). They set a password from the email, then appear here with no access until you tick a role.</p>
     <div class="toolbar"><button class="btn" type="button" id="adReload">Reload list</button><button class="btn" type="button" id="adExport">Export all data (JSON)</button><span class="msg" id="adExportMsg" role="status"></span></div>
     ${S.admin.error ? banner('block', `<div>${esc(S.admin.error)}</div>`) : ''}</div>
+  ${featuresPanel()}
   ${usagePanel(S.admin.usage)}
   <div class="panel"><h2>People (${users.length})</h2>${S.admin.loading && !users.length ? '<p>Loading…</p>' : users.map(row).join('') || '<p class="empty">Nobody yet.</p>'}</div>`;
 };
@@ -688,12 +709,13 @@ for (const h of GAME_HUBS) {
   V[`${h.team}-scrims`] = () => scrimsPanel(h.title);
   V[`${h.team}-reports`] = () => reportsPanel(h.title);
   if (gameOf(h.title)) V[`${h.team}-patterns`] = () => capUi().patternsPage(h.title);
-  if (h.draftRoom) V[`${h.team}-draft`] = () => drUi().page(h.title);
+  if (h.draftRoom) V[`${h.team}-draft`] = () => (FEAT.draftRoom ? drUi().page(h.title) : `<div class="panel">${banner('warn', '<div>The Draft Room switches on after the V1.14 database update.</div>')}</div>`);
   V[`${h.team}-rivals`] = () => competitorsPanel(h.title);
 }
 V['dota-scrims'] = () => scrimsPanel('Dota 2');
 V['dota-reports'] = () => reportsPanel('Dota 2');
 V['dota-patterns'] = () => capUi().patternsPage('Dota 2');
+V.guide = () => guidePage({ lang: S.lang, feat: PLATFORM?.features ? FEAT : {}, isAdmin: HUB_USER ? HUB_USER.isAdmin : true, esc, tag });
 V['pubgm-scrims'] = () => scrimsPanel('PUBG Mobile');
 V['pubgm-reports'] = () => reportsPanel('PUBG Mobile');
 V['pubgm-rivals'] = () => competitorsPanel('PUBG Mobile');
@@ -1278,7 +1300,7 @@ function donnyProviderNow() {
 function ensureReadiness() {
   const key = `${S.rd.title}|${S.rd.date}|${S.mode}|${S.rd.ver || 0}`; if (S.rd.key === key) return;
   S.rd.key = key; S.rd.data = null; S.rd.error = '';
-  const provider = READINESS_SLOT.apiUrl ? donnyProvider(httpSource(READINESS_SLOT.apiUrl)) : donnyProviderNow();
+  const provider = READINESS_SLOT.apiUrl ? donnyProvider(httpSource(READINESS_SLOT.apiUrl)) : FEAT.donny ? donnyProviderNow() : mockProvider;
   loadReadiness(provider, { title: S.rd.title, date: S.rd.date }).then((d) => { if (S.rd.key === key) { S.rd.data = d; if (viewOf() === 'readiness') render(); } })
     .catch((e) => { S.rd.error = e.message; loadReadiness(mockProvider, { title: S.rd.title, date: S.rd.date }).then((d) => { S.rd.data = d; if (viewOf() === 'readiness') render(); }); });
 }
@@ -1291,6 +1313,7 @@ function donnyPanel() {
 }
 V.readiness = () => {
   if (readinessRestricted()) return `<div class="panel">${banner('block', '<div><b>Restricted.</b> Athlete readiness is limited to the readiness owner (Coach Donny) and admins until the Head Coach decides who else may see it.</div>')}</div>`;
+  if (!FEAT.donny) { ensureReadiness(); return `${banner('warn', "<div>Coach Donny's system switches on after the V1.15 database update. Until then this is the dummy preview.</div>")}${readinessView({ data: S.rd.data, titles: MOCK_TITLES, title: S.rd.title, date: S.rd.date })}`; }
   const mode = S.rd.mode || 'donny';
   const seg = `<div class="drseg" role="tablist"><button type="button" role="tab" aria-selected="${mode === 'donny'}" data-rd-mode="donny">Coach Donny's system</button><button type="button" role="tab" aria-selected="${mode === 'hub'}" data-rd-mode="hub">Hub view</button></div>`;
   if (mode === 'donny') return `<div class="panel">${seg}</div>${donnyPanel()}`;
@@ -1353,7 +1376,7 @@ function oppCardHtml(a, plan, ours) {
       ${Object.keys(plan.focus).length ? `<div class="h3">One focus per player</div><ul class="plain">${Object.entries(plan.focus).map(([k, v]) => `<li><b>${esc(k)}</b>: ${esc(v)}</li>`).join('')}</ul>` : ''}` : `<p class="empty">The title coach writes three key points and our answer (form on this page).</p>`}
     <div class="h3">Their roster${a.coach ? ` · coach ${esc(a.coach)}` : ''}</div>
     <div class="tw"><table><thead><tr><th>Player</th><th>Role / club</th>${a.title === 'Dota 2' ? '<th>Most played (club games since 7.41)</th>' : ''}</tr></thead><tbody>${a.roster.map((p) => `<tr><td><b>${esc(p.ign)}</b>${p.captain ? ' (C)' : ''}${p.flags.length ? ' <span class="note">⚠</span>' : ''}</td><td>${esc([p.role, p.club].filter(Boolean).join(' · ') || '—')}${p.pool?.lane ? `<div class="note">${esc(p.pool.lane)}</div>` : ''}</td>${a.title === 'Dota 2' ? `<td>${p.pool?.n ? `${p.pool.top.map((h) => `${esc(h.name)} <span class="note">${h.games}</span>`).join(', ')}<div class="note">${p.pool.n} games${p.pool.probable ? ' · account probable' : ''}</div>` : '<span class="note">no data</span>'}</td>` : ''}</tr>`).join('')}</tbody></table></div>
-    ${(() => { const bk = ['MLBB', 'MLBB Women'].includes(a.title) ? drUi().bookFor(a.title, a.nation) : null; return bk ? `<div class="h3">Draft book (Draft Room, v${bk.version}, ${bk.status === 'approved' ? `approved by ${esc(bk.approvedBy)}` : 'draft, not approved'})</div><ul class="plain"><li>Bans: ${esc(bk.bans.join(', ') || '—')}</li><li>Protect: ${esc(bk.protect.join(', ') || '—')}</li><li>Flex: ${esc(bk.flex.join(', ') || '—')}</li>${bk.blue ? `<li>Blue: ${esc(bk.blue)}</li>` : ''}${bk.red ? `<li>Red: ${esc(bk.red)}</li>` : ''}</ul>` : ''; })()}
+    ${(() => { const bk = FEAT.draftRoom && ['MLBB', 'MLBB Women'].includes(a.title) ? drUi().bookFor(a.title, a.nation) : null; return bk ? `<div class="h3">Draft book (Draft Room, v${bk.version}, ${bk.status === 'approved' ? `approved by ${esc(bk.approvedBy)}` : 'draft, not approved'})</div><ul class="plain"><li>Bans: ${esc(bk.bans.join(', ') || '—')}</li><li>Protect: ${esc(bk.protect.join(', ') || '—')}</li><li>Flex: ${esc(bk.flex.join(', ') || '—')}</li>${bk.blue ? `<li>Blue: ${esc(bk.blue)}</li>` : ''}${bk.red ? `<li>Red: ${esc(bk.red)}</li>` : ''}</ul>` : ''; })()}
     ${a.contested.length ? `<div class="h3">Heroes both sides play (club data)</div><p class="note">A first-phase decision: ban it, or take it first. Not a verdict on who plays it better.</p><ul class="plain">${a.contested.map((c) => `<li><b>${esc(c.hero)}</b> — ${esc(c.them)} ${c.theirGames} games · our ${esc(c.us)} ${c.ourGames}</li>`).join('')}</ul>` : ''}
     ${a.banCandidates.length ? `<div class="h3">Most-played heroes — ban candidates</div><ul class="plain">${a.banCandidates.map((b) => `<li><b>${esc(b.hero)}</b> — ${esc(b.player)}, ${b.games} of ${b.of} games${b.probable ? ' <span class="note">(account probable)</span>' : ''}</li>`).join('')}</ul><p class="note">Presence in club games, not proof they will draft it for the national team.</p>` : ''}
     <div class="h3">What we know · staff tier: ${esc(a.tier)}</div>${a.tierWhy ? `<p class="note">${esc(a.tierBy)}: ${esc(a.tierWhy)}</p>` : ''}
@@ -1457,6 +1480,7 @@ async function onClick(e) {
   // V1.13 capture / patterns buttons only, so every other click stays synchronous until its own first await.
   if (Object.keys(t.dataset).some((k) => /^(cap|pat)[A-Z]/.test(k)) && await capUi().onClick(t)) return;
   if (Object.keys(t.dataset).some((k) => /^dr[A-Z]/.test(k)) && await drUi().onClick(t)) return;
+  if (t.dataset.guideJump) { document.getElementById(`guide-${t.dataset.guideJump}`)?.scrollIntoView?.({ behavior: 'smooth', block: 'start' }); return; }
   if (t.dataset.rdMode) { S.rd.mode = t.dataset.rdMode; S.rd.key = null; render(); return; }
   const id = t.id;
   if (id === 'langBtn') { S.lang = S.lang === 'id' ? 'en' : 'id'; try { localStorage.setItem('hub-lang', S.lang); } catch { /* per-viewer convenience only */ } render(); return; }
@@ -1710,7 +1734,7 @@ async function onClick(e) {
       const done = sc ? completeScrim(sc, { score: resultText(r.result), notes: r.worked || r.failed, by: r.by, matchIds: [], perObjective: {} }) : null;
       if (S.db) { await S.db.collection('scrim_reports').doc(r.id).set(r); if (done) await S.db.collection('scrims').doc(sc.id).set(done); }
       else { S.reports.push(r); if (done) Object.assign(sc, done); }
-      const nGames = (S.cap[fid]?.ready || []).length;
+      const nGames = (S.cap?.[fid]?.ready || []).length;
       try { await capUi().afterSave(title, fid, r); } catch (err) { render(); return setMsg(`rpMsg-${fid}`, `Report saved, but its games were not (${err.message}). They are kept on this device: use "Retry saving games" under Games.`, 'err'); }
       const keep = Object.fromEntries(RP_KEEP_AFTER_SAVE.map((k) => [k, g(k)]).filter(([, v]) => v));
       storeDraft(fid, { ...keep, at: new Date().toISOString() });

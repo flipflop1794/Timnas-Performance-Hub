@@ -103,3 +103,9 @@ test('digest: staff marks on earlier findings travel with the request', async ()
   const sent = JSON.parse(a.log.calls[0].body.messages[0].content[0].text);
   assert.equal(sent.FEEDBACK[0].status, 'wrong'); assert.match(a.log.calls[0].body.system[0].text, /FEEDBACK lists earlier findings/);
 });
+
+test('ping: tells the hub whether AI is switched on, without an AI call or a usage row', async () => {
+  const on = setup(); const r = await on.call({ action: 'ping' });
+  assert.equal(r.status, 200); assert.deepEqual(r.body, { ok: true, ai: true }); assert.equal(on.log.calls.length, 0); assert.equal(on.log.inserts.length, 0);
+  const off = setup({ key: '' }); assert.deepEqual((await off.call({ action: 'ping' })).body, { ok: true, ai: false });
+});

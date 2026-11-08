@@ -45,8 +45,10 @@ export async function handle(req, deps) {
   if (req.method !== 'POST') return fail(405, 'Use POST.');
   const auth = req.headers.authorization || req.headers.Authorization || '';
   if (!/^Bearer\s+\S+/.test(auth)) return fail(401, 'Sign in first.');
-  if (!deps.env.ANTHROPIC_API_KEY) return fail(503, 'AI capture is not switched on yet (the AI key is not set on the server). Enter the values by hand.');
   let body; try { body = await req.json(); } catch { return fail(400, 'Bad request.'); }
+  // V1.15: the hub asks once after sign-in whether AI is switched on (no AI call, nothing logged).
+  if (body?.action === 'ping') return json(200, { ok: true, ai: !!deps.env.ANTHROPIC_API_KEY });
+  if (!deps.env.ANTHROPIC_API_KEY) return fail(503, 'AI capture is not switched on yet (the AI key is not set on the server). Enter the values by hand.');
   const { action, title } = body || {};
   if (!ACTIONS.includes(action)) return fail(400, 'Unknown action.');
   const game = gameOf(title);

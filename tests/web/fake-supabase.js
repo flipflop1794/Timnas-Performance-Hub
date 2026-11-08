@@ -68,6 +68,7 @@ function client(B, sessionUserId) {
       select() { if (action !== 'select') returning = true; return q; }, order() { return q; },
       eq(c, v) { filters.push([c, v]); return q; },
       gte(c, v) { filters.push([c, v, 'gte']); return q; },
+      limit(n) { range = [0, n - 1]; return q; },
       range(a, b) { range = [a, b]; return q; },
       maybeSingle() { single = true; return q; },
       insert(rows) { action = 'insert'; payload = Array.isArray(rows) ? rows : [rows]; return q; },
@@ -78,6 +79,8 @@ function client(B, sessionUserId) {
     };
     const match = (r) => filters.every(([c, v, op]) => (op === 'gte' ? String(r[c]) >= String(v) : r[c] === v));
     function run() {
+      // Tests can simulate a live database that has not had a migration yet (B.missing = Set of tables).
+      if (B.missing?.has(table)) return { data: null, error: { code: 'PGRST205', message: `Could not find the table 'public.${table}' in the schema cache` } };
       const T = B.tables[table]; const id = uid();
       if (action === 'select') {
         let rows = T.filter((r) => match(r) && B.readable(id, table, r)).map((r) => structuredClone(r));
@@ -131,6 +134,7 @@ function client(B, sessionUserId) {
     from: (t) => query(t),
     // The scrim-ai server function: tests set B.ai = async (body, userId) => ({ data } | { status, error }).
     functions: { invoke: async (name, { body }) => {
+      if (name === 'scrim-ai' && body?.action === 'ping' && B.ai) return { data: { ok: true, ai: B.aiKey !== false }, error: null };
       if (name !== 'scrim-ai' || !B.ai) return { data: null, error: Object.assign(new Error('Edge Function returned a non-2xx status code'), { context: { status: 404, json: async () => ({}) } }) };
       const out = await B.ai(structuredClone(body), uid());
       if (out.error) return { data: null, error: Object.assign(new Error('Edge Function returned a non-2xx status code'), { context: { status: out.status || 400, json: async () => ({ error: out.error }) } }) };

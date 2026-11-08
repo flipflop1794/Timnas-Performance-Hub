@@ -51,3 +51,25 @@ Checked in Chrome at 1280 px and 412 px: no sideways scrolling, no errors. All 5
   items are safe).
 - The hub's own interim wellbeing check-in (Performance → Wellbeing check / Log) still exists; retire it once
   Donny confirms his check-in replaces it.
+
+## Going live (8 Nov 2026)
+
+The website can go live **before** the database update. On start-up it checks which newer tables and the AI
+function exist; anything missing stays hidden and the hub works as V1.12 did (tested: every screen, admin and
+title coach, real PostgREST with the V1.12 schema). Admins see **Staff → Users & access → What is switched on**.
+
+To switch the new parts on (admin, about 2 minutes):
+1. Supabase → project `cwedqaupevboyzuxvdto` → **SQL Editor** → New query.
+2. Paste all of `supabase/RUN_ON_LIVE_V1_13_TO_V1_15.sql` → **Run**. It only adds tables, functions, policies
+   and one private storage bucket, in one transaction (all or nothing). Tested on a copy of the V1.12 schema.
+3. Reload the hub. Scrim capture by hand, Patterns, Draft Room and Coach Donny's system switch on.
+4. AI (screenshots, Say it once, Look for patterns): deploy the `scrim-ai` function and set the Claude API key
+   with a spend limit (docs/HUB_V1_13.md, release steps 2–3). Until then the AI buttons stay hidden.
+
+New: **Guide** in the top menu: how to use each part, in English and Bahasa Indonesia, with "not switched on
+yet" marks where a part is pending on the site.
+
+Checked before going live: `npm test` 184 + Coach Donny's 105; Chrome end to end on the local stack, before
+and after the database update (21 checks: every screen opens, pending parts hidden, admin panel, Draft Room
+saves, Coach Donny's system saves once and loads on a phone, title coach kept out, AI ping). The only browser
+console messages were the local stand-in's missing live-update socket (real Supabase has it).

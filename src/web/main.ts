@@ -159,6 +159,23 @@ function aiApi(client: SupabaseClient) {
   };
 }
 
+// V1.15: which newer parts the live database and server already have. The website can be updated before the
+// database: anything not switched on yet stays hidden instead of failing (Staff → Users & access lists them).
+export type Features = { capture: boolean; draftRoom: boolean; donny: boolean; ai: boolean };
+export async function probeFeatures(client: SupabaseClient): Promise<Features> {
+  const has = async (table: string) => {
+    try {
+      const { error, status } = await client.from(table).select('id').limit(1);
+      return !error || !(status === 404 || /PGRST205|42P01|does not exist|Could not find the table/i.test(`${(error as { code?: string }).code || ''} ${error.message || ''}`));
+    } catch { return false; }
+  };
+  const ai = async () => {
+    try { const { data, error } = await client.functions.invoke('scrim-ai', { body: { action: 'ping' } }); return !error && !!(data as { ai?: boolean })?.ai; } catch { return false; }
+  };
+  const [capture, draftRoom, donny, aiOn] = await Promise.all([has('scrim_games'), has('draft_books'), has('readiness_store'), ai()]);
+  return { capture, draftRoom, donny, ai: aiOn };
+}
+
 async function start(client: SupabaseClient, userId: string) {
   shell(`<p>${T('Loading the hub…')}</p>`);
   let me: HubUser;
@@ -174,7 +191,8 @@ async function start(client: SupabaseClient, userId: string) {
   const db = createHubDb(client, { canWellbeing: me.canWellbeing, names });
   W.claude = { use: async (n: string) => (n === 'db' ? db : n === 'downloads' ? { save: download } : null) };
   W.__HUB_USER__ = me;
-  W.__HUB_PLATFORM__ = { signOut: () => client.auth.signOut(), admin: me.isAdmin ? adminApi(client) : null, download, ai: aiApi(client) };
+  const features = await probeFeatures(client);
+  W.__HUB_PLATFORM__ = { signOut: () => client.auth.signOut(), admin: me.isAdmin ? adminApi(client) : null, download, ai: aiApi(client), features };
   // @ts-ignore -- the hub is plain JavaScript; importing it starts it.
   await import('../hub/app.js');
 }
