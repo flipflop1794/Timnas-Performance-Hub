@@ -6,6 +6,7 @@ import assert from 'node:assert/strict';
 import { readFileSync, readdirSync } from 'node:fs';
 import { randomUUID } from 'node:crypto';
 import pg from 'pg';
+import { dailySession, updateFollowUp } from '../../src/core/daily_sessions.js';
 
 const URL0 = process.env.DATABASE_URL || 'postgres://postgres:localtest@localhost:5432/postgres';
 const root = new URL('../../', import.meta.url);
@@ -56,6 +57,29 @@ t('a title coach files a report for his title; author and time are set by the se
   await insReport('indra', report('RP-1', 'MLBB'), U.fayad); // tries to claim Fayad wrote it
   const [r] = await rows('aufa', 'select title, created_by from public.scrim_reports where id = $1', ['RP-1']);
   assert.equal(r.title, 'MLBB'); assert.equal(r.created_by, U.indra);
+});
+
+t('daily session and its follow-up inherit session title access and audit attribution', async () => {
+  const author = { id: U.indra, name: 'Coach', roles: ['title_coach'], titles: ['MLBB'] };
+  const manager = { id: U.fayad, name: 'Head Coach', roles: ['head_coach'], titles: [] };
+  const session = dailySession({ title: 'MLBB', date: '2026-11-11', kind: 'team practice', objective: 'Turtle setup',
+    outcome: 'Two clean setups', issue: 'Late ward', nextAction: 'Review timing' }, author, 'SC-daily-test', '2026-11-11');
+  const put = (who, s) => as(who, (q) => q('insert into public.scrim_sessions (id, data) values ($1, $2)', [s.id, s]));
+  await assert.rejects(put('christie', session), /row-level security/);
+  await put('indra', session);
+  const query = 'select created_by, updated_by, data from public.scrim_sessions where id = $1';
+  assert.equal((await rows('christie', query, [session.id])).length, 0);
+  assert.equal((await rows('nobody', query, [session.id])).length, 0);
+  await assert.rejects(rows('anon', query, [session.id]), /permission denied/);
+  const change = updateFollowUp(session, { ownerId: manager.id, due: '2026-11-13', status: 'Done' }, [manager]);
+  const save = (who) => as(who, (q) => q('update public.scrim_sessions set data = $1 where id = $2', [change, session.id]));
+  for (const who of ['christie', 'donny', 'nobody']) assert.equal((await save(who)).rowCount, 0);
+  assert.equal((await save('fayad')).rowCount, 1);
+  const [saved] = await rows('aufa', query, [session.id]);
+  assert.equal(saved.created_by, U.indra);
+  assert.equal(saved.updated_by, U.fayad);
+  assert.deepEqual(saved.data.dailyReport, session.dailyReport);
+  assert.equal(saved.data.followUp.status, 'Done');
 });
 
 t('Head Coach and assistant coaches read every title; a coach of another title sees nothing and cannot write there', async () => {

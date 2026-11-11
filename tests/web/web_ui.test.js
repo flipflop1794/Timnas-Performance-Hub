@@ -7,6 +7,7 @@ import { readFileSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
 import { JSDOM } from 'jsdom';
 import { backend } from './fake-supabase.js';
+import { localDay, shiftDay } from '../../src/core/dates.js';
 
 let html;
 before(() => {
@@ -88,6 +89,77 @@ test('a coach of another title cannot see or file MLBB records; the page says wh
   assert.match(c.d.getElementById('rpMsg-MLBB').textContent, /don't have permission/);
   assert.equal(B.tables.scrim_reports.length, 1, 'nothing written');
   await c.go('pubgm-reports'); assert.doesNotMatch(c.text(), /You are not assigned/);
+});
+
+test('daily session persists, a manager resolves its follow-up, and leadership sees the live change', async () => {
+  const B = world();
+  people.manager = { id: 'u-manager', email: 'manager@example.test', password: 'pw-manager-123', name: 'Team Manager', roles: ['assistant_coach'], titles: ['MLBB'] };
+  B.addUser(people.manager);
+  const today = localDay();
+  const date = shiftDay(today, -2);
+  const due = shiftDay(today, -1);
+  const plan = { id: 'SC-planned', title: 'MLBB', date: today, time: '19:00 WIB', kind: 'scrim', partner: 'Academy', owner: 'Coach Indra', status: 'planned', objectives: [], origin: 'operational' };
+  await B.client(people.indra.id).from('scrim_sessions').insert({ id: plan.id, data: plan });
+  const lead = await open(B, 'fayad', 'daily-sessions');
+  assert.match(lead.text(), /No report filed/);
+  assert.ok(lead.d.querySelector('a[href="#mlbb-scrims?record=SC-planned"]'));
+  await lead.go('mlbb-scrims?record=SC-planned');
+  assert.match(lead.text(), /Academy/);
+  await lead.go('daily-sessions');
+  const coach = await open(B, 'indra', 'mlbb-reports');
+  await coach.go('daily-sessions?title=MLBB');
+  assert.deepEqual([...coach.d.querySelectorAll('#daily-title option')].map((o) => o.value), ['MLBB']);
+  for (const [key, value] of Object.entries({ date, objective: 'Turtle setup', outcome: '2 clean setups', issue: 'Late ward', nextAction: 'Review river timing' })) coach.set(`daily-${key}`, value);
+  await coach.click('#daily-new button[type=submit]');
+  const session = B.tables.scrim_sessions.find((row) => row.data.dailyReport);
+  assert.equal(session.created_by, people.indra.id);
+  assert.equal(session.data.followUp.ownerId, people.indra.id);
+  assert.equal(session.data.followUp.due, shiftDay(today, 1));
+  assert.equal(session.data.dailyReport.issue, 'Late ward');
+  const again = await open(B, 'indra', 'daily-sessions');
+  assert.match(again.text(), /Session history.*Turtle setup/s);
+  await again.click(`a[href="#daily-sessions?session=${session.id}"]`);
+  assert.match(again.text(), /2 clean setups/);
+
+  const manager = await open(B, 'manager', `daily-sessions?session=${session.id}`);
+  manager.set('daily-ownerId', people.manager.id);
+  manager.set('daily-due', due);
+  manager.set('daily-status', 'In progress');
+  await manager.click('#daily-edit button');
+  await sleep(350);
+  assert.equal(B.tables.scrim_sessions.find((row) => row.id === session.id).updated_by, people.manager.id);
+  assert.match(lead.text(), /Team Manager.*In progress.*Overdue/s);
+  assert.equal(lead.d.querySelectorAll(`a[href="#daily-sessions?session=${session.id}"]`).length, 4);
+  manager.set('daily-status', 'Done');
+  await manager.click('#daily-edit button');
+  await sleep(350);
+  assert.match(lead.text(), /No open follow-ups/);
+  assert.equal(lead.d.querySelectorAll(`a[href="#daily-sessions?session=${session.id}"]`).length, 2);
+  await lead.click('#langBtn');
+  assert.match(lead.text(), /Kesiapan tiap disiplin/);
+  const other = await open(B, 'donny', `daily-sessions?session=${session.id}`);
+  assert.match(other.text(), /Turtle setup/);
+  assert.equal(other.d.querySelector('#daily-edit'), null, 'unassigned assistant has read access only');
+  for (const page of [lead, coach, again, manager, other]) page.dom.window.close();
+});
+
+test('invite and password reset screens use the existing password flow', async () => {
+  const B = world();
+  const login = await open(B, null);
+  login.set('authEmail', people.indra.email);
+  await login.click('#forgotBtn');
+  assert.match(login.text(), /a link to set a new password is on its way/);
+  for (const type of ['invite', 'recovery']) {
+    const link = await open(B, 'indra', `type=${type}`);
+    assert.match(link.text(), /Set your password/);
+    const password = `local-test-password-${type}`;
+    link.set('pw1', password);
+    link.set('pw2', password);
+    await link.click('#pwForm button');
+    assert.equal(B.users.find((u) => u.id === people.indra.id).password, password);
+    link.dom.window.close();
+  }
+  login.dom.window.close();
 });
 
 test('corrections are added, never overwrite the report, and show who entered them', async () => {

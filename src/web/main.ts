@@ -186,13 +186,23 @@ async function start(client: SupabaseClient, userId: string) {
     $('#noAccessOut').onclick = () => client.auth.signOut();
     return;
   }
-  const { data: people } = await client.from('profiles').select('id, display_name');
-  const names = Object.fromEntries(((people || []) as Record<string, string>[]).map((p) => [p.id, p.display_name]));
+  const [{ data: people }, { data: roles }, { data: titles }] = await Promise.all([
+    client.from('profiles').select('id, display_name'),
+    client.from('user_roles').select('user_id, role'),
+    client.from('user_titles').select('user_id, title'),
+  ]);
+  const directory = (people || []).map((p) => ({
+    id: p.id as string, name: (p.display_name || p.id) as string,
+    roles: (roles || []).filter((r) => r.user_id === p.id).map((r) => r.role as Role),
+    titles: (titles || []).filter((t) => t.user_id === p.id).map((t) => t.title as string),
+  })).filter((person) => person.roles.length);
+  const actionOwners = [me, ...directory.filter((person) => person.id !== me.id)];
+  const names = Object.fromEntries((people || []).map((p) => [p.id, p.display_name]));
   const db = createHubDb(client, { canWellbeing: me.canWellbeing, names });
   W.claude = { use: async (n: string) => (n === 'db' ? db : n === 'downloads' ? { save: download } : null) };
   W.__HUB_USER__ = me;
   const features = await probeFeatures(client);
-  W.__HUB_PLATFORM__ = { signOut: () => client.auth.signOut(), admin: me.isAdmin ? adminApi(client) : null, download, ai: aiApi(client), features };
+  W.__HUB_PLATFORM__ = { signOut: () => client.auth.signOut(), admin: me.isAdmin ? adminApi(client) : null, download, ai: aiApi(client), features, actionOwners };
   // @ts-ignore -- the hub is plain JavaScript; importing it starts it.
   await import('../hub/app.js');
 }

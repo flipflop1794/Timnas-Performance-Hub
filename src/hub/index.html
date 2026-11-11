@@ -130,6 +130,13 @@ button.chip{cursor:pointer;font:inherit;font-size:12.5px}
 input:not([type]),input[type="search"],input[type="text"],input[type="number"],input[type="date"],input[type="email"],input[type="password"],select,textarea{min-height:34px;padding:6px 10px;border-radius:6px;border:1px solid var(--line-2);background:var(--sunk);color:var(--ink);font:inherit;font-size:13px;min-width:0;width:100%}
 textarea{font-family:var(--f-mono);font-size:12px;min-height:110px;resize:vertical}
 .form{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,180px),1fr));gap:10px}
+.daily-notes,.daily-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,270px),1fr));gap:12px}
+.daily-notes{margin-block:12px}
+.daily-notes textarea{min-height:64px;resize:vertical}
+.daily-card,.daily-context dd{overflow-wrap:anywhere}
+#daily-new .btn,#daily-edit .btn{min-height:44px}
+#daily-new:not(:has(#daily-kind option[value="scrim"]:checked)) label[for="daily-partner"]{display:none}
+@media(max-width:600px){#daily-new input,#daily-new select,#daily-new textarea,#daily-edit input,#daily-edit select{font-size:16px}}
 .field{display:flex;flex-direction:column;gap:4px;font-size:12px;font-weight:600;color:var(--muted)}
 .msg{font-size:13px;color:var(--muted)}.msg.ok{color:var(--good)}.msg.err{color:var(--bad)}
 :focus-visible{outline:2px solid var(--gold);outline-offset:2px}

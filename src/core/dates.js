@@ -1,7 +1,9 @@
-// Calendar dates in the viewer's own time zone (WIB for the staff). toISOString() is UTC, which
-// before 07:00 WIB gives yesterday's date, so every "today" in the hub goes through here.
+// Use the team's calendar even when staff are travelling or their device is set to UTC.
+const jakarta = new Intl.DateTimeFormat('en', {
+  timeZone: 'Asia/Jakarta', year: 'numeric', month: '2-digit', day: '2-digit',
+});
 export function localDay(d = new Date()) {
-  const x = new Date(d.getTime() - d.getTimezoneOffset() * 60000);
-  return x.toISOString().slice(0, 10);
+  const parts = Object.fromEntries(jakarta.formatToParts(d).map(({ type, value }) => [type, value]));
+  return `${parts.year}-${parts.month}-${parts.day}`;
 }
 export const shiftDay = (iso, n) => new Date(Date.parse(iso) + n * 86400000).toISOString().slice(0, 10);
