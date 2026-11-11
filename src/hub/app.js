@@ -52,7 +52,7 @@ import { draftRoomUi } from './draftroom_ui.js';
 import { guidePage } from './guide.js';
 import { dailySessionsUi, dailyLink } from './daily_sessions_ui.js';
 import { dailyText } from './daily_sessions_strings.js';
-import { canWriteSession } from '../core/daily_sessions.js';
+import { canAddDailyReport, canWriteSession } from '../core/daily_sessions.js';
 import { gameOf } from '../core/capture.js';
 import { statGoal } from '../core/patterns.js';
 
@@ -412,6 +412,7 @@ function scrimsPanel(title) {
   const objName = (id) => S.cycle.find((o) => o.id === id)?.rec.problem || id;
   const card = (sc) => `<div class="obj"><header><div><span class="note">${esc(sc.date)}${sc.time ? ` ${esc(sc.time)}` : ''} · ${esc(sc.kind)}${sc.format ? ` · ${esc(sc.format)}` : ''} · owner ${esc(sc.owner)}</span><h3>${sc.partner ? `vs ${esc(sc.partner)}` : esc(sc.kind)}${sc.mirrors ? ` <span class="note">(stand-in for ${esc(sc.mirrors)})</span>` : ''}</h3></div>${tag(sc.status === 'done' ? 'c-Verified' : sc.status === 'cancelled' ? 'c-Blocked' : 'c-Low', sc.status)}</header>
     ${sc.dailyReport ? `<p data-no-tr>${esc(sc.dailyReport.objective)}</p><a href="${esc(dailyLink('session', sc.id))}">${dailyLabel('Open session report')}</a>` : sc.objectives.length ? `<p class="note">Practising: ${sc.objectives.map((id) => esc(objName(id))).join('; ')}</p>` : '<p class="note">No objective attached: free scrim.</p>'}
+    ${S.mode === 'live' && sc._version && canAddDailyReport(sc, HUB_USER) ? `<a href="${esc(dailyLink('session', sc.id))}">${dailyLabel('Add daily report')}</a>` : ''}
     ${sc.result ? `<p>${sc.result.score ? `<b>${esc(sc.result.score)}</b> · ` : ''}${sc.result.matchIds.length ? `matches ${sc.result.matchIds.map(esc).join(', ')} · ` : ''}${esc(sc.result.notes || sc.result.cancelledWhy)} <span class="note">— ${esc(sc.result.by)}</span></p>` : `<details><summary class="btn">Log result</summary><div class="form">
       <label class="field" for="scS-${sc.id}">${title === 'PUBG Mobile' ? 'Points / placement' : 'Score (e.g. 2-1)'}<input type="text" id="scS-${sc.id}"></label>
       <label class="field" for="scM-${sc.id}">Match IDs (comma-separated)<input type="text" id="scM-${sc.id}"></label>

@@ -18,18 +18,39 @@ export function dailySession(input, author, id, today = localDay()) {
   if (!Object.hasOwn(GAME_SPEC, title) || !canWriteSession(author, title)) throw new Error('You cannot log a session for this discipline.');
   if (!isDate(date) || date > today) throw new Error('Enter a session date on or before today (WIB).');
   if (!['team practice', 'scrim'].includes(kind)) throw new Error('Choose practice or scrim.');
+  const report = reportFields(input, author);
+  const session = planScrim({ title, date, kind, partner: input.partner?.trim() || (kind === 'scrim' ? 'Internal' : ''), owner: author.name });
+  const completed = completeScrim(session, { by: author.name, score: kind === 'scrim' ? report.outcome : '', notes: kind === 'team practice' ? report.outcome : '' });
+  return withDailyReport({ ...completed, id }, report, author, today);
+}
+
+export function canAddDailyReport(session, author, today = localDay()) {
+  return session?.origin === 'operational' && session.status === 'done' && !!session.result
+    && !session.dailyReport && isDate(session.date) && session.date <= today && canWriteSession(author, session.title);
+}
+
+export function addDailyReport(session, input, author, today = localDay()) {
+  if (!canAddDailyReport(session, author, today)) throw new Error('This session cannot accept a daily report.');
+  return withDailyReport(session, reportFields(input, author), author, today);
+}
+
+function reportFields(input, author) {
   const [objective, outcome, issue, nextAction] = ['objective', 'outcome', 'issue', 'nextAction']
     .map((key) => (input[key] || '').trim());
   if ([objective, outcome, issue, nextAction].some((value) => !value || value.length > NOTE_LIMIT)) {
     throw new Error('Enter an objective, outcome, main issue and next action (up to 500 characters each).');
   }
-  const session = planScrim({ title, date, kind, partner: input.partner?.trim() || (kind === 'scrim' ? 'Internal' : ''), owner: author.name });
+  return { objective, outcome, issue, nextAction, by: author.name, filedAt: new Date().toISOString() };
+}
+
+function withDailyReport(session, dailyReport, author, today) {
   return {
-    ...completeScrim(session, { by: author.name, score: kind === 'scrim' ? outcome : '', notes: kind === 'team practice' ? outcome : '' }),
-    id, dailyReport: { objective, outcome, issue, nextAction },
+    ...session, dailyReport,
     followUp: { ownerId: author.id, ownerName: author.name, due: shiftDay(today, 1), status: 'Open' },
   };
 }
+
+export const reportFiledAt = (record) => record.dailyReport?.filedAt || record.createdAt || '';
 
 export function updateFollowUp(session, { ownerId, due, status }, owners) {
   const owner = owners.find((person) => person.id === ownerId && canWriteSession(person, session.title));
@@ -53,7 +74,7 @@ export function sessionOverview(titles, sessions, scrimReports, today) {
       ...mine.filter((session) => session.dailyReport).map((record) => ({ kind: 'session', record })),
       ...scrimReports.filter((report) => report.title === title).map((record) => ({ kind: 'report', record })),
     ].filter(({ record }) => record.date <= today).sort((a, b) =>
-      b.record.date.localeCompare(a.record.date) || (b.record.createdAt || '').localeCompare(a.record.createdAt || ''));
+      b.record.date.localeCompare(a.record.date) || reportFiledAt(b.record).localeCompare(reportFiledAt(a.record)));
     const open = mine.filter((session) => session.dailyReport && session.followUp && session.followUp.status !== 'Done')
       .sort((a, b) => a.followUp.due.localeCompare(b.followUp.due));
     const next = mine.filter((session) => session.status === 'planned' && session.date >= today)

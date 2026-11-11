@@ -162,6 +162,38 @@ test('invite and password reset screens use the existing password flow', async (
   login.dom.window.close();
 });
 
+test('a completed session accepts one daily report and keeps its original result and objectives', async () => {
+  const B = world();
+  const id = 'SC-completed';
+  const date = shiftDay(localDay(), -1);
+  const result = { score: '2-1', matchIds: ['G1'], notes: 'Original log', by: 'Coach Indra', perObjective: {} };
+  const source = { id, title: 'MLBB', date, kind: 'scrim', partner: 'Academy', owner: 'Coach Indra',
+    status: 'done', objectives: ['OBJ-existing'], result, origin: 'operational' };
+  await B.client(people.indra.id).from('scrim_sessions').insert({ id, data: source });
+  const coach = await open(B, 'indra', `mlbb-scrims?record=${id}`);
+  await coach.click('a[href="#daily-sessions?session=SC-completed"]');
+  assert.equal(coach.d.getElementById('daily-outcome').value, '2-1');
+  assert.equal(coach.d.getElementById('daily-date'), null);
+  for (const [key, value] of Object.entries({ objective: 'Secure river', issue: 'Late ward', nextAction: 'Check vision timing' })) {
+    coach.set(`daily-${key}`, value);
+  }
+  await coach.click('#daily-new button');
+  assert.match(coach.text(), /Daily report saved/);
+  assert.equal(B.tables.scrim_sessions.length, 1);
+  const row = B.tables.scrim_sessions[0];
+  assert.deepEqual(row.data.result, result);
+  assert.deepEqual(row.data.objectives, source.objectives);
+  assert.equal(row.data.dailyReport.outcome, '2-1');
+  assert.equal(row.data.followUp.ownerId, people.indra.id);
+  const lead = await open(B, 'fayad', 'daily-sessions');
+  assert.match(lead.text(), /Check vision timing/);
+  await lead.go(`daily-sessions?session=${id}`);
+  assert.equal(lead.d.getElementById('daily-new'), null);
+  assert.ok(lead.d.querySelector(`a[href="#mlbb-scrims?record=${id}"]`));
+  coach.dom.window.close();
+  lead.dom.window.close();
+});
+
 test('corrections are added, never overwrite the report, and show who entered them', async () => {
   const B = world(); const indra = await open(B, 'indra', 'mlbb-reports');
   indra.set('rp-MLBB-partner', 'X'); indra.set('rp-MLBB-won', '2'); indra.set('rp-MLBB-lost', '1'); indra.set('rp-MLBB-focus', 'f'); indra.set('rp-MLBB-progress', '3'); indra.set('rp-MLBB-failed', 'x'); indra.set('rp-MLBB-adjust', 'y');
