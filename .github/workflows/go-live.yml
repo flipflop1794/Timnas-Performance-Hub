@@ -1,0 +1,109 @@
+name: Go-live (database update + AI)
+# Runs by hand only: GitHub → Actions → "Go-live (database update + AI)" → Run workflow → type GO.
+# Does the two live-site steps that otherwise need the Supabase SQL Editor and the Supabase CLI on a laptop:
+#   1. Database update for V1.13–V1.15 (supabase/RUN_ON_LIVE_V1_13_TO_V1_15.sql). Skipped if already applied.
+#      It only ADDS tables, policies and a private storage bucket; it runs in one transaction (all or nothing).
+#   2. AI: sets the function secrets and deploys the scrim-ai Edge Function.
+# Safe to run again: step 1 detects it was applied; step 2 just redeploys.
+#
+# Repository secrets needed (Settings → Secrets and variables → Actions → New repository secret):
+#   SUPABASE_DB_URL        Supabase → Connect → Session pooler connection string, with the database password
+#                          (the nightly backup uses the same secret)
+#   SUPABASE_ACCESS_TOKEN  supabase.com → Account → Access Tokens → Generate new token     (step 2 only)
+#   ANTHROPIC_API_KEY      console.anthropic.com → API keys; set a monthly spend limit there (step 2 only)
+on:
+  workflow_dispatch:
+    inputs:
+      confirm:
+        description: 'Type GO to change the live project'
+        required: true
+      database_update:
+        description: 'Step 1: database update (V1.13–V1.15)'
+        type: boolean
+        default: true
+      deploy_ai:
+        description: 'Step 2: deploy the AI function and set its key'
+        type: boolean
+        default: true
+      daily_call_cap:
+        description: 'AI calls per person per day'
+        default: '300'
+
+env:
+  PROJECT_REF: cwedqaupevboyzuxvdto
+  SITE_ORIGIN: https://timnas-performance-hub-kappa.vercel.app
+
+jobs:
+  go-live:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Confirm
+        if: inputs.confirm != 'GO'
+        run: echo "::error::Type GO in the confirm box to run this." && exit 1
+
+      - uses: actions/checkout@v5
+
+      - name: Check secrets
+        env:
+          DB: ${{ secrets.SUPABASE_DB_URL }}
+          TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        run: |
+          missing=""
+          if [ "${{ inputs.database_update }}" = "true" ] && [ -z "$DB" ]; then missing="$missing SUPABASE_DB_URL"; fi
+          if [ "${{ inputs.deploy_ai }}" = "true" ]; then
+            [ -z "$TOKEN" ] && missing="$missing SUPABASE_ACCESS_TOKEN"
+            [ -z "$KEY" ] && missing="$missing ANTHROPIC_API_KEY"
+          fi
+          if [ -n "$missing" ]; then echo "::error::Missing repository secrets:$missing"; exit 1; fi
+          echo "## Go-live run" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: 'Step 1: database update'
+        if: inputs.database_update
+        env:
+          DB: ${{ secrets.SUPABASE_DB_URL }}
+        run: |
+          set -euo pipefail
+          q() { docker run --rm -i -e DB postgres:17 sh -c 'psql "$DB" -v ON_ERROR_STOP=1 -X -q -t -A' ; }
+          applied=$(echo "select count(*) from (values ('scrim_games'),('draft_books'),('readiness_store')) v(t) where to_regclass('public.'||t) is not null;" | q)
+          if [ "$applied" = "3" ]; then
+            echo "Already applied: all three tables exist. Nothing to do."
+            echo "- Database update: **already applied**, nothing changed" >> "$GITHUB_STEP_SUMMARY"
+          elif [ "$applied" = "0" ]; then
+            q < supabase/RUN_ON_LIVE_V1_13_TO_V1_15.sql
+            echo "- Database update: **applied**" >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "::error::Partly applied ($applied of 3 tables exist). Not touching it: check the database by hand."
+            exit 1
+          fi
+          tables=$(echo "select string_agg(t, ', ') from (values ('scrim_captures'),('scrim_games'),('pattern_findings'),('player_aliases'),('ai_usage'),('draft_pools'),('draft_books'),('mock_drafts'),('draft_drills'),('pro_games'),('readiness_store')) v(t) where to_regclass('public.'||t) is not null;" | q)
+          echo "Tables present: $tables"
+          echo "- Tables present: $tables" >> "$GITHUB_STEP_SUMMARY"
+
+      - uses: supabase/setup-cli@v1
+        if: inputs.deploy_ai
+        with:
+          version: latest
+
+      - name: 'Step 2: AI secrets and function'
+        if: inputs.deploy_ai
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          CAP: ${{ inputs.daily_call_cap }}
+        run: |
+          set -euo pipefail
+          supabase secrets set --project-ref "$PROJECT_REF" "ANTHROPIC_API_KEY=$KEY" "ALLOWED_ORIGINS=$SITE_ORIGIN" "DAILY_CALL_CAP=$CAP" > /dev/null
+          supabase functions deploy scrim-ai --project-ref "$PROJECT_REF"
+          code=$(curl -s -o /dev/null -w '%{http_code}' -X OPTIONS -H "Origin: $SITE_ORIGIN" "https://$PROJECT_REF.supabase.co/functions/v1/scrim-ai")
+          echo "Function answers: HTTP $code"
+          if [ "$code" = "404" ]; then echo "::error::The function is not reachable after deploy."; exit 1; fi
+          echo "- AI function: **deployed** (answers HTTP $code), daily cap $CAP calls per person" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Next
+        run: |
+          {
+            echo ""
+            echo "Next: reload the hub, sign in as admin and open Admin → What is switched on."
+            echo "Screenshot capture, Patterns, Draft Room and Athlete readiness should show as on."
+          } >> "$GITHUB_STEP_SUMMARY"
