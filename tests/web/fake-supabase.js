@@ -34,6 +34,10 @@ export function backend() {
     if (table === 'scrim_reports' && op === 'update') return { code: '42501', message: 'Submitted records cannot be changed. Add a correction instead.' };
     if (DOC_TABLES.includes(table)) {
       if (row.data?.origin !== 'operational') return { code: '22023', message: 'Only operational records can be stored (origin must be "operational").' };
+      // V1.16 guard_approval: "approved" only via approve_record.
+      if (['draft_books', 'opponent_cards'].includes(table) && row.data?.status === 'approved' && !B.approving && JSON.stringify(old?.data) !== JSON.stringify(row.data)) {
+        return { code: '42501', message: 'Approval is recorded with the Approve button by the Head Coach or an assistant coach; a changed version is saved as a draft.' };
+      }
       if (old && !canWrite(uid, old.title)) return deny;
       return canWrite(uid, row.title) ? null : deny;
     }
@@ -44,6 +48,7 @@ export function backend() {
     if (table === 'profiles') return has(uid, 'admin') || row.id === uid ? null : deny;
     return deny;
   };
+  B.canApprove = (id) => has(id, 'admin') || has(id, 'head_coach') || has(id, 'assistant_coach');
   B.notify = (table) => { for (const ch of B.channels) for (const h of ch.handlers) if (h.table === table) setTimeout(h.cb, 0); };
   B.client = (sessionUserId) => client(B, sessionUserId);
   return B;
@@ -141,6 +146,17 @@ function client(B, sessionUserId) {
       return { data: out.data, error: null };
     } },
     rpc: async (name, args) => {
+      if (name === 'approve_record') {
+        const r = (B.tables[args.p_table] || []).find((x) => x.id === args.p_id); const me = uid();
+        if (!r) return { data: null, error: { code: 'P0002', message: 'Not found. Reload and try again.' } };
+        if (!B.canApprove(me)) return { data: null, error: { code: '42501', message: `Only the Head Coach or an assistant coach can approve for ${r.title}.` } };
+        if (r.data.status !== 'draft') return { data: null, error: { code: '22023', message: 'Only a draft version can be approved.' } };
+        if (r.updated_by === me) return { data: null, error: { code: '42501', message: 'Ask another coach to approve: the writer of this version cannot approve it.' } };
+        const name = B.tables.profiles.find((p) => p.id === me)?.display_name || '';
+        r.data = { ...r.data, status: 'approved', approvedBy: name, approvedById: me, approvedAt: new Date().toISOString() };
+        r.updated_by = me; r.updated_at = new Date(Date.now() + ++tick).toISOString();
+        B.notify(args.p_table); return { data: structuredClone(r.data), error: null };
+      }
       if (name !== 'set_roster') return { error: { message: 'unknown rpc' } };
       const err = B.write(uid(), 'roster_players', 'insert', {}); if (err) return { error: err };
       for (const [title, list] of Object.entries(args.p)) { B.tables.roster_players = B.tables.roster_players.filter((r) => r.title !== title); list.forEach((ign, i) => B.tables.roster_players.push({ title, ign, sort_order: i })); }

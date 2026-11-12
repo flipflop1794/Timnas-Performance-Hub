@@ -13,7 +13,7 @@ const pct = (x) => (x == null ? '—' : `${Math.round(x * 100)}%`);
 const mmss = (s) => `${Math.floor(Math.max(0, s) / 60)}:${String(Math.max(0, s) % 60).padStart(2, '0')}`;
 
 export function draftRoomUi(ctx) {
-  const { S, esc, tag, banner, setMsg, val, render, meName, sid } = ctx;
+  const { S, esc, tag, banner, setMsg, val, render, meName, sid, HUB_USER = null, CAN_APPROVE = true } = ctx;
   S.dr ||= { section: {}, mock: {}, drill: {}, proPreview: {} };
   for (const k of Object.keys(COLL)) S[`dr_${k}`] ||= [];
   const H = (title) => heroesFor(title);
@@ -117,10 +117,12 @@ export function draftRoomUi(ctx) {
       <div class="grid2"><label class="field" for="drBlue">Plan on blue side<textarea id="drBlue" rows="3">${v('blue')}</textarea></label>
         <label class="field" for="drRed">Plan on red side<textarea id="drRed" rows="3">${v('red')}</textarea></label></div>
       <label class="field" for="drNotes">Notes (from VODs, scrims vs stand-ins, pro games)<textarea id="drNotes" rows="2">${v('notes')}</textarea></label>
-      <div class="toolbar"><label class="field" for="drBookBy">Written by<input id="drBookBy" value="${esc(meName())}"></label><button class="btn primary" data-dr-savebook="${esc(title)}">Save new version</button>
-        ${book && book.status === 'draft' ? `<label class="field" for="drApprover">Approver<select id="drApprover">${ap.map((n) => `<option>${esc(n)}</option>`).join('')}</select></label><button class="btn" data-dr-approve="${esc(title)}">Approve this version</button>` : ''}
+      <div class="toolbar"><label class="field" for="drBookBy">Written by<input id="drBookBy" value="${esc(HUB_USER ? HUB_USER.name : meName())}"${HUB_USER ? ' readonly' : ''}></label><button class="btn primary" data-dr-savebook="${esc(title)}">Save new version</button>
+        ${book && book.status === 'draft' ? (HUB_USER
+          ? (CAN_APPROVE ? `<button class="btn" data-dr-approve="${esc(title)}">Approve this version as ${esc(HUB_USER.name)}</button>` : '')
+          : `<label class="field" for="drApprover">Approver<select id="drApprover">${ap.map((n) => `<option>${esc(n)}</option>`).join('')}</select></label><button class="btn" data-dr-approve="${esc(title)}">Approve this version</button>`) : ''}
         <span class="msg" id="msg-dr-book" role="status"></span></div>
-      <p class="note">Approval: ${esc(ap.join(', '))}; not the writer of the version. The approved book is shown on the opponent card and the match-day runbook (90 minutes before).</p>
+      <p class="note">Approval: ${HUB_USER ? 'the Head Coach or an assistant coach' : esc(ap.join(', '))}; not the writer of the version. The approved book is shown on the opponent card and the match-day runbook (90 minutes before).</p>
       ${book?.history?.length ? `<details><summary class="btn ghost">Earlier versions (${book.history.length})</summary><ul class="plain">${book.history.slice().reverse().map((h) => `<li>v${h.version} · ${esc(h.by)} · ${esc(String(h.at).slice(0, 10))} · bans ${esc((h.bans || []).join(', ') || '—')}${h.status === 'approved' ? ` ${tag('s-done', 'was approved')}` : ''}</li>`).join('')}</ul></details>` : ''}</div>
       <div class="panel"><h2>All books — ${esc(title)}</h2>${all.length ? `<ul class="plain">${all.map((b) => `<li><b>${esc(b.opponent)}</b> v${b.version} ${tag(b.status === 'approved' ? 's-done' : 's-proposed', b.status)} <span class="note">bans ${esc(b.bans.join(', ') || '—')}</span></li>`).join('')}</ul>` : '<p class="empty">None yet.</p>'}</div>`;
   }
@@ -220,6 +222,14 @@ export function draftRoomUi(ctx) {
         const opp = val('drBookOpp'); const prev = mine('books', title).find((b) => b.opponent === opp) || null;
         const rec = D.saveBook(prev, { bans: val('drBans'), protect: val('drProtect'), flex: val('drFlex'), blue: val('drBlue'), red: val('drRed'), notes: val('drNotes') }, { title, opponent: opp, by: val('drBookBy'), heroes });
         await put('books', rec); render(); setMsg('msg-dr-book', `Saved as version ${rec.version} (draft).`, 'ok'); return true;
+      }
+      if (ds.drApprove && HUB_USER && S.db?.approve) {
+        // V1.16: approved in the database as the signed-in person (the writer of the version is refused there).
+        const b = mine('books', title).find((x) => x.opponent === val('drBookOpp'));
+        if (!b) throw new Error('Save the book first.');
+        const rec = await S.db.approve('draft_books', sid(b.id));
+        const list = S.dr_books; const i = list.findIndex((x) => x.id === rec.id); if (i >= 0) list[i] = rec; else list.push(rec);
+        render(); setMsg('msg-dr-book', 'Approved.', 'ok'); return true;
       }
       if (ds.drApprove) { const opp = val('drBookOpp'); const b = mine('books', title).find((x) => x.opponent === opp); const rec = D.approveBook(b, { by: val('drApprover'), approvers: approvers(title) }); await put('books', rec); render(); setMsg('msg-dr-book', 'Approved.', 'ok'); return true; }
       if (ds.drPlayer) { S.dr.poolPlayer = { ...(S.dr.poolPlayer || {}), [title]: ds.drPlayer }; render(); return true; }

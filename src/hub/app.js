@@ -21,6 +21,9 @@ import { STAFF, TITLES as WEC_TITLES, WELLBEING, owner, ownerNote, reviewersFor,
 // Website build: the signed-in account (src/web/main.ts). Absent in the Claude artifact build.
 const HUB_USER = (typeof window !== 'undefined' && window.__HUB_USER__) || null;
 const PLATFORM = (typeof window !== 'undefined' && window.__HUB_PLATFORM__) || null;
+// V1.16: approvers are the Head Coach, admins and every assistant coach (enforced in the database). On the
+// website the approver and reviewer are always the signed-in person; the artifact build keeps typed names.
+const CAN_APPROVE = !HUB_USER || HUB_USER.roles.some((r) => ['admin', 'head_coach', 'assistant_coach'].includes(r));
 // V1.15: newer parts switch on only when the live database / server has them (all on in the artifact build).
 const FEAT = { capture: true, draftRoom: true, donny: true, ai: true, ...(PLATFORM?.features || {}) };
 if (HUB_USER && !HUB_USER.staffKey) {
@@ -88,7 +91,7 @@ const CAP_OFF = { gamesSection: () => '', reportGames: () => '', debriefSection:
   patternsPage: () => `<div class="panel">${banner('warn', '<div>Patterns switch on after the V1.13 database update (Staff → Users & access lists what is pending).</div>')}</div>` };
 const capUi = () => (FEAT.capture ? capUiReal() : CAP_OFF);
 let DR = null;
-const drUi = () => (DR ||= draftRoomUi({ S, esc, tag, banner, setMsg, val, render, meName, sid }));
+const drUi = () => (DR ||= draftRoomUi({ S, esc, tag, banner, setMsg, val, render, meName, sid, HUB_USER, CAN_APPROVE }));
 const heroByName = () => Object.fromEntries(Object.values(S.heroes).map((h) => [h.name.toLowerCase(), h.id]));
 const accounts = () => Object.values(S.players).map((p) => p.account);
 const WEC_DOTA = ['Greece', 'South Africa', 'Egypt', 'Venezuela', 'Argentina', 'Kazakhstan', 'Mongolia', 'Iran', 'Belarus', 'North Macedonia', 'New Zealand'];
@@ -977,11 +980,12 @@ function cycleCard(o) {
       <dt>Drill</dt><dd>${esc(o.objective.drill)}</dd><dt>Success</dt><dd>${esc(o.objective.success)}</dd><dt>Next step</dt><dd><b>${esc(nextStep(o, S.rules))}</b></dd></dl>
     ${o.reviews.length ? `<div class="h3">Reviews</div><ul class="plain">${o.reviews.map((r) => `<li><b>${esc(r.decision)}</b> by ${esc(r.reviewer)}, ${esc(r.at.slice(0, 16).replace('T', ' '))}${r.reason ? ` — ${esc(r.reason)}` : ''}</li>`).join('')}</ul>` : ''}
     ${t.length ? `<div class="h3">Sessions → decisions</div><ul class="plain">${t.map(({ session: s, decision: d }) => `<li><b>${esc(s.id)}</b> ${esc(s.date)} · ${esc(s.owner)} · ${esc(s.execution)} · result <b>${esc(s.result)}</b>${s.measure ? ` (${esc(s.measure)})` : ''}${s.context?.opponent ? ` · vs ${esc(s.context.opponent)}` : ''}${d ? ` → <b>${esc(d.decision)}</b> by ${esc(d.by)}: ${esc(d.reason)}` : ' → <i>no decision yet</i>'}</li>`).join('')}</ul>` : ''}
-    ${open ? `<details ${o.status === 'proposed' ? 'open' : ''}><summary class="btn">Review</summary><div class="form">
-      <label class="field" for="rv-d-${o.id}">Decision<select id="rv-d-${o.id}">${opt(REVIEW)}</select></label><label class="field" for="rv-n-${o.id}">Reviewer<input type="text" id="rv-n-${o.id}" list="rv-l-${o.id}" value="${esc(STAFF.find((x) => x.id === S.me)?.name || '')}"></label><datalist id="rv-l-${o.id}">${reviewersFor(o.title).map((n) => `<option value="${esc(n)}"></option>`).join('')}</datalist>
+    ${open ? `${CAN_APPROVE ? `<details ${o.status === 'proposed' ? 'open' : ''}><summary class="btn">Review</summary><div class="form">
+      <label class="field" for="rv-d-${o.id}">Decision<select id="rv-d-${o.id}">${opt(REVIEW)}</select></label>${HUB_USER ? `<label class="field" for="rv-n-${o.id}">Reviewer<input type="text" id="rv-n-${o.id}" value="${esc(HUB_USER.name)}" readonly></label>` : `<label class="field" for="rv-n-${o.id}">Reviewer<input type="text" id="rv-n-${o.id}" list="rv-l-${o.id}" value="${esc(STAFF.find((x) => x.id === S.me)?.name || '')}"></label><datalist id="rv-l-${o.id}">${reviewersFor(o.title).map((n) => `<option value="${esc(n)}"></option>`).join('')}</datalist>`}
       <label class="field" for="rv-r-${o.id}">Reason (required to modify or reject)<input type="text" id="rv-r-${o.id}"></label></div>
       <div class="form"><label class="field" for="rv-dr-${o.id}">Changed drill (if modifying)<input type="text" id="rv-dr-${o.id}"></label><label class="field" for="rv-s-${o.id}">Changed success criterion<input type="text" id="rv-s-${o.id}"></label></div>
-      <div class="toolbar"><button class="btn primary" type="button" data-act="review" data-id="${esc(o.id)}">Save review</button></div></details>
+      <div class="toolbar"><button class="btn primary" type="button" data-act="review" data-id="${esc(o.id)}">Save review</button></div></details>`
+      : o.status === 'proposed' ? '<p class="note">Waiting for review by the Head Coach or an assistant coach.</p>' : ''}
     ${['accepted', 'modified'].includes(o.status) ? `<details><summary class="btn">Log a session</summary><div class="form">
       <label class="field" for="ss-o-${o.id}">Owner<input type="text" id="ss-o-${o.id}"></label><label class="field" for="ss-d-${o.id}">Date<input type="date" id="ss-d-${o.id}" value="${today()}"></label>
       <label class="field" for="ss-e-${o.id}">Executed<select id="ss-e-${o.id}">${opt(EXECUTION)}</select></label><label class="field" for="ss-r-${o.id}">Result vs success criterion<select id="ss-r-${o.id}">${opt(RESULT)}</select></label>
@@ -989,7 +993,7 @@ function cycleCard(o) {
       <label class="field" for="ss-p-${o.id}">Patch / version<input type="text" id="ss-p-${o.id}"></label><label class="field" for="ss-n-${o.id}">Notes<input type="text" id="ss-n-${o.id}"></label></div>
       <div class="toolbar"><button class="btn primary" type="button" data-act="session" data-id="${esc(o.id)}">Save session</button></div></details>` : ''}
     <details><summary class="btn">Decide next step</summary><div class="form">
-      <label class="field" for="dc-d-${o.id}">Decision<select id="dc-d-${o.id}">${opt(DECISIONS)}</select></label><label class="field" for="dc-b-${o.id}">Decided by<input type="text" id="dc-b-${o.id}"></label>
+      <label class="field" for="dc-d-${o.id}">Decision<select id="dc-d-${o.id}">${opt(DECISIONS)}</select></label><label class="field" for="dc-b-${o.id}">Decided by<input type="text" id="dc-b-${o.id}"${HUB_USER ? ` value="${esc(HUB_USER.name)}" readonly` : ''}></label>
       <label class="field" for="dc-r-${o.id}">Reason<input type="text" id="dc-r-${o.id}"></label></div>
       <div class="toolbar"><button class="btn primary" type="button" data-act="decide" data-id="${esc(o.id)}">Save decision</button></div></details>` : ''}
     <div class="msg" id="msg-${esc(o.id)}" role="status"></div></article>`;
@@ -1429,9 +1433,11 @@ V['comp-card'] = () => {
     <label class="field" for="ocTh">What they are likely to do<input type="text" id="ocTh" value="${esc(plan?.theirPlan || '')}" placeholder="${t === 'Dota 2' || t.startsWith('MLBB') ? 'first-phase bans, comfort picks, side' : t === 'PUBG Mobile' ? 'drops per map, rotation style' : t.startsWith('CS2') ? 'map picks and bans, default setups' : 'formation, tempo'}"></label>
     <label class="field" for="ocA">Our answer (required)<input type="text" id="ocA" value="${esc(plan?.ourAnswer || '')}"></label>
     ${ours.length ? `<fieldset class="objpick"><legend class="note">One focus per player (optional)</legend>${ours.map((p, i) => `<label class="field" for="ocF${i}">${esc(p)}<input type="text" id="ocF${i}" data-player="${esc(p)}" value="${esc(plan?.focus[p] || '')}"></label>`).join('')}</fieldset>` : ''}
-    <label class="field" for="ocBy">Written by<input type="text" id="ocBy" value="${esc(meName())}"></label>
+    <label class="field" for="ocBy">Written by<input type="text" id="ocBy" value="${esc(HUB_USER ? HUB_USER.name : meName())}"${HUB_USER ? ' readonly' : ''}></label>
     <div class="toolbar"><button class="btn primary" type="button" id="ocSave">Save draft</button><span class="msg" id="ocSaveMsg"></span></div>
-    ${plan && plan.status !== 'approved' ? `<div class="form"><label class="field" for="ocAp">Approve as (${esc(owner(t).name)} or the title coach)<input type="text" id="ocAp" value="${esc(meName())}"></label></div><div class="toolbar"><button class="btn" type="button" id="ocApprove">Approve card</button><span class="msg" id="ocApMsg"></span></div>` : ''}
+    ${plan && plan.status !== 'approved' ? (HUB_USER
+      ? (CAN_APPROVE ? `<div class="toolbar"><button class="btn" type="button" id="ocApprove">Approve card as ${esc(HUB_USER.name)}</button><span class="msg" id="ocApMsg"></span></div><p class="note">Approval: the Head Coach or an assistant coach, not the writer of this version.</p>` : '<p class="note">Waiting for approval by the Head Coach or an assistant coach.</p>')
+      : `<div class="form"><label class="field" for="ocAp">Approve as (${esc(owner(t).name)} or the title coach)<input type="text" id="ocAp" value="${esc(meName())}"></label></div><div class="toolbar"><button class="btn" type="button" id="ocApprove">Approve card</button><span class="msg" id="ocApMsg"></span></div>`) : ''}
     <p class="note">Editing an approved card returns it to draft.</p></div></div>`;
 };
 
@@ -1557,6 +1563,11 @@ async function onClick(e) {
         const md = cardMarkdown(autoCard({ title: ti, nation: na, per, team: rosterOf(ti, na), data: DATA, heroes: S.heroes, ours: ti === 'Dota 2' ? dotaTeam().pools : [], asOf: today() }), S.oppCards[key] || null);
         const dl = await window.claude?.use?.('downloads'); if (!dl) throw new Error('Downloads are not available in this view; use Print.');
         await dl.save({ filename: `opponent-card-${sid(ti)}-${sid(na)}.md`, data: md }); setMsg('ocMsg', 'Saved.', 'ok'); return;
+      }
+      if (id === 'ocApprove' && HUB_USER && S.db?.approve) {
+        // V1.16: the database records the signed-in approver and refuses the writer of the version.
+        const doc = await S.db.approve('opp_cards', sid(key));
+        S.oppCards = { ...S.oppCards, [key]: doc }; render(); return;
       }
       const plan = id === 'ocSave'
         ? cardPlan({ keys: [0, 1, 2].map((i) => val(`ocK${i}`)), theirPlan: val('ocTh'), ourAnswer: val('ocA'), by: val('ocBy'), focus: Object.fromEntries([...document.querySelectorAll('input[id^="ocF"]')].map((x) => [x.dataset.player, x.value])) })

@@ -124,15 +124,16 @@ t('wellbeing: only the readiness owner and admins can read or write, enforced in
   }
 });
 
-t('proposals: a title coach proposes; only the Head Coach or the assigned assistant coach approves', async () => {
+t('proposals: a title coach proposes; the Head Coach or any assistant coach approves (V1.16)', async () => {
   const o = (id, title, status) => ({ id, title, status, rec: { problem: 'p' }, reviews: [], sessions: [], decisions: [], origin: 'operational' });
   const put = (who, x) => as(who, (q) => q('insert into public.coaching_objectives (id, data, created_by) values ($1, $2, $3) on conflict (id) do update set data = excluded.data', [x.id, x, U[who]]));
+  const upd = (who, x) => as(who, (q) => q('update public.coaching_objectives set data = $2 where id = $1', [x.id, x]));
   await put('indra', o('OBJ-1', 'MLBB', 'proposed'));
-  await assert.rejects(put('indra', o('OBJ-1', 'MLBB', 'accepted')), /Only the Head Coach or the assigned assistant coach/);
-  await assert.rejects(put('donny', o('OBJ-1', 'MLBB', 'accepted')), /Only the Head Coach|row-level security/);
+  await assert.rejects(put('indra', o('OBJ-1', 'MLBB', 'accepted')), /Only the Head Coach or an assistant coach/);
   await put('aufa', o('OBJ-1', 'MLBB', 'accepted'));
   await put('christie', o('OBJ-2', 'PUBG Mobile', 'proposed'));
-  await assert.rejects(put('donny', o('OBJ-2', 'PUBG Mobile', 'accepted')), /row-level security|Only the Head Coach/);
+  // Donny is an assistant coach not assigned to PUBG Mobile: he may review it (update), not create rows there.
+  assert.equal((await upd('donny', o('OBJ-2', 'PUBG Mobile', 'accepted'))).rowCount, 1);
   await put('fayad', o('OBJ-2', 'PUBG Mobile', 'rejected'));
   // logging a session keeps the status: allowed for the title coach
   const s = o('OBJ-1', 'MLBB', 'accepted'); s.sessions = [{ id: 'S1' }];
@@ -157,7 +158,9 @@ t('roles: only admins grant roles; nobody can grant themselves; the last admin c
   await as('aufa', (x) => x('insert into public.user_titles (user_id, title) values ($1, $2)', [U.indra, 'MLBB Women']));
   assert.equal((await rows('indra', 'select title from public.user_titles where user_id = $1 order by title', [U.indra])).map((r) => r.title).join(','), 'MLBB,MLBB Women');
   await assert.rejects(as('aufa', (x) => x(`delete from public.user_roles where user_id = $1 and role = 'admin'`, [U.aufa])), /At least one admin/);
-  await as('indra', (x) => x('update public.profiles set display_name = $1 where id = $2', ['Coach Indra', U.indra]));
+  // V1.16: names are what the screens show as "who", so only an admin sets them.
+  await assert.rejects(as('indra', (x) => x('update public.profiles set display_name = $1 where id = $2', ['Fayad', U.indra])), /Only an admin/);
+  await as('aufa', (x) => x('update public.profiles set display_name = $1 where id = $2', ['Coach Indra', U.indra]));
   await assert.rejects(as('indra', (x) => x(`update public.profiles set staff_key = 'fayad' where id = $1`, [U.indra])), /Only an admin/);
   assert.equal((await rows('christie', `select * from public.profiles where id = $1`, [U.indra]))[0].display_name, 'Coach Indra', 'staff can see names');
 });

@@ -260,6 +260,29 @@ test('admin page: AI use this month with an estimated cost', async () => {
   assert.match(aufa.text(), /AI use this month/); assert.match(aufa.text(), /Game screenshots1—\$0\.012/);
 });
 
+test('V1.16 approvals: a title coach cannot approve; the writer cannot approve his own version; an assistant coach approves as himself', async () => {
+  const B = world();
+  const indra = await open(B, 'indra', 'mlbb-draft');
+  await indra.click('[data-dr-section="book"]');
+  assert.ok(indra.d.getElementById('drBookBy').readOnly, '"written by" is the signed-in person');
+  indra.set('drBans', 'Fanny'); await indra.click('[data-dr-savebook]');
+  assert.match(indra.d.getElementById('msg-dr-book').textContent, /version 1/);
+  assert.equal(indra.d.querySelector('[data-dr-approve]'), null, 'title coach: no approve button');
+  assert.equal(indra.d.getElementById('drApprover'), null, 'no approver picker on the website');
+  // A typed "approved" written straight to the database is refused.
+  const [row] = B.tables.draft_books;
+  const forged = await B.client('u-indra').from('draft_books').upsert({ id: row.id, data: { ...row.data, status: 'approved', approvedBy: 'Fayad' } });
+  assert.match(forged.error.message, /Approve button/);
+  // Aufa (assistant coach) approves; the record names him, not a picked name.
+  const aufa = await open(B, 'aufa', 'mlbb-draft');
+  await aufa.click('[data-dr-section="book"]');
+  assert.match(aufa.d.querySelector('[data-dr-approve]').textContent, /as Aufa Bassam/);
+  await aufa.click('[data-dr-approve]'); await sleep(60);
+  assert.equal(B.tables.draft_books[0].data.status, 'approved');
+  assert.equal(B.tables.draft_books[0].data.approvedBy, 'Aufa Bassam');
+  assert.match(aufa.text(), /approved by Aufa Bassam/);
+});
+
 test("Coach Donny's system inside the hub: staff sign-in, team saved once in the database, other devices load it, title coaches kept out", async () => {
   const B = world();
   const donny = await open(B, 'donny', 'readiness');

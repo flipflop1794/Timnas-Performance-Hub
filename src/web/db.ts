@@ -37,7 +37,7 @@ export function friendlyError(e: { code?: string; message?: string } | null | un
   const msg = e?.message || '';
   let text: string; let code = e?.code || 'unknown';
   if (/row-level security|permission denied|42501/.test(msg) || code === '42501') {
-    text = /Only the Head Coach|cannot be changed|Only an admin|At least one admin/.test(msg) ? msg : `You don't have permission to ${action} this record. Ask the Head Coach or admin to assign you to this title.`;
+    text = /Only the Head Coach|cannot be changed|Only an admin|At least one admin|Approve button|writer of this version|history/.test(msg) ? msg : `You don't have permission to ${action} this record. Ask the Head Coach or admin to assign you to this title.`;
     code = 'permission_denied';
   } else if (/JWT|session|not signed in/i.test(msg) || code === 'PGRST301') { text = 'Your session has ended. Sign in again; what you typed is kept on this device.'; code = 'unauthenticated'; }
   else if (/Failed to fetch|NetworkError|network|timeout/i.test(msg)) { text = 'Not saved: no connection. What you typed is still here; try again.'; code = 'network'; }
@@ -226,8 +226,20 @@ export function createHubDb(client: SupabaseClient, opts: HubDbOptions) {
       },
     };
   }
+  // V1.16: approval of a draft book or opponent card happens in the database (approve_record), which records
+  // the signed-in approver and refuses the writer of the version. Returns the approved record.
+  async function approve(name: string, id: string): Promise<Doc> {
+    const table = TABLES[name];
+    if (!['draft_books', 'opponent_cards'].includes(table)) throw new Error(`No approval for ${name}.`);
+    const { data, error } = await client.rpc('approve_record', { p_table: table, p_id: id });
+    if (error) throw friendlyError(error, 'approve');
+    const v = await client.from(table).select('updated_at').eq('id', id).maybeSingle();
+    if (v.data) versions.set(`${table}:${id}`, String((v.data as Doc).updated_at));
+    return data as Doc;
+  }
   return {
     collection,
+    approve,
     doc(path: string) { const [c, id] = path.split('/'); if (c !== 'config' || !id) throw new Error(`Unsupported document path: ${path}`); return configDoc(id); },
   };
 }
