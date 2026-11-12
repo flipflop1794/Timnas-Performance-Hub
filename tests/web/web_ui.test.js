@@ -309,6 +309,20 @@ test('V1.16 screenshot storage: admin sees how full it is and deletes screenshot
   assert.match(aufa.text(), /Deleted 2 screenshots/); assert.match(aufa.text(), /200 MB of 1 GB/);
 });
 
+test('V1.16 practice quality: leadership compares titles; a title coach sees only his own', async () => {
+  const B = world();
+  const day = localDay();
+  const rep = (id, title, progress) => ({ id, title, data: { id, title, date: day, by: 'x', partner: 'p', result: { mode: 'wl', won: 1, lost: 0, drawn: 0 }, focus: 'f', progress, worked: 'w', adjust: 'a', notes: [], origin: 'operational', createdAt: new Date().toISOString() }, created_by: 'u-indra', created_at: new Date().toISOString() });
+  B.tables.scrim_reports.push(rep('r1', 'MLBB', 5), rep('r2', 'MLBB', 3), rep('r3', 'Dota 2', 1));
+  const fayad = await open(B, 'fayad', 'staff-quality');
+  const row = (p, t) => [...p.d.querySelectorAll('#main tbody tr')].find((tr) => tr.cells[0].textContent === t)?.textContent || '';
+  assert.match(row(fayad, 'MLBB'), /^MLBB88/);            // on time 100%, plan followed 75% → 88
+  assert.match(row(fayad, 'Dota 2'), /^Dota 250/);          // on time 100%, plan followed 0% → 50
+  assert.match(row(fayad, 'eFootball'), /no records/);
+  const indra = await open(B, 'indra', 'staff-quality');
+  assert.deepEqual([...indra.d.querySelectorAll('#main tbody tr')].map((tr) => tr.cells[0].textContent), ['MLBB']);
+});
+
 test("Coach Donny's system inside the hub: staff sign-in, team saved once in the database, other devices load it, title coaches kept out", async () => {
   const B = world();
   const donny = await open(B, 'donny', 'readiness');

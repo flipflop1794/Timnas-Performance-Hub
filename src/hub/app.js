@@ -57,6 +57,7 @@ import { dailySessionsUi, dailyLink } from './daily_sessions_ui.js';
 import { dailyText } from './daily_sessions_strings.js';
 import { canAddDailyReport, canWriteSession } from '../core/daily_sessions.js';
 import { gameOf } from '../core/capture.js';
+import { practiceQuality, PARTS as PQ_PARTS, MIN_SESSIONS as PQ_MIN } from '../core/practice_quality.js';
 import { statGoal } from '../core/patterns.js';
 
 // ---------- state ----------
@@ -270,7 +271,7 @@ const TITLES = [
   ...GAME_HUBS.map((h) => ({ id: h.id, label: h.label, tabs: hubTabs(h) })),
   { id: 'well', label: 'Performance', tabs: [['readiness', 'Athlete readiness'], ['players', 'Player plans'], ['well-day', 'Wellbeing check'], ['well-log', 'Log check-in & load']] },
   { id: 'guide', label: 'Guide', tabs: [['guide', 'How to use the hub']] },
-  { id: 'staff', label: 'Staff', tabs: [['staff-cycle', 'Coaching cycle'], ['staff-measure', 'Is it working?'], ['staff-rules', 'Rules & decisions'], ['staff-sources', 'Sources & limits'], ...(HUB_USER?.isAdmin ? [['admin-users', 'Users & access']] : [])] },
+  { id: 'staff', label: 'Staff', tabs: [['staff-cycle', 'Coaching cycle'], ['staff-quality', 'Practice quality'], ['staff-measure', 'Is it working?'], ['staff-rules', 'Rules & decisions'], ['staff-sources', 'Sources & limits'], ...(HUB_USER?.isAdmin ? [['admin-users', 'Users & access']] : [])] },
 ];
 const viewOf = () => { const h = location.hash.slice(1).split('?')[0]; return TITLES.some((t) => t.tabs.some(([id]) => id === h)) ? h : 'today'; };
 const viewParams = () => new URLSearchParams(location.hash.split('?')[1]);
@@ -1016,6 +1017,23 @@ function cycleCard(o) {
       <div class="toolbar"><button class="btn primary" type="button" data-act="decide" data-id="${esc(o.id)}">Save decision</button></div></details>` : ''}
     <div class="msg" id="msg-${esc(o.id)}" role="status"></div></article>`;
 }
+// V1.16: practice quality across titles (src/core/practice_quality.js). Priority titles first (decided 12 Nov 2026).
+const PQ_ORDER = ['MLBB', 'MLBB Women', 'Dota 2', 'PUBG Mobile', 'eFootball', 'CS2', 'CS2 Women'];
+V['staff-quality'] = () => {
+  if (S.mode === 'demo') return `<div class="panel">${DEMO_BANNER}<p class="empty">Practice quality uses operational records only.</p></div>`;
+  const win = S.pqDays || 7;
+  const rows = practiceQuality(PQ_ORDER.filter(titleVisible), { scrims: S.scrims, reports: S.reports, cycle: S.cycle }, today(), win);
+  const pc = (p) => (p ? `${Math.round(p.value * 100)}%${p.hit != null ? ` <span class="note">${p.hit}/${p.n}</span>` : ` <span class="note">n=${p.n}</span>`}` : '<span class="note">—</span>');
+  const chg = (r) => (r.change == null ? '' : ` <span class="note">${r.change > 0 ? '▲' : r.change < 0 ? '▼' : '='} ${Math.abs(r.change)}</span>`);
+  return `<div class="panel"><div class="lead">Practice <em>quality</em></div>
+    <p>How rigorously each title practises, from the records the staff already keep: sessions held as planned, objectives, reports and follow-ups. It measures the process, not results or talent. A part with no records is left out (—), not counted as zero.</p>
+    <div class="form"><label class="field" for="pqDays">Window<select id="pqDays">${[7, 14, 28].map((d) => `<option value="${d}" ${d === win ? 'selected' : ''}>Last ${d} days</option>`).join('')}</select></label></div>
+    ${S.scrimLoad === 'error' || S.reportLoad === 'error' ? banner('block', '<div>Sessions or reports could not be loaded: these numbers are incomplete.</div>') : ''}
+    <div class="tw"><table><thead><tr><th>Title</th><th class="n">Score</th><th class="n">Sessions (days)</th>${PQ_PARTS.map(([, l]) => `<th class="n">${esc(l)}</th>`).join('')}</tr></thead><tbody>
+    ${rows.map((r) => `<tr><td><b>${esc(r.title)}</b></td><td class="n">${r.score == null ? '<span class="note">no records</span>' : `<b>${r.score}</b>${chg(r)}${r.lowSample ? ` ${tag('c-Low', 'few sessions')}` : ''}`}</td>
+      <td class="n">${r.sessions} (${r.days})</td>${PQ_PARTS.map(([k]) => `<td class="n">${pc(r.parts[k])}</td>`).join('')}</tr>`).join('')}</tbody></table></div>
+    <p class="note">Score: the average of the parts that have records, 0–100. ▲▼: change from the ${win} days before, shown only when both periods have at least ${PQ_MIN} sessions. "Reports filed by next day" counts scrim reports and daily reports entered by the end of the day after the session (WIB). "Plan followed" is the coach's 1–5 rating on scrim reports.</p></div>`;
+};
 V['staff-cycle'] = () => {
   if (S.mode === 'demo') return `<div class="panel">${DEMO_BANNER}<p class="empty">The coaching cycle holds operational records only.</p></div>`;
   const groups = [['proposed', 'Awaiting review'], ['accepted', 'In practice'], ['modified', 'In practice (modified)'], ['evidence-needed', 'Gathering evidence'], ['rejected', 'Rejected'], ['retired', 'Closed']];
@@ -1937,6 +1955,7 @@ document.addEventListener('change', (e) => {
   if (id === 'plT') { S.planTitle = e.target.value; S.planPlayer = null; render(); }
   if (id === 'plP') { S.planPlayer = e.target.value; render(); }
   if (id === 'brD') { S.briefDate = e.target.value || today(); render(); }
+  if (id === 'pqDays') { S.pqDays = Number(e.target.value) || 7; render(); }
   if (id === 'wD') { S.wellDate = e.target.value; render(); }
   if (id === 'dFirst') { S.draft.firstUs = e.target.value === 'us'; S.draft.steps = []; render(); }
   if (id === 'dOpp') { S.draft.opp = e.target.value; render(); }
