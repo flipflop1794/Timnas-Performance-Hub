@@ -10,14 +10,14 @@ Prepared 3 Nov 2026. Builds on V1.3 (HUB_V1_3.md). Not published: files only.
 | Rival VOD library | Each title → Competitors | Links (not video) per rival nation, tagged (draft, rotation, map veto…). A reviewed VOD can become a competitor note with the link as its source. Nations outside the published field are refused. | Title coaches / analysts (TBD) |
 | Sparring partner bank | Each title → Scrims & practice | Partner, level, region, which WEC rival they play like and why, availability, which staff member holds the contact. Scrim counts come from logged scrims. Partners appear as suggestions in the scrim planner. Phone numbers are refused. | Title coaches |
 | Individual player plans | Players → Player plans | Goals per player in three areas (game, physical, mental), each with a measure, owner, due date and status history. A per-title overview shows open, at-risk and done goals. The page warns not to write health details here. | Title coaches (game), Donny (physical, mental) |
-| Weekly brief | Today → Weekly brief | One page generated from the hub: per-title objectives, sessions, scrims, rivals covered and check-in **rate**; gaps; main threats; player goals at risk; unconfirmed rules; pending decisions. Copy or download as Markdown. No individual wellbeing values, no compensation, no win probabilities; nothing is sent. | Fayad |
+| Weekly brief | Today → Weekly brief | One page generated from the hub: per-title objectives, sessions, scrims, rivals covered and check-in **rate**; gaps; main threats; player goals at risk; unconfirmed rules; pending decisions. Copy or download as Markdown. No individual wellbeing values, no win probabilities; nothing is sent. | Fayad |
 
 Navigation: new **Tournament** section; "Wellbeing" is now **Players** (player plans + wellbeing check + log).
 
 ## What the hub does not do (on purpose)
 - No WEC schedule is invented: the bracket, times and format are not published; matches are entered when IESF announces them.
 - The runbook is a starting template, marked "not yet agreed" until the staff edit it.
-- The brief lists pending decisions (Juara Umum scoring, coaching-contact rules, pelatnas dates, SK, compensation — no figures, wellbeing access, PUBGM logger, CS2 owner). Edit the list in `PENDING` (app.js) as they are settled.
+- The brief lists pending decisions (Juara Umum scoring, coaching-contact rules, player availability, wellbeing access, PUBGM logger, CS2 owner). Edit the list in `PENDING` (app.js) as they are settled.
 
 ## New shared-store collections
 `wec_matches`, `config/runbooks`, `vods`, `partners`, `player_plans` (default access: signed-in viewers read, contributors write). Wellbeing collections stay editors-only.

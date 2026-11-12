@@ -111,7 +111,7 @@ export function attendanceRate(records, title) {
 }
 
 // ---------------------------------------------------------------- availability request (message to players)
-// What can be said now and what is pending, per the onboarding rules: no compensation figures, no SK date.
+// Asks for dates and a reason category only.
 export function availabilityMessage({ lang = 'id', camp = null } = {}) {
   const dates = camp ? `${camp.start} – ${camp.end}${camp.status === 'confirmed' ? '' : (lang === 'id' ? ' (usulan, belum final)' : ' (proposed, not final)')}` : (lang === 'id' ? 'tanggal masih menunggu konfirmasi PB ESI' : 'dates still to be confirmed by PB ESI');
   if (lang === 'id') return [
@@ -119,7 +119,6 @@ export function availabilityMessage({ lang = 'id', camp = null } = {}) {
     `Kami sedang menyusun jadwal pelatnas (${dates}). Mohon balas pesan ini dengan:`,
     '1. Tanggal kamu BISA ikut pelatnas (dari – sampai).',
     '2. Tanggal yang TIDAK bisa, dengan kategori alasan saja: pertandingan/turnamen klub, bootcamp klub, sekolah/ujian, perjalanan, pribadi, lainnya. Tidak perlu detail pribadi.',
-    'Untuk SK dan kompensasi: keduanya sedang diproses PB ESI dan akan diinformasikan resmi. Mohon jangan mengandalkan info dari sumber lain.',
     'Terima kasih!',
   ].join('\n');
   return [
@@ -127,7 +126,6 @@ export function availabilityMessage({ lang = 'id', camp = null } = {}) {
     `We are building the pelatnas schedule (${dates}). Please reply with:`,
     '1. The dates you CAN attend the training camp (from – to).',
     '2. Any dates you CANNOT, with the reason category only: club match/tournament, club bootcamp, school/exam, travel, personal, other. No personal details needed.',
-    'About the SK and compensation: both are being processed by PB ESI and will be communicated officially. Please do not rely on other sources.',
     'Thank you!',
   ].join('\n');
 }

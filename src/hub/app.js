@@ -1203,9 +1203,7 @@ V.players = () => {
 const PENDING = [
   'Juara Umum (overall title) scoring rule — PB ESI intl. relations to obtain from IESF.',
   'WEC coaching-contact rules (between games, pauses) — Fayad to confirm with IESF.',
-  'Pelatnas dates and player availability — to be collected and confirmed.',
-  'Player SK publication date and process — to be confirmed.',
-  'Player compensation — under discussion; no figures to be communicated.',
+  'Player availability for the pelatnas (16 Nov – 12 Dec) — to be collected (Pelatnas → Availability).',
   'Wellbeing record access: editors, or Donny only — Fayad/Donny to decide.',
   'Who logs PUBG Mobile scrims and session RPE — Fayad to assign.',
   'CS2 and CS2 Women focus owner on the staff — Fayad to assign.',
@@ -1225,7 +1223,7 @@ function mdHtml(md) {
 V.brief = () => {
   if (S.mode === 'demo') return `<div class="panel">${DEMO_BANNER}<p class="empty">The brief uses operational records only.</p></div>`;
   const md = briefText();
-  return `<div class="panel"><div class="lead">Weekly <em>brief</em></div><p>One page for Fayad and the BOD, built from the same records the staff use. Team-level counts only: no individual wellbeing values, no compensation, no win probabilities. Nothing is sent from here; Fayad decides what goes to the BOD.</p>
+  return `<div class="panel"><div class="lead">Weekly <em>brief</em></div><p>One page for Fayad and the BOD, built from the same records the staff use. Team-level counts only: no individual wellbeing values, no win probabilities. Nothing is sent from here; Fayad decides what goes to the BOD.</p>
     <div class="form"><label class="field" for="brD">Week ending<input type="date" id="brD" value="${esc(S.briefDate)}"></label></div>
     <div class="toolbar"><button class="btn" type="button" id="brCopy">Copy text</button><button class="btn" type="button" id="brDl">Download .md</button><span class="msg" id="brMsg"></span></div></div>
   <div class="panel brief">${mdHtml(md)}</div>`;

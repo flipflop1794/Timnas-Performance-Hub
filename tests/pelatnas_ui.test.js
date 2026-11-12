@@ -52,9 +52,9 @@ test('Pelatnas: dates TBD, a planned session gets attendance, availability saved
   // availability
   await h.go('pel-avail');
   assert.match(h.text(), /Player availability/);
-  assert.match(h.d.getElementById('plMsg').value, /SK dan kompensasi/);
+  assert.match(h.d.getElementById('plMsg').value, /Tanggal kamu BISA/); assert.doesNotMatch(h.d.getElementById('plMsg').value, /\bSK\b|kompensasi/);
   assert.doesNotMatch(h.d.getElementById('plMsg').value, /Rp|IDR/);
-  await click(h, '[data-pl-msglang="en"]'); assert.match(h.d.getElementById('plMsg').value, /SK and compensation/);
+  await click(h, '[data-pl-msglang="en"]'); assert.match(h.d.getElementById('plMsg').value, /dates you CAN attend/); assert.doesNotMatch(h.d.getElementById('plMsg').value, /\bSK\b|compensation/);
   set(h, 'plStatus', 'Available for part of it'); set(h, 'plCFrom', '2026-11-22'); set(h, 'plCTo', '2026-11-23'); set(h, 'plCReason', 'Club bootcamp');
   await click(h, '[data-pl-addconf]'); assert.match(h.text(), /2026-11-22 to 2026-11-23 · Club bootcamp/);
   set(h, 'plStatus', 'Available for part of it');

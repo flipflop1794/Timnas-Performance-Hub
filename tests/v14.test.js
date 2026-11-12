@@ -116,7 +116,7 @@ test('page: runbook, WEC match, between-games, VOD, partner, player plan and bri
   assert.equal(db.store.get(pk).goals[0].status, 'at risk');
   // brief
   await go('brief');
-  assert.match(main(), /Whitemon: game goal at risk/); assert.match(main(), /no figures to be communicated/);
+  assert.match(main(), /Whitemon: game goal at risk/); assert.match(main(), /Player availability for the pelatnas/);
   d.getElementById('brDl').click(); await wait();
   assert.match(saved.filename, /^timnas-brief-\d{4}-\d{2}-\d{2}\.md$/); assert.match(saved.data, /# Timnas weekly brief/);
 });

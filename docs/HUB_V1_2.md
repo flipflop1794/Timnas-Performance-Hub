@@ -24,7 +24,7 @@ A Juara Umum push is won across seven titles, not in one tool. The biggest risks
 ## Privacy and confidentiality
 - Wellbeing records are health and mental-wellbeing data. When published, the page declares database rules so only editors can read or write them (`dist/capabilities.json`). Viewers without edit access see "Editors only".
 - **Needs a decision before use:** players' informed consent for recording wellbeing data, and who may see it (Donny only, or Donny + Head Coach). Owner: PB ESI / Head Coach. The hub shows this as pending on every wellbeing screen.
-- No compensation, SK or other onboarding data is in the hub.
+- No onboarding data is in the hub.
 
 ## Validation (40 automated tests, all pass)
 New in V1.2:

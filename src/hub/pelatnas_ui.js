@@ -96,7 +96,7 @@ export function pelatnasUi(ctx) {
         ${sum.map((r) => `<tr><td><button type="button" class="linkish" data-pl-title="${esc(r.title)}">${esc(r.title)}</button></td><td class="n">${r.players}</td><td class="n">${r.full}</td><td class="n">${r.part}</td><td class="n">${r.none}</td><td>${r.open.length ? esc(r.open.join(', ')) : tag('s-done', 'all answered')}</td></tr>`).join('')}
         </tbody></table></div></div>
       <div class="panel"><h2>Ask the players</h2>
-        <p class="note">A ready message for WhatsApp. It asks for dates and a reason category only, and says that the SK and compensation will come officially from PB ESI, with no figures or dates promised.</p>
+        <p class="note">A ready message for WhatsApp. It asks for dates and a reason category only.</p>
         <div class="toolbar"><button class="btn ${S.pl.msgLang === 'id' ? 'primary' : ''}" type="button" data-pl-msglang="id">Bahasa Indonesia</button><button class="btn ${S.pl.msgLang === 'en' ? 'primary' : ''}" type="button" data-pl-msglang="en">English</button>
           <button class="btn" type="button" data-pl-copy="1">Copy message</button><span class="msg" id="msg-pl-copy" role="status"></span></div>
         <textarea id="plMsg" rows="9" readonly>${esc(msg)}</textarea></div>

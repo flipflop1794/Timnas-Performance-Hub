@@ -48,11 +48,11 @@ test('schedule comes from the planner; attendance per session and its rate', () 
   assert.equal(P.attendanceRate([]).rate, null);
 });
 
-test('availability message: no compensation figures or SK dates; says when dates are not final', () => {
+test('availability message: dates and reason categories only; says when dates are not final', () => {
   for (const lang of ['id', 'en']) {
     const m = P.availabilityMessage({ lang });
     assert.doesNotMatch(m, /Rp|IDR|\$|\d{1,3}\.\d{3}/, 'no money figures');
-    assert.match(m, /SK/);
+    assert.doesNotMatch(m, /\bSK\b|compensation|kompensasi/i);
     assert.match(m, lang === 'id' ? /menunggu konfirmasi PB ESI/ : /to be confirmed by PB ESI/);
   }
   const prop = P.campDates({ start: '2026-11-20', end: '2026-12-13', status: 'proposed', by: 'Aufa' });
