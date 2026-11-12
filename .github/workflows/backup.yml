@@ -25,6 +25,15 @@ jobs:
           PASS: ${{ secrets.BACKUP_PASSPHRASE }}
         run: |
           set -euo pipefail
+          # Tolerate a pasted value with spaces, line breaks or quotes around it.
+          DB=$(printf '%s' "$DB" | tr -d '\r\n' | sed -E "s/^[[:space:]\"']+//; s/[[:space:]\"']+\$//")
+          case "$DB" in
+            postgres://*|postgresql://*) ;;
+            *) echo "::error::SUPABASE_DB_URL must be the Session pooler connection string, starting with postgresql://"; exit 1 ;;
+          esac
+          case "$DB" in *YOUR-PASSWORD*) echo "::error::SUPABASE_DB_URL still contains [YOUR-PASSWORD]: put the database password in its place."; exit 1 ;; esac
+          echo "Connecting to: ${DB##*@}"
+          export DB
           stamp=$(date -u +%Y%m%dT%H%MZ)
           docker run --rm -e DB postgres:17 sh -c 'pg_dump "$DB" --data-only --schema=public --no-owner --no-privileges' > public.sql
           docker run --rm -e DB postgres:17 sh -c 'pg_dump "$DB" --data-only --table=auth.users --table=auth.identities --no-owner --no-privileges' > auth.sql
