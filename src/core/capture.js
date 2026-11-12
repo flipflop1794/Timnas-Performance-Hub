@@ -264,6 +264,10 @@ export function heroesFromDraft(game, draft, heroes) {
       if (byName && !byName.hero) { byName.hero = heroes.find(pk.hero); byName.flags = byName.flags.filter((f) => f.field !== 'hero'); }
     }
     for (const p of rows) { for (const pk of picks) { const h = heroes.find(pk.hero); if (h && !p.candidates.includes(h) && !rows.some((q) => q.hero === h)) p.candidates.push(h); } }
+    // V1.17: when only one player on a side is still without a hero and only one of that side's picks is unused, it is theirs.
+    const open = rows.filter((p) => !p.hero);
+    const unused = picks.map((pk) => heroes.find(pk.hero)).filter((h) => h && !rows.some((q) => q.hero === h));
+    if (open.length === 1 && unused.length === 1) { open[0].hero = unused[0]; open[0].flags = open[0].flags.filter((f) => f.field !== 'hero'); }
   }
   return out;
 }

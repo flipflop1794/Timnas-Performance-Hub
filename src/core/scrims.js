@@ -17,6 +17,7 @@ export function planScrim(x) {
     id: `SC-${x.date.replace(/-/g, '')}-${Math.random().toString(36).slice(2, 6)}`,
     title: x.title, date: x.date, time: x.time || '', kind: x.kind, format: x.format || '', partner: (x.partner || '').trim(),
     partnerLevel: x.partnerLevel || '', mirrors: (x.mirrors || '').trim(), owner: x.owner.trim(),
+    focus: String(x.focus || '').trim().slice(0, 200), drill: String(x.drill || '').trim().slice(0, 300), measure: String(x.measure || '').trim().slice(0, 200),
     objectives: x.objectives || [], status: 'planned', result: null, origin: 'operational', createdAt: new Date().toISOString(),
   };
 }

@@ -10,11 +10,11 @@
 //   debrief             { title, text, roster: [names] }                   -> { raw, model }
 //   digest              { title, facts: [...], excerpts: [...] }           -> { raw, model }
 import {
-  PROMPT_VERSION, DEFAULT_MODEL, LIMITS, gameOf, scoreboardSchema, draftSchema, debriefSchema, digestSchema,
-  scoreboardPrompt, draftPrompt, debriefPrompt, digestPrompt, messagesRequest, imageBlock, parseModelJson, usageOf, capturePath,
+  PROMPT_VERSION, DEFAULT_MODEL, LIMITS, gameOf, scoreboardSchema, draftSchema, debriefSchema, digestSchema, planSchema,
+  scoreboardPrompt, draftPrompt, debriefPrompt, digestPrompt, planPrompt, messagesRequest, imageBlock, parseModelJson, usageOf, capturePath,
 } from './scrim_spec.js';
 
-const ACTIONS = ['scoreboard', 'draft', 'debrief', 'digest'];
+const ACTIONS = ['scoreboard', 'draft', 'debrief', 'digest', 'plan'];
 export const RETRIES = 2;
 const RETRYABLE = [429, 500, 502, 503, 504, 529];
 export function backoff(attempt, retryAfter) {
@@ -47,7 +47,7 @@ export async function handle(req, deps) {
   if (!/^Bearer\s+\S+/.test(auth)) return fail(401, 'Sign in first.');
   let body; try { body = await req.json(); } catch { return fail(400, 'Bad request.'); }
   // V1.15: the hub asks once after sign-in whether AI is switched on (no AI call, nothing logged).
-  if (body?.action === 'ping') return json(200, { ok: true, ai: !!deps.env.ANTHROPIC_API_KEY });
+  if (body?.action === 'ping') return json(200, { ok: true, ai: !!deps.env.ANTHROPIC_API_KEY, actions: ACTIONS });
   if (!deps.env.ANTHROPIC_API_KEY) return fail(503, 'AI capture is not switched on yet (the AI key is not set on the server). Enter the values by hand.');
   const { action, title } = body || {};
   if (!ACTIONS.includes(action)) return fail(400, 'Unknown action.');
@@ -84,6 +84,15 @@ export async function handle(req, deps) {
       if (text.length > LIMITS.debriefChars) return fail(413, `Keep the note under ${LIMITS.debriefChars} characters.`);
       const roster = (Array.isArray(body.roster) ? body.roster : []).map(String).slice(0, 12);
       request = messagesRequest({ model, system: debriefPrompt(title, roster), schema: debriefSchema(), maxTokens: 2048, content: [{ type: 'text', text }] });
+    } else if (action === 'plan') {
+      const clip = (v, n = 400) => String(v ?? '').slice(0, n);
+      const reports = (Array.isArray(body.reports) ? body.reports : []).slice(0, LIMITS.planReports).map((r) => ({
+        id: clip(r.id, 60), date: clip(r.date, 10), partner: clip(r.partner, 80), result: clip(r.result, 60), focus: clip(r.focus), plan_followed: Number(r.progress) || null,
+        worked: clip(r.worked), failed: clip(r.failed), adjustment: clip(r.adjust), previous_adjustment: clip(r.prevAdjust), previous_adjustment_check: clip(r.fixCheck, 40) }));
+      if (!reports.length) return fail(400, 'No scrim reports yet for this title: file one first.');
+      const findings = (Array.isArray(body.findings) ? body.findings : []).slice(0, LIMITS.planFindings).map((f) => ({ id: clip(f.id, 60), claim: clip(f.claim), staff_mark: clip(f.status, 20) }));
+      const objectives = (Array.isArray(body.objectives) ? body.objectives : []).slice(0, 8).map((o) => clip(o, 200));
+      request = messagesRequest({ model, system: planPrompt(title), schema: planSchema(), maxTokens: 1200, content: [{ type: 'text', text: JSON.stringify({ REPORTS: reports, FINDINGS: findings, OBJECTIVES: objectives }) }] });
     } else {
       const facts = (Array.isArray(body.facts) ? body.facts : []).slice(0, LIMITS.digestFacts);
       const feedback = (Array.isArray(body.feedback) ? body.feedback : []).slice(0, LIMITS.digestFeedback);

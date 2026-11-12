@@ -7,7 +7,7 @@
 // Rules the prompts enforce: read only what is on the screen, never guess a number, mark what is
 // unclear. The coach confirms every value before it is saved; nothing here writes a record by itself.
 
-export const PROMPT_VERSION = 'scrim-ai-2026-11-07.4';
+export const PROMPT_VERSION = 'scrim-ai-2026-11-12.5';
 export const DEFAULT_MODEL = 'claude-sonnet-5-5';
 
 // Titles with screenshot capture. MLBB Women plays the same game client as MLBB.
@@ -36,6 +36,8 @@ export const LIMITS = {
   excerptChars: 600,
   findings: 5,
   digestFeedback: 30,             // staff marks on earlier findings sent with a digest
+  planReports: 10,                // V1.17 next-session plan: latest reports sent
+  planFindings: 8,
 };
 
 const str = { type: 'string' };
@@ -88,6 +90,13 @@ export function draftSchema(game) {
 
 export const DEBRIEF_FIELDS = ['focus', 'worked', 'failed', 'adjust', 'player_notes', 'detail'];
 export const debriefSchema = () => obj({ ...Object.fromEntries(DEBRIEF_FIELDS.map((k) => [k, str])), not_placed: str });
+
+// V1.17 next-session plan: one suggested focus, built only from the coaches' own reports and findings.
+export const planSchema = () => obj({
+  focus: str, why: str, drill: str, measure: str,
+  based_on: { type: 'array', items: str },
+  alternatives: { type: 'array', items: str },
+});
 
 export const FINDING_KINDS = ['problem', 'strength', 'tendency', 'opponent'];
 export const digestSchema = () => obj({
@@ -165,6 +174,21 @@ export function digestPrompt(title) {
     '- claim: one or two plain sentences with the numbers. why_it_matters: one sentence on what to practise or check. kind: problem, strength, tendency, or opponent (about partners or rival stand-ins).',
     '- FEEDBACK lists earlier findings and how the staff marked them: useful, known (they already knew it), wrong (they judged it a misreading), promoted (turned into a coaching proposal). Do not raise again what is marked known or promoted; for one marked wrong, do not repeat that reading of the same facts. Prefer findings of the kinds the staff marked useful.',
     '- If the facts show nothing worth acting on, return an empty findings list.',
+  ].join('\n');
+}
+
+export function planPrompt(title) {
+  return [
+    `You help the ${title} coaching staff of a national esports team choose the focus of their NEXT practice session.`,
+    'You receive REPORTS (the latest scrim reports: id, date, partner, result, focus, plan-followed rating 1-5, what worked, what failed, the adjustment, and whether the previous adjustment was fixed), FINDINGS (pattern findings with ids) and OBJECTIVES (accepted coaching objectives).',
+    'Suggest ONE focus for the next session:',
+    '- focus: one short line the coach can write on the board. drill: one concrete practice activity for a scrim or drill session. measure: how the coach will know it worked in the next report (observable, no invented targets).',
+    '- why: one or two sentences that point to the material, quoting report ids or finding ids in brackets, e.g. [RP-20261120-ab12]. based_on: those ids.',
+    '- Prefer an adjustment that keeps coming back or was marked "No change" or "Better, not fixed yet"; then repeated failures; then findings marked useful; then accepted objectives.',
+    '- Use only what is in the material. Do not invent statistics, opponents, heroes or players. Copy any number exactly from the material, or write none.',
+    '- Write in the language the coaches used (Bahasa Indonesia, English or mixed). No comments on health, mood or wellbeing.',
+    '- alternatives: up to 2 other one-line focuses, or [].',
+    '- If there is too little material (no reports), say so in why and leave focus, drill and measure empty.',
   ].join('\n');
 }
 

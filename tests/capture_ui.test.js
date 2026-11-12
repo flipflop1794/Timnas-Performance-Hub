@@ -79,7 +79,7 @@ test('real screen → only sure heroes filled → coach taps suggestions → Dat
   h.set('cg-MLBB-0-kills', '7');          // the coach fixes the misread value (7 on the screen)
   // Data tab: fills damage, keeps what the coach typed.
   await h.upload('[data-cap-more="MLBB"]');
-  assert.match(h.d.getElementById('capMsg-MLBB').textContent, /Second screenshot added/);
+  assert.match(h.d.getElementById('capMsg-MLBB').textContent, /1 more screen merged/);
   assert.equal(h.d.getElementById('cg-MLBB-0-hero_damage').value, '50001'); assert.equal(h.d.getElementById('cg-MLBB-0-kills').value, '7', 'typed value kept');
   assert.equal(h.d.getElementById('cg-MLBB-4-hero').value, 'Wanwan', 'picked hero kept');
   await h.upload('[data-cap-draft="MLBB"]'); assert.equal(h.d.getElementById('cd-MLBB-0-hero').value, 'Fanny');
@@ -144,4 +144,44 @@ test('findings: checked against the facts, marked by the coach, promoted into a 
   h.set(`patS-${id}`, 'Win 3 of the next 5 games');
   await h.click(`[data-pat-promote="${id}"]`);
   await h.go('staff-cycle'); assert.match(h.text(), /Won 4 of 6 games \(67%\)/, 'proposal in the coaching cycle');
+});
+
+test('V1.17: result screen and draft picked together → the draft is recognised, read as a draft and fills heroes', async () => {
+  let n = 0;
+  const truth = REAL[1].truthHeroes.left;
+  const h = await hub(async (b) => {
+    if (b.action === 'scoreboard') { n++; return n === 1 ? { captureId: 'cap-1', raw: screen(1), model: 'm' } : { captureId: `cap-x${n}`, raw: { screen_kind: 'draft_or_loading', readable: false, outcome: 'not_shown', duration_seconds: -1, score: { left: -1, right: -1 }, team_names: { left: '', right: '' }, players: [], notes: '' }, model: 'm' }; }
+    if (b.action === 'draft') return { captureId: 'cap-d', raw: { screen_kind: 'draft', readable: true, first_pick_side: 'left', notes: '', actions: truth.map((hero, i) => ({ order: 11 + i, side: 'left', action: 'pick', hero, hero_sure: true, hero_candidates: [], player_name: '', order_sure: false })) }, model: 'm' };
+    throw new Error('unexpected');
+  });
+  const input = h.d.querySelector('[data-cap-shot="MLBB"]'); assert.ok(input.multiple, 'several files can be picked');
+  const f = () => new h.dom.window.File([new Uint8Array([0x89, 0x50, 0x4e, 0x47, 1])], 's.png', { type: 'image/png' });
+  Object.defineProperty(input, 'files', { value: [f(), f()] });
+  input.dispatchEvent(new h.dom.window.Event('change', { bubbles: true })); await wait(250);
+  assert.deepEqual(h.calls.map((c) => c.action), ['scoreboard', 'scoreboard', 'draft']);
+  assert.match(h.d.getElementById('capMsg-MLBB').textContent, /draft read: heroes filled/);
+  assert.match(h.text(), /Draft/, 'the draft table is shown on the check screen');
+  const sugg = h.d.getElementById('main').textContent;
+  for (const hero of truth) assert.ok(sugg.includes(hero), `${hero} offered from the draft`);
+});
+
+test('V1.17: microphone buttons fill the Say it once note (browser speech recognition)', async () => {
+  let inst = null;
+  const dom = new JSDOM(`<!doctype html><html><body>${html}</body></html>`, { runScripts: 'dangerously', url: 'https://example.test/#mlbb-reports', beforeParse(w) {
+    w.claude = { use: async () => null };
+    w.__HUB_PLATFORM__ = { ai: { call: async () => ({ raw: {}, model: 'm' }) } };
+    w.webkitSpeechRecognition = class { constructor() { inst = this; this.started = false; } start() { this.started = true; } stop() { this.started = false; this.onend?.(); } };
+    w.console.error = (...a) => { throw new Error(a.join(' ')); };
+  } });
+  await wait();
+  const d = dom.window.document;
+  const btn = d.querySelector('[data-cap-mic="MLBB|id-ID"]'); assert.ok(btn, 'mic button shown when the browser supports speech');
+  btn.click(); await wait();
+  assert.ok(inst?.started); assert.equal(inst.lang, 'id-ID');
+  assert.equal(d.querySelector('[data-cap-mic="MLBB|id-ID"]').textContent, '■ Stop');
+  inst.onresult({ resultIndex: 0, results: [Object.assign([{ transcript: 'fokus rotasi early' }], { isFinal: true })] });
+  inst.onresult({ resultIndex: 0, results: [Object.assign([{ transcript: 'lord fight telat' }], { isFinal: true })] });
+  assert.equal(d.getElementById('rp-MLBB-dump').value, 'fokus rotasi early. lord fight telat.');
+  d.querySelector('[data-cap-mic="MLBB|id-ID"]').click(); await wait();
+  assert.equal(inst.started, false); assert.match(d.querySelector('[data-cap-mic="MLBB|id-ID"]').textContent, /Bicara/);
 });

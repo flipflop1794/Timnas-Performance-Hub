@@ -106,6 +106,20 @@ test('digest: staff marks on earlier findings travel with the request', async ()
 
 test('ping: tells the hub whether AI is switched on, without an AI call or a usage row', async () => {
   const on = setup(); const r = await on.call({ action: 'ping' });
-  assert.equal(r.status, 200); assert.deepEqual(r.body, { ok: true, ai: true }); assert.equal(on.log.calls.length, 0); assert.equal(on.log.inserts.length, 0);
-  const off = setup({ key: '' }); assert.deepEqual((await off.call({ action: 'ping' })).body, { ok: true, ai: false });
+  assert.equal(r.status, 200); assert.deepEqual(r.body, { ok: true, ai: true, actions: ['scoreboard', 'draft', 'debrief', 'digest', 'plan'] }); assert.equal(on.log.calls.length, 0); assert.equal(on.log.inserts.length, 0);
+  const off = setup({ key: '' }); assert.equal((await off.call({ action: 'ping' })).body.ai, false);
+});
+
+test('V1.17 plan: latest reports and findings go to the prompt, clipped; no reports is refused; usage logged as plan', async () => {
+  const ans = { focus: 'Vision sebelum lord', why: 'Kembali muncul [RP-1] [RP-2]', drill: 'Scrim 2 game: ward 30 s sebelum lord', measure: 'Lord fight dengan vision', based_on: ['RP-1', 'RP-2'], alternatives: [] };
+  const s = setup({ ai: { content: [{ type: 'text', text: JSON.stringify(ans) }], stop_reason: 'end_turn', usage: { input_tokens: 900, output_tokens: 200 } } });
+  const reports = Array.from({ length: 14 }, (_, i) => ({ id: `RP-${i + 1}`, date: '2026-11-20', partner: 'Team A', result: '1-2', focus: 'Lord', progress: 3, worked: 'early', failed: 'x'.repeat(900), adjust: 'vision sebelum lord', prevAdjust: 'vision', fixCheck: 'No change' }));
+  const r = await s.call({ action: 'plan', title: 'MLBB', reports, findings: [{ id: 'PF-1', claim: 'Blue side 2-5', status: 'useful' }], objectives: ['Lord control'] });
+  assert.equal(r.status, 200); assert.equal(r.body.raw.focus, 'Vision sebelum lord');
+  const req = s.log.calls[0].body; const sent = JSON.parse(req.messages[0].content[0].text);
+  assert.equal(sent.REPORTS.length, 10, 'latest 10 only'); assert.equal(sent.REPORTS[0].failed.length, 400, 'long text clipped');
+  assert.equal(sent.REPORTS[0].previous_adjustment_check, 'No change'); assert.equal(sent.FINDINGS[0].staff_mark, 'useful');
+  assert.match(req.system[0].text, /NEXT practice session/); assert.match(req.system[0].text, /Do not invent statistics/);
+  assert.equal(s.log.inserts[0].row.action, 'plan');
+  assert.match((await setup().call({ action: 'plan', title: 'MLBB', reports: [] })).body.error, /No scrim reports yet/);
 });

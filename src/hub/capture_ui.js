@@ -63,9 +63,9 @@ export function captureUi(ctx) {
       <button type="button" class="linkbtn" data-cap-remove="${esc(`${fid}|${i}`)}">Remove</button></li>`).join('');
     if (s.savedFor) return `<div class="h3">Games</div>${banner('block', `<div><b>${s.ready.length} game(s) of the report vs ${esc(s.savedFor.partner)} (${esc(s.savedFor.date)}) are not saved yet.</b> The report itself is saved.</div>`)}<div class="toolbar"><button class="btn primary" type="button" data-cap-retry="${esc(title)}">Retry saving games</button><span class="msg" id="capMsg-${fid}" role="status"></span></div>`;
     return `<div class="h3">Games</div>
-      <p class="note">${on ? 'Upload the end-of-game screenshot of each game: the AI reads it and you check every value before it counts.' : 'AI screenshot reading works on the website. Here you can type each game by hand.'} Confirmed games fill the result above and feed the Patterns tab and player trails.</p>
+      <p class="note">${on ? 'Upload the screenshots of one game: pick the end-of-game screen first, and you can select the second screen (Data or Scoreboard tab) and the draft or loading screen together with it. The AI sorts them, and a draft fills the heroes. You check every value before it counts.' : 'AI screenshot reading works on the website. Here you can type each game by hand.'} Confirmed games fill the result above and feed the Patterns tab and player trails.</p>
       ${list ? `<ul class="plain capgames">${list}</ul>` : ''}
-      ${s.pending ? editorHtml(title, fid, s.pending) : `<div class="toolbar">${on ? `<label class="btn primary filebtn">Add game from screenshot<input type="file" accept="image/*" data-cap-shot="${esc(title)}" hidden></label>` : ''}<button class="btn" type="button" data-cap-manual="${esc(title)}">Add game by hand</button><span class="msg" id="capMsg-${fid}" role="status"></span></div>`}`;
+      ${s.pending ? editorHtml(title, fid, s.pending) : `<div class="toolbar">${on ? `<label class="btn primary filebtn">Add game from screenshot<input type="file" accept="image/*" multiple data-cap-shot="${esc(title)}" hidden></label>` : ''}<button class="btn" type="button" data-cap-manual="${esc(title)}">Add game by hand</button><span class="msg" id="capMsg-${fid}" role="status"></span></div>`}`;
   }
   const flagOf = (p, field) => (p.flags || []).find((f) => f.field === field);
   const cell = (p, field) => { const f = flagOf(p, field); return f ? ` class="flag" title="${esc(f.reason)}" aria-invalid="true"` : ''; };
@@ -110,7 +110,7 @@ export function captureUi(ctx) {
       <p class="note">Highlighted cells are ones the AI was unsure of or that failed a check: hover or tap for the reason. Empty = not shown on the screen. On a phone, swipe the table sideways for the numbers.</p>
       ${draftHtml}
       <div class="toolbar">${block ? '' : `<button class="btn primary" type="button" data-cap-confirm="${esc(title)}">${pend.fix ? 'Save the fix' : 'Confirm game'}</button>`}
-        ${ai() && !block && !pend.fix ? `<label class="btn filebtn">Add another screenshot of this game<input type="file" accept="image/*" data-cap-more="${esc(title)}" hidden></label>` : ''}
+        ${ai() && !block && !pend.fix ? `<label class="btn filebtn">Add another screenshot of this game<input type="file" accept="image/*" multiple data-cap-more="${esc(title)}" hidden></label>` : ''}
         ${ai() && !dr && !block ? `<label class="btn filebtn">Add draft screenshot<input type="file" accept="image/*" data-cap-draft="${esc(title)}" hidden></label>` : ''}
         <button class="btn" type="button" data-cap-discard="${esc(title)}">${pend.fix ? 'Cancel' : 'Discard'}</button><span class="msg" id="capMsg-${fid}" role="status"></span></div>
       ${ai() && !block && !pend.fix ? `<p class="note">${game === 'dota' ? 'Dota spreads a game over two screens: add the Scoreboard tab to the Overview (or the other way round) with "Add another screenshot".' : 'The Data tab adds hero damage, damage taken and turret damage: "Add another screenshot".'}</p>` : ''}</div>`;
@@ -158,12 +158,35 @@ export function captureUi(ctx) {
   }
 
   // ---------------------------------------------------------------- debrief dump
+  // V1.17 microphone for "Say it once": the browser's speech recognition, appended to the note.
+  const SR = () => (typeof window !== 'undefined' ? window.SpeechRecognition || window.webkitSpeechRecognition : null);
+  const micOk = () => !!SR();
+  const MIC = { rec: null, fid: null, lang: null };
+  function paintMic() {
+    for (const b of document.querySelectorAll('[data-cap-mic]')) {
+      const [title, lang] = b.dataset.capMic.split('|'); const on = MIC.fid === sid(title) && MIC.lang === lang;
+      b.setAttribute('aria-pressed', String(on)); b.textContent = on ? '■ Stop' : lang === 'id-ID' ? '🎙 Bicara (ID)' : '🎙 Speak (EN)';
+    }
+  }
+  function stopMic() { try { MIC.rec?.stop(); } catch { /* already stopped */ } MIC.rec = null; MIC.fid = null; MIC.lang = null; paintMic(); }
+  function startMic(fid, lang) {
+    stopMic();
+    const rec = new (SR())(); rec.lang = lang; rec.continuous = true; rec.interimResults = false;
+    rec.onresult = (ev) => {
+      const el = document.getElementById(`rp-${fid}-dump`); if (!el) return;
+      for (let i = ev.resultIndex; i < ev.results.length; i++) if (ev.results[i].isFinal) el.value = `${el.value}${el.value && !/\s$/.test(el.value) ? ' ' : ''}${ev.results[i][0].transcript.trim()}.`;
+    };
+    rec.onerror = (ev) => { setMsg(`capDbMsg-${fid}`, ev.error === 'not-allowed' ? 'Microphone blocked: allow it for this site in the browser, or type the note.' : `Speech stopped (${ev.error}). Type the rest, or press the microphone again.`, 'err'); stopMic(); };
+    rec.onend = () => { if (MIC.rec === rec) { MIC.rec = null; MIC.fid = null; MIC.lang = null; paintMic(); } };
+    MIC.rec = rec; MIC.fid = fid; MIC.lang = lang; rec.start(); paintMic();
+  }
   function debriefSection(title, fid) {
     const on = !!ai();
     return `<details class="capdump"><summary>Say it once: one note, AI fills the fields${on ? '' : ' (website only)'}</summary>
       <p class="note">Dictate with your phone keyboard's microphone or type freely (Indonesian, English or mixed). The AI only moves your own words into the fields below; check them before saving. Performance only: health or personal details are left out.</p>
       <label class="field" for="rp-${fid}-dump">Your note<textarea rows="4" id="rp-${fid}-dump" maxlength="${LIMITS.debriefChars}" placeholder="e.g. Fokus rotasi early ke turtle. Draft bagus, Kevin cepat rotasi. Lord fight masih telat. Next: set up vision sebelum lord."></textarea></label>
-      <div class="toolbar">${on ? `<button class="btn" type="button" data-cap-debrief="${esc(title)}">Fill the fields</button>` : ''}<span class="msg" id="capDbMsg-${fid}" role="status"></span></div><div id="capDbOut-${fid}"></div></details>`;
+      <div class="toolbar">${on && micOk() ? `<button class="btn" type="button" data-cap-mic="${esc(`${title}|id-ID`)}" aria-pressed="${MIC.fid === fid && MIC.lang === 'id-ID'}">${MIC.fid === fid && MIC.lang === 'id-ID' ? '■ Stop' : '🎙 Bicara (ID)'}</button><button class="btn" type="button" data-cap-mic="${esc(`${title}|en-US`)}" aria-pressed="${MIC.fid === fid && MIC.lang === 'en-US'}">${MIC.fid === fid && MIC.lang === 'en-US' ? '■ Stop' : '🎙 Speak (EN)'}</button>` : ''}${on ? `<button class="btn" type="button" data-cap-debrief="${esc(title)}">Fill the fields</button>` : ''}<span class="msg" id="capDbMsg-${fid}" role="status"></span></div>
+      ${on && micOk() ? '<p class="note">The microphone buttons turn speech into text in your browser (Chrome uses Google\'s speech service). Speak, press Stop, read the text, then "Fill the fields".</p>' : ''}<div id="capDbOut-${fid}"></div></details>`;
   }
 
   // ---------------------------------------------------------------- report save hooks
@@ -282,44 +305,66 @@ export function captureUi(ctx) {
     if (t.dataset?.patPeriod) { S.patPeriod[t.dataset.patPeriod] = t.value; render(); return true; }
     const shot = t.dataset?.capShot; const drft = t.dataset?.capDraft; const more = t.dataset?.capMore;
     if (!shot && !drft && !more) return false;
-    const title = shot || drft || more; const fid = sid(title); const file = t.files?.[0]; if (!file) return true;
+    const title = shot || drft || more; const fid = sid(title); const files = [...(t.files || [])].slice(0, 4); if (!files.length) return true;
     const heroes = heroesFor(title);
-    try {
-      syncPending(title, fid);
-      setMsg(`capMsg-${fid}`, drft ? 'Reading the draft… (10–20 s)' : 'Reading the screenshot… (10–20 s)');
-      const image = await prepImage(file);
-      const out = await ai().call({ action: drft ? 'draft' : 'scoreboard', title, day: val(`rp-${fid}-date`) || localToday(), image });
+    const day = () => val(`rp-${fid}-date`) || localToday();
+    // One screenshot, read as a draft, a second screen of the game, or a new game.
+    async function readOne(file, kind, n) {
       const s = st(fid);
-      if (drft) {
-        if (!s.pending) return true;
+      setMsg(`capMsg-${fid}`, `${n ? `Screenshot ${n}: ` : ''}${kind === 'draft' ? 'reading the draft' : 'reading the screenshot'}… (10–20 s)`);
+      const image = await prepImage(file);
+      const out = await ai().call({ action: kind === 'draft' ? 'draft' : 'scoreboard', title, day: day(), image });
+      if (kind !== 'draft' && n > 1 && out.raw?.screen_kind === 'draft_or_loading') return readOne(file, 'draft', n);   // a draft picked together with the result screen
+      if (kind === 'draft') {
+        if (!s.pending) throw new Error('Add the end-of-game screenshot first, then the draft.');
         const d = proposeDraft({ title, raw: out.raw, heroes });
-        if (d.issues.some((i) => i.level === 'block')) { keep(fid); render(); setMsg(`capMsg-${fid}`, d.issues[0].text, 'err'); return true; }
+        if (d.issues.some((i) => i.level === 'block')) throw new Error(d.issues[0].text);
         s.pending.draft = d; s.pending.captureIds = [...(s.pending.captureIds || []), out.captureId];
         s.pending.base = heroesFromDraft(s.pending.base, d, heroes);
         if (s.pending.ai) s.pending.ai = heroesFromDraft(s.pending.ai, d, heroes);
-      } else if (more) {
-        if (!s.pending) return true;
+        return 'draft';
+      }
+      if (kind === 'more') {
+        if (!s.pending) throw new Error('Add the end-of-game screenshot first.');
         const b = proposeGame({ title, raw: out.raw, roster: rosterOf(title), aliases: aliasesOf(title), heroes });
-        if (b.issues.some((i) => i.level === 'block')) { keep(fid); render(); setMsg(`capMsg-${fid}`, b.issues[0].text, 'err'); return true; }
+        if (b.issues.some((i) => i.level === 'block')) throw new Error(b.issues[0].text);
         const m = mergeGames(s.pending.base, b);
         s.pending.base = { ...m.game, issues: m.game.issues };
         if (s.pending.ai) s.pending.ai = mergeGames(s.pending.ai, b).game;
         s.pending.captureIds = [...(s.pending.captureIds || []), out.captureId];
-      } else {
-        const p = proposeGame({ title, raw: out.raw, roster: rosterOf(title), aliases: aliasesOf(title), heroes });
-        // The same game twice (already added, or already saved)?
-        const dup = findDuplicate(p, [...s.ready, ...gamesOf(title).filter((g) => g.date === (val(`rp-${fid}-date`) || localToday()))]);
-        if (dup) p.issues.unshift({ level: 'check', text: `This looks like a game already added (${dup}): same kill score and duration. Discard it if it is the same game.` });
-        s.pending = { base: p, ai: JSON.parse(JSON.stringify(p)), captureIds: [out.captureId], draft: null, fromScreenshot: true };
+        return 'more';
       }
-      keep(fid); S.capFresh = true; render();
-      if (more) setMsg(`capMsg-${fid}`, 'Second screenshot added: empty values filled, disagreements highlighted.', 'ok');
-    } catch (err) { setMsg(`capMsg-${fid}`, err.message, 'err'); }
+      const p = proposeGame({ title, raw: out.raw, roster: rosterOf(title), aliases: aliasesOf(title), heroes });
+      if (p.issues.some((i) => i.level === 'block')) { s.pending = { base: p, ai: JSON.parse(JSON.stringify(p)), captureIds: [out.captureId], draft: null, fromScreenshot: true }; return 'blocked'; }
+      const dup = findDuplicate(p, [...s.ready, ...gamesOf(title).filter((g) => g.date === day())]);
+      if (dup) p.issues.unshift({ level: 'check', text: `This looks like a game already added (${dup}): same kill score and duration. Discard it if it is the same game.` });
+      s.pending = { base: p, ai: JSON.parse(JSON.stringify(p)), captureIds: [out.captureId], draft: null, fromScreenshot: true };
+      return 'game';
+    }
+    try {
+      syncPending(title, fid);
+      const done = [];
+      for (let i = 0; i < files.length; i++) {
+        const kind = drft ? 'draft' : more || i > 0 ? 'more' : 'game';
+        const r = await readOne(files[i], kind, files.length > 1 ? i + 1 : 0);
+        done.push(r); keep(fid); S.capFresh = true; render();
+        if (r === 'blocked') break;
+      }
+      const drafts = done.filter((x) => x === 'draft').length; const extra = done.filter((x) => x === 'more').length;
+      if (done.at(-1) !== 'blocked' && (drafts || extra)) setMsg(`capMsg-${fid}`, `${extra ? `${extra} more screen${extra > 1 ? 's' : ''} merged (empty values filled, disagreements highlighted)` : ''}${extra && drafts ? '; ' : ''}${drafts ? 'draft read: heroes filled from it' : ''}.`, 'ok');
+    } catch (err) { keep(fid); render(); setMsg(`capMsg-${fid}`, err.message, 'err'); }
     finally { if (t) t.value = ''; }
     return true;
   }
   async function onClick(t) {
     const d = t.dataset || {};
+    if (d.capMic) {
+      const [title, lang] = d.capMic.split('|'); const fid = sid(title);
+      if (MIC.fid === fid && MIC.lang === lang) { stopMic(); return true; }
+      try { startMic(fid, lang); setMsg(`capDbMsg-${fid}`, lang === 'id-ID' ? 'Mendengarkan… bicara sekarang, tekan Stop jika selesai.' : 'Listening… speak now, press Stop when done.', 'ok'); }
+      catch (err) { setMsg(`capDbMsg-${fid}`, `The microphone could not start (${err.message}). Type the note instead.`, 'err'); }
+      return true;
+    }
     if (d.capRetry) { const fid = sid(d.capRetry); try { await retrySave(d.capRetry, fid); render(); setMsg(`capMsg-${fid}`, 'Games saved.', 'ok'); } catch (err) { setMsg(`capMsg-${fid}`, err.message, 'err'); } return true; }
     if (d.capManual) { const title = d.capManual; const fid = sid(title); const s = st(fid); s.pending = { base: blankGame(title, rosterOf(title), s.ready.at(-1)?.ourSide), captureIds: [], draft: null, fromScreenshot: false }; keep(fid); render(); return true; }
     if (d.capDiscard) { const fid = sid(d.capDiscard); st(fid).pending = null; keep(fid); render(); return true; }

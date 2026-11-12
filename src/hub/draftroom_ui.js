@@ -39,7 +39,7 @@ export function draftRoomUi(ctx) {
   // ---------------------------------------------------------------- page
   function page(title) {
     const sec = S.dr.section[title] || 'mock';
-    const nav = `<div class="drseg" role="tablist">${SECTIONS.map(([k, l]) => `<button type="button" role="tab" aria-selected="${k === sec}" data-dr-section="${k}" data-dr-title="${esc(title)}">${esc(l)}</button>`).join('')}</div>`;
+    const nav = `<div class="drseg" role="tablist">${SECTIONS.filter(([k]) => !(ctx.focus?.() && ['drills', 'pro'].includes(k)) || k === sec).map(([k, l]) => `<button type="button" role="tab" aria-selected="${k === sec}" data-dr-section="${k}" data-dr-title="${esc(title)}">${esc(l)}</button>`).join('')}</div>`;
     const body = { mock: mockSection, book: bookSection, pools: poolSection, patterns: patternSection, drills: drillSection, pro: proSection }[sec](title);
     return `<div class="panel hero-panel"><div class="lead">Draft <em>Room</em> — ${esc(title)}</div>
       <p class="note">The hub's own draft tools. Our numbers come only from national-team scrims and mock drafts; public pro games are imported by staff and always shown apart. ${esc(D.ORDER_NOTE)}</p>${nav}</div>${body}`;

@@ -65,3 +65,30 @@ test('Pelatnas: dates TBD, a planned session gets attendance, availability saved
   // Today shows the pelatnas line
   await h.go('today'); assert.match(h.text(), /have not answered about availability/);
 });
+
+test('V1.17: AI suggests the next session from reports; "Use in the plan" fills focus, drill and check; planned focus reaches the report', async () => {
+  const db = mock(); const calls = [];
+  await db.collection('scrim_reports').doc('RP-1').set({ id: 'RP-1', title: 'MLBB', date: '2026-11-11', createdAt: '2026-11-11T10:00:00Z', by: 'Aufa Bassam', partner: 'Team A', focus: 'Lord', progress: 3, worked: 'early', failed: 'late lord', adjust: 'vision before lord', result: { mode: 'wl', won: 1, lost: 2, drawn: 0 }, notes: [], origin: 'operational' });
+  const dom = new JSDOM(`<!doctype html><html><body>${html}</body></html>`, { runScripts: 'dangerously', url: 'https://example.test/#mlbb-scrims', beforeParse(w) {
+    w.claude = { use: async (nm) => (nm === 'db' ? db : null) };
+    w.__HUB_PLATFORM__ = { ai: { call: async (b) => { calls.push(b); return { raw: { focus: 'Vision before lord', why: 'Repeated [RP-1]', drill: 'Ward 30 s before lord', measure: 'Lord fights with vision', based_on: ['RP-1'], alternatives: ['Early rotations'] }, model: 'm' }; } } };
+    w.console.error = (...a) => { throw new Error(a.join(' ')); };
+  } });
+  await new Promise((r) => setTimeout(r, 40));
+  const d = dom.window.document; const wait = () => new Promise((r) => setTimeout(r, 30));
+  assert.match(d.getElementById('main').textContent, /Suggest the next session \(AI\)/);
+  d.querySelector('[data-plan-suggest="MLBB"]').click(); await wait(); await wait();
+  assert.equal(calls[0].action, 'plan'); assert.equal(calls[0].reports[0].id, 'RP-1'); assert.equal(calls[0].reports[0].result, '1-2');
+  assert.match(d.getElementById('main').textContent, /Vision before lord/);
+  d.querySelector('[data-plan-use="MLBB"]').click(); await wait();
+  assert.equal(d.getElementById('spFo-MLBB').value, 'Vision before lord'); assert.equal(d.getElementById('spDr-MLBB').value, 'Ward 30 s before lord');
+  d.getElementById('spP-MLBB').value = 'Team B';
+  d.querySelector('[data-scrim-plan="MLBB"]').click(); await wait();
+  const planned = [...db.store.entries()].filter(([k]) => k.startsWith('scrims/')).map(([, v]) => v);
+  assert.equal(planned[0].focus, 'Vision before lord'); assert.equal(planned[0].measure, 'Lord fights with vision');
+  assert.match(d.getElementById('main').textContent, /Focus: Vision before lord/);
+  // the report form offers "Did we fix it?" for last time's adjustment
+  dom.window.location.hash = 'mlbb-reports'; dom.window.dispatchEvent(new dom.window.HashChangeEvent('hashchange')); await wait();
+  assert.match(d.getElementById('main').textContent, /the adjustment was: vision before lord/);
+  assert.ok(d.getElementById('rp-MLBB-fix'));
+});

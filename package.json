@@ -1,7 +1,7 @@
 {
   "type": "module",
   "name": "timnas-performance-hub",
-  "version": "1.16.0",
+  "version": "1.17.0",
   "private": true,
   "scripts": {
     "test": "node --test tests/*.test.js tests/db/*.test.js tests/web/*.test.js && npm run test:donny",

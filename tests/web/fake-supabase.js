@@ -134,7 +134,7 @@ function client(B, sessionUserId) {
     from: (t) => query(t),
     // The scrim-ai server function: tests set B.ai = async (body, userId) => ({ data } | { status, error }).
     functions: { invoke: async (name, { body }) => {
-      if (name === 'scrim-ai' && body?.action === 'ping' && B.ai) return { data: { ok: true, ai: B.aiKey !== false }, error: null };
+      if (name === 'scrim-ai' && body?.action === 'ping' && B.ai) return { data: { ok: true, ai: B.aiKey !== false, actions: ['scoreboard', 'draft', 'debrief', 'digest', 'plan'] }, error: null };
       if (name !== 'scrim-ai' || !B.ai) return { data: null, error: Object.assign(new Error('Edge Function returned a non-2xx status code'), { context: { status: 404, json: async () => ({}) } }) };
       const out = await B.ai(structuredClone(body), uid());
       if (out.error) return { data: null, error: Object.assign(new Error('Edge Function returned a non-2xx status code'), { context: { status: out.status || 400, json: async () => ({ error: out.error }) } }) };

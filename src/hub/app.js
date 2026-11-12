@@ -22,7 +22,7 @@ import { STAFF, TITLES as WEC_TITLES, WELLBEING, owner, ownerNote, reviewersFor,
 const HUB_USER = (typeof window !== 'undefined' && window.__HUB_USER__) || null;
 const PLATFORM = (typeof window !== 'undefined' && window.__HUB_PLATFORM__) || null;
 // V1.15: newer parts switch on only when the live database / server has them (all on in the artifact build).
-const FEAT = { capture: true, draftRoom: true, donny: true, pelatnas: true, ai: true, ...(PLATFORM?.features || {}) };
+const FEAT = { capture: true, draftRoom: true, donny: true, pelatnas: true, ai: true, aiPlan: true, ...(PLATFORM?.features || {}) };
 if (HUB_USER && !HUB_USER.staffKey) {
   const ROLE_LABEL = { admin: 'Admin', head_coach: 'Head Coach', assistant_coach: 'Assistant coach', readiness_owner: 'Readiness owner', title_coach: 'Title coach', analyst: 'Analyst' };
   STAFF.push({ id: 'user', name: HUB_USER.name, role: HUB_USER.roles.map((r) => ROLE_LABEL[r] || r).join(', '), focus: HUB_USER.titles.length ? HUB_USER.titles : WEC_TITLES.map((t) => t.id) });
@@ -34,7 +34,7 @@ import { EVENT, defaultRunbook, tLabel, wecMatch, tick, setResult, gameNote, mar
 import { VOD_TAGS, vod, reviewVod, LEVELS, partner as partnerRec, partnerStats, AREAS, GOAL_STATUS, goal as goalRec, updateGoal, plan as newPlan } from '../core/library.js';
 import { weeklyBrief } from '../core/brief.js';
 import { localDay, shiftDay } from '../core/dates.js';
-import { scrimReport, addNote as reportNote, byDay as reportDays, reportSummary, reportsCsv, resultText, GAME_SPEC, PROGRESS, ROSTER_PLAYED } from '../core/reports.js';
+import { scrimReport, addNote as reportNote, byDay as reportDays, reportSummary, reportsCsv, resultText, GAME_SPEC, PROGRESS, ROSTER_PLAYED, FIX_CHECK } from '../core/reports.js';
 import { seedRosters, effective, editPlayers, recordCheck, checkStatus, dotaPool, ACCOUNT_KIND, ROLE_HINT, rosterKey, CHECK_EVERY_DAYS } from '../core/rosters.js';
 import { loadReadiness, READINESS_SLOT } from '../readiness/contract.js';
 import { mockProvider, MOCK_TITLES } from '../readiness/mockProvider.js';
@@ -73,6 +73,7 @@ const S = {
     MLBB: ['Aran', 'Kevin', 'Drichel', 'Lyoni', 'Jull.'], 'MLBB Women': [], eFootball: ['ELGA'], CS2: [], 'CS2 Women': [] },
   rivals: [], tiers: {}, scrims: [], reports: [],
   runbooks: {}, wecMatches: [], tourTitle: 'Dota 2', tourMatch: null, vods: [], partners: [], plans: {}, planTitle: 'Dota 2', planPlayer: null, lang: (() => { try { return localStorage.getItem('hub-lang') === 'id' ? 'id' : 'en'; } catch { return 'en'; } })(), rd: { title: 'All titles', date: localDay(), data: null, key: null }, rivalSeed: seedRosters(DATA.rivalRosters), rosterEdits: {}, oppCards: {}, crTitle: 'Dota 2', crNation: 'All', ocTitle: 'Dota 2', ocNation: 'Mongolia', compNation: 'Egypt', compAllEf: false, briefDate: localDay(),
+  showAll: (() => { try { return localStorage.getItem('hub-showall') === '1'; } catch { return false; } })(),
   well: { checkins: [], loads: [] }, wellTitle: 'Dota 2', wellDate: localDay(),
   selMatch: 9057681759, selNation: 'MGL', selDay: null, freshPools: {}, importReport: null, lastFlag: null,
 };
@@ -86,8 +87,13 @@ const CAP_OFF = { gamesSection: () => '', reportGames: () => '', debriefSection:
   patternsPage: () => `<div class="panel">${banner('warn', '<div>Patterns switch on after the V1.13 database update (Staff → Users & access lists what is pending).</div>')}</div>` };
 const capUi = () => (FEAT.capture ? capUiReal() : CAP_OFF);
 let DR = null;
-const drUi = () => (DR ||= draftRoomUi({ S, esc, tag, banner, setMsg, val, render, meName, sid }));
+const drUi = () => (DR ||= draftRoomUi({ S, esc, tag, banner, setMsg, val, render, meName, sid, focus: () => focusOn() }));
 let PL = null;
+// Focus mode (website only, per device): hide screens that are not used yet, so coaches see what matters before WEC.
+// Nothing is deleted; "Show all tools" brings everything back.
+const FOCUS_HIDE = new Set(['board', 'staff-measure', 'tour-series', 'dota-post', 'dota-draft', 'dota-review', 'pubgm-sim', 'pubgm-review', ...(FEAT.donny ? ['well-day', 'well-log'] : [])]);
+const focusOn = () => !!HUB_USER && !S.showAll;
+const tabShown = (id, view) => !focusOn() || !FOCUS_HIDE.has(id) || id === view;
 const canSetDates = () => !HUB_USER || HUB_USER.isAdmin || HUB_USER.roles.includes('head_coach');
 const plUi = () => (PL ||= pelatnasUi({ S, esc, tag, banner, setMsg, val, render, meName, sid, localDay, shiftDay, titleVisible: (t) => titleVisible(t), canSetDates }));
 const heroByName = () => Object.fromEntries(Object.values(S.heroes).map((h) => [h.name.toLowerCase(), h.id]));
@@ -270,8 +276,9 @@ function renderNav(view) {
   $('#titles').innerHTML = (HUB_USER ? `<span class="me" title="${esc(HUB_USER.email)}">${esc(HUB_USER.name)}</span><button type="button" id="signOutBtn" class="mode">Sign out</button>`
     : `<label class="me" for="meSel">I am <select id="meSel">${STAFF.map((x) => `<option value="${x.id}" ${x.id === S.me ? 'selected' : ''}>${esc(x.name.split(' ')[0])}</option>`).join('')}</select></label>`) + TITLES.filter(groupVisible).map((t) => `<button type="button" data-go="${t.tabs[0][0]}" aria-pressed="${t === title}">${esc(t.label)}${t.id === 'staff' && pending ? ` · ${pending}` : ''}</button>`).join('')
     + `<button type="button" id="langBtn" class="lang" aria-label="${S.lang === 'id' ? 'Switch to English' : 'Ganti ke Bahasa Indonesia'}"><b${S.lang === 'en' ? ' class="on"' : ''}>EN</b><b${S.lang === 'id' ? ' class="on"' : ''}>ID</b></button>`
-    + `<button type="button" id="modeBtn" class="mode ${S.mode}" aria-pressed="${S.mode === 'demo'}">${S.mode === 'demo' ? 'Leave demo sandbox' : 'Demo sandbox'}</button>`;
-  $('#tabs').innerHTML = title.tabs.map(([id, label]) => `<a href="#${id}" ${id === view ? 'aria-current="page"' : ''}>${esc(label)}</a>`).join('');
+    + `<button type="button" id="modeBtn" class="mode ${S.mode}" aria-pressed="${S.mode === 'demo'}">${S.mode === 'demo' ? 'Leave demo sandbox' : 'Demo sandbox'}</button>`
+    + (HUB_USER ? `<button type="button" id="focusBtn" class="mode" aria-pressed="${!S.showAll}" title="Focus mode hides screens not in use yet">${S.showAll ? 'Focus mode' : 'Show all tools'}</button>` : '');
+  $('#tabs').innerHTML = title.tabs.filter(([id]) => tabShown(id, view)).map(([id, label]) => `<a href="#${id}" ${id === view ? 'aria-current="page"' : ''}>${esc(label)}</a>`).join('');
 }
 
 // ---------- views ----------
@@ -315,8 +322,8 @@ V.today = () => {
   const d = dotaTeam();
   const pd = pubgmData(); const p = pubgmRun(pd);
   const titlePanel = (title) => {
-    if (title === 'Dota 2') { const L = todayList(S.cycle, d.recs, 'Dota 2'); return `<div class="panel"><h2>Dota 2</h2>${CLUB_BANNER}${L.length ? `<ul class="plain today">${L.map(todayCard).join('')}</ul>` : '<p class="empty">No proposals with enough evidence.</p>'}<div class="toolbar"><a class="btn" href="#dota-team">Evidence</a></div></div>`; }
-    if (title === 'PUBG Mobile') { const L = todayList(S.cycle, p.insufficient ? [] : p.recs, 'PUBG Mobile'); return `<div class="panel"><h2>PUBG Mobile</h2>${p.insufficient ? banner('block', `<div><b>Not enough operational evidence.</b> ${esc(p.insufficient)} <a href="#pubgm-log">Log scrims</a>.</div>`) : ''}${L.length ? `<ul class="plain today">${L.map(todayCard).join('')}</ul>` : ''}</div>`; }
+    if (title === 'Dota 2' && !focusOn()) { const L = todayList(S.cycle, d.recs, 'Dota 2'); return `<div class="panel"><h2>Dota 2</h2>${CLUB_BANNER}${L.length ? `<ul class="plain today">${L.map(todayCard).join('')}</ul>` : '<p class="empty">No proposals with enough evidence.</p>'}<div class="toolbar"><a class="btn" href="#dota-team">Evidence</a></div></div>`; }
+    if (title === 'PUBG Mobile' && !focusOn()) { const L = todayList(S.cycle, p.insufficient ? [] : p.recs, 'PUBG Mobile'); return `<div class="panel"><h2>PUBG Mobile</h2>${p.insufficient ? banner('block', `<div><b>Not enough operational evidence.</b> ${esc(p.insufficient)} <a href="#pubgm-log">Log scrims</a>.</div>`) : ''}${L.length ? `<ul class="plain today">${L.map(todayCard).join('')}</ul>` : ''}</div>`; }
     const L = todayList(S.cycle, [], title);
     return `<div class="panel"><h2>${esc(title)}</h2>${L.length ? `<ul class="plain today">${L.map(todayCard).join('')}</ul>` : `<p class="empty">No objectives yet. Add a staff observation from VOD or scrims.</p>`}<div class="toolbar"><a class="btn" href="#${TEAM_TAB[title] || 'mlbb'}">Add observation</a></div></div>`;
   };
@@ -397,6 +404,7 @@ function scrimsPanel(title) {
   const fid = sid(title);
   const objName = (id) => S.cycle.find((o) => o.id === id)?.rec.problem || id;
   const card = (sc) => `<div class="obj"><header><div><span class="note">${esc(sc.date)}${sc.time ? ` ${esc(sc.time)}` : ''} · ${esc(sc.kind)}${sc.format ? ` · ${esc(sc.format)}` : ''} · owner ${esc(sc.owner)}</span><h3>${sc.partner ? `vs ${esc(sc.partner)}` : esc(sc.kind)}${sc.mirrors ? ` <span class="note">(stand-in for ${esc(sc.mirrors)})</span>` : ''}</h3></div>${tag(sc.status === 'done' ? 'c-Verified' : sc.status === 'cancelled' ? 'c-Blocked' : 'c-Low', sc.status)}</header>
+    ${sc.focus ? `<p><b>Focus:</b> ${esc(sc.focus)}${sc.drill ? ` <span class="note">· Drill: ${esc(sc.drill)}</span>` : ''}${sc.measure ? ` <span class="note">· Check: ${esc(sc.measure)}</span>` : ''}</p>` : ''}
     ${sc.objectives.length ? `<p class="note">Practising: ${sc.objectives.map((id) => esc(objName(id))).join('; ')}</p>` : '<p class="note">No objective attached: free scrim.</p>'}
     ${sc.result ? `<p>${sc.result.score ? `<b>${esc(sc.result.score)}</b> · ` : ''}${sc.result.matchIds.length ? `matches ${sc.result.matchIds.map(esc).join(', ')} · ` : ''}${esc(sc.result.notes || sc.result.cancelledWhy)} <span class="note">— ${esc(sc.result.by)}</span></p>` : `<details><summary class="btn">Log result</summary><div class="form">
       <label class="field" for="scS-${sc.id}">${title === 'PUBG Mobile' ? 'Points / placement' : 'Score (e.g. 2-1)'}<input type="text" id="scS-${sc.id}"></label>
@@ -409,6 +417,7 @@ function scrimsPanel(title) {
     <div class="stats"><div class="stat"><span class="k">Planned</span><span class="v">${Sm.upcoming.length}</span></div><div class="stat"><span class="k">Overdue to log</span><span class="v">${Sm.overdue.length}</span></div><div class="stat"><span class="k">Done, last 7 days</span><span class="v">${Sm.last7}</span></div>
     <div class="stat"><span class="k">Done with an objective</span><span class="v">${Sm.done.length ? `${Sm.withObjective}/${Sm.done.length}` : '—'}</span></div><div class="stat"><span class="k">Rivals practised against (stand-ins)</span><span class="v">${Sm.mirrored.length}</span></div></div>
     <p class="note">Attach accepted objectives to a scrim; logging its result also logs a session on each of them. Use "stand-in for" when a sparring partner plays like a WEC rival.</p></div>
+  ${S.mode !== 'demo' && FEAT.ai && FEAT.aiPlan && PLATFORM?.ai ? planSuggestPanel(title, fid) : ''}
   ${S.mode === 'demo' ? '' : `<div class="panel"><h2>Plan a session</h2><div class="form">
     <label class="field" for="spD-${fid}">Date<input type="date" id="spD-${fid}" value="${today()}"></label><label class="field" for="spTm-${fid}">Time<input type="text" id="spTm-${fid}" placeholder="19:00 WIB"></label>
     <label class="field" for="spK-${fid}">Kind<select id="spK-${fid}">${SCRIM_KINDS.map((k) => `<option>${k}</option>`).join('')}</select></label>
@@ -416,12 +425,28 @@ function scrimsPanel(title) {
     <label class="field" for="spP-${fid}">Sparring partner<input type="text" id="spP-${fid}" placeholder="Team name" list="pbList-${fid}"></label><datalist id="pbList-${fid}">${S.partners.filter((p) => p.title === title).map((p) => `<option value="${esc(p.name)}">${esc(p.level)}${p.resembles ? ` · like ${esc(p.resembles)}` : ''}</option>`).join('')}</datalist>
     <label class="field" for="spL-${fid}">Partner level<select id="spL-${fid}"><option value=""></option><option>Tier 1 international</option><option>Tier 1 domestic</option><option>Tier 2</option><option>Academy / amateur</option></select></label>
     <label class="field" for="spMi-${fid}">Stand-in for (WEC rival)<select id="spMi-${fid}"><option value=""></option>${(FIELDS[title] || []).map((n) => `<option>${esc(n)}</option>`).join('')}</select></label>
-    <label class="field" for="spO-${fid}">Owner<input type="text" id="spO-${fid}" value="${esc(STAFF.find((x) => x.id === S.me)?.name || '')}"></label></div>
+    <label class="field" for="spO-${fid}">Owner<input type="text" id="spO-${fid}" value="${esc(STAFF.find((x) => x.id === S.me)?.name || '')}"></label>
+    <label class="field wide" for="spFo-${fid}">Focus of the session (optional)<input type="text" id="spFo-${fid}" maxlength="200" placeholder="e.g. Vision before lord"></label>
+    <label class="field wide" for="spDr-${fid}">Drill (optional)<input type="text" id="spDr-${fid}" maxlength="300"></label>
+    <label class="field wide" for="spMe-${fid}">How we will know it worked (optional)<input type="text" id="spMe-${fid}" maxlength="200"></label></div>
     ${objs.length ? `<fieldset class="objpick"><legend class="note">Objectives to practise</legend>${objs.map((o) => `<label><input type="checkbox" name="spObj-${fid}" value="${esc(o.id)}"> ${esc(o.rec.problem)}</label>`).join('')}</fieldset>` : '<p class="note">No accepted objective for this title yet: the scrim will be logged without one.</p>'}
     <div class="toolbar"><button class="btn primary" type="button" data-scrim-plan="${esc(title)}">Add to plan</button><span class="msg" id="spMsg-${fid}"></span></div></div>`}
   <div class="cols"><div class="panel"><h2>Upcoming${Sm.overdue.length ? ' and overdue' : ''}</h2>${[...Sm.overdue, ...Sm.upcoming].map(card).join('') || '<p class="empty">Nothing planned.</p>'}</div>
   <div class="panel"><h2>Done</h2>${Sm.done.slice(0, 12).map(card).join('') || '<p class="empty">No scrims logged yet.</p>'}
     ${Object.keys(Sm.partners).length ? `<div class="h3">Sparring partners</div><ul class="plain">${Object.entries(Sm.partners).map(([k, v]) => `<li>${esc(k)} — ${v.length} scrim${v.length > 1 ? 's' : ''}</li>`).join('')}</ul>` : ''}</div></div>${partnerPanel(title)}`;
+}
+// V1.17 next-session plan: the AI suggests one focus from the title's latest reports, findings and objectives.
+function planSuggestPanel(title, fid) {
+  const sug = S.planSug?.[title];
+  const n = S.reports.filter((r) => r.title === title).length;
+  return `<div class="panel"><h2>Suggest the next session (AI)</h2>
+    <p class="note">Reads the last ${Math.min(n, 10)} scrim report${n === 1 ? '' : 's'} of ${esc(title)}, the pattern findings and accepted objectives, and suggests one focus with a drill and how to check it. It only uses what your staff wrote; you decide.</p>
+    <div class="toolbar"><button class="btn" type="button" data-plan-suggest="${esc(title)}" ${n ? '' : 'disabled'}>${sug ? 'Suggest again' : 'Suggest a focus'}</button><span class="msg" id="psMsg-${fid}" role="status"></span></div>
+    ${!n ? '<p class="empty">File a scrim report first.</p>' : ''}
+    ${sug ? `<div class="obj"><header><div><span class="note">Suggestion · based on ${sug.based_on?.length ? esc(sug.based_on.join(', ')) : 'the reports'}</span><h3>${esc(sug.focus || 'Not enough material yet')}</h3></div>${tag('c-Low', 'suggestion')}</header>
+      ${sug.drill ? `<p><b>Drill:</b> ${esc(sug.drill)}</p>` : ''}${sug.measure ? `<p><b>How we will know:</b> ${esc(sug.measure)}</p>` : ''}<p class="note">${esc(sug.why || '')}</p>
+      ${sug.alternatives?.length ? `<p class="note">Other options: ${sug.alternatives.map(esc).join(' · ')}</p>` : ''}
+      ${sug.focus ? `<div class="toolbar"><button class="btn primary" type="button" data-plan-use="${esc(title)}">Use in the plan below</button></div>` : ''}</div>` : ''}</div>`;
 }
 const OBS_TITLES = ['MLBB', 'MLBB Women', 'eFootball', 'CS2', 'CS2 Women', 'Dota 2', 'PUBG Mobile'];
 function observationForm(defTitle) {
@@ -447,6 +472,7 @@ function reportCard(r) {
     <p><b>${esc(resultText(r.result))}</b> · <span class="note">Practised: ${esc(r.focus)} · ${esc(pl)}</span></p>
     ${r.worked ? `<p><b>Worked:</b> ${esc(r.worked)}</p>` : ''}${r.failed ? `<p><b>Failed:</b> ${esc(r.failed)}</p>` : ''}
     ${r.detail ? `<p><b>${esc(spec.detail)}:</b> ${esc(r.detail)}</p>` : ''}${r.playerNotes ? `<p><b>Player notes:</b> ${esc(r.playerNotes)}</p>` : ''}
+    ${r.prevAdjust ? `<p class="note"><b>Last adjustment</b> (${esc(r.prevAdjust)}): ${esc(r.fixCheck || 'not checked')}</p>` : ''}
     <p><b>Next session:</b> ${esc(r.adjust)}</p>${capUi().reportGames(r)}${safeUrl(r.vod) ? `<p class="note">VOD: <a href="${esc(safeUrl(r.vod))}" target="_blank" rel="noopener">${esc(r.vod)}</a></p>` : r.vod ? `<p class="note">VOD: ${esc(r.vod)}</p>` : ''}
     ${(r.notes || []).map((n) => `<p class="note">Correction ${esc(n.at.slice(0, 10))} — ${esc(n.by)}: ${esc(n.text)}</p>`).join('')}
     ${S.mode === 'demo' ? '' : `<details><summary class="note">Add a correction</summary><div class="form"><label class="field" for="rpN-${r.id}">Correction or follow-up<input type="text" id="rpN-${r.id}" placeholder="e.g. Score was 2-0, not 2-1"></label></div>
@@ -535,7 +561,7 @@ V['reports-all'] = () => {
 
 // ---------- fast report entry: drafts, quick picks, progress buttons ----------
 // Drafts are a per-device convenience (this browser only). The saved report is what counts.
-const RP_KEYS = ['date', 'time', 'by', 'partner', 'level', 'format', 'roster', 'scrim', 'won', 'lost', 'drawn', 'played', 'points', 'avg', 'chicken', 'focus', 'progress', 'worked', 'failed', 'detail', 'players', 'adjust', 'vod'];
+const RP_KEYS = ['date', 'time', 'by', 'partner', 'level', 'format', 'roster', 'scrim', 'won', 'lost', 'drawn', 'played', 'points', 'avg', 'chicken', 'focus', 'progress', 'worked', 'failed', 'detail', 'players', 'adjust', 'vod', 'fix'];
 const RP_RE = new RegExp(`^rp-(.+)-(${RP_KEYS.join('|')})$`);
 const RP_KEEP_AFTER_SAVE = ['time', 'by', 'level', 'format', 'roster', 'focus'];
 const cap = (x) => x.charAt(0).toUpperCase() + x.slice(1);
@@ -601,7 +627,7 @@ function reportForm(title, { fid, spec, pts, unit, planned, t0 }) {
       <label class="field" for="rp-${fid}-by">Written by<input type="text" id="rp-${fid}-by" list="staffNames" value="${esc(dv('by', meName()))}"></label>
       <label class="field" for="rp-${fid}-partner">Sparring partner<input type="text" id="rp-${fid}-partner" list="pbList-${fid}" placeholder="Team name, or internal" value="${esc(dv('partner'))}"></label>
     </div><datalist id="pbList-${fid}">${S.partners.filter((p) => p.title === title).map((p) => `<option value="${esc(p.name)}">${esc(p.level)}${p.resembles ? ` · like ${esc(p.resembles)}` : ''}</option>`).join('')}</datalist>
-    ${plannedToday.length || partners.length ? `<div class="chips"><span class="note">Quick pick:</span>${plannedToday.map((x) => chip(fid, { partner: x.partner, scrim: x.id, format: x.format, level: x.partnerLevel }, `Planned today: ${x.partner}`, ' planned')).join('')}${partners.map((p) => chip(fid, { partner: p }, p)).join('')}</div>` : ''}
+    ${plannedToday.length || partners.length ? `<div class="chips"><span class="note">Quick pick:</span>${plannedToday.map((x) => chip(fid, { partner: x.partner, scrim: x.id, format: x.format, level: x.partnerLevel, ...(x.focus ? { focus: x.focus } : {}) }, `Planned today: ${x.partner}`, ' planned')).join('')}${partners.map((p) => chip(fid, { partner: p }, p)).join('')}</div>` : ''}
     ${capUi().gamesSection(title, fid)}
     <div class="h3">Result</div>
     ${gameOf(title) && (S.cap?.[fid]?.ready || []).length ? '<p class="note">Filled from the confirmed games above.</p>' : ''}
@@ -610,6 +636,10 @@ function reportForm(title, { fid, spec, pts, unit, planned, t0 }) {
     ${pts ? `${num('played', 'Matches played')}${num('points', 'Total points')}` : `${num('won', `${esc(cap(unit))} won`)}${num('lost', `${esc(cap(unit))} lost`)}`}
     </div>
     <div class="h3">Progress</div>
+    ${last?.adjust ? `<div class="fixcheck"><span class="note">Last time (${esc(last.date)}, vs ${esc(last.partner)}) the adjustment was:</span> <b>${esc(last.adjust)}</b>
+      <input type="hidden" id="rp-${fid}-prevadj" value="${esc(last.adjust)}">
+      <div class="form">${sel('fix', 'Did we fix it?', [['', '—'], ...FIX_CHECK.map((x) => [x, x])])}</div>
+      <div class="chips">${chip(fid, { focus: last.adjust }, "Make it today's focus")}</div></div>` : ''}
     ${capUi().debriefSection(title, fid)}
     ${txt('focus', 'What was this session meant to practise?', 'e.g. Early rotations; fallback drop; set-piece defending')}
     ${focuses.length ? `<div class="chips"><span class="note">Recent and active objectives:</span>${focuses.map((f) => chip(fid, { focus: f }, f.length > 48 ? `${f.slice(0, 46)}…` : f)).join('')}</div>` : ''}
@@ -1492,6 +1522,7 @@ async function onClick(e) {
   if (t.dataset.guideJump) { document.getElementById(`guide-${t.dataset.guideJump}`)?.scrollIntoView?.({ behavior: 'smooth', block: 'start' }); return; }
   if (t.dataset.rdMode) { S.rd.mode = t.dataset.rdMode; S.rd.key = null; render(); return; }
   const id = t.id;
+  if (id === 'focusBtn') { S.showAll = !S.showAll; try { localStorage.setItem('hub-showall', S.showAll ? '1' : ''); } catch { /* per-device convenience */ } render(); return; }
   if (id === 'langBtn') { S.lang = S.lang === 'id' ? 'en' : 'id'; try { localStorage.setItem('hub-lang', S.lang); } catch { /* per-viewer convenience only */ } render(); return; }
   if (id === 'modeBtn' || id === 'modeBtn2') { S.mode = S.mode === 'demo' ? 'live' : 'demo'; S.pubgm.team = null; S.pubgm.sim = null; render(); return; }
   if (t.dataset.hero && viewOf() === 'dota-draft') { S.draft.steps.push(+t.dataset.hero); render(); return; }
@@ -1737,7 +1768,7 @@ async function onClick(e) {
       if (fromGames) fillReport(fid, { won: String(fromGames.won), lost: String(fromGames.lost) });
       const r = scrimReport({ title, date: g('date'), time: g('time'), by: g('by'), partner: g('partner'), partnerLevel: g('level'), format: g('format'), roster: g('roster'), scrimId: g('scrim'),
         won: g('won'), lost: g('lost'), drawn: g('drawn'), played: g('played'), points: g('points'), avgPlacement: g('avg'), chicken: g('chicken'),
-        focus: g('focus'), progress: g('progress'), worked: g('worked'), failed: g('failed'), detail: g('detail'), playerNotes: g('players'), adjust: g('adjust'), vod: g('vod'), asOf: localToday() });
+        focus: g('focus'), progress: g('progress'), worked: g('worked'), failed: g('failed'), detail: g('detail'), playerNotes: g('players'), adjust: g('adjust'), vod: g('vod'), prevAdjust: g('prevadj'), fixCheck: g('fix'), asOf: localToday() });
       // Closing a planned session here avoids typing the same result twice.
       const sc = r.scrimId ? S.scrims.find((x) => x.id === r.scrimId && x.status === 'planned') : null;
       const done = sc ? completeScrim(sc, { score: resultText(r.result), notes: r.worked || r.failed, by: r.by, matchIds: [], perObjective: {} }) : null;
@@ -1769,11 +1800,31 @@ async function onClick(e) {
     } catch (err) { setMsg(msgId, err.code === 'declined' ? 'Download cancelled.' : err.message, err.code === 'declined' ? '' : 'err'); }
     return;
   }
+  if (t.dataset.planSuggest) {
+    const title = t.dataset.planSuggest; const fid = sid(title);
+    try {
+      setMsg(`psMsg-${fid}`, 'Thinking… (10–20 s)');
+      const reports = S.reports.filter((r) => r.title === title).sort((a, b) => b.date.localeCompare(a.date) || b.createdAt.localeCompare(a.createdAt)).slice(0, 10)
+        .map((r) => ({ id: r.id, date: r.date, partner: r.partner, result: resultText(r.result), focus: r.focus, progress: r.progress, worked: r.worked, failed: r.failed, adjust: r.adjust, prevAdjust: r.prevAdjust || '', fixCheck: r.fixCheck || '' }));
+      const findings = (S.findings || []).filter((x) => x.title === title && x.status !== 'wrong').slice(-8).map((x) => ({ id: x.id, claim: x.claim, status: x.status }));
+      const objectives = S.cycle.filter((o) => o.title === title && ['accepted', 'modified'].includes(o.status)).map((o) => o.rec.problem);
+      const out = await PLATFORM.ai.call({ action: 'plan', title, reports, findings, objectives });
+      S.planSug = { ...(S.planSug || {}), [title]: out.raw }; render();
+    } catch (err) { setMsg(`psMsg-${fid}`, `${err.message}`, 'err'); }
+    return;
+  }
+  if (t.dataset.planUse) {
+    const title = t.dataset.planUse; const fid = sid(title); const sug = S.planSug?.[title]; if (!sug) return;
+    const put = (id, v) => { const el = document.getElementById(id); if (el) el.value = v || ''; };
+    put(`spFo-${fid}`, sug.focus); put(`spDr-${fid}`, sug.drill); put(`spMe-${fid}`, sug.measure);
+    document.getElementById(`spFo-${fid}`)?.scrollIntoView?.({ block: 'center' }); setMsg(`spMsg-${fid}`, 'Suggestion copied into the plan: pick the date and partner, then "Add to plan".', 'ok');
+    return;
+  }
   if (t.dataset.scrimPlan) {
     const title = t.dataset.scrimPlan; const fid = sid(title);
     try {
       const objectives = [...document.querySelectorAll(`input[name="spObj-${fid}"]:checked`)].map((x) => x.value);
-      const sc = planScrim({ title, date: val(`spD-${fid}`), time: val(`spTm-${fid}`), kind: val(`spK-${fid}`), format: val(`spF-${fid}`), partner: val(`spP-${fid}`), partnerLevel: val(`spL-${fid}`), mirrors: val(`spMi-${fid}`), owner: val(`spO-${fid}`), objectives });
+      const sc = planScrim({ title, date: val(`spD-${fid}`), time: val(`spTm-${fid}`), kind: val(`spK-${fid}`), format: val(`spF-${fid}`), partner: val(`spP-${fid}`), partnerLevel: val(`spL-${fid}`), mirrors: val(`spMi-${fid}`), owner: val(`spO-${fid}`), focus: val(`spFo-${fid}`), drill: val(`spDr-${fid}`), measure: val(`spMe-${fid}`), objectives });
       if (S.db) await S.db.collection('scrims').doc(sc.id).set(sc); else S.scrims.push(sc);
       render();
     } catch (err) { setMsg(`spMsg-${fid}`, err.message, 'err'); }
@@ -1838,7 +1889,7 @@ async function onClick(e) {
 // arriving from the shared database, a filter, the language switch — keeps what is being typed.
 document.addEventListener('click', async (e) => {
   const b = e.target.closest('button');
-  KEEP_FORMS = !b || b.id === 'langBtn' || b.id === 'modeBtn' || 'rpFill' in b.dataset || 'rpProg' in b.dataset;
+  KEEP_FORMS = !b || b.id === 'langBtn' || b.id === 'modeBtn' || 'rpFill' in b.dataset || 'rpProg' in b.dataset || 'capMic' in b.dataset;
   try { await onClick(e); } finally { KEEP_FORMS = true; }
 });
 for (const ev of ['input', 'change']) document.addEventListener(ev, (e) => draftField(e.target));
