@@ -38,6 +38,9 @@ export const LIMITS = {
   digestFeedback: 30,             // staff marks on earlier findings sent with a digest
   planReports: 10,                // V1.17 next-session plan: latest reports sent
   planFindings: 8,
+  summaryFacts: 80,               // V1.20 weekly leadership summary
+  prepItems: 40,                  // V1.20 preparation pack: items per list
+  tagReports: 20,                 // V1.20 weakness tags: reports per call
 };
 
 const str = { type: 'string' };
@@ -96,6 +99,47 @@ export const planSchema = () => obj({
   focus: str, why: str, drill: str, measure: str,
   based_on: { type: 'array', items: str },
   alternatives: { type: 'array', items: str },
+});
+
+// ---------------------------------------------------------------- V1.20 coach AI
+// Weakness tags per kind of game. The model may only use these; coaches can correct them.
+export const WEAKNESS_TAGS = {
+  moba: ['draft', 'early game / laning', 'rotation', 'objective timing', 'vision', 'teamfight', 'late game / macro', 'communication', 'mechanics', 'discipline'],
+  br: ['drop', 'rotation', 'zone timing', 'vehicles', 'fights', 'third party', 'endgame', 'communication', 'utility', 'discipline'],
+  football: ['defensive shape', 'set pieces', 'transitions', 'finishing', 'build-up', 'game management', 'mechanics', 'discipline'],
+  fps: ['utility', 'entries', 'retakes', 'economy', 'clutches', 'mid-round calls', 'communication', 'mechanics', 'discipline'],
+};
+export const FAMILY = { MLBB: 'moba', 'MLBB Women': 'moba', 'Dota 2': 'moba', 'PUBG Mobile': 'br', eFootball: 'football', CS2: 'fps', 'CS2 Women': 'fps' };
+export const tagsOf = (title) => WEAKNESS_TAGS[FAMILY[title]] || [];
+export const tagsSchema = (title) => obj({
+  reports: { type: 'array', items: obj({ id: str, tags: { type: 'array', items: { type: 'string', enum: tagsOf(title) } } }) },
+});
+// Weekly summary for the Ketua BTN and Dewan Pengawas, from the dashboard's own figures.
+export const summarySchema = () => obj({
+  headline: str,
+  titles: { type: 'array', items: obj({ title: str, line: str }) },
+  attention: { type: 'array', items: str },
+  next_week: { type: 'array', items: str },
+});
+// Preparation pack for one WEC match.
+const cite = { type: 'array', items: str };
+export const prepSchema = () => obj({
+  summary: str,
+  their_tendencies: { type: 'array', items: obj({ text: str, sources: cite }) },
+  our_focus: { type: 'array', items: obj({ focus: str, drill: str, measure: str, sources: cite }) },
+  scrims: { type: 'array', items: obj({ day: int, partner: str, focus: str }) },
+  watch_out: { type: 'array', items: str },
+});
+// PUBG Mobile end-of-match screen.
+export const brResultSchema = () => obj({
+  screen_kind: { type: 'string', enum: ['team_result', 'lobby_standings', 'other'] },
+  readable: { type: 'boolean' },
+  map: str,
+  placement: int,
+  team_kills: int,
+  players: { type: 'array', items: obj({ name_seen: str, kills: int, damage: int, survived_seconds: int, uncertain: { type: 'boolean' } }) },
+  lobby: { type: 'array', items: obj({ rank: int, team_name: str, kills: int, points: int }) },
+  notes: str,
 });
 
 export const FINDING_KINDS = ['problem', 'strength', 'tendency', 'opponent'];
@@ -189,6 +233,62 @@ export function planPrompt(title) {
     '- Write in the language the coaches used (Bahasa Indonesia, English or mixed). No comments on health, mood or wellbeing.',
     '- alternatives: up to 2 other one-line focuses, or [].',
     '- If there is too little material (no reports), say so in why and leave focus, drill and measure empty.',
+  ].join('\n');
+}
+
+const NUMBERS_RULE = 'Every digit you write must be copied exactly from FACTS (or from the item you cite). Write no other number: no totals, differences, percentages or rankings you worked out. Lines with any other number are removed automatically.';
+const SAFE_RULE = 'No predictions of WEC results or win chances, no player rankings, no comments on health, mood, wellbeing, contracts or money.';
+
+export function tagsPrompt(title) {
+  return [
+    `You label scrim reports of the ${title} national team so the coaches can see which weaknesses keep coming back.`,
+    'You receive REPORTS: id, what failed in the session and the adjustment the coach chose for next time (Indonesian, English or mixed).',
+    `For each report return up to 3 tags from this list only: ${tagsOf(title).join(', ')}.`,
+    'Tag what the coach wrote as a problem, not what went well. A report with nothing failing gets []. Do not guess beyond the text.',
+  ].join('\n');
+}
+
+export function summaryPrompt() {
+  return [
+    'You write the weekly half-page summary of the Indonesian national esports teams for the Ketua BTN and the Dewan Pengawas (supervisory board), in Bahasa Indonesia, plain and factual.',
+    'You receive FACTS from the hub: days to IESF WEC 2026, and per title the practice-quality score (0-100, how rigorously the team practises) and its change, sessions and scrim record in the last 7 days, plan-followed rating (1-5), results trend verdict (Better / Worse / No clear change / Not enough data), overdue follow-ups, recurring weaknesses and the next WEC match.',
+    '- headline: one sentence on the overall picture.',
+    '- titles: one line per title that has data (skip titles without records); say what is going well or not, using the facts.',
+    '- attention: up to 3 points leadership should know or support (e.g. a title with no reports, overdue follow-ups, a weakness that keeps returning).',
+    '- next_week: up to 3 points about the coming week (WEC matches, what the staff will focus on). Only from the facts.',
+    `- ${NUMBERS_RULE}`,
+    '- "Better"/"Worse" may only be said when the fact says so; "No clear change" and "Not enough data" must not be described as improvement or decline.',
+    `- ${SAFE_RULE}`,
+  ].join('\n');
+}
+
+export function prepPrompt(title) {
+  return [
+    `You help the ${title} coaching staff of the Indonesian national team prepare for one IESF WEC 2026 match.`,
+    'You receive MATCH (opponent nation, date, days left), CARD (the opponent card: tier, observed notes, hypotheses, VOD takeaways, roster, ban candidates), STANDINS (our scrim results against partners who stand in for this opponent), WEAKNESSES (our recurring weaknesses with counts), REPORTS (our latest scrim reports), BOOK (the approved draft book, MOBA only) and PARTNERS (sparring partners in the bank, with level and which nation they resemble). Every item has an id.',
+    '- summary: two or three sentences on what this match will ask of us.',
+    '- their_tendencies: up to 4 things the opponent tends to do, only from CARD or STANDINS, each citing the item ids in sources.',
+    '- our_focus: up to 3 practice focuses for the days before the match; each with a concrete drill and an observable measure, citing ids (prefer recurring weaknesses that matter against this opponent).',
+    '- scrims: up to 4 suggested scrim sessions before the match: day = days from today (1 = tomorrow, never past MATCH.days_left), partner = a name from PARTNERS (prefer ones resembling the opponent) or "internal", focus = one of our_focus.',
+    '- watch_out: up to 3 risks, only from the material.',
+    `- ${NUMBERS_RULE}`,
+    '- Use only the material. Do not invent heroes, players, strategies or partners. Write in the language the coaches used.',
+    `- ${SAFE_RULE}`,
+    '- If the material is too thin, say so in summary and keep the lists short or empty.',
+  ].join('\n');
+}
+
+export function brResultPrompt() {
+  return [
+    'You read one PUBG Mobile screenshot taken by a national-team coach after a scrim match and return what it shows as JSON.',
+    'Screens: TEAM RESULT (screen_kind "team_result"): the screenshot owner\'s team placement ("#3", "Peringkat 3" or "Winner Winner Chicken Dinner" = 1), map name if shown, and per player name, kills (finishes), damage, survival time. LOBBY STANDINGS (screen_kind "lobby_standings", custom-room or tournament result list): rank, team name, kills and points per team.',
+    'Rules:',
+    '- Read only what is visible. Never estimate or complete a number: use -1 when a value is not shown or not readable, and set uncertain=true on that player.',
+    '- survived_seconds: convert mm:ss to seconds; -1 if not shown. team_kills: the team kill total if printed, else the sum is NOT computed: use -1.',
+    '- map: as printed (Erangel, Miramar, Sanhok, Vikendi, Livik, Rondo...), "" if not shown. placement: -1 if not shown.',
+    '- lobby: [] unless the screen lists several teams.',
+    '- notes: one short sentence about anything the coach must check. Empty if none.',
+    '- If the screenshot is not a result screen, return screen_kind "other", readable=false and empty lists.',
   ].join('\n');
 }
 

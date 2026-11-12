@@ -5,7 +5,8 @@ const FIXED = { pubgm_logs: 'PUBG Mobile', dota_matches: 'Dota 2', dota_pools: '
 const DOC_TABLES = ['scrim_sessions', 'scrim_reports', 'coaching_objectives', 'scouting_notes', 'rival_tiers', 'rival_rosters', 'rival_vods', 'opponent_cards',
   'sparring_partners', 'wec_matches', 'player_plans', 'pubgm_logs', 'dota_matches', 'dota_pools', 'wellbeing_checkins', 'wellbeing_loads',
   'scrim_games', 'scrim_captures', 'pattern_findings', 'player_aliases',
-  'draft_pools', 'draft_books', 'mock_drafts', 'draft_drills', 'pro_games', 'readiness_store'];
+  'draft_pools', 'draft_books', 'mock_drafts', 'draft_drills', 'pro_games', 'readiness_store', 'pelatnas_availability', 'pelatnas_attendance',
+  'leadership_briefs', 'prep_packs', 'weakness_tags'];
 
 export function backend() {
   const B = { users: [], tables: {}, channels: new Set(), log: [] };
@@ -35,7 +36,7 @@ export function backend() {
     if (DOC_TABLES.includes(table)) {
       if (row.data?.origin !== 'operational') return { code: '22023', message: 'Only operational records can be stored (origin must be "operational").' };
       // V1.16 guard_approval: "approved" only via approve_record.
-      if (['draft_books', 'opponent_cards'].includes(table) && row.data?.status === 'approved' && !B.approving && JSON.stringify(old?.data) !== JSON.stringify(row.data)) {
+      if (['draft_books', 'opponent_cards', 'prep_packs'].includes(table) && row.data?.status === 'approved' && !B.approving && JSON.stringify(old?.data) !== JSON.stringify(row.data)) {
         return { code: '42501', message: 'Approval is recorded with the Approve button by the Head Coach or an assistant coach; a changed version is saved as a draft.' };
       }
       if (old && !canWrite(uid, old.title)) return deny;
@@ -142,7 +143,7 @@ function client(B, sessionUserId) {
     from: (t) => query(t),
     // The scrim-ai server function: tests set B.ai = async (body, userId) => ({ data } | { status, error }).
     functions: { invoke: async (name, { body }) => {
-      if (name === 'scrim-ai' && body?.action === 'ping' && B.ai) return { data: { ok: true, ai: B.aiKey !== false, actions: ['scoreboard', 'draft', 'debrief', 'digest', 'plan'] }, error: null };
+      if (name === 'scrim-ai' && body?.action === 'ping' && B.ai) return { data: { ok: true, ai: B.aiKey !== false, actions: B.aiActions || ['scoreboard', 'draft', 'debrief', 'digest', 'plan', 'summary', 'prep', 'tags', 'br_result'] }, error: null };
       if (name !== 'scrim-ai' || !B.ai) return { data: null, error: Object.assign(new Error('Edge Function returned a non-2xx status code'), { context: { status: 404, json: async () => ({}) } }) };
       const out = await B.ai(structuredClone(body), uid());
       if (out.error) return { data: null, error: Object.assign(new Error('Edge Function returned a non-2xx status code'), { context: { status: out.status || 400, json: async () => ({ error: out.error }) } }) };

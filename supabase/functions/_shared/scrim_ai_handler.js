@@ -12,9 +12,12 @@
 import {
   PROMPT_VERSION, DEFAULT_MODEL, LIMITS, gameOf, scoreboardSchema, draftSchema, debriefSchema, digestSchema, planSchema,
   scoreboardPrompt, draftPrompt, debriefPrompt, digestPrompt, planPrompt, messagesRequest, imageBlock, parseModelJson, usageOf, capturePath,
+  tagsSchema, tagsPrompt, tagsOf, summarySchema, summaryPrompt, prepSchema, prepPrompt, brResultSchema, brResultPrompt,
 } from './scrim_spec.js';
 
-const ACTIONS = ['scoreboard', 'draft', 'debrief', 'digest', 'plan'];
+// V1.20: summary (weekly, all titles), prep (one WEC match), tags (weakness labels), br_result (PUBG Mobile screenshot).
+const ACTIONS = ['scoreboard', 'draft', 'debrief', 'digest', 'plan', 'summary', 'prep', 'tags', 'br_result'];
+const IMAGE_ACTIONS = ['scoreboard', 'draft', 'br_result'];
 // Calls per day (WIB) for the whole staff, unless the TEAM_DAILY_CALL_CAP secret says otherwise.
 export const TEAM_DAILY_CAP = 600;
 export const RETRIES = 2;
@@ -60,13 +63,16 @@ export async function handle(req, deps) {
   if (!ACTIONS.includes(action)) return fail(400, 'Unknown action.');
   const game = gameOf(title);
   if (['scoreboard', 'draft'].includes(action) && !game) return fail(400, `Screenshot capture is not set up for ${title}.`);
-  if (typeof title !== 'string' || !title) return fail(400, 'Title is required.');
+  if (action === 'br_result' && title !== 'PUBG Mobile') return fail(400, 'This screenshot reader is for PUBG Mobile.');
+  // The weekly summary covers every title: only those who write every title (Head Coach, admin) may ask for it.
+  const allTitles = action === 'summary';
+  if (!allTitles && (typeof title !== 'string' || !title)) return fail(400, 'Title is required.');
 
   const db = deps.clientFor(auth);
   const { data: who, error: authErr } = await db.auth.getUser();
   if (authErr || !who?.user) return fail(401, 'Your session has ended. Sign in again.');
-  const { data: canWrite, error: permErr } = await db.rpc('can_write_title', { t: title });
-  if (permErr || canWrite !== true) return fail(403, `You are not assigned to ${title}. Ask the admin for access.`);
+  const { data: canWrite, error: permErr } = await db.rpc('can_write_title', { t: allTitles ? null : title });
+  if (permErr || canWrite !== true) return fail(403, allTitles ? 'The weekly summary is written by the Head Coach or an admin.' : `You are not assigned to ${title}. Ask the admin for access.`);
   const cap = Number(deps.env.DAILY_CALL_CAP || 300);
   const { data: used } = await db.rpc('ai_calls_today');
   if (Number(used) >= cap) return fail(429, `Daily AI limit reached (${cap} calls). Enter the values by hand today, or ask the admin to raise the limit.`);
@@ -78,17 +84,33 @@ export async function handle(req, deps) {
   const model = deps.env.SCRIM_AI_MODEL || DEFAULT_MODEL;
   let request; let bytes = null; let mediaType = '';
   try {
-    if (action === 'scoreboard' || action === 'draft') {
+    if (IMAGE_ACTIONS.includes(action)) {
       bytes = decode(body.image?.data);
       if (bytes.length > LIMITS.imageBytes) return fail(413, 'The screenshot is too large (over 2.5 MB). Take it again or crop it.');
       mediaType = sniff(bytes);
       if (!mediaType) return fail(415, 'This file is not a WebP, JPEG or PNG image.');
-      const names = deps.heroes[game] || [];
-      request = messagesRequest({
-        model, system: action === 'scoreboard' ? scoreboardPrompt(game, names) : draftPrompt(game, names),
-        schema: action === 'scoreboard' ? scoreboardSchema(game) : draftSchema(game),
-        content: [imageBlock(body.image.data, mediaType), { type: 'text', text: `Title: ${title}. Read this ${action === 'scoreboard' ? 'end-of-game screen' : 'draft screen'}.` }],
-      });
+      if (action === 'br_result') {
+        request = messagesRequest({ model, system: brResultPrompt(), schema: brResultSchema(), maxTokens: 2048,
+          content: [imageBlock(body.image.data, mediaType), { type: 'text', text: 'Title: PUBG Mobile. Read this end-of-match screen.' }] });
+      } else {
+        const names = deps.heroes[game] || [];
+        request = messagesRequest({
+          model, system: action === 'scoreboard' ? scoreboardPrompt(game, names) : draftPrompt(game, names),
+          schema: action === 'scoreboard' ? scoreboardSchema(game) : draftSchema(game),
+          content: [imageBlock(body.image.data, mediaType), { type: 'text', text: `Title: ${title}. Read this ${action === 'scoreboard' ? 'end-of-game screen' : 'draft screen'}.` }],
+        });
+      }
+    } else if (action === 'tags') {
+      const clip = (v, n = 500) => String(v ?? '').slice(0, n);
+      if (!tagsOf(title).length) return fail(400, `No weakness tags are set up for ${title}.`);
+      const reports = (Array.isArray(body.reports) ? body.reports : []).slice(0, LIMITS.tagReports).map((r) => ({ id: clip(r.id, 60), failed: clip(r.failed), adjustment: clip(r.adjust) }));
+      if (!reports.length) return fail(400, 'No reports to tag.');
+      request = messagesRequest({ model, system: tagsPrompt(title), schema: tagsSchema(title), maxTokens: 1500, content: [{ type: 'text', text: JSON.stringify({ REPORTS: reports }) }] });
+    } else if (action === 'summary' || action === 'prep') {
+      const payload = JSON.stringify(body.material || {});
+      if (payload.length < 20) return fail(400, 'Nothing to summarise yet.');
+      if (payload.length > 60000) return fail(413, 'Too much material for one call.');
+      request = messagesRequest({ model, system: action === 'summary' ? summaryPrompt() : prepPrompt(title), schema: action === 'summary' ? summarySchema() : prepSchema(), maxTokens: 2500, content: [{ type: 'text', text: payload }] });
     } else if (action === 'debrief') {
       const text = String(body.text || '').trim();
       if (!text) return fail(400, 'Type or dictate the note first.');
@@ -153,7 +175,7 @@ export async function handle(req, deps) {
   } catch (e) { errText = e.message || 'AI call failed.'; }
 
   const u = usageOf(resp);
-  await db.from('ai_usage').insert({ title, action, model, input_tokens: u.input_tokens, output_tokens: u.output_tokens, cache_read_tokens: u.cache_read_tokens, cache_write_tokens: u.cache_write_tokens, attempts, ok: !errText, error: errText.slice(0, 300) });
+  await db.from('ai_usage').insert({ title: allTitles ? null : title, action, model, input_tokens: u.input_tokens, output_tokens: u.output_tokens, cache_read_tokens: u.cache_read_tokens, cache_write_tokens: u.cache_write_tokens, attempts, ok: !errText, error: errText.slice(0, 300) });
   if (errText) return fail(502, `${errText} You can enter the values by hand.`);
 
   if (bytes) {

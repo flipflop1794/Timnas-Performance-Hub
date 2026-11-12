@@ -183,7 +183,8 @@ function aiApi(client: SupabaseClient) {
 
 // V1.15: which newer parts the live database and server already have. The website can be updated before the
 // database: anything not switched on yet stays hidden instead of failing (Staff → Users & access lists them).
-export type Features = { capture: boolean; draftRoom: boolean; donny: boolean; pelatnas: boolean; ai: boolean; aiPlan: boolean };
+// coachAi: the V1.20 tables exist; coachAiFn: the deployed scrim-ai function has the V1.20 actions.
+export type Features = { capture: boolean; draftRoom: boolean; donny: boolean; pelatnas: boolean; ai: boolean; aiPlan: boolean; coachAi: boolean; coachAiFn: boolean };
 export async function probeFeatures(client: SupabaseClient): Promise<Features> {
   const has = async (table: string) => {
     try {
@@ -192,10 +193,10 @@ export async function probeFeatures(client: SupabaseClient): Promise<Features> {
     } catch { return false; }
   };
   const ai = async () => {
-    try { const { data, error } = await client.functions.invoke('scrim-ai', { body: { action: 'ping' } }); const d = (data || {}) as { ai?: boolean; actions?: string[] }; return { on: !error && !!d.ai, plan: !error && !!d.ai && (d.actions || []).includes('plan') }; } catch { return { on: false, plan: false }; }
+    try { const { data, error } = await client.functions.invoke('scrim-ai', { body: { action: 'ping' } }); const d = (data || {}) as { ai?: boolean; actions?: string[] }; return { on: !error && !!d.ai, plan: !error && !!d.ai && (d.actions || []).includes('plan'), coach: !error && !!d.ai && (d.actions || []).includes('prep') }; } catch { return { on: false, plan: false, coach: false }; }
   };
-  const [capture, draftRoom, donny, pelatnas, aiOn] = await Promise.all([has('scrim_games'), has('draft_books'), has('readiness_store'), has('pelatnas_availability'), ai()]);
-  return { capture, draftRoom, donny, pelatnas, ai: aiOn.on, aiPlan: aiOn.plan };
+  const [capture, draftRoom, donny, pelatnas, coachAi, aiOn] = await Promise.all([has('scrim_games'), has('draft_books'), has('readiness_store'), has('pelatnas_availability'), has('prep_packs'), ai()]);
+  return { capture, draftRoom, donny, pelatnas, ai: aiOn.on, aiPlan: aiOn.plan, coachAi, coachAiFn: aiOn.coach };
 }
 
 async function start(client: SupabaseClient, userId: string) {

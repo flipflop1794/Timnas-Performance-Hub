@@ -27,7 +27,7 @@ const CAN_APPROVE = !HUB_USER || HUB_USER.roles.some((r) => ['admin', 'head_coac
 // V1.19: an account with only the Leadership role reads everything and saves nothing (the database refuses).
 const LEADERSHIP_ONLY = !!HUB_USER && HUB_USER.roles.length > 0 && HUB_USER.roles.every((r) => r === 'leadership');
 // V1.15: newer parts switch on only when the live database / server has them (all on in the artifact build).
-const FEAT = { capture: true, draftRoom: true, donny: true, pelatnas: true, ai: true, aiPlan: true, ...(PLATFORM?.features || {}) };
+const FEAT = { capture: true, draftRoom: true, donny: true, pelatnas: true, ai: true, aiPlan: true, coachAi: true, coachAiFn: true, ...(PLATFORM?.features || {}) };
 if (HUB_USER && !HUB_USER.staffKey) {
   const ROLE_LABEL = { admin: 'Admin', head_coach: 'Head Coach', assistant_coach: 'Assistant coach', readiness_owner: 'Readiness owner', title_coach: 'Title coach', analyst: 'Analyst', leadership: 'Leadership' };
   STAFF.push({ id: 'user', name: HUB_USER.name, role: HUB_USER.roles.map((r) => ROLE_LABEL[r] || r).join(', '), focus: HUB_USER.titles.length ? HUB_USER.titles : WEC_TITLES.map((t) => t.id) });
@@ -60,6 +60,8 @@ import { dailySessionsUi, dailyLink } from './daily_sessions_ui.js';
 import { dailyText } from './daily_sessions_strings.js';
 import { canAddDailyReport, canWriteSession, sessionFromReport } from '../core/daily_sessions.js';
 import { gameOf, latestGames } from '../core/capture.js';
+import { coachAiUi } from './coach_ai_ui.js';
+import { standInRecord } from '../core/patterns.js';
 import { weeks as trendWeeks, teamTrends, playerTrends, VERDICT_WEEKS, MIN_VALUES as TR_MIN } from '../core/trends.js';
 import { practiceQuality, PARTS as PQ_PARTS, MIN_SESSIONS as PQ_MIN } from '../core/practice_quality.js';
 import { statGoal } from '../core/patterns.js';
@@ -99,6 +101,12 @@ const capUi = () => (FEAT.capture ? capUiReal() : CAP_OFF);
 let DR = null;
 const drUi = () => (DR ||= draftRoomUi({ S, esc, tag, banner, setMsg, val, render, meName, sid, focus: () => focusOn(), HUB_USER, CAN_APPROVE }));
 let PL = null;
+// V1.20 coach AI (src/hub/coach_ai_ui.js): weekly leadership summary, preparation packs, weaknesses, PUBGM screenshots.
+let CO = null;
+const coUi = () => (CO ||= coachAiUi({ S, esc, tag, banner, setMsg, val, render, sid, PLATFORM, HUB_USER, CAN_APPROVE, today: () => today(), EVENT,
+  titles: () => PQ_ORDER, titleVisible: (t) => titleVisible(t), cardFor: (t, n) => prepCardFor(t, n), meName: () => meName(), prepImage: (f) => capUiReal().prepImage(f),
+  saveScrims: (xs) => saveScrimList(xs), propose: (t, label, w) => proposeWeakness(t, label, w), onSaved: (rows) => savePubgmRows(rows),
+  aiOn: () => FEAT.ai && FEAT.coachAi && FEAT.coachAiFn && !!PLATFORM?.ai }));
 // Focus mode (website only, per device): hide screens that are not used yet, so coaches see what matters before WEC.
 // Nothing is deleted; "Show all tools" brings everything back.
 const FOCUS_HIDE = new Set(['board', 'staff-measure', 'tour-series', 'dota-post', 'dota-draft', 'dota-review', 'pubgm-sim', 'pubgm-review', ...(FEAT.donny ? ['well-day', 'well-log'] : [])]);
@@ -219,6 +227,7 @@ async function initCaps() {
     if (FEAT.capture) try { capUi().subscribe(db); } catch { /* older store without the V1.13 collections */ }
     if (FEAT.draftRoom) try { drUi().subscribe(db); } catch { /* older store without the V1.14 collections */ }
     if (FEAT.pelatnas) try { plUi().subscribe(db); } catch { /* older store without the V1.16 collections */ }
+    if (FEAT.coachAi) try { coUi().subscribe(db); } catch { /* older store without the V1.20 collections */ }
     on(db.collection('wec_matches'), 'WEC matches', (snap) => { S.wecMatches = snap.docs.map((d) => d.data()).filter((x) => x?.origin === 'operational'); render(); });
     on(db.doc('config/runbooks'), 'Runbooks', (d) => { const x = d.data(); if (x?.runbooks) S.runbooks = x.runbooks; render(); });
     on(db.collection('vods'), 'VOD library', (snap) => { S.vods = snap.docs.map((d) => ({ ...d.data(), id: d.id })).filter((x) => x?.origin === 'operational'); render(); });
@@ -275,14 +284,14 @@ const GAME_HUBS = [
   { id: 'cs2', label: 'CS2', title: 'CS2', team: 't-cs2' },
   { id: 'cs2w', label: 'CS2 Women', title: 'CS2 Women', team: 't-cs2w' },
 ];
-const hubTabs = (h) => [[h.team, 'Team'], [`${h.team}-scrims`, 'Scrims & practice'], [`${h.team}-reports`, 'Scrim reports'], [`${h.team}-trends`, 'Trends'], ...(gameOf(h.title) && FEAT.capture ? [[`${h.team}-patterns`, 'Patterns']] : []), [`${h.team}-rivals`, 'Competitors'], ...(h.draftRoom && FEAT.draftRoom ? [[`${h.team}-draft`, 'Draft Room']] : [])];
+const hubTabs = (h) => [[h.team, 'Team'], [`${h.team}-scrims`, 'Scrims & practice'], [`${h.team}-reports`, 'Scrim reports'], [`${h.team}-trends`, 'Trends'], ...(FEAT.coachAi ? [[`${h.team}-weak`, 'Weaknesses']] : []), ...(gameOf(h.title) && FEAT.capture ? [[`${h.team}-patterns`, 'Patterns']] : []), [`${h.team}-rivals`, 'Competitors'], ...(h.draftRoom && FEAT.draftRoom ? [[`${h.team}-draft`, 'Draft Room']] : [])];
 const TITLES = [
   { id: 'home', label: 'Today', tabs: [['today', 'My day'], ['overview', 'Main dashboard'], ...(HUB_USER ? [['daily-sessions', 'Daily sessions']] : []), ['board', 'Juara Umum board'], ['reports-all', 'Scrim reports'], ['brief', 'Weekly brief']] },
   ...(FEAT.pelatnas ? [{ id: 'pelatnas', label: 'Pelatnas', tabs: [['pel-day', 'Schedule & attendance'], ['pel-avail', 'Availability']] }] : []),
   { id: 'comp', label: 'Competitors', tabs: [['comp-overview', 'All nations'], ['comp-nation', 'Nation profile'], ['comp-rosters', 'Rosters & players'], ['comp-card', 'Opponent card'], ['comp-coverage', 'Scouting coverage']] },
-  { id: 'tour', label: 'Tournament', tabs: [['tour-runbook', 'Match-day runbook'], ['tour-series', 'Between games']] },
-  { id: 'dota', label: 'Dota 2', tabs: [['dota-team', 'Team'], ['dota-scrims', 'Scrims & practice'], ['dota-reports', 'Scrim reports'], ['dota-trends', 'Trends'], ...(FEAT.capture ? [['dota-patterns', 'Patterns']] : []), ['dota-post', 'Post-match'], ['dota-scout', 'Competitors'], ['dota-draft', 'Draft room'], ['dota-review', 'Series review']] },
-  { id: 'pubgm', label: 'PUBG Mobile', tabs: [['pubgm-team', 'Team'], ['pubgm-scrims', 'Scrims & practice'], ['pubgm-reports', 'Scrim reports'], ['pubgm-trends', 'Trends'], ['pubgm-log', 'Log & import'], ['pubgm-rivals', 'Competitors'], ['pubgm-sim', 'Strategy sim'], ['pubgm-review', 'Match-day review']] },
+  { id: 'tour', label: 'Tournament', tabs: [['tour-runbook', 'Match-day runbook'], ...(FEAT.coachAi ? [['tour-prep', 'Preparation packs']] : []), ['tour-series', 'Between games']] },
+  { id: 'dota', label: 'Dota 2', tabs: [['dota-team', 'Team'], ['dota-scrims', 'Scrims & practice'], ['dota-reports', 'Scrim reports'], ['dota-trends', 'Trends'], ...(FEAT.coachAi ? [['dota-weak', 'Weaknesses']] : []), ...(FEAT.capture ? [['dota-patterns', 'Patterns']] : []), ['dota-post', 'Post-match'], ['dota-scout', 'Competitors'], ['dota-draft', 'Draft room'], ['dota-review', 'Series review']] },
+  { id: 'pubgm', label: 'PUBG Mobile', tabs: [['pubgm-team', 'Team'], ['pubgm-scrims', 'Scrims & practice'], ['pubgm-reports', 'Scrim reports'], ['pubgm-trends', 'Trends'], ...(FEAT.coachAi ? [['pubgm-weak', 'Weaknesses']] : []), ['pubgm-log', 'Log & import'], ['pubgm-rivals', 'Competitors'], ['pubgm-sim', 'Strategy sim'], ['pubgm-review', 'Match-day review']] },
   ...GAME_HUBS.map((h) => ({ id: h.id, label: h.label, tabs: hubTabs(h) })),
   { id: 'well', label: 'Performance', tabs: [['readiness', 'Athlete readiness'], ['players', 'Player plans'], ['well-day', 'Wellbeing check'], ['well-log', 'Log check-in & load']] },
   { id: 'guide', label: 'Guide', tabs: [['guide', 'How to use the hub']] },
@@ -596,6 +605,7 @@ function trendsPage(title) {
     <p class="note">Read the lines against these dates: a change after an objective started is a hint, not proof, that the practice worked.</p></div>`;
 }
 for (const [view, title] of [['dota-trends', 'Dota 2'], ['pubgm-trends', 'PUBG Mobile']]) V[view] = () => trendsPage(title);
+for (const [view, title] of [['dota-weak', 'Dota 2'], ['pubgm-weak', 'PUBG Mobile']]) V[view] = () => coUi().weaknessPage(title);
 
 function reportsPanel(title) {
   const record = HUB_USER && viewParams().get('record');
@@ -848,6 +858,7 @@ for (const h of GAME_HUBS) {
   V[`${h.team}-scrims`] = () => scrimsPanel(h.title);
   V[`${h.team}-reports`] = () => reportsPanel(h.title);
   V[`${h.team}-trends`] = () => trendsPage(h.title);
+  V[`${h.team}-weak`] = () => coUi().weaknessPage(h.title);
   if (gameOf(h.title)) V[`${h.team}-patterns`] = () => capUi().patternsPage(h.title);
   if (h.draftRoom) V[`${h.team}-draft`] = () => (FEAT.draftRoom ? drUi().page(h.title) : `<div class="panel">${banner('warn', '<div>The Draft Room switches on after the V1.14 database update.</div>')}</div>`);
   V[`${h.team}-rivals`] = () => competitorsPanel(h.title);
@@ -1031,7 +1042,7 @@ export function checkPubgmImport(mText, fText) {
   if (!rows.length && !fights.length) errs.push('Paste or load at least one CSV.');
   return { rows, fights, errs };
 }
-V['pubgm-log'] = () => `<div class="panel"><h2>Log scrims and fights</h2>
+V['pubgm-log'] = () => `${FEAT.coachAi ? coUi().brSection() : ''}<div class="panel"><h2>Log scrims and fights</h2>
   ${S.mode === 'demo' ? DEMO_BANNER + '<p class="empty">Logging is switched off in the demo sandbox.</p>' : `
   <p>One row per team per match (the whole lobby), plus one row per fight tagged from VOD. Rows are checked, stamped as operational and saved to the shared log.</p>
   ${S.dbState === 'live' ? banner('real', '<div><b>Shared log connected.</b></div>') : banner('synth', `<div><b>Shared log not connected</b> (${esc(S.dbState)}). Rows stay in this browser tab only and are lost on reload.</div>`)}
@@ -1145,6 +1156,7 @@ V.overview = () => {
       ${tile('Overdue follow-ups', String(overdue.length), 'next actions past their due date', HUB_USER ? '#daily-sessions' : '')}
       ${tile('Proposals waiting', String(waiting.length), 'for Head Coach or assistant coach review', '#staff-cycle')}
     </div></div>
+  ${FEAT.coachAi ? coUi().briefPanel() : ''}
   ${S.scrimLoad === 'error' || S.reportLoad === 'error' ? `<div class="panel">${banner('block', '<div>Sessions or reports could not be loaded: these numbers are incomplete.</div>')}</div>` : ''}
   <div class="panel"><h2>Titles</h2><div class="tw"><table><thead><tr><th>Title</th><th class="n">Practice quality</th><th class="n">Last 7 days</th><th class="n">Plan followed</th><th>Results trend</th><th>Next WEC match</th><th class="n">Overdue</th></tr></thead><tbody>
     ${titles.map(row).join('')}</tbody></table></div>
@@ -1274,6 +1286,7 @@ async function saveMatch(m) {
 const liveRuleBanner = () => { const r = rule('wec-live-coaching'); return r && r.status !== 'confirmed' ? banner('block', `<div><b>WEC coaching-contact rules: ${esc(r.status)}.</b> IESF has not published when coaches may talk to players (between games, pauses, draft). Use the between-games sheet only within what the rules allow; Fayad confirms the rule before 15 Dec (Staff → Rules).</div>`) : ''; };
 const SIDES = { 'Dota 2': ['Radiant', 'Dire'], MLBB: ['Blue', 'Red'], 'MLBB Women': ['Blue', 'Red'], CS2: ['CT start', 'T start'], 'CS2 Women': ['CT start', 'T start'], 'PUBG Mobile': ['Erangel', 'Miramar', 'Sanhok', 'Vikendi', 'Livik', 'Rondo'], eFootball: ['Home', 'Away'] };
 
+V['tour-prep'] = () => coUi().prepPage();
 V['tour-runbook'] = () => {
   if (S.mode === 'demo') return `<div class="panel">${DEMO_BANNER}<p class="empty">The match tracker uses operational records only.</p></div>`;
   const t = S.tourTitle, rb = runbookFor(t);
@@ -1530,6 +1543,31 @@ function attachDonny() {
 
 // ---------- V1.6: rival rosters & player tracker, pre-match opponent card ----------
 const rosterOf = (title, nation) => effective(S.rivalSeed, S.rosterEdits, rosterKey(title, nation));
+// V1.20 preparation pack material for one opponent: the opponent card, scrims vs stand-ins, approved draft book, partner bank.
+function prepCardFor(title, nation) {
+  let auto = {};
+  try {
+    const per = nationProfile(nation, compData()).per.find((x) => x.title === title);
+    auto = autoCard({ title, nation, per, team: rosterOf(title, nation), data: DATA, heroes: S.heroes, ours: title === 'Dota 2' ? dotaTeam().pools : [], asOf: today() });
+  } catch { /* nation outside the published field (e.g. TBD): card stays empty */ }
+  const games = latestGames((S.games || []).filter((g) => g.title === title));
+  const standIn = gameOf(title) ? standInRecord(games, nation, { reports: S.reports, scrims: S.scrims, partners: S.partners }) : null;
+  const book = (S.dr_books || []).find((b) => b.title === title && b.opponent === nation && b.status === 'approved') || null;
+  return { card: { ...auto, plan: S.oppCards[rosterKey(title, nation)] || null }, standIn, book, partners: S.partners.filter((p) => p.title === title) };
+}
+async function saveScrimList(list) {
+  for (const sc of list) { if (S.db) await S.db.collection('scrims').doc(sc.id).set(sc); else S.scrims.push(sc); }
+}
+async function proposeWeakness(title, label, w) {
+  const ev = staffObservation({ title, observation: `${label}: ${w.n} reports in 14 days`, source: 'Recurring weaknesses (scrim report labels)', kind: 'observed', n: w.n, context: 'national', by: meName() || S.me });
+  const rec = recommendationRecord({ problem: label, drill: 'Choose a drill that targets it in the next sessions', success: `Fewer reports labelled "${w.tag}" over the next 14 days`, explanation: `Labelled in ${w.n} scrim reports in the last 14 days (${w.prev} in the 14 days before).`, priority: 2, confidence: ev.confidence, area: 'staff', findings: [ev.id] }, [ev]);
+  await saveObj(propose(rec, { title, by: meName() || S.me, rulesSnapshot: snapshot(S.rules, title === 'PUBG Mobile' ? ['pubgm-scoring'] : title === 'Dota 2' ? ['dota-patch'] : []) }));
+}
+async function savePubgmRows(rows) {
+  const mr = tagOrigin(rows, 'operational');
+  if (S.db) await S.db.collection('pubgm_logs').add({ kind: 'matches', origin: 'operational', source: 'screenshot', rows: mr, at: new Date().toISOString() });
+  else S.pubgm.logged = { ...S.pubgm.logged, matches: [...S.pubgm.logged.matches, ...mr] };
+}
 async function saveRoster(team) {
   const key = rosterKey(team.title, team.nation); S.rosterEdits = { ...S.rosterEdits, [key]: team };
   if (S.db) await S.db.collection('rival_rosters').doc(sid(key)).set({ ...team, key });
@@ -1703,6 +1741,7 @@ async function onClick(e) {
   // V1.13 capture / patterns buttons only, so every other click stays synchronous until its own first await.
   if (Object.keys(t.dataset).some((k) => /^(cap|pat)[A-Z]/.test(k)) && await capUi().onClick(t)) return;
   if (Object.keys(t.dataset).some((k) => /^dr[A-Z]/.test(k)) && await drUi().onClick(t)) return;
+  if (FEAT.coachAi && Object.keys(t.dataset).some((k) => /^co[A-Z]/.test(k)) && await coUi().onClick(t)) return;
   if (Object.keys(t.dataset).some((k) => /^pl[A-Z]/.test(k)) && await plUi().onClick(t)) return;
   if (t.dataset.guideJump) { document.getElementById(`guide-${t.dataset.guideJump}`)?.scrollIntoView?.({ behavior: 'smooth', block: 'start' }); return; }
   if (t.dataset.rdMode) { S.rd.mode = t.dataset.rdMode; S.rd.key = null; render(); return; }
@@ -1986,6 +2025,7 @@ async function onClick(e) {
         }
       } else { S.reports.push(r); if (done) Object.assign(sc, done); }
       const nGames = (S.cap?.[fid]?.ready || []).length;
+      if (FEAT.coachAi) coUi().autoTag(r);   // V1.20: weakness labels in the background (one small AI call)
       try { await capUi().afterSave(title, fid, r); } catch (err) { render(); return setMsg(`rpMsg-${fid}`, `Report saved, but its games were not (${err.message}). They are kept on this device: use "Retry saving games" under Games.`, 'err'); }
       const keep = Object.fromEntries(RP_KEEP_AFTER_SAVE.map((k) => [k, g(k)]).filter(([, v]) => v));
       storeDraft(fid, { ...keep, at: new Date().toISOString() });
@@ -2108,6 +2148,7 @@ for (const ev of ['input', 'change']) document.addEventListener(ev, (e) => draft
 document.addEventListener('change', (e) => {
   if (e.target.dataset?.drBookopp || e.target.dataset?.drCsvfile) { drUi().onChange(e); return; }
   if (e.target.dataset?.plPickday) { plUi().onChange(e); return; }
+  if (e.target.dataset?.coBrFile) { coUi().onChange(e); return; }
   if (e.target.dataset?.capShot || e.target.dataset?.capDraft || e.target.dataset?.capMore || e.target.dataset?.patPeriod) { capUi().onChange(e); return; }
   const id = e.target.id;
   if (id === 'meSel') { S.me = e.target.value; try { localStorage.setItem('hub-me', S.me); } catch { /* per-viewer convenience only */ } render(); }

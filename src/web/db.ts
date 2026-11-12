@@ -15,6 +15,8 @@ export const TABLES: Record<string, string> = {
   draft_pools: 'draft_pools', draft_books: 'draft_books', mock_drafts: 'mock_drafts', draft_drills: 'draft_drills', pro_games: 'pro_games',
   // V1.15 Coach Donny's readiness system
   readiness_store: 'readiness_store',
+  // V1.20 coach AI
+  leadership_briefs: 'leadership_briefs', prep_packs: 'prep_packs', weakness_tags: 'weakness_tags',
   // V1.16 Pelatnas board
   pelatnas_availability: 'pelatnas_availability', pelatnas_attendance: 'pelatnas_attendance',
 };
@@ -232,7 +234,7 @@ export function createHubDb(client: SupabaseClient, opts: HubDbOptions) {
   // the signed-in approver and refuses the writer of the version. Returns the approved record.
   async function approve(name: string, id: string): Promise<Doc> {
     const table = TABLES[name];
-    if (!['draft_books', 'opponent_cards'].includes(table)) throw new Error(`No approval for ${name}.`);
+    if (!['draft_books', 'opponent_cards', 'prep_packs'].includes(table)) throw new Error(`No approval for ${name}.`);
     const { data, error } = await client.rpc('approve_record', { p_table: table, p_id: id });
     if (error) throw friendlyError(error, 'approve');
     const v = await client.from(table).select('updated_at').eq('id', id).maybeSingle();
