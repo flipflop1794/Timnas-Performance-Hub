@@ -37,7 +37,8 @@ export function dailySessionsUi({ S, user, owners, titles, titleVisible, esc, pa
         ${field('date', 'Session date (WIB)', `type="date" required value="${today}" max="${today}"`)}
         ${select('kind', 'Session type', options([['team practice', dailyText('Team practice', S.lang)], ['scrim', 'Scrim']], 'team practice'))}
         ${field('partner', 'Scrim opponent (blank for internal)', 'maxlength="120"')}
-      </div>`}
+      </div>
+      <p class="note">${T('Scrim with a sparring partner? File it under Scrim reports instead: the report counts as the daily report too.')}${writable.length ? ` <a href="#${esc(reportTab[writable.includes(title) ? title : writable[0]])}">${T('Scrim reports')}</a>` : ''}</p>`}
       <div class="daily-notes">
         ${notes('objective', 'Objective')}${notes('outcome', 'Outcome', priorOutcome.length <= NOTE_LIMIT ? priorOutcome : '')}
         ${notes('issue', 'Main issue')}${notes('nextAction', 'Next action')}

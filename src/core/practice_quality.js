@@ -32,7 +32,8 @@ export function titleQuality(title, { scrims = [], reports = [], cycle = [] }, f
   const reportFor = new Set(reports.filter((r) => r.scrimId).map((r) => r.scrimId));
   const filed = [
     ...reps.map((r) => ({ date: r.date, at: r.createdAt })),
-    ...held.filter((s) => s.dailyReport).map((s) => ({ date: s.date, at: s.dailyReport.filedAt })),
+    // A daily report made from a scrim report (V1.16 one form) is the same filing: counted once, as the report.
+    ...held.filter((s) => s.dailyReport && !s.dailyReport.fromReport).map((s) => ({ date: s.date, at: s.dailyReport.filedAt })),
   ];
   const fu = mine.filter((s) => s.followUp && inWin(s.followUp.due) && s.followUp.due < to);
   const props = cycle.filter((o) => o.title === title && inWin(wibDay(o.createdAt)));

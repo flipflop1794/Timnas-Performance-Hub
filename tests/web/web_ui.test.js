@@ -320,6 +320,23 @@ test('V1.16 scrim report: the author is the signed-in coach and cannot be change
   assert.equal(indra.d.getElementById('rp-MLBB-by').value, 'Coach Indra'); assert.equal(indra.d.getElementById('rp-MLBB-partner').value, 'Team Q');
 });
 
+test('V1.16 one form: a scrim report filed by the title coach is also the daily report, with his follow-up', async () => {
+  const B = world();
+  const indra = await open(B, 'indra', 'mlbb-reports');
+  for (const [k, v] of Object.entries({ partner: 'Team Q', won: '2', lost: '1', focus: 'Turtle setup', progress: '4', worked: 'Clean turtle', failed: 'Late vision', adjust: 'Ward before lord' })) indra.set(`rp-MLBB-${k}`, v);
+  await indra.click('[data-report-save="MLBB"]'); await sleep(150);
+  assert.match(indra.d.getElementById('rpMsg-MLBB').textContent, /also the daily report/);
+  const [rep] = B.tables.scrim_reports; const sess = B.tables.scrim_sessions.find((s) => s.id === rep.data.scrimId);
+  assert.ok(sess, 'report linked to a new session');
+  assert.equal(sess.data.status, 'done'); assert.equal(sess.data.dailyReport.fromReport, rep.id);
+  assert.equal(sess.data.dailyReport.issue, 'Late vision'); assert.equal(sess.data.followUp.ownerId, 'u-indra');
+  // Leadership sees it under Daily sessions without anyone filling the daily form.
+  const fayad = await open(B, 'fayad', 'daily-sessions');
+  assert.match(fayad.text(), /Session history.*Turtle setup/s); assert.match(fayad.text(), /Ward before lord/);
+  // The daily form points scrims to Scrim reports.
+  await indra.go('daily-sessions?title=MLBB'); assert.match(indra.text(), /File it under Scrim reports instead/);
+});
+
 test('V1.16 practice quality: leadership compares titles; a title coach sees only his own', async () => {
   const B = world();
   const day = localDay();

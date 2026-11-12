@@ -50,6 +50,29 @@ function withDailyReport(session, dailyReport, author, today) {
   };
 }
 
+// V1.16 one form: a saved scrim report is also that session's daily report, so a coach never fills both.
+// Report -> daily report: focus -> objective, result + what worked -> outcome, what failed -> main issue,
+// adjustment -> next action (the follow-up, owned by the author, due tomorrow WIB).
+const clip = (s) => { const t = String(s || '').trim(); return t.length > NOTE_LIMIT ? `${t.slice(0, NOTE_LIMIT - 1)}…` : t; };
+export function dailyFromReport(r, resultLine) {
+  return {
+    objective: clip(r.focus),
+    outcome: clip([`${resultLine} vs ${r.partner}`, r.worked].filter(Boolean).join('. ')),
+    issue: clip(r.failed || 'No main issue noted'),
+    nextAction: clip(r.adjust),
+  };
+}
+// session: the planned session this report closes (already completed), or null to create one.
+// Returns the session record to save, or null when the author cannot write sessions for the title.
+export function sessionFromReport(r, resultLine, author, { session = null, id, today = localDay() } = {}) {
+  if (!canWriteSession(author, r.title)) return null;
+  const fields = dailyFromReport(r, resultLine);
+  const out = session
+    ? (canAddDailyReport(session, author, today) ? addDailyReport(session, fields, author, today) : null)
+    : dailySession({ title: r.title, date: r.date, kind: 'scrim', partner: r.partner, ...fields }, author, id, today);
+  return out ? { ...out, dailyReport: { ...out.dailyReport, fromReport: r.id } } : null;
+}
+
 export const reportFiledAt = (record) => record.dailyReport?.filedAt || record.createdAt || '';
 
 export function updateFollowUp(session, { ownerId, due, status }, owners) {

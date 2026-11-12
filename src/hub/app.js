@@ -55,7 +55,7 @@ import { draftRoomUi } from './draftroom_ui.js';
 import { guidePage } from './guide.js';
 import { dailySessionsUi, dailyLink } from './daily_sessions_ui.js';
 import { dailyText } from './daily_sessions_strings.js';
-import { canAddDailyReport, canWriteSession } from '../core/daily_sessions.js';
+import { canAddDailyReport, canWriteSession, sessionFromReport } from '../core/daily_sessions.js';
 import { gameOf, latestGames } from '../core/capture.js';
 import { weeks as trendWeeks, teamTrends, playerTrends, VERDICT_WEEKS, MIN_VALUES as TR_MIN } from '../core/trends.js';
 import { practiceQuality, PARTS as PQ_PARTS, MIN_SESSIONS as PQ_MIN } from '../core/practice_quality.js';
@@ -1874,19 +1874,30 @@ async function onClick(e) {
     try {
       const fromGames = capUi().beforeSave(title, fid);
       if (fromGames) fillReport(fid, { won: String(fromGames.won), lost: String(fromGames.lost) });
-      const r = scrimReport({ title, date: g('date'), time: g('time'), by: g('by'), partner: g('partner'), partnerLevel: g('level'), format: g('format'), roster: g('roster'), scrimId: g('scrim'),
+      // V1.16 one form: on the website the report is also the session's daily report. Without a planned
+      // session, a new (completed) session is created and linked, so the report needs its id up front.
+      const asDaily = !!HUB_USER && canWriteSession(HUB_USER, title);
+      const newSession = asDaily && !g('scrim') ? `SC-${String(g('date')).replace(/-/g, '')}-${Math.random().toString(36).slice(2, 6)}` : '';
+      const r = scrimReport({ title, date: g('date'), time: g('time'), by: g('by'), partner: g('partner'), partnerLevel: g('level'), format: g('format'), roster: g('roster'), scrimId: g('scrim') || newSession,
         won: g('won'), lost: g('lost'), drawn: g('drawn'), played: g('played'), points: g('points'), avgPlacement: g('avg'), chicken: g('chicken'),
         focus: g('focus'), progress: g('progress'), worked: g('worked'), failed: g('failed'), detail: g('detail'), playerNotes: g('players'), adjust: g('adjust'), vod: g('vod'), asOf: localToday() });
       // Closing a planned session here avoids typing the same result twice.
       const sc = r.scrimId ? S.scrims.find((x) => x.id === r.scrimId && x.status === 'planned') : null;
       const done = sc ? completeScrim(sc, { score: resultText(r.result), notes: r.worked || r.failed, by: r.by, matchIds: [], perObjective: {} }) : null;
-      if (S.db) { await S.db.collection('scrim_reports').doc(r.id).set(r); if (done) await S.db.collection('scrims').doc(sc.id).set(done); }
-      else { S.reports.push(r); if (done) Object.assign(sc, done); }
+      const daily = asDaily && (done || newSession) ? sessionFromReport(r, resultText(r.result), HUB_USER, { session: done, id: newSession, today: localToday() }) : null;
+      const session = daily || done;
+      if (S.db) {
+        await S.db.collection('scrim_reports').doc(r.id).set(r);
+        if (session) {
+          try { await S.db.collection('scrims').doc(session.id).set(session); }
+          catch (err) { render(); return setMsg(`rpMsg-${fid}`, `Report saved, but its daily session was not (${err.message}). Log it under Daily sessions if needed.`, 'err'); }
+        }
+      } else { S.reports.push(r); if (done) Object.assign(sc, done); }
       const nGames = (S.cap?.[fid]?.ready || []).length;
       try { await capUi().afterSave(title, fid, r); } catch (err) { render(); return setMsg(`rpMsg-${fid}`, `Report saved, but its games were not (${err.message}). They are kept on this device: use "Retry saving games" under Games.`, 'err'); }
       const keep = Object.fromEntries(RP_KEEP_AFTER_SAVE.map((k) => [k, g(k)]).filter(([, v]) => v));
       storeDraft(fid, { ...keep, at: new Date().toISOString() });
-      render(); setMsg(`rpMsg-${fid}`, `Report saved (${resultText(r.result)} vs ${r.partner}${nGames ? `, ${nGames} game${nGames > 1 ? 's' : ''} with stats` : ''}). Next partner? The setup is kept.`, 'ok');
+      render(); setMsg(`rpMsg-${fid}`, `Report saved (${resultText(r.result)} vs ${r.partner}${nGames ? `, ${nGames} game${nGames > 1 ? 's' : ''} with stats` : ''})${daily ? '; it is also the daily report, with your next action due tomorrow' : ''}. Next partner? The setup is kept.`, 'ok');
     } catch (err) { setMsg(`rpMsg-${fid}`, err.message, 'err'); markInvalid(fid, err.message); }
     return;
   }

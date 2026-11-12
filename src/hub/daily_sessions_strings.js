@@ -9,6 +9,8 @@ const ID = {
   'Team practice': 'Latihan tim',
   'team practice': 'latihan tim',
   'Scrim opponent (blank for internal)': 'Lawan scrim (kosongkan untuk scrim internal)',
+  'Scrim with a sparring partner? File it under Scrim reports instead: the report counts as the daily report too.': 'Scrim dengan sparring partner? Isi di Laporan scrim: laporan itu sekaligus menjadi laporan harian.',
+  'Scrim reports': 'Laporan scrim',
   Objective: 'Tujuan',
   'Main issue': 'Kendala utama',
   'Next action': 'Tindakan berikutnya',
