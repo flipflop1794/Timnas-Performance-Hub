@@ -23,11 +23,11 @@ async function page(hash, db) {
     as: async (who) => { const el = d.getElementById('meSel'); el.value = who; el.dispatchEvent(new dom.window.Event('change', { bubbles: true })); await wait(); } };
 }
 
-test('dates follow WIB, not UTC: 05:30 WIB on 6 Nov is 6 Nov', () => {
+test('dates follow WIB even on a device set to UTC or Los Angeles', () => {
   const code = "import('./src/core/dates.js').then(({ localDay }) => process.stdout.write(localDay(new Date('2026-11-05T22:30:00Z'))))";
-  assert.equal(execFileSync(process.execPath, ['-e', code], { env: { ...process.env, TZ: 'Asia/Jakarta' }, cwd: new URL('..', import.meta.url) }).toString(), '2026-11-06');
-  const code2 = "import('./src/core/dates.js').then(({ localDay }) => process.stdout.write(localDay(new Date('2026-11-05T22:30:00Z'))))";
-  assert.equal(execFileSync(process.execPath, ['-e', code2], { env: { ...process.env, TZ: 'UTC' }, cwd: new URL('..', import.meta.url) }).toString(), '2026-11-05');
+  for (const TZ of ['Asia/Jakarta', 'UTC', 'America/Los_Angeles']) {
+    assert.equal(execFileSync(process.execPath, ['-e', code], { env: { ...process.env, TZ }, cwd: new URL('..', import.meta.url) }).toString(), '2026-11-06');
+  }
 });
 
 test('typing survives a colleague saving something else; focus stays in the field', async () => {
@@ -71,6 +71,11 @@ test('quick picks, progress buttons, highlighted errors, kept setup and drafts',
   await click('[data-rp-clear="MLBB"]'); assert.equal(d.getElementById('rp-MLBB-focus').value, '');
   const copy = [...d.querySelectorAll('.chip')].find((b) => b.textContent === 'Copy setup from last report'); copy.click(); await h.wait();
   assert.equal(d.getElementById('rp-MLBB-partner').value, 'Team X'); assert.equal(d.getElementById('rp-MLBB-focus').value, 'Early rotations');
+  // Last report's adjustment is one tap away as the next focus (V1.17 "Did we fix it?" block)
+  const cont = [...d.querySelectorAll('.chip')].find((b) => b.textContent === "Make it today's focus"); assert.ok(cont, 'focus chip'); cont.click(); await h.wait();
+  assert.equal(d.getElementById('rp-MLBB-focus').value, 'Faster turtle');
+  // "Say it once" comes before the games and the result
+  const html = d.querySelector('.panel.rp').innerHTML; assert.ok(html.indexOf('Say it once') < html.indexOf('>Result<'));
 });
 
 test('a session planned for today is one tap: partner filled and the session closed on save', async () => {

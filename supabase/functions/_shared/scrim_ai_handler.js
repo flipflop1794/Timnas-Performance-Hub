@@ -15,6 +15,8 @@ import {
 } from './scrim_spec.js';
 
 const ACTIONS = ['scoreboard', 'draft', 'debrief', 'digest', 'plan'];
+// Calls per day (WIB) for the whole staff, unless the TEAM_DAILY_CALL_CAP secret says otherwise.
+export const TEAM_DAILY_CAP = 600;
 export const RETRIES = 2;
 const RETRYABLE = [429, 500, 502, 503, 504, 529];
 export function backoff(attempt, retryAfter) {
@@ -47,7 +49,12 @@ export async function handle(req, deps) {
   if (!/^Bearer\s+\S+/.test(auth)) return fail(401, 'Sign in first.');
   let body; try { body = await req.json(); } catch { return fail(400, 'Bad request.'); }
   // V1.15: the hub asks once after sign-in whether AI is switched on (no AI call, nothing logged).
-  if (body?.action === 'ping') return json(200, { ok: true, ai: !!deps.env.ANTHROPIC_API_KEY, actions: ACTIONS });
+  // V1.18: only a signed-in session gets the answer.
+  if (body?.action === 'ping') {
+    const { data: me, error: pingErr } = await deps.clientFor(auth).auth.getUser();
+    if (pingErr || !me?.user) return fail(401, 'Sign in first.');
+    return json(200, { ok: true, ai: !!deps.env.ANTHROPIC_API_KEY, actions: ACTIONS });
+  }
   if (!deps.env.ANTHROPIC_API_KEY) return fail(503, 'AI capture is not switched on yet (the AI key is not set on the server). Enter the values by hand.');
   const { action, title } = body || {};
   if (!ACTIONS.includes(action)) return fail(400, 'Unknown action.');
@@ -63,6 +70,10 @@ export async function handle(req, deps) {
   const cap = Number(deps.env.DAILY_CALL_CAP || 300);
   const { data: used } = await db.rpc('ai_calls_today');
   if (Number(used) >= cap) return fail(429, `Daily AI limit reached (${cap} calls). Enter the values by hand today, or ask the admin to raise the limit.`);
+  // V1.16: one limit for the whole staff as well, so many coaches together cannot run up the bill.
+  const teamCap = Number(deps.env.TEAM_DAILY_CALL_CAP || TEAM_DAILY_CAP);
+  const { data: teamUsed, error: teamErr } = await db.rpc('ai_calls_today_all');
+  if (!teamErr && Number(teamUsed) >= teamCap) return fail(429, `The staff's daily AI limit is reached (${teamCap} calls). Enter the values by hand today, or ask the admin to raise TEAM_DAILY_CALL_CAP.`);
 
   const model = deps.env.SCRIM_AI_MODEL || DEFAULT_MODEL;
   let request; let bytes = null; let mediaType = '';

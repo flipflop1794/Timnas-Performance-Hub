@@ -46,3 +46,9 @@ test('the one-paste file is exactly the three migrations, in order (no drift)', 
   const parts = ['20261110120000_scrim_capture.sql', '20261112120000_draft_room.sql', '20261113120000_readiness_store.sql'].map((f) => readFileSync(new URL(`supabase/migrations/${f}`, root), 'utf8')).join('');
   assert.ok(one.includes(parts)); assert.match(one, /^begin;$/m); assert.match(one, /^commit;$/m);
 });
+
+test('the V1.18 one-paste file is exactly its three migrations, in order (no drift)', () => {
+  const one = readFileSync(new URL('supabase/RUN_ON_LIVE_V1_18.sql', root), 'utf8');
+  const parts = ['20261118120000_approvals.sql', '20261118120100_capture_storage.sql', '20261118120200_ai_team_cap.sql'].map((f) => readFileSync(new URL(`supabase/migrations/${f}`, root), 'utf8')).join('');
+  assert.ok(one.includes(parts)); assert.match(one, /^begin;$/m); assert.match(one, /^commit;$/m);
+});

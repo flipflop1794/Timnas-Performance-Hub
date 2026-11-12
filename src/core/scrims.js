@@ -3,7 +3,7 @@ import { localDay } from './dates.js';
 // is meant to practise; completing it logs a session on each of those objectives (core/cycle.js).
 
 export const FORMATS = ['Bo1', 'Bo2', 'Bo3', 'Bo5', 'Lobby (BR)', 'Custom scenario', 'Internal (5v5 / split)'];
-export const KINDS = ['scrim', 'scenario drill', 'review', 'individual practice', 'physical / recovery'];
+export const KINDS = ['scrim', 'scenario drill', 'review', 'individual practice', 'physical / recovery', 'team practice'];
 
 const need = (c, m) => { if (!c) throw new Error(m); };
 

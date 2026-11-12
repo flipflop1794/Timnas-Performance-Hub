@@ -120,6 +120,27 @@ function adminApi(client: SupabaseClient) {
       }
       return rows;
     },
+    // V1.16: screenshot storage (Supabase Free has 1 GB) and the 90-day retention.
+    async storageUsage() {
+      const { data, error } = await client.rpc('capture_storage');
+      if (error) throw new Error(error.message);
+      const r = (Array.isArray(data) ? data[0] : data) as { files: number; bytes: number; oldest: string | null } | undefined;
+      return { files: Number(r?.files || 0), bytes: Number(r?.bytes || 0), oldest: r?.oldest || null };
+    },
+    async oldCaptures(days = 90) {
+      const { data, error } = await client.rpc('old_capture_files', { days });
+      if (error) throw new Error(error.message);
+      return ((data || []) as unknown[]).map((x) => (typeof x === 'string' ? x : String((x as Record<string, unknown>).old_capture_files ?? '')));
+    },
+    async removeCaptures(names: string[]) {
+      let removed = 0;
+      for (let i = 0; i < names.length; i += 100) {
+        const { data, error } = await client.storage.from('scrim-captures').remove(names.slice(i, i + 100));
+        if (error) throw new Error(`Deleted ${removed} of ${names.length}; then: ${error.message}`);
+        removed += (data || []).length;
+      }
+      return removed;
+    },
     // Everything this account can read, as one JSON file (admins can read every table).
     async exportAll() {
       const tables = ['profiles', 'user_roles', 'user_titles', 'disciplines', 'roster_players', 'app_config', 'scrim_sessions', 'scrim_reports', 'scrim_report_corrections',
@@ -186,13 +207,23 @@ async function start(client: SupabaseClient, userId: string) {
     $('#noAccessOut').onclick = () => client.auth.signOut();
     return;
   }
-  const { data: people } = await client.from('profiles').select('id, display_name');
-  const names = Object.fromEntries(((people || []) as Record<string, string>[]).map((p) => [p.id, p.display_name]));
+  const [{ data: people }, { data: roles }, { data: titles }] = await Promise.all([
+    client.from('profiles').select('id, display_name'),
+    client.from('user_roles').select('user_id, role'),
+    client.from('user_titles').select('user_id, title'),
+  ]);
+  const directory = (people || []).map((p) => ({
+    id: p.id as string, name: (p.display_name || p.id) as string,
+    roles: (roles || []).filter((r) => r.user_id === p.id).map((r) => r.role as Role),
+    titles: (titles || []).filter((t) => t.user_id === p.id).map((t) => t.title as string),
+  })).filter((person) => person.roles.length);
+  const actionOwners = [me, ...directory.filter((person) => person.id !== me.id)];
+  const names = Object.fromEntries((people || []).map((p) => [p.id, p.display_name]));
   const db = createHubDb(client, { canWellbeing: me.canWellbeing, names });
   W.claude = { use: async (n: string) => (n === 'db' ? db : n === 'downloads' ? { save: download } : null) };
   W.__HUB_USER__ = me;
   const features = await probeFeatures(client);
-  W.__HUB_PLATFORM__ = { signOut: () => client.auth.signOut(), admin: me.isAdmin ? adminApi(client) : null, download, ai: aiApi(client), features };
+  W.__HUB_PLATFORM__ = { signOut: () => client.auth.signOut(), admin: me.isAdmin ? adminApi(client) : null, download, ai: aiApi(client), features, actionOwners };
   // @ts-ignore -- the hub is plain JavaScript; importing it starts it.
   await import('../hub/app.js');
 }

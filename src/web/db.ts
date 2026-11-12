@@ -39,7 +39,7 @@ export function friendlyError(e: { code?: string; message?: string } | null | un
   const msg = e?.message || '';
   let text: string; let code = e?.code || 'unknown';
   if (/row-level security|permission denied|42501/.test(msg) || code === '42501') {
-    text = /Only the Head Coach|cannot be changed|Only an admin|At least one admin/.test(msg) ? msg : `You don't have permission to ${action} this record. Ask the Head Coach or admin to assign you to this title.`;
+    text = /Only the Head Coach|cannot be changed|Only an admin|At least one admin|Approve button|writer of this version|history/.test(msg) ? msg : `You don't have permission to ${action} this record. Ask the Head Coach or admin to assign you to this title.`;
     code = 'permission_denied';
   } else if (/JWT|session|not signed in/i.test(msg) || code === 'PGRST301') { text = 'Your session has ended. Sign in again; what you typed is kept on this device.'; code = 'unauthenticated'; }
   else if (/Failed to fetch|NetworkError|network|timeout/i.test(msg)) { text = 'Not saved: no connection. What you typed is still here; try again.'; code = 'network'; }
@@ -118,7 +118,10 @@ export function createHubDb(client: SupabaseClient, opts: HubDbOptions) {
     if (INCREMENTAL.has(table)) cache.set(table, { rows: keep, newest });
     loaded.add(table);
     const all = [...keep.values()].sort((a, b) => String(a.updated_at).localeCompare(String(b.updated_at)));
-    return { docs: all.map((r) => ({ id: String(r.id), exists: true, data: () => r.data as Doc })) };
+    return { docs: all.map((r) => ({
+      id: String(r.id), exists: true,
+      data: () => table === 'scrim_sessions' ? { ...(r.data as Doc), _version: String(r.updated_at) } : r.data as Doc,
+    })) };
   }
 
   async function writeReport(id: string, data: Doc) {
@@ -146,25 +149,27 @@ export function createHubDb(client: SupabaseClient, opts: HubDbOptions) {
     err.code = 'conflict'; throw err;
   }
   // Insert a new record, or update one only if it is still the version this device last saw.
-  async function versionedWrite(table: string, keyCol: string, id: string, row: Doc) {
-    const vkey = `${table}:${id}`; const known = versions.get(vkey);
+  async function versionedWrite(table: string, keyCol: string, id: string, row: Doc, expected?: string) {
+    const vkey = `${table}:${id}`; const known = expected ?? versions.get(vkey);
     if (!loaded.has(table) && !known) {
       // Not loaded on this device (should not happen in the app): keep the plain upsert.
       const { data, error } = await client.from(table).upsert({ [keyCol]: id, ...row }, { onConflict: keyCol }).select('updated_at');
       if (error) throw friendlyError(error);
       if (data?.[0]) versions.set(vkey, String((data[0] as Doc).updated_at));
-      return;
+      return data?.[0] ? String((data[0] as Doc).updated_at) : undefined;
     }
     const res = known
       ? await client.from(table).update(row).eq(keyCol, id).eq('updated_at', known).select('updated_at')
       : await client.from(table).insert({ [keyCol]: id, ...row }).select('updated_at');
     if (res.error) { if (res.error.code === '23505') await conflict(table, keyCol, id); throw friendlyError(res.error); }
     if (!res.data?.length) await conflict(table, keyCol, id);
-    versions.set(vkey, String((res.data![0] as Doc).updated_at));
+    const version = String((res.data![0] as Doc).updated_at);
+    versions.set(vkey, version);
+    return version;
   }
-  async function writeRow(table: string, id: string, data: Doc) {
-    const clean = { ...data }; delete clean._entered;
-    await versionedWrite(table, 'id', id, { data: clean });
+  async function writeRow(table: string, id: string, data: Doc, expected?: string) {
+    const clean = { ...data }; delete clean._entered; delete clean._version;
+    return versionedWrite(table, 'id', id, { data: clean }, expected);
   }
 
   // ---- config documents: config/runbooks, config/rules (app_config) and config/roster (roster_players)
@@ -210,9 +215,9 @@ export function createHubDb(client: SupabaseClient, opts: HubDbOptions) {
     if (!table) throw new Error(`Unknown collection: ${name}`);
     const denied = WELLBEING.has(name) && !opts.canWellbeing;
     const load = name === 'scrim_reports' ? loadReports : (full = true) => loadTable(table, full);
-    const set = (id: string, d: Doc) => (denied ? Promise.reject(friendlyError({ code: '42501', message: 'permission denied' })) : name === 'scrim_reports' ? writeReport(id, d) : writeRow(table, id, d));
+    const set = (id: string, d: Doc, expected?: string) => (denied ? Promise.reject(friendlyError({ code: '42501', message: 'permission denied' })) : name === 'scrim_reports' ? writeReport(id, d) : writeRow(table, id, d, expected));
     return {
-      doc: (id: string) => ({ set: (d: Doc) => set(id, d) }),
+      doc: (id: string) => ({ set: (d: Doc, expected?: string) => set(id, d, expected) }),
       add: async (d: Doc) => { const id = (globalThis.crypto?.randomUUID?.() || `${Date.now()}-${Math.random().toString(36).slice(2)}`); await set(id, d); return { id }; },
       onSnapshot(next: Next<QuerySnap>, fail?: Fail) {
         // Wellbeing is refused up front for people without access (the database would also return nothing).
@@ -223,8 +228,20 @@ export function createHubDb(client: SupabaseClient, opts: HubDbOptions) {
       },
     };
   }
+  // V1.16: approval of a draft book or opponent card happens in the database (approve_record), which records
+  // the signed-in approver and refuses the writer of the version. Returns the approved record.
+  async function approve(name: string, id: string): Promise<Doc> {
+    const table = TABLES[name];
+    if (!['draft_books', 'opponent_cards'].includes(table)) throw new Error(`No approval for ${name}.`);
+    const { data, error } = await client.rpc('approve_record', { p_table: table, p_id: id });
+    if (error) throw friendlyError(error, 'approve');
+    const v = await client.from(table).select('updated_at').eq('id', id).maybeSingle();
+    if (v.data) versions.set(`${table}:${id}`, String((v.data as Doc).updated_at));
+    return data as Doc;
+  }
   return {
     collection,
+    approve,
     doc(path: string) { const [c, id] = path.split('/'); if (c !== 'config' || !id) throw new Error(`Unsupported document path: ${path}`); return configDoc(id); },
   };
 }

@@ -21,6 +21,9 @@ import { STAFF, TITLES as WEC_TITLES, WELLBEING, owner, ownerNote, reviewersFor,
 // Website build: the signed-in account (src/web/main.ts). Absent in the Claude artifact build.
 const HUB_USER = (typeof window !== 'undefined' && window.__HUB_USER__) || null;
 const PLATFORM = (typeof window !== 'undefined' && window.__HUB_PLATFORM__) || null;
+// V1.16: approvers are the Head Coach, admins and every assistant coach (enforced in the database). On the
+// website the approver and reviewer are always the signed-in person; the artifact build keeps typed names.
+const CAN_APPROVE = !HUB_USER || HUB_USER.roles.some((r) => ['admin', 'head_coach', 'assistant_coach'].includes(r));
 // V1.15: newer parts switch on only when the live database / server has them (all on in the artifact build).
 const FEAT = { capture: true, draftRoom: true, donny: true, pelatnas: true, ai: true, aiPlan: true, ...(PLATFORM?.features || {}) };
 if (HUB_USER && !HUB_USER.staffKey) {
@@ -51,7 +54,12 @@ import { captureUi } from './capture_ui.js';
 import { draftRoomUi } from './draftroom_ui.js';
 import { pelatnasUi } from './pelatnas_ui.js';
 import { guidePage } from './guide.js';
-import { gameOf } from '../core/capture.js';
+import { dailySessionsUi, dailyLink } from './daily_sessions_ui.js';
+import { dailyText } from './daily_sessions_strings.js';
+import { canAddDailyReport, canWriteSession, sessionFromReport } from '../core/daily_sessions.js';
+import { gameOf, latestGames } from '../core/capture.js';
+import { weeks as trendWeeks, teamTrends, playerTrends, VERDICT_WEEKS, MIN_VALUES as TR_MIN } from '../core/trends.js';
+import { practiceQuality, PARTS as PQ_PARTS, MIN_SESSIONS as PQ_MIN } from '../core/practice_quality.js';
 import { statGoal } from '../core/patterns.js';
 
 // ---------- state ----------
@@ -87,7 +95,7 @@ const CAP_OFF = { gamesSection: () => '', reportGames: () => '', debriefSection:
   patternsPage: () => `<div class="panel">${banner('warn', '<div>Patterns switch on after the V1.13 database update (Staff → Users & access lists what is pending).</div>')}</div>` };
 const capUi = () => (FEAT.capture ? capUiReal() : CAP_OFF);
 let DR = null;
-const drUi = () => (DR ||= draftRoomUi({ S, esc, tag, banner, setMsg, val, render, meName, sid, focus: () => focusOn() }));
+const drUi = () => (DR ||= draftRoomUi({ S, esc, tag, banner, setMsg, val, render, meName, sid, focus: () => focusOn(), HUB_USER, CAN_APPROVE }));
 let PL = null;
 // Focus mode (website only, per device): hide screens that are not used yet, so coaches see what matters before WEC.
 // Nothing is deleted; "Show all tools" brings everything back.
@@ -181,6 +189,9 @@ async function initCaps() {
     S.db = db; S.dbState = 'live';
     const t = setTimeout(() => { S.dbState = 'slow'; render(); }, 10000);
     const fail = () => { S.dbState = 'off'; render(); };
+    // V1.16: a failed load shows a notice instead of looking like "no records yet" (cleared by the next good load).
+    const on = (ref, label, next) => ref.onSnapshot((x) => { if (S.loadErr?.[label]) delete S.loadErr[label]; next(x); },
+      (e) => { if (e?.code === 'permission_denied') return; S.loadErr = { ...(S.loadErr || {}), [label]: true }; render(); });
     db.collection('dota_matches').onSnapshot((snap) => {
       clearTimeout(t);
       for (const d of snap.docs) { const x = d.data(); if (x?.m && x.origin === 'operational') S.matches[x.m.id] = { m: x.m, origin: 'operational', retrieved: x.retrieved || x.at?.slice(0, 10), source: x.source || 'Shared store' }; }
@@ -192,29 +203,36 @@ async function initCaps() {
       S.pubgm.logged = { matches: m, fights: f }; render();
     }, fail);
     db.collection('cycle').onSnapshot((snap) => { S.cycle = snap.docs.map((d) => d.data()).filter((o) => o?.origin === 'operational'); render(); }, fail);
-    db.collection('rivals').onSnapshot((snap) => { S.rivals = snap.docs.map((d) => d.data()).filter((x) => x?.origin === 'operational'); render(); }, () => {});
-    db.collection('rival_tiers').onSnapshot((snap) => { S.tiers = Object.fromEntries(snap.docs.map((d) => { const x = d.data(); return [`${x.title}|${x.nation}`, x]; })); render(); }, () => {});
-    db.collection('scrims').onSnapshot((snap) => { S.scrims = snap.docs.map((d) => d.data()).filter((x) => x?.origin === 'operational'); render(); }, () => {});
-    db.collection('scrim_reports').onSnapshot((snap) => { S.reports = snap.docs.map((d) => d.data()).filter((x) => x?.origin === 'operational'); render(); }, () => {});
+    on(db.collection('rivals'), 'Scouting notes', (snap) => { S.rivals = snap.docs.map((d) => d.data()).filter((x) => x?.origin === 'operational'); render(); });
+    on(db.collection('rival_tiers'), 'Threat tiers', (snap) => { S.tiers = Object.fromEntries(snap.docs.map((d) => { const x = d.data(); return [`${x.title}|${x.nation}`, x]; })); render(); });
+    db.collection('scrims').onSnapshot((snap) => {
+      S.scrims = snap.docs.map((d) => d.data()).filter((x) => x?.origin === 'operational');
+      S.scrimLoad = 'ready'; S.scrimRefreshFailed = false; render();
+    }, () => {
+      if (S.scrimLoad === 'ready') S.scrimRefreshFailed = true;
+      else S.scrimLoad = 'error';
+      render();
+    });
+    db.collection('scrim_reports').onSnapshot((snap) => { S.reports = snap.docs.map((d) => d.data()).filter((x) => x?.origin === 'operational'); S.reportLoad = 'ready'; render(); }, () => { S.reportLoad = 'error'; render(); });
     if (FEAT.capture) try { capUi().subscribe(db); } catch { /* older store without the V1.13 collections */ }
     if (FEAT.draftRoom) try { drUi().subscribe(db); } catch { /* older store without the V1.14 collections */ }
     if (FEAT.pelatnas) try { plUi().subscribe(db); } catch { /* older store without the V1.16 collections */ }
-    db.collection('wec_matches').onSnapshot((snap) => { S.wecMatches = snap.docs.map((d) => d.data()).filter((x) => x?.origin === 'operational'); render(); }, () => {});
-    db.doc('config/runbooks').onSnapshot((d) => { const x = d.data(); if (x?.runbooks) S.runbooks = x.runbooks; render(); }, () => {});
-    db.collection('vods').onSnapshot((snap) => { S.vods = snap.docs.map((d) => ({ ...d.data(), id: d.id })).filter((x) => x?.origin === 'operational'); render(); }, () => {});
-    db.collection('partners').onSnapshot((snap) => { S.partners = snap.docs.map((d) => ({ ...d.data(), id: d.id })).filter((x) => x?.origin === 'operational'); render(); }, () => {});
-    db.collection('player_plans').onSnapshot((snap) => { S.plans = Object.fromEntries(snap.docs.map((d) => [d.id, d.data()]).filter(([, x]) => x?.origin === 'operational')); render(); }, () => {});
-    db.collection('rival_rosters').onSnapshot((snap) => { S.rosterEdits = Object.fromEntries(snap.docs.map((d) => d.data()).filter((x) => x?.origin === 'operational' && x.key).map((x) => [x.key, x])); render(); }, () => {});
-    db.collection('opp_cards').onSnapshot((snap) => { S.oppCards = Object.fromEntries(snap.docs.map((d) => d.data()).filter((x) => x?.origin === 'operational' && x.key).map((x) => [x.key, x])); render(); }, () => {});
-    db.doc('config/roster').onSnapshot((d) => { const x = d.data(); if (x?.roster) S.roster = { ...S.roster, ...x.roster }; render(); }, () => {});
+    on(db.collection('wec_matches'), 'WEC matches', (snap) => { S.wecMatches = snap.docs.map((d) => d.data()).filter((x) => x?.origin === 'operational'); render(); });
+    on(db.doc('config/runbooks'), 'Runbooks', (d) => { const x = d.data(); if (x?.runbooks) S.runbooks = x.runbooks; render(); });
+    on(db.collection('vods'), 'VOD library', (snap) => { S.vods = snap.docs.map((d) => ({ ...d.data(), id: d.id })).filter((x) => x?.origin === 'operational'); render(); });
+    on(db.collection('partners'), 'Sparring partners', (snap) => { S.partners = snap.docs.map((d) => ({ ...d.data(), id: d.id })).filter((x) => x?.origin === 'operational'); render(); });
+    on(db.collection('player_plans'), 'Player plans', (snap) => { S.plans = Object.fromEntries(snap.docs.map((d) => [d.id, d.data()]).filter(([, x]) => x?.origin === 'operational')); render(); });
+    on(db.collection('rival_rosters'), 'Rival rosters', (snap) => { S.rosterEdits = Object.fromEntries(snap.docs.map((d) => d.data()).filter((x) => x?.origin === 'operational' && x.key).map((x) => [x.key, x])); render(); });
+    on(db.collection('opp_cards'), 'Opponent cards', (snap) => { S.oppCards = Object.fromEntries(snap.docs.map((d) => d.data()).filter((x) => x?.origin === 'operational' && x.key).map((x) => [x.key, x])); render(); });
+    on(db.doc('config/roster'), 'Rosters', (d) => { const x = d.data(); if (x?.roster) S.roster = { ...S.roster, ...x.roster }; render(); });
     // Wellbeing collections are readable and writable by editors only (declared in the page's db rules).
     db.collection('wellbeing_checkins').onSnapshot((snap) => { S.well.checkins = snap.docs.map((d) => d.data()).filter((x) => x?.origin === 'operational'); S.wellAccess = 'ok'; render(); }, () => { S.wellAccess = 'denied'; render(); });
-    db.collection('wellbeing_load').onSnapshot((snap) => { S.well.loads = snap.docs.map((d) => d.data()).filter((x) => x?.origin === 'operational'); render(); }, () => {});
-    db.doc('config/rules').onSnapshot((d) => { const x = d.data(); if (x?.rules) S.rules = x.rules; render(); }, () => {});
-    db.collection('dota_pools').onSnapshot((snap) => {
+    on(db.collection('wellbeing_load'), 'Training load', (snap) => { S.well.loads = snap.docs.map((d) => d.data()).filter((x) => x?.origin === 'operational'); render(); });
+    on(db.doc('config/rules'), 'Rules', (d) => { const x = d.data(); if (x?.rules) S.rules = x.rules; render(); });
+    on(db.collection('dota_pools'), 'Dota hero pools', (snap) => {
       for (const d of snap.docs) { const x = d.data(); if (x?.games && S.players[d.id]) { S.players[d.id].games = x.games; S.freshPools[d.id] = x.at; } }
       render();
-    }, () => {});
+    });
   } catch { S.dbState = 'off'; render(); }
 }
 async function browserFetchText(url) {
@@ -255,20 +273,21 @@ const GAME_HUBS = [
   { id: 'cs2', label: 'CS2', title: 'CS2', team: 't-cs2' },
   { id: 'cs2w', label: 'CS2 Women', title: 'CS2 Women', team: 't-cs2w' },
 ];
-const hubTabs = (h) => [[h.team, 'Team'], [`${h.team}-scrims`, 'Scrims & practice'], [`${h.team}-reports`, 'Scrim reports'], ...(gameOf(h.title) && FEAT.capture ? [[`${h.team}-patterns`, 'Patterns']] : []), [`${h.team}-rivals`, 'Competitors'], ...(h.draftRoom && FEAT.draftRoom ? [[`${h.team}-draft`, 'Draft Room']] : [])];
+const hubTabs = (h) => [[h.team, 'Team'], [`${h.team}-scrims`, 'Scrims & practice'], [`${h.team}-reports`, 'Scrim reports'], [`${h.team}-trends`, 'Trends'], ...(gameOf(h.title) && FEAT.capture ? [[`${h.team}-patterns`, 'Patterns']] : []), [`${h.team}-rivals`, 'Competitors'], ...(h.draftRoom && FEAT.draftRoom ? [[`${h.team}-draft`, 'Draft Room']] : [])];
 const TITLES = [
-  { id: 'home', label: 'Today', tabs: [['today', 'My day'], ['board', 'Juara Umum board'], ['reports-all', 'Scrim reports'], ['brief', 'Weekly brief']] },
+  { id: 'home', label: 'Today', tabs: [['today', 'My day'], ...(HUB_USER ? [['daily-sessions', 'Daily sessions']] : []), ['board', 'Juara Umum board'], ['reports-all', 'Scrim reports'], ['brief', 'Weekly brief']] },
   ...(FEAT.pelatnas ? [{ id: 'pelatnas', label: 'Pelatnas', tabs: [['pel-day', 'Schedule & attendance'], ['pel-avail', 'Availability']] }] : []),
   { id: 'comp', label: 'Competitors', tabs: [['comp-overview', 'All nations'], ['comp-nation', 'Nation profile'], ['comp-rosters', 'Rosters & players'], ['comp-card', 'Opponent card'], ['comp-coverage', 'Scouting coverage']] },
   { id: 'tour', label: 'Tournament', tabs: [['tour-runbook', 'Match-day runbook'], ['tour-series', 'Between games']] },
-  { id: 'dota', label: 'Dota 2', tabs: [['dota-team', 'Team'], ['dota-scrims', 'Scrims & practice'], ['dota-reports', 'Scrim reports'], ...(FEAT.capture ? [['dota-patterns', 'Patterns']] : []), ['dota-post', 'Post-match'], ['dota-scout', 'Competitors'], ['dota-draft', 'Draft room'], ['dota-review', 'Series review']] },
-  { id: 'pubgm', label: 'PUBG Mobile', tabs: [['pubgm-team', 'Team'], ['pubgm-scrims', 'Scrims & practice'], ['pubgm-reports', 'Scrim reports'], ['pubgm-log', 'Log & import'], ['pubgm-rivals', 'Competitors'], ['pubgm-sim', 'Strategy sim'], ['pubgm-review', 'Match-day review']] },
+  { id: 'dota', label: 'Dota 2', tabs: [['dota-team', 'Team'], ['dota-scrims', 'Scrims & practice'], ['dota-reports', 'Scrim reports'], ['dota-trends', 'Trends'], ...(FEAT.capture ? [['dota-patterns', 'Patterns']] : []), ['dota-post', 'Post-match'], ['dota-scout', 'Competitors'], ['dota-draft', 'Draft room'], ['dota-review', 'Series review']] },
+  { id: 'pubgm', label: 'PUBG Mobile', tabs: [['pubgm-team', 'Team'], ['pubgm-scrims', 'Scrims & practice'], ['pubgm-reports', 'Scrim reports'], ['pubgm-trends', 'Trends'], ['pubgm-log', 'Log & import'], ['pubgm-rivals', 'Competitors'], ['pubgm-sim', 'Strategy sim'], ['pubgm-review', 'Match-day review']] },
   ...GAME_HUBS.map((h) => ({ id: h.id, label: h.label, tabs: hubTabs(h) })),
   { id: 'well', label: 'Performance', tabs: [['readiness', 'Athlete readiness'], ['players', 'Player plans'], ['well-day', 'Wellbeing check'], ['well-log', 'Log check-in & load']] },
   { id: 'guide', label: 'Guide', tabs: [['guide', 'How to use the hub']] },
-  { id: 'staff', label: 'Staff', tabs: [['staff-cycle', 'Coaching cycle'], ['staff-measure', 'Is it working?'], ['staff-rules', 'Rules & decisions'], ['staff-sources', 'Sources & limits'], ...(HUB_USER?.isAdmin ? [['admin-users', 'Users & access']] : [])] },
+  { id: 'staff', label: 'Staff', tabs: [['staff-cycle', 'Coaching cycle'], ['staff-quality', 'Practice quality'], ['staff-measure', 'Is it working?'], ['staff-rules', 'Rules & decisions'], ['staff-sources', 'Sources & limits'], ...(HUB_USER?.isAdmin ? [['admin-users', 'Users & access']] : [])] },
 ];
-const viewOf = () => { const h = location.hash.slice(1); return TITLES.some((t) => t.tabs.some(([id]) => id === h)) ? h : 'today'; };
+const viewOf = () => { const h = location.hash.slice(1).split('?')[0]; return TITLES.some((t) => t.tabs.some(([id]) => id === h)) ? h : 'today'; };
+const viewParams = () => new URLSearchParams(location.hash.split('?')[1]);
 function renderNav(view) {
   const title = TITLES.find((t) => t.tabs.some(([id]) => id === view));
   const pending = S.cycle.filter((o) => o.status === 'proposed').length;
@@ -278,11 +297,23 @@ function renderNav(view) {
     + `<button type="button" id="langBtn" class="lang" aria-label="${S.lang === 'id' ? 'Switch to English' : 'Ganti ke Bahasa Indonesia'}"><b${S.lang === 'en' ? ' class="on"' : ''}>EN</b><b${S.lang === 'id' ? ' class="on"' : ''}>ID</b></button>`
     + `<button type="button" id="modeBtn" class="mode ${S.mode}" aria-pressed="${S.mode === 'demo'}">${S.mode === 'demo' ? 'Leave demo sandbox' : 'Demo sandbox'}</button>`
     + (HUB_USER ? `<button type="button" id="focusBtn" class="mode" aria-pressed="${!S.showAll}" title="Focus mode hides screens not in use yet">${S.showAll ? 'Focus mode' : 'Show all tools'}</button>` : '');
-  $('#tabs').innerHTML = title.tabs.filter(([id]) => tabShown(id, view)).map(([id, label]) => `<a href="#${id}" ${id === view ? 'aria-current="page"' : ''}>${esc(label)}</a>`).join('');
+  $('#tabs').innerHTML = title.tabs.filter(([id]) => tabShown(id, view)).map(([id, label]) => `<a href="#${id}" ${id === view ? 'aria-current="page"' : ''}>${id === 'daily-sessions' ? dailyLabel(label) : esc(label)}</a>`).join('');
 }
 
 // ---------- views ----------
 const V = {};
+let DAILY;
+V['daily-sessions'] = () => DAILY.page();
+const dailyLabel = (text) => esc(dailyText(text, S.lang));
+const dailyEntry = (title) => S.mode === 'live' && canWriteSession(HUB_USER, title)
+  ? `<div class="toolbar"><a class="btn" href="${esc(dailyLink('title', title))}">${dailyLabel('Log a session')}</a></div>` : '';
+function linkedRecord(title, record, state, card) {
+  if (S.mode === 'demo') return `<div class="panel"><p>${dailyLabel('Leave the demo sandbox to log or view daily sessions.')}</p></div>`;
+  const message = state === 'ready' || !titleVisible(title) ? 'Session unavailable.'
+    : state === 'error' ? 'Session records could not be loaded. Reload to try again.' : 'Loading session records…';
+  return `<div class="panel"><a href="#daily-sessions">${dailyLabel('Back to daily sessions')}</a><h2 data-session-heading tabindex="-1">${esc(title)}</h2>
+    ${titleVisible(title) && record ? card(record) : `<p class="note">${dailyLabel(message)}</p>`}</div>`;
+}
 let LAST = { recs: {} }; // recommendation records shown on the current view, for the propose buttons
 
 function todayCard(item) {
@@ -405,7 +436,8 @@ function scrimsPanel(title) {
   const objName = (id) => S.cycle.find((o) => o.id === id)?.rec.problem || id;
   const card = (sc) => `<div class="obj"><header><div><span class="note">${esc(sc.date)}${sc.time ? ` ${esc(sc.time)}` : ''} · ${esc(sc.kind)}${sc.format ? ` · ${esc(sc.format)}` : ''} · owner ${esc(sc.owner)}</span><h3>${sc.partner ? `vs ${esc(sc.partner)}` : esc(sc.kind)}${sc.mirrors ? ` <span class="note">(stand-in for ${esc(sc.mirrors)})</span>` : ''}</h3></div>${tag(sc.status === 'done' ? 'c-Verified' : sc.status === 'cancelled' ? 'c-Blocked' : 'c-Low', sc.status)}</header>
     ${sc.focus ? `<p><b>Focus:</b> ${esc(sc.focus)}${sc.drill ? ` <span class="note">· Drill: ${esc(sc.drill)}</span>` : ''}${sc.measure ? ` <span class="note">· Check: ${esc(sc.measure)}</span>` : ''}</p>` : ''}
-    ${sc.objectives.length ? `<p class="note">Practising: ${sc.objectives.map((id) => esc(objName(id))).join('; ')}</p>` : '<p class="note">No objective attached: free scrim.</p>'}
+    ${sc.dailyReport ? `<p data-no-tr>${esc(sc.dailyReport.objective)}</p><a href="${esc(dailyLink('session', sc.id))}">${dailyLabel('Open session report')}</a>` : sc.objectives.length ? `<p class="note">Practising: ${sc.objectives.map((id) => esc(objName(id))).join('; ')}</p>` : '<p class="note">No objective attached: free scrim.</p>'}
+    ${S.mode === 'live' && sc._version && canAddDailyReport(sc, HUB_USER) ? `<a href="${esc(dailyLink('session', sc.id))}">${dailyLabel('Add daily report')}</a>` : ''}
     ${sc.result ? `<p>${sc.result.score ? `<b>${esc(sc.result.score)}</b> · ` : ''}${sc.result.matchIds.length ? `matches ${sc.result.matchIds.map(esc).join(', ')} · ` : ''}${esc(sc.result.notes || sc.result.cancelledWhy)} <span class="note">— ${esc(sc.result.by)}</span></p>` : `<details><summary class="btn">Log result</summary><div class="form">
       <label class="field" for="scS-${sc.id}">${title === 'PUBG Mobile' ? 'Points / placement' : 'Score (e.g. 2-1)'}<input type="text" id="scS-${sc.id}"></label>
       <label class="field" for="scM-${sc.id}">Match IDs (comma-separated)<input type="text" id="scM-${sc.id}"></label>
@@ -413,14 +445,16 @@ function scrimsPanel(title) {
       <label class="field" for="scN-${sc.id}">Notes<input type="text" id="scN-${sc.id}"></label></div>
       ${sc.objectives.map((id) => `<div class="form"><label class="field" for="scR-${sc.id}-${id}">Result for: ${esc(objName(id))}<select id="scR-${sc.id}-${id}"><option value="">skip</option><option>met</option><option>partly-met</option><option>not-met</option><option>not-measured</option></select></label><label class="field" for="scV-${sc.id}-${id}">Measured value<input type="text" id="scV-${sc.id}-${id}"></label></div>`).join('')}
       <div class="toolbar"><button class="btn primary" type="button" data-scrim-done="${esc(sc.id)}">Save result</button><button class="btn" type="button" data-scrim-cancel="${esc(sc.id)}">Cancelled</button><span class="msg" id="scMsg-${sc.id}"></span></div></details>`}</div>`;
-  return `<div class="panel"><h2>Scrims &amp; practice — ${esc(title)}</h2>
+  const record = HUB_USER && viewParams().get('record');
+  if (record) return linkedRecord(title, S.scrims.find((s) => s.title === title && s.id === record), S.scrimLoad, card);
+  return `<div class="panel"><h2>Scrims &amp; practice — ${esc(title)}</h2>${dailyEntry(title)}
     <div class="stats"><div class="stat"><span class="k">Planned</span><span class="v">${Sm.upcoming.length}</span></div><div class="stat"><span class="k">Overdue to log</span><span class="v">${Sm.overdue.length}</span></div><div class="stat"><span class="k">Done, last 7 days</span><span class="v">${Sm.last7}</span></div>
     <div class="stat"><span class="k">Done with an objective</span><span class="v">${Sm.done.length ? `${Sm.withObjective}/${Sm.done.length}` : '—'}</span></div><div class="stat"><span class="k">Rivals practised against (stand-ins)</span><span class="v">${Sm.mirrored.length}</span></div></div>
     <p class="note">Attach accepted objectives to a scrim; logging its result also logs a session on each of them. Use "stand-in for" when a sparring partner plays like a WEC rival.</p></div>
   ${S.mode !== 'demo' && FEAT.ai && FEAT.aiPlan && PLATFORM?.ai ? planSuggestPanel(title, fid) : ''}
   ${S.mode === 'demo' ? '' : `<div class="panel"><h2>Plan a session</h2><div class="form">
     <label class="field" for="spD-${fid}">Date<input type="date" id="spD-${fid}" value="${today()}"></label><label class="field" for="spTm-${fid}">Time<input type="text" id="spTm-${fid}" placeholder="19:00 WIB"></label>
-    <label class="field" for="spK-${fid}">Kind<select id="spK-${fid}">${SCRIM_KINDS.map((k) => `<option>${k}</option>`).join('')}</select></label>
+    <label class="field" for="spK-${fid}">Kind<select id="spK-${fid}">${SCRIM_KINDS.map((k) => `<option value="${esc(k)}">${dailyLabel(k)}</option>`).join('')}</select></label>
     <label class="field" for="spF-${fid}">Format<select id="spF-${fid}"><option value=""></option>${FORMATS.map((k) => `<option ${title === 'PUBG Mobile' && k === 'Lobby (BR)' ? 'selected' : ''}>${k}</option>`).join('')}</select></label>
     <label class="field" for="spP-${fid}">Sparring partner<input type="text" id="spP-${fid}" placeholder="Team name" list="pbList-${fid}"></label><datalist id="pbList-${fid}">${S.partners.filter((p) => p.title === title).map((p) => `<option value="${esc(p.name)}">${esc(p.level)}${p.resembles ? ` · like ${esc(p.resembles)}` : ''}</option>`).join('')}</datalist>
     <label class="field" for="spL-${fid}">Partner level<select id="spL-${fid}"><option value=""></option><option>Tier 1 international</option><option>Tier 1 domestic</option><option>Tier 2</option><option>Academy / amateur</option></select></label>
@@ -519,7 +553,49 @@ function reportTrends(title) {
     </div><p class="note">Days without a report are left empty. Hover or tap a day for its numbers; the full list is under "Day by day".</p></div>`;
 }
 
+// ---------- V1.16 Trends (src/core/trends.js): weekly, team and players, with a fair "is it moving?" verdict ----------
+const VERDICT_TAG = { better: ['c-High', 'Better'], worse: ['c-Blocked', 'Worse'], 'no clear change': ['c-Medium', 'No clear change'], 'not enough data': ['c-Low', 'Not enough data'] };
+const verdictTag = (v) => tag(...(VERDICT_TAG[v] || ['c-Low', v]));
+const trFmt = (m, v) => (v == null ? '—' : m.type === 'prop' ? `${Math.round(v * 100)}%` : `${round(v, 1)}`);
+function trendChart(m, W) {
+  const prop = m.type === 'prop'; const vals = m.values.map((v) => (v == null ? null : prop ? Math.round(v * 100) : round(v, 2)));
+  const have = vals.filter((v) => v != null);
+  const [min, max] = prop ? [0, 100] : m.key === 'plan' ? [1, 5] : [0, Math.max(1, Math.ceil(Math.max(...have, 0) * 1.15))];
+  const ticks = prop ? [0, 50, 100] : m.key === 'plan' ? [1, 3, 5] : [0, round(max / 2, 1), max];
+  return trendSvg({ days: W.map((w) => w.to), values: vals, kind: 'line', min, max, ticks, fmt: (v) => (prop ? `${v}%` : `${v}`), label: m.label,
+    tip: (i) => `Week ${W[i].from} to ${W[i].to}: ${trFmt(m, m.values[i])} (${m.counts[i]} value${m.counts[i] === 1 ? '' : 's'})` });
+}
+function trendsPage(title) {
+  if (S.mode === 'demo') return `<div class="panel">${DEMO_BANNER}<p class="empty">Trends use operational records only.</p></div>`;
+  const n = S.trWeeks || 6; const W = trendWeeks(today(), n);
+  let pubgm = null;
+  if (title === 'PUBG Mobile') { const d = pubgmData(); pubgm = { rows: d.rows, team: d.team, points: (r) => d.sc.total(r) }; }
+  const team = teamTrends(title, { reports: S.reports, pubgm }, W);
+  const games = gameOf(title) && FEAT.capture ? latestGames((S.games || []).filter((g) => g.title === title)) : [];
+  const players = playerTrends(games, W);
+  const changes = S.cycle.filter((o) => o.title === title).flatMap((o) => (o.reviews || []).filter((r) => ['accepted', 'modified'].includes(r.decision) && String(r.at).slice(0, 10) >= W[0].from).map((r) => ({ at: String(r.at).slice(0, 10), what: o.rec?.problem || o.id, drill: o.objective?.drill || '' })))
+    .sort((a, b) => a.at.localeCompare(b.at));
+  const head = (m) => `<div class="toolbar"><b>${esc(m.label)}</b> ${verdictTag(m.verdict)} <span class="note">last ${VERDICT_WEEKS} weeks ${trFmt(m, m.after)} (${m.nAfter}) vs ${trFmt(m, m.before)} (${m.nBefore}) before</span></div>`;
+  const wk = (w) => `${w.to.slice(8)}/${w.to.slice(5, 7)}`;
+  return `<div class="panel"><div class="lead">${esc(title)}: <em>trends</em></div>
+    <p>Is practice turning into improvement? Week by week from scrim reports${gameOf(title) ? ', confirmed scrim games (per player)' : ''}${title === 'PUBG Mobile' ? ' and the match log' : ''}. Nothing extra to type.</p>
+    <div class="form"><label class="field" for="trWeeks">Period<select id="trWeeks">${[4, 6, 8].map((k) => `<option value="${k}" ${k === n ? 'selected' : ''}>Last ${k} weeks</option>`).join('')}</select></label></div>
+    ${S.reportLoad === 'error' ? banner('block', '<div>Scrim reports could not be loaded: these trends are incomplete.</div>') : ''}
+    <p class="note">"Better" or "Worse" only when the last ${VERDICT_WEEKS} weeks differ from the ${VERDICT_WEEKS} before by more than chance (95% interval), with at least ${TR_MIN} games or reports on each side. Partner strength changes week to week: read a change against who you played (Scrim reports). It shows a change in practice numbers, not in tournament chances.</p></div>
+  ${team.length ? `<div class="panel"><h2>Team</h2>${team.map((m) => `<div class="trendrow">${head(m)}<div class="trends">${trendChart(m, W)}</div></div>`).join('')}</div>`
+    : `<div class="panel"><h2>Team</h2><p class="empty">No scrim reports in this period yet. File reports under Scrim reports and the lines appear here.</p></div>`}
+  ${gameOf(title) ? `<div class="panel"><h2>Players</h2>${players.length ? `<div class="tw"><table><thead><tr><th>Player</th><th>Per game</th>${W.map((w) => `<th class="n">${wk(w)}</th>`).join('')}<th>Last ${VERDICT_WEEKS} weeks</th></tr></thead><tbody>
+      ${players.flatMap((p) => p.measures.map((m, i) => `<tr>${i ? '<td></td>' : `<td><b>${esc(p.player)}</b><br><span class="note">${p.games} game${p.games === 1 ? '' : 's'}</span></td>`}<td>${esc(m.label)}${m.better === 'down' ? ' <span class="note">(lower is better)</span>' : ''}</td>${m.values.map((v, k) => `<td class="n" title="${m.counts[k]} game(s)">${trFmt(m, v)}</td>`).join('')}<td>${verdictTag(m.verdict)}</td></tr>`)).join('')}</tbody></table></div>
+      <p class="note">From coach-confirmed scrim games only (screenshot capture or typed in). Weekly averages per game; stand-ins are left out.</p>`
+    : `<p class="empty">No confirmed scrim games in this period. Add games to a scrim report (screenshot or by hand) to see each player's line.</p>`}</div>` : ''}
+  <div class="panel"><h2>What the staff changed in this period</h2>${changes.length ? `<ul class="plain">${changes.map((c) => `<li><b>${esc(c.at)}</b> accepted: ${esc(c.what)}${c.drill ? ` <span class="note">— drill: ${esc(c.drill)}</span>` : ''}</li>`).join('')}</ul>` : '<p class="empty">No objective accepted in this period.</p>'}
+    <p class="note">Read the lines against these dates: a change after an objective started is a hint, not proof, that the practice worked.</p></div>`;
+}
+for (const [view, title] of [['dota-trends', 'Dota 2'], ['pubgm-trends', 'PUBG Mobile']]) V[view] = () => trendsPage(title);
+
 function reportsPanel(title) {
+  const record = HUB_USER && viewParams().get('record');
+  if (record) return linkedRecord(title, S.reports.find((r) => r.title === title && r.id === record), S.reportLoad, reportCard);
   const spec = GAME_SPEC[title]; const fid = sid(title); const t0 = localToday();
   const mine = S.reports.filter((r) => r.title === title);
   const Sm = reportSummary(S.reports, title, t0); const days = reportDays(S.reports, title);
@@ -529,7 +605,7 @@ function reportsPanel(title) {
   const unit = spec.unit;
   const ready = Sm.carryOver ? `<div class="panel"><h2>Start the next session from here</h2><p>${esc(Sm.carryOver.adjust)}</p><p class="note">Adjustment written by ${esc(Sm.carryOver.by)} on ${esc(Sm.carryOver.date)}. If the next report does not mention it, ask whether it was tried.</p></div>` : '';
   const form = S.mode === 'demo' ? '' : reportForm(title, { fid, spec, pts, unit, planned, t0 });
-  return `<div class="panel"><h2>Scrim reports — ${esc(title)}</h2>
+  return `<div class="panel"><h2>Scrim reports — ${esc(title)}</h2>${dailyEntry(title)}
     <div class="stats"><div class="stat"><span class="k">Sessions, last 7 days</span><span class="v">${Sm.sessions}</span></div>
     <div class="stat"><span class="k">${pts ? 'Points, last 7 days' : 'Record, last 7 days'}</span><span class="v">${Sm.sessions ? (pts ? `${Sm.points} (${Sm.matches} m)` : `${Sm.won}-${Sm.lost}${Sm.drawn ? `-${Sm.drawn}` : ''}`) : '—'}</span></div>
     <div class="stat"><span class="k">Plan followed (average, 1–5)</span><span class="v">${Sm.progress ?? '—'}</span>${trendTag(Sm.trend)}</div>
@@ -583,7 +659,7 @@ function draftField(el) {
 }
 function fillReport(fid, values) {
   for (const [k, v] of Object.entries(values)) {
-    const el = document.getElementById(`rp-${fid}-${k}`); if (!el) continue;
+    const el = document.getElementById(`rp-${fid}-${k}`); if (!el || el.readOnly) continue;   // the signed-in author is never overwritten
     if (el.tagName === 'SELECT' && v && ![...el.options].some((o) => o.value === v)) continue;
     el.value = v; draftField(el);
     if (k === 'progress') document.querySelectorAll(`[data-rp-prog="${fid}"]`).forEach((x) => x.setAttribute('aria-pressed', String(x.dataset.v === String(v))));
@@ -608,6 +684,8 @@ function reportForm(title, { fid, spec, pts, unit, planned, t0 }) {
   const partners = uniq(mine.map((r) => r.partner)).filter((p) => !plannedToday.some((x) => x.partner === p)).slice(0, 5);
   const objectives = S.cycle.filter((o) => o.title === title && ['accepted', 'modified'].includes(o.status)).map((o) => o.rec.problem);
   const focuses = uniq([...objectives, ...mine.map((r) => r.focus)]).slice(0, 5);
+  // A planned session's objectives become the report's focus (one tap instead of retyping).
+  const plannedFocus = (x) => (x.objectives || []).map((id) => S.cycle.find((o) => o.id === id)?.rec?.problem).filter(Boolean).join('; ');
   const scores = title === 'eFootball' ? [['1-0', 1, 0, 0], ['0-1', 0, 1, 0], ['Draw', 0, 0, 1], ['2-0', 2, 0, 0], ['1-1', 1, 1, 0], ['0-2', 0, 2, 0]] : [['2-0', 2, 0, 0], ['2-1', 2, 1, 0], ['1-2', 1, 2, 0], ['0-2', 0, 2, 0], ['1-0', 1, 0, 0], ['0-1', 0, 1, 0]];
   const hasDraft = Object.keys(d).some((k) => k !== 'at' && d[k] !== '');
   const isDefault = (k, v) => (k === 'roster' && v === ROSTER_PLAYED[0]) || (k === 'format' && pts && v === 'Lobby (BR)');
@@ -619,15 +697,17 @@ function reportForm(title, { fid, spec, pts, unit, planned, t0 }) {
   const sel = (k, label, opts, def = '') => `<label class="field" for="rp-${fid}-${k}">${label}<select id="rp-${fid}-${k}">${opts.map(([v, l]) => `<option value="${esc(v)}" ${v === dv(k, def) ? 'selected' : ''}>${esc(l)}</option>`).join('')}</select></label>`;
   const prog = dv('progress');
   return `<div class="panel rp"><h2>File a scrim report — ${esc(title)}</h2>
-    <p class="note">One report per sparring partner, the same day. Required fields first; everything under "More details" is optional. Reports cannot be edited afterwards: add a correction note instead. Performance notes only: no health, personal or contact details (wellbeing goes through Coach Donny).</p>
+    <p class="note">One report per sparring partner. Tap a chip where you can; "More details" is optional. Saved reports are fixed (add a correction instead). Performance notes only.</p>
     ${hasDraft ? `<p class="note draftnote">Draft kept on this device${d.at ? ` (last typed ${esc(new Date(d.at).toTimeString().slice(0, 5))})` : ''}. <button type="button" class="linkbtn" data-rp-clear="${esc(fid)}">Clear form</button></p>` : ''}
     ${last ? `<div class="toolbar">${chip(fid, { partner: last.partner, level: last.partnerLevel, format: last.format, roster: last.roster, focus: last.focus, by: last.by }, 'Copy setup from last report', ' wide')}<span class="note">vs ${esc(last.partner)}, ${esc(last.date)}</span></div>` : ''}
     <div class="form">
       <label class="field" for="rp-${fid}-date">Date<input type="date" id="rp-${fid}-date" value="${esc(dv('date', t0))}" max="${t0}"></label>
-      <label class="field" for="rp-${fid}-by">Written by<input type="text" id="rp-${fid}-by" list="staffNames" value="${esc(dv('by', meName()))}"></label>
+      ${HUB_USER ? `<label class="field" for="rp-${fid}-by">Written by<input type="text" id="rp-${fid}-by" value="${esc(HUB_USER.name)}" readonly></label>`
+        : `<label class="field" for="rp-${fid}-by">Written by<input type="text" id="rp-${fid}-by" list="staffNames" value="${esc(dv('by', meName()))}"></label>`}
       <label class="field" for="rp-${fid}-partner">Sparring partner<input type="text" id="rp-${fid}-partner" list="pbList-${fid}" placeholder="Team name, or internal" value="${esc(dv('partner'))}"></label>
     </div><datalist id="pbList-${fid}">${S.partners.filter((p) => p.title === title).map((p) => `<option value="${esc(p.name)}">${esc(p.level)}${p.resembles ? ` · like ${esc(p.resembles)}` : ''}</option>`).join('')}</datalist>
-    ${plannedToday.length || partners.length ? `<div class="chips"><span class="note">Quick pick:</span>${plannedToday.map((x) => chip(fid, { partner: x.partner, scrim: x.id, format: x.format, level: x.partnerLevel, ...(x.focus ? { focus: x.focus } : {}) }, `Planned today: ${x.partner}`, ' planned')).join('')}${partners.map((p) => chip(fid, { partner: p }, p)).join('')}</div>` : ''}
+    ${plannedToday.length || partners.length ? `<div class="chips"><span class="note">Quick pick:</span>${plannedToday.map((x) => chip(fid, { partner: x.partner, scrim: x.id, format: x.format, level: x.partnerLevel, ...(x.focus || plannedFocus(x) ? { focus: x.focus || plannedFocus(x) } : {}) }, `Planned today: ${x.partner}`, ' planned')).join('')}${partners.map((p) => chip(fid, { partner: p }, p)).join('')}</div>` : ''}
+    ${capUi().debriefSection(title, fid)}
     ${capUi().gamesSection(title, fid)}
     <div class="h3">Result</div>
     ${gameOf(title) && (S.cap?.[fid]?.ready || []).length ? '<p class="note">Filled from the confirmed games above.</p>' : ''}
@@ -640,9 +720,8 @@ function reportForm(title, { fid, spec, pts, unit, planned, t0 }) {
       <input type="hidden" id="rp-${fid}-prevadj" value="${esc(last.adjust)}">
       <div class="form">${sel('fix', 'Did we fix it?', [['', '—'], ...FIX_CHECK.map((x) => [x, x])])}</div>
       <div class="chips">${chip(fid, { focus: last.adjust }, "Make it today's focus")}</div></div>` : ''}
-    ${capUi().debriefSection(title, fid)}
     ${txt('focus', 'What was this session meant to practise?', 'e.g. Early rotations; fallback drop; set-piece defending')}
-    ${focuses.length ? `<div class="chips"><span class="note">Recent and active objectives:</span>${focuses.map((f) => chip(fid, { focus: f }, f.length > 48 ? `${f.slice(0, 46)}…` : f)).join('')}</div>` : ''}
+    ${focuses.filter((f) => f !== last?.adjust).length ? `<div class="chips"><span class="note">Recent and active objectives:</span>${focuses.filter((f) => f !== last?.adjust).map((f) => chip(fid, { focus: f }, f.length > 48 ? `${f.slice(0, 46)}…` : f)).join('')}</div>` : ''}
     <div class="field"><span id="rp-${fid}-proglabel">How closely did the team follow the plan?</span><input type="hidden" id="rp-${fid}-progress" value="${esc(prog)}">
       <div class="seg" role="group" aria-labelledby="rp-${fid}-proglabel">${PROGRESS.map(([n, l]) => `<button type="button" data-rp-prog="${esc(fid)}" data-v="${n}" aria-pressed="${String(prog) === String(n)}" title="${esc(l)}"><b>${n}</b> ${esc(PROG_SHORT[n])}</button>`).join('')}</div></div>
     <div class="form">${txt('worked', 'What worked', '', true)}${txt('failed', 'What failed', '', true)}</div>
@@ -669,6 +748,7 @@ async function loadAdminUsers() {
   try { S.admin.users = await PLATFORM.admin.listUsers(); } catch (e) { S.admin.error = e.message; }
   // AI usage this calendar month (WIB); a missing table (AI not set up yet) just hides the panel.
   if (PLATFORM.admin.aiUsage) { try { S.admin.usage = await PLATFORM.admin.aiUsage(`${localDay().slice(0, 8)}01T00:00:00+07:00`); } catch { S.admin.usage = null; } }
+  if (PLATFORM.admin.storageUsage && FEAT.capture) { try { S.admin.storage = await PLATFORM.admin.storageUsage(); } catch { S.admin.storage = null; } }
   S.admin.loading = false; render();
 }
 // V1.15: what the live database and server already have; the rest stays hidden until switched on.
@@ -683,6 +763,19 @@ function featuresPanel() {
     ${row(f.pelatnas, 'Pelatnas board: dates, availability, attendance (V1.16)', 'apply <code>supabase/migrations/20261116120000_pelatnas.sql</code> in Supabase → SQL Editor')}
     ${row(f.ai, 'AI: read screenshots, Say it once, Look for patterns', 'deploy the <code>scrim-ai</code> function and set the Claude API key (docs/HUB_V1_13.md, steps 2–3)')}
   </ul><p class="note">Pending parts are hidden for everyone, and the rest of the hub works as before. Reload after switching something on.</p></div>`;
+}
+// V1.16: screenshot storage. Supabase Free holds 1 GB; screenshots are kept 90 days (policy), then removed
+// here by an admin after a confirmation. The confirmed games and their numbers stay.
+const STORAGE_LIMIT = 1024 ** 3; const CAPTURE_KEEP_DAYS = 90;
+function storagePanel(st, old) {
+  if (!st) return '';
+  const share = st.bytes / STORAGE_LIMIT; const mb = (b) => `${(b / 1024 ** 2).toFixed(0)} MB`;
+  return `<div class="panel" id="storagePanel"><h2>Screenshot storage</h2>
+    <p><b>${mb(st.bytes)}</b> of 1 GB (Supabase Free) · ${st.files} file${st.files === 1 ? '' : 's'}${st.oldest ? ` · oldest ${esc(String(st.oldest).slice(0, 10))}` : ''}</p>
+    ${share >= 0.8 ? banner('block', `<div><b>Storage ${Math.round(share * 100)}% full.</b> New screenshots will fail when it is full. Delete screenshots older than ${CAPTURE_KEEP_DAYS} days below.</div>`) : share >= 0.6 ? banner('warn', `<div>Storage ${Math.round(share * 100)}% full.</div>`) : ''}
+    ${old && old.length ? `${banner('block', `<div><b>Delete ${old.length} screenshot${old.length === 1 ? '' : 's'} older than ${CAPTURE_KEEP_DAYS} days?</b> This cannot be undone. The games read from them stay saved.</div>`)}
+      <div class="toolbar"><button class="btn primary" type="button" id="stPurge">Delete ${old.length} file${old.length === 1 ? '' : 's'}</button><button class="btn" type="button" id="stCancel">Cancel</button><span class="msg" id="stMsg" role="status"></span></div>`
+    : `<div class="toolbar"><button class="btn" type="button" id="stFind">Find screenshots older than ${CAPTURE_KEEP_DAYS} days</button><span class="msg" id="stMsg" role="status"></span></div>`}</div>`;
 }
 function usagePanel(rows) {
   if (!rows) return '';
@@ -706,13 +799,14 @@ V['admin-users'] = () => {
     <div class="toolbar"><button class="btn primary" type="button" data-admin-save="${esc(u.id)}">Save access</button><span class="msg" id="adMsg-${u.id}" role="status"></span></div></div>`;
   return `<div class="panel"><div class="lead">Users &amp; <em>access</em></div>
     <p>Who can sign in and what they can see. The database enforces these rules for every request; this page only changes them.</p>
-    <ul class="plain"><li><b>Admin, Head Coach, assistant coaches:</b> read every title. Admin and Head Coach write every title; assistant coaches write their assigned titles and approve proposals there.</li>
+    <ul class="plain"><li><b>Admin, Head Coach, assistant coaches:</b> read every title. Admin and Head Coach write every title; assistant coaches write their assigned titles. Head Coach and every assistant coach approve proposals, draft books and opponent cards for all titles.</li>
     <li><b>Title coaches, analysts:</b> read and write only their assigned titles.</li><li><b>Wellbeing:</b> readiness owner and admins only (until visibility is decided).</li></ul>
     <p class="note">To add someone: Supabase dashboard → Authentication → Users → Invite user (their email). They set a password from the email, then appear here with no access until you tick a role.</p>
     <div class="toolbar"><button class="btn" type="button" id="adReload">Reload list</button><button class="btn" type="button" id="adExport">Export all data (JSON)</button><span class="msg" id="adExportMsg" role="status"></span></div>
     ${S.admin.error ? banner('block', `<div>${esc(S.admin.error)}</div>`) : ''}</div>
   ${featuresPanel()}
   ${usagePanel(S.admin.usage)}
+  ${storagePanel(S.admin.storage, S.admin.old)}
   <div class="panel"><h2>People (${users.length})</h2>${S.admin.loading && !users.length ? '<p>Loading…</p>' : users.map(row).join('') || '<p class="empty">Nobody yet.</p>'}</div>`;
 };
 // Title coaches and analysts see only their assigned games (the database hides the rest anyway).
@@ -748,6 +842,7 @@ for (const h of GAME_HUBS) {
   V[h.team] = () => teamPage(h.title);
   V[`${h.team}-scrims`] = () => scrimsPanel(h.title);
   V[`${h.team}-reports`] = () => reportsPanel(h.title);
+  V[`${h.team}-trends`] = () => trendsPage(h.title);
   if (gameOf(h.title)) V[`${h.team}-patterns`] = () => capUi().patternsPage(h.title);
   if (h.draftRoom) V[`${h.team}-draft`] = () => (FEAT.draftRoom ? drUi().page(h.title) : `<div class="panel">${banner('warn', '<div>The Draft Room switches on after the V1.14 database update.</div>')}</div>`);
   V[`${h.team}-rivals`] = () => competitorsPanel(h.title);
@@ -989,11 +1084,12 @@ function cycleCard(o) {
       <dt>Drill</dt><dd>${esc(o.objective.drill)}</dd><dt>Success</dt><dd>${esc(o.objective.success)}</dd><dt>Next step</dt><dd><b>${esc(nextStep(o, S.rules))}</b></dd></dl>
     ${o.reviews.length ? `<div class="h3">Reviews</div><ul class="plain">${o.reviews.map((r) => `<li><b>${esc(r.decision)}</b> by ${esc(r.reviewer)}, ${esc(r.at.slice(0, 16).replace('T', ' '))}${r.reason ? ` — ${esc(r.reason)}` : ''}</li>`).join('')}</ul>` : ''}
     ${t.length ? `<div class="h3">Sessions → decisions</div><ul class="plain">${t.map(({ session: s, decision: d }) => `<li><b>${esc(s.id)}</b> ${esc(s.date)} · ${esc(s.owner)} · ${esc(s.execution)} · result <b>${esc(s.result)}</b>${s.measure ? ` (${esc(s.measure)})` : ''}${s.context?.opponent ? ` · vs ${esc(s.context.opponent)}` : ''}${d ? ` → <b>${esc(d.decision)}</b> by ${esc(d.by)}: ${esc(d.reason)}` : ' → <i>no decision yet</i>'}</li>`).join('')}</ul>` : ''}
-    ${open ? `<details ${o.status === 'proposed' ? 'open' : ''}><summary class="btn">Review</summary><div class="form">
-      <label class="field" for="rv-d-${o.id}">Decision<select id="rv-d-${o.id}">${opt(REVIEW)}</select></label><label class="field" for="rv-n-${o.id}">Reviewer<input type="text" id="rv-n-${o.id}" list="rv-l-${o.id}" value="${esc(STAFF.find((x) => x.id === S.me)?.name || '')}"></label><datalist id="rv-l-${o.id}">${reviewersFor(o.title).map((n) => `<option value="${esc(n)}"></option>`).join('')}</datalist>
+    ${open ? `${CAN_APPROVE ? `<details ${o.status === 'proposed' ? 'open' : ''}><summary class="btn">Review</summary><div class="form">
+      <label class="field" for="rv-d-${o.id}">Decision<select id="rv-d-${o.id}">${opt(REVIEW)}</select></label>${HUB_USER ? `<label class="field" for="rv-n-${o.id}">Reviewer<input type="text" id="rv-n-${o.id}" value="${esc(HUB_USER.name)}" readonly></label>` : `<label class="field" for="rv-n-${o.id}">Reviewer<input type="text" id="rv-n-${o.id}" list="rv-l-${o.id}" value="${esc(STAFF.find((x) => x.id === S.me)?.name || '')}"></label><datalist id="rv-l-${o.id}">${reviewersFor(o.title).map((n) => `<option value="${esc(n)}"></option>`).join('')}</datalist>`}
       <label class="field" for="rv-r-${o.id}">Reason (required to modify or reject)<input type="text" id="rv-r-${o.id}"></label></div>
       <div class="form"><label class="field" for="rv-dr-${o.id}">Changed drill (if modifying)<input type="text" id="rv-dr-${o.id}"></label><label class="field" for="rv-s-${o.id}">Changed success criterion<input type="text" id="rv-s-${o.id}"></label></div>
-      <div class="toolbar"><button class="btn primary" type="button" data-act="review" data-id="${esc(o.id)}">Save review</button></div></details>
+      <div class="toolbar"><button class="btn primary" type="button" data-act="review" data-id="${esc(o.id)}">Save review</button></div></details>`
+      : o.status === 'proposed' ? '<p class="note">Waiting for review by the Head Coach or an assistant coach.</p>' : ''}
     ${['accepted', 'modified'].includes(o.status) ? `<details><summary class="btn">Log a session</summary><div class="form">
       <label class="field" for="ss-o-${o.id}">Owner<input type="text" id="ss-o-${o.id}"></label><label class="field" for="ss-d-${o.id}">Date<input type="date" id="ss-d-${o.id}" value="${today()}"></label>
       <label class="field" for="ss-e-${o.id}">Executed<select id="ss-e-${o.id}">${opt(EXECUTION)}</select></label><label class="field" for="ss-r-${o.id}">Result vs success criterion<select id="ss-r-${o.id}">${opt(RESULT)}</select></label>
@@ -1001,11 +1097,28 @@ function cycleCard(o) {
       <label class="field" for="ss-p-${o.id}">Patch / version<input type="text" id="ss-p-${o.id}"></label><label class="field" for="ss-n-${o.id}">Notes<input type="text" id="ss-n-${o.id}"></label></div>
       <div class="toolbar"><button class="btn primary" type="button" data-act="session" data-id="${esc(o.id)}">Save session</button></div></details>` : ''}
     <details><summary class="btn">Decide next step</summary><div class="form">
-      <label class="field" for="dc-d-${o.id}">Decision<select id="dc-d-${o.id}">${opt(DECISIONS)}</select></label><label class="field" for="dc-b-${o.id}">Decided by<input type="text" id="dc-b-${o.id}"></label>
+      <label class="field" for="dc-d-${o.id}">Decision<select id="dc-d-${o.id}">${opt(DECISIONS)}</select></label><label class="field" for="dc-b-${o.id}">Decided by<input type="text" id="dc-b-${o.id}"${HUB_USER ? ` value="${esc(HUB_USER.name)}" readonly` : ''}></label>
       <label class="field" for="dc-r-${o.id}">Reason<input type="text" id="dc-r-${o.id}"></label></div>
       <div class="toolbar"><button class="btn primary" type="button" data-act="decide" data-id="${esc(o.id)}">Save decision</button></div></details>` : ''}
     <div class="msg" id="msg-${esc(o.id)}" role="status"></div></article>`;
 }
+// V1.16: practice quality across titles (src/core/practice_quality.js). Priority titles first (decided 12 Nov 2026).
+const PQ_ORDER = ['MLBB', 'MLBB Women', 'Dota 2', 'PUBG Mobile', 'eFootball', 'CS2', 'CS2 Women'];
+V['staff-quality'] = () => {
+  if (S.mode === 'demo') return `<div class="panel">${DEMO_BANNER}<p class="empty">Practice quality uses operational records only.</p></div>`;
+  const win = S.pqDays || 7;
+  const rows = practiceQuality(PQ_ORDER.filter(titleVisible), { scrims: S.scrims, reports: S.reports, cycle: S.cycle }, today(), win);
+  const pc = (p) => (p ? `${Math.round(p.value * 100)}%${p.hit != null ? ` <span class="note">${p.hit}/${p.n}</span>` : ` <span class="note">n=${p.n}</span>`}` : '<span class="note">—</span>');
+  const chg = (r) => (r.change == null ? '' : ` <span class="note">${r.change > 0 ? '▲' : r.change < 0 ? '▼' : '='} ${Math.abs(r.change)}</span>`);
+  return `<div class="panel"><div class="lead">Practice <em>quality</em></div>
+    <p>How rigorously each title practises, from the records the staff already keep: sessions held as planned, objectives, reports and follow-ups. It measures the process, not results or talent. A part with no records is left out (—), not counted as zero.</p>
+    <div class="form"><label class="field" for="pqDays">Window<select id="pqDays">${[7, 14, 28].map((d) => `<option value="${d}" ${d === win ? 'selected' : ''}>Last ${d} days</option>`).join('')}</select></label></div>
+    ${S.scrimLoad === 'error' || S.reportLoad === 'error' ? banner('block', '<div>Sessions or reports could not be loaded: these numbers are incomplete.</div>') : ''}
+    <div class="tw"><table><thead><tr><th>Title</th><th class="n">Score</th><th class="n">Sessions (days)</th>${PQ_PARTS.map(([, l]) => `<th class="n">${esc(l)}</th>`).join('')}</tr></thead><tbody>
+    ${rows.map((r) => `<tr><td><b>${esc(r.title)}</b></td><td class="n">${r.score == null ? '<span class="note">no records</span>' : `<b>${r.score}</b>${chg(r)}${r.lowSample ? ` ${tag('c-Low', 'few sessions')}` : ''}`}</td>
+      <td class="n">${r.sessions} (${r.days})</td>${PQ_PARTS.map(([k]) => `<td class="n">${pc(r.parts[k])}</td>`).join('')}</tr>`).join('')}</tbody></table></div>
+    <p class="note">Score: the average of the parts that have records, 0–100. ▲▼: change from the ${win} days before, shown only when both periods have at least ${PQ_MIN} sessions. "Reports filed by next day" counts scrim reports and daily reports entered by the end of the day after the session (WIB). "Plan followed" is the coach's 1–5 rating on scrim reports.</p></div>`;
+};
 V['staff-cycle'] = () => {
   if (S.mode === 'demo') return `<div class="panel">${DEMO_BANNER}<p class="empty">The coaching cycle holds operational records only.</p></div>`;
   const groups = [['proposed', 'Awaiting review'], ['accepted', 'In practice'], ['modified', 'In practice (modified)'], ['evidence-needed', 'Gathering evidence'], ['rejected', 'Rejected'], ['retired', 'Closed']];
@@ -1439,9 +1552,11 @@ V['comp-card'] = () => {
     <label class="field" for="ocTh">What they are likely to do<input type="text" id="ocTh" value="${esc(plan?.theirPlan || '')}" placeholder="${t === 'Dota 2' || t.startsWith('MLBB') ? 'first-phase bans, comfort picks, side' : t === 'PUBG Mobile' ? 'drops per map, rotation style' : t.startsWith('CS2') ? 'map picks and bans, default setups' : 'formation, tempo'}"></label>
     <label class="field" for="ocA">Our answer (required)<input type="text" id="ocA" value="${esc(plan?.ourAnswer || '')}"></label>
     ${ours.length ? `<fieldset class="objpick"><legend class="note">One focus per player (optional)</legend>${ours.map((p, i) => `<label class="field" for="ocF${i}">${esc(p)}<input type="text" id="ocF${i}" data-player="${esc(p)}" value="${esc(plan?.focus[p] || '')}"></label>`).join('')}</fieldset>` : ''}
-    <label class="field" for="ocBy">Written by<input type="text" id="ocBy" value="${esc(meName())}"></label>
+    <label class="field" for="ocBy">Written by<input type="text" id="ocBy" value="${esc(HUB_USER ? HUB_USER.name : meName())}"${HUB_USER ? ' readonly' : ''}></label>
     <div class="toolbar"><button class="btn primary" type="button" id="ocSave">Save draft</button><span class="msg" id="ocSaveMsg"></span></div>
-    ${plan && plan.status !== 'approved' ? `<div class="form"><label class="field" for="ocAp">Approve as (${esc(owner(t).name)} or the title coach)<input type="text" id="ocAp" value="${esc(meName())}"></label></div><div class="toolbar"><button class="btn" type="button" id="ocApprove">Approve card</button><span class="msg" id="ocApMsg"></span></div>` : ''}
+    ${plan && plan.status !== 'approved' ? (HUB_USER
+      ? (CAN_APPROVE ? `<div class="toolbar"><button class="btn" type="button" id="ocApprove">Approve card as ${esc(HUB_USER.name)}</button><span class="msg" id="ocApMsg"></span></div><p class="note">Approval: the Head Coach or an assistant coach, not the writer of this version.</p>` : '<p class="note">Waiting for approval by the Head Coach or an assistant coach.</p>')
+      : `<div class="form"><label class="field" for="ocAp">Approve as (${esc(owner(t).name)} or the title coach)<input type="text" id="ocAp" value="${esc(meName())}"></label></div><div class="toolbar"><button class="btn" type="button" id="ocApprove">Approve card</button><span class="msg" id="ocApMsg"></span></div>`) : ''}
     <p class="note">Editing an approved card returns it to draft.</p></div></div>`;
 };
 
@@ -1450,7 +1565,14 @@ let KEEP_FORMS = true; let LAST_VIEW = null;
 function captureForms() {
   const m = $('#main'); if (!m) return null;
   const vals = {};
-  for (const el of m.querySelectorAll('input[id],select[id],textarea[id]')) { if (el.type === 'file') continue; vals[el.id] = el.type === 'checkbox' || el.type === 'radio' ? { c: el.checked } : { v: el.value }; }
+  const edit = m.querySelector('#daily-edit');
+  const dirty = edit && [...edit.elements].some((el) => el.tagName === 'SELECT'
+    ? [...el.options].some((o) => o.selected !== o.defaultSelected)
+    : el.tagName === 'INPUT' && el.value !== el.defaultValue);
+  for (const el of m.querySelectorAll('input[id],select[id],textarea[id]')) {
+    if (el.type === 'file' || (el.form === edit && edit && !dirty)) continue;
+    vals[el.id] = el.type === 'checkbox' || el.type === 'radio' ? { c: el.checked } : { v: el.value };
+  }
   const a = document.activeElement;
   const focus = a && a.id && m.contains(a) ? { id: a.id, s: typeof a.selectionStart === 'number' ? a.selectionStart : null, e: typeof a.selectionEnd === 'number' ? a.selectionEnd : null } : null;
   return { vals, open: [...m.querySelectorAll('details')].map((d) => d.open), focus };
@@ -1470,10 +1592,14 @@ function restoreForms(st) {
   if (st.focus) { const el = document.getElementById(st.focus.id); if (el) { el.focus({ preventScroll: true }); try { if (st.focus.s != null) el.setSelectionRange(st.focus.s, st.focus.e); } catch { /* not a text field */ } } }
 }
 function render() {
-  const view = viewOf(); const kept = KEEP_FORMS && view === LAST_VIEW ? captureForms() : null;
+  const view = viewOf(); const route = location.hash;
+  const sameRoute = route === LAST_VIEW;
+  const kept = KEEP_FORMS && sameRoute ? captureForms() : null;
   renderNav(view); LAST = { recs: {} };
   document.documentElement.classList.toggle('demo', S.mode === 'demo');
   try { $('#main').innerHTML = V[view](); } catch (e) { $('#main').innerHTML = `<div class="panel">${banner('block', `<div>Something failed while building this view: ${esc(e.message)}</div>`)}</div>`; console.error(e); }
+  const failed = S.mode === 'live' ? Object.keys(S.loadErr || {}) : [];
+  if (failed.length) $('#main').insertAdjacentHTML('afterbegin', `<div class="panel" data-load-error>${banner('block', `<div><b>Some records could not be loaded:</b> ${esc(failed.join(', '))}. This page may be incomplete. Check the connection, then reload.</div>`)}</div>`);
   document.documentElement.lang = S.lang;
   if (S.lang === 'id') {
     translateDom(document.querySelector('header.top'), 'id'); translateDom($('#main'), 'id');
@@ -1484,13 +1610,20 @@ function render() {
     if (vt && !HUB_USER.titles.includes(vt)) $('#main').insertAdjacentHTML('afterbegin', `<div class="panel">${banner('synth', `<div><b>You are not assigned to ${esc(vt)}.</b> Its records are hidden and you cannot save here. Ask the admin if you need access.</div>`)}</div>`);
   }
   if (kept) restoreForms(kept);
-  LAST_VIEW = view;
+  if (!sameRoute) S.focusSessionHeading = view === 'daily-sessions' || viewParams().has('record');
+  const heading = S.focusSessionHeading && $('#main [data-session-heading]');
+  if (heading) {
+    heading.focus({ preventScroll: true });
+    document.scrollingElement?.scrollTo?.(0, 0);
+    S.focusSessionHeading = false;
+  }
+  LAST_VIEW = route;
   if (document.getElementById('drClock')) drUi().startTicker();
   attachDonny();
 }
 // Views that show engine findings or data notes, which stay in English.
 const ORIGINAL_LANG_VIEWS = /^(dota-team|dota-post|dota-scout|dota-draft|dota-review|pubgm-(team|log|rivals|sim|review)|comp-nation|comp-card|comp-rosters|staff-sources|staff-rules)/;
-const setMsg = (id, text, cls = '') => { const el = document.getElementById(id); if (el) { el.textContent = S.lang === 'id' ? (trId(text) ?? text) : text; el.className = `msg ${cls}`; } };
+const setMsg = (id, text, cls = '') => { const el = document.getElementById(id); if (el) { el.textContent = id === 'dailyMsg' ? dailyText(text, S.lang) : S.lang === 'id' ? (trId(text) ?? text) : text; el.className = `msg ${cls}`; } };
 const val = (id) => document.getElementById(id)?.value ?? '';
 async function doImport(text, label) {
   const r = importMatch(text, { ourAccounts: accounts(), known: Object.keys(S.matches).map(Number) });
@@ -1553,6 +1686,11 @@ async function onClick(e) {
         const md = cardMarkdown(autoCard({ title: ti, nation: na, per, team: rosterOf(ti, na), data: DATA, heroes: S.heroes, ours: ti === 'Dota 2' ? dotaTeam().pools : [], asOf: today() }), S.oppCards[key] || null);
         const dl = await window.claude?.use?.('downloads'); if (!dl) throw new Error('Downloads are not available in this view; use Print.');
         await dl.save({ filename: `opponent-card-${sid(ti)}-${sid(na)}.md`, data: md }); setMsg('ocMsg', 'Saved.', 'ok'); return;
+      }
+      if (id === 'ocApprove' && HUB_USER && S.db?.approve) {
+        // V1.16: the database records the signed-in approver and refuses the writer of the version.
+        const doc = await S.db.approve('opp_cards', sid(key));
+        S.oppCards = { ...S.oppCards, [key]: doc }; render(); return;
       }
       const plan = id === 'ocSave'
         ? cardPlan({ keys: [0, 1, 2].map((i) => val(`ocK${i}`)), theirPlan: val('ocTh'), ourAnswer: val('ocA'), by: val('ocBy'), focus: Object.fromEntries([...document.querySelectorAll('input[id^="ocF"]')].map((x) => [x.dataset.player, x.value])) })
@@ -1744,6 +1882,16 @@ async function onClick(e) {
   }
   if (id === 'signOutBtn') { await PLATFORM?.signOut(); return; }
   if (id === 'adReload') { S.admin = { users: null, loading: false, error: '' }; render(); return; }
+  if (id === 'stFind' || id === 'stPurge' || id === 'stCancel') {
+    try {
+      if (id === 'stCancel') { S.admin.old = null; render(); return; }
+      if (id === 'stFind') { setMsg('stMsg', 'Looking…'); S.admin.old = await PLATFORM.admin.oldCaptures(CAPTURE_KEEP_DAYS); render(); if (!S.admin.old.length) setMsg('stMsg', `No screenshot is older than ${CAPTURE_KEEP_DAYS} days.`, 'ok'); return; }
+      setMsg('stMsg', 'Deleting…');
+      const n = await PLATFORM.admin.removeCaptures(S.admin.old || []);
+      S.admin.old = null; S.admin.storage = await PLATFORM.admin.storageUsage(); render(); setMsg('stMsg', `Deleted ${n} screenshot${n === 1 ? '' : 's'}. The confirmed games and their numbers are kept.`, 'ok');
+    } catch (err) { setMsg('stMsg', err.message, 'err'); }
+    return;
+  }
   if (id === 'adExport') {
     try { setMsg('adExportMsg', 'Exporting…'); const json = await PLATFORM.admin.exportAll(); await PLATFORM.download({ filename: `timnas-hub-export-${localDay()}.json`, data: json }); setMsg('adExportMsg', 'Saved. It may contain wellbeing data: store it securely.', 'ok'); }
     catch (err) { setMsg('adExportMsg', err.message, 'err'); }
@@ -1766,19 +1914,30 @@ async function onClick(e) {
     try {
       const fromGames = capUi().beforeSave(title, fid);
       if (fromGames) fillReport(fid, { won: String(fromGames.won), lost: String(fromGames.lost) });
-      const r = scrimReport({ title, date: g('date'), time: g('time'), by: g('by'), partner: g('partner'), partnerLevel: g('level'), format: g('format'), roster: g('roster'), scrimId: g('scrim'),
+      // V1.16 one form: on the website the report is also the session's daily report. Without a planned
+      // session, a new (completed) session is created and linked, so the report needs its id up front.
+      const asDaily = !!HUB_USER && canWriteSession(HUB_USER, title);
+      const newSession = asDaily && !g('scrim') ? `SC-${String(g('date')).replace(/-/g, '')}-${Math.random().toString(36).slice(2, 6)}` : '';
+      const r = scrimReport({ title, date: g('date'), time: g('time'), by: g('by'), partner: g('partner'), partnerLevel: g('level'), format: g('format'), roster: g('roster'), scrimId: g('scrim') || newSession,
         won: g('won'), lost: g('lost'), drawn: g('drawn'), played: g('played'), points: g('points'), avgPlacement: g('avg'), chicken: g('chicken'),
         focus: g('focus'), progress: g('progress'), worked: g('worked'), failed: g('failed'), detail: g('detail'), playerNotes: g('players'), adjust: g('adjust'), vod: g('vod'), prevAdjust: g('prevadj'), fixCheck: g('fix'), asOf: localToday() });
       // Closing a planned session here avoids typing the same result twice.
       const sc = r.scrimId ? S.scrims.find((x) => x.id === r.scrimId && x.status === 'planned') : null;
       const done = sc ? completeScrim(sc, { score: resultText(r.result), notes: r.worked || r.failed, by: r.by, matchIds: [], perObjective: {} }) : null;
-      if (S.db) { await S.db.collection('scrim_reports').doc(r.id).set(r); if (done) await S.db.collection('scrims').doc(sc.id).set(done); }
-      else { S.reports.push(r); if (done) Object.assign(sc, done); }
+      const daily = asDaily && (done || newSession) ? sessionFromReport(r, resultText(r.result), HUB_USER, { session: done, id: newSession, today: localToday() }) : null;
+      const session = daily || done;
+      if (S.db) {
+        await S.db.collection('scrim_reports').doc(r.id).set(r);
+        if (session) {
+          try { await S.db.collection('scrims').doc(session.id).set(session); }
+          catch (err) { render(); return setMsg(`rpMsg-${fid}`, `Report saved, but its daily session was not (${err.message}). Log it under Daily sessions if needed.`, 'err'); }
+        }
+      } else { S.reports.push(r); if (done) Object.assign(sc, done); }
       const nGames = (S.cap?.[fid]?.ready || []).length;
       try { await capUi().afterSave(title, fid, r); } catch (err) { render(); return setMsg(`rpMsg-${fid}`, `Report saved, but its games were not (${err.message}). They are kept on this device: use "Retry saving games" under Games.`, 'err'); }
       const keep = Object.fromEntries(RP_KEEP_AFTER_SAVE.map((k) => [k, g(k)]).filter(([, v]) => v));
       storeDraft(fid, { ...keep, at: new Date().toISOString() });
-      render(); setMsg(`rpMsg-${fid}`, `Report saved (${resultText(r.result)} vs ${r.partner}${nGames ? `, ${nGames} game${nGames > 1 ? 's' : ''} with stats` : ''}). Next partner? The setup is kept.`, 'ok');
+      render(); setMsg(`rpMsg-${fid}`, `Report saved (${resultText(r.result)} vs ${r.partner}${nGames ? `, ${nGames} game${nGames > 1 ? 's' : ''} with stats` : ''})${daily ? '; it is also the daily report, with your next action due tomorrow' : ''}. Next partner? The setup is kept.`, 'ok');
     } catch (err) { setMsg(`rpMsg-${fid}`, err.message, 'err'); markInvalid(fid, err.message); }
     return;
   }
@@ -1913,6 +2072,8 @@ document.addEventListener('change', (e) => {
   if (id === 'plT') { S.planTitle = e.target.value; S.planPlayer = null; render(); }
   if (id === 'plP') { S.planPlayer = e.target.value; render(); }
   if (id === 'brD') { S.briefDate = e.target.value || today(); render(); }
+  if (id === 'pqDays') { S.pqDays = Number(e.target.value) || 7; render(); }
+  if (id === 'trWeeks') { S.trWeeks = Number(e.target.value) || 6; render(); }
   if (id === 'wD') { S.wellDate = e.target.value; render(); }
   if (id === 'dFirst') { S.draft.firstUs = e.target.value === 'us'; S.draft.steps = []; render(); }
   if (id === 'dOpp') { S.draft.opp = e.target.value; render(); }
@@ -1926,6 +2087,11 @@ document.addEventListener('change', (e) => {
 });
 document.addEventListener('keydown', (e) => { if (e.key === 'Enter' && e.target.id === 'dHero') $('#dLock')?.click(); else if (/^drHero$|^drDrillHero$/.test(e.target.id)) drUi().onKey(e); });
 window.addEventListener('hashchange', render);
+if (HUB_USER) {
+  DAILY = dailySessionsUi({ S, user: HUB_USER, owners: PLATFORM.actionOwners,
+    titles: WEC_TITLES.map((t) => t.id), titleVisible, esc, params: viewParams, render, setMsg, reportTab: REPORT_TAB });
+  document.addEventListener('submit', DAILY.submit);
+}
 if (restricted() && HUB_USER.titles[0] && (!location.hash || location.hash === '#')) history.replaceState(null, '', `#${REPORT_TAB[HUB_USER.titles[0]]}`);
 render();
 initCaps();

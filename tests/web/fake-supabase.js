@@ -34,6 +34,10 @@ export function backend() {
     if (table === 'scrim_reports' && op === 'update') return { code: '42501', message: 'Submitted records cannot be changed. Add a correction instead.' };
     if (DOC_TABLES.includes(table)) {
       if (row.data?.origin !== 'operational') return { code: '22023', message: 'Only operational records can be stored (origin must be "operational").' };
+      // V1.16 guard_approval: "approved" only via approve_record.
+      if (['draft_books', 'opponent_cards'].includes(table) && row.data?.status === 'approved' && !B.approving && JSON.stringify(old?.data) !== JSON.stringify(row.data)) {
+        return { code: '42501', message: 'Approval is recorded with the Approve button by the Head Coach or an assistant coach; a changed version is saved as a draft.' };
+      }
       if (old && !canWrite(uid, old.title)) return deny;
       return canWrite(uid, row.title) ? null : deny;
     }
@@ -44,6 +48,8 @@ export function backend() {
     if (table === 'profiles') return has(uid, 'admin') || row.id === uid ? null : deny;
     return deny;
   };
+  B.roles = roles;
+  B.canApprove = (id) => has(id, 'admin') || has(id, 'head_coach') || has(id, 'assistant_coach');
   B.notify = (table) => { for (const ch of B.channels) for (const h of ch.handlers) if (h.table === table) setTimeout(h.cb, 0); };
   B.client = (sessionUserId) => client(B, sessionUserId);
   return B;
@@ -81,6 +87,8 @@ function client(B, sessionUserId) {
     function run() {
       // Tests can simulate a live database that has not had a migration yet (B.missing = Set of tables).
       if (B.missing?.has(table)) return { data: null, error: { code: 'PGRST205', message: `Could not find the table 'public.${table}' in the schema cache` } };
+      // Tests can simulate a dropped connection for reads of some tables (B.failRead = Set of tables).
+      if (action === 'select' && B.failRead?.has(table)) return { data: null, error: { message: 'Failed to fetch' } };
       const T = B.tables[table]; const id = uid();
       if (action === 'select') {
         let rows = T.filter((r) => match(r) && B.readable(id, table, r)).map((r) => structuredClone(r));
@@ -141,11 +149,35 @@ function client(B, sessionUserId) {
       return { data: out.data, error: null };
     } },
     rpc: async (name, args) => {
+      if (name === 'approve_record') {
+        const r = (B.tables[args.p_table] || []).find((x) => x.id === args.p_id); const me = uid();
+        if (!r) return { data: null, error: { code: 'P0002', message: 'Not found. Reload and try again.' } };
+        if (!B.canApprove(me)) return { data: null, error: { code: '42501', message: `Only the Head Coach or an assistant coach can approve for ${r.title}.` } };
+        if (r.data.status !== 'draft') return { data: null, error: { code: '22023', message: 'Only a draft version can be approved.' } };
+        if (r.updated_by === me) return { data: null, error: { code: '42501', message: 'Ask another coach to approve: the writer of this version cannot approve it.' } };
+        const name = B.tables.profiles.find((p) => p.id === me)?.display_name || '';
+        r.data = { ...r.data, status: 'approved', approvedBy: name, approvedById: me, approvedAt: new Date().toISOString() };
+        r.updated_by = me; r.updated_at = new Date(Date.now() + ++tick).toISOString();
+        B.notify(args.p_table); return { data: structuredClone(r.data), error: null };
+      }
+      // V1.16 screenshot storage (tests fill B.files = [{ name, size, created_at }]).
+      if (name === 'capture_storage' || name === 'old_capture_files') {
+        if (!B.roles(uid()).includes('admin')) return { data: null, error: { code: '42501', message: 'Admins only.' } };
+        const files = B.files || [];
+        if (name === 'capture_storage') return { data: [{ files: files.length, bytes: files.reduce((s, f) => s + f.size, 0), oldest: files.map((f) => f.created_at).sort()[0] || null }], error: null };
+        const cut = new Date(Date.now() - args.days * 86400000).toISOString();
+        return { data: files.filter((f) => f.created_at < cut).map((f) => f.name), error: null };
+      }
       if (name !== 'set_roster') return { error: { message: 'unknown rpc' } };
       const err = B.write(uid(), 'roster_players', 'insert', {}); if (err) return { error: err };
       for (const [title, list] of Object.entries(args.p)) { B.tables.roster_players = B.tables.roster_players.filter((r) => r.title !== title); list.forEach((ign, i) => B.tables.roster_players.push({ title, ign, sort_order: i })); }
       B.notify('roster_players'); return { error: null };
     },
+    storage: { from: () => ({ remove: async (names) => {
+      if (!B.roles(uid()).includes('admin')) return { data: null, error: { message: 'new row violates row-level security policy' } };
+      const gone = (B.files || []).filter((f) => names.includes(f.name)); B.files = (B.files || []).filter((f) => !names.includes(f.name));
+      return { data: gone, error: null };
+    } }) },
     channel: () => { const ch = { handlers: [], on(_t, f, cb) { ch.handlers.push({ table: f.table, cb }); return ch; }, subscribe() { B.channels.add(ch); return ch; } }; return ch; },
     removeChannel: (ch) => { B.channels.delete(ch); },
   };

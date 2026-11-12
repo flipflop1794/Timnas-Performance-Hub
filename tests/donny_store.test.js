@@ -1,9 +1,10 @@
+import { fileURLToPath } from 'node:url';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { build } from 'esbuild';
 
 // The storage bridge is TypeScript that imports Coach Donny's code; bundle it for Node first.
-const { outputFiles } = await build({ entryPoints: [new URL('../src/readiness/donny/store.ts', import.meta.url).pathname], bundle: true, format: 'esm', platform: 'node', write: false });
+const { outputFiles } = await build({ entryPoints: [fileURLToPath(new URL('../src/readiness/donny/store.ts', import.meta.url))], bundle: true, format: 'esm', platform: 'node', write: false });
 const S = await import(`data:text/javascript;base64,${Buffer.from(outputFiles[0].text).toString('base64')}`);
 const { build: _b } = { build };
 

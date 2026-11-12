@@ -6,6 +6,7 @@
 //   ALLOWED_ORIGINS     comma-separated site origins, e.g. https://timnas-performance-hub-kappa.vercel.app
 //   SCRIM_AI_MODEL      optional, default claude-sonnet-5-5
 //   DAILY_CALL_CAP      optional, calls per person per day (WIB), default 300
+//   TEAM_DAILY_CALL_CAP optional, calls per day for the whole staff (WIB), default 600 (V1.16)
 //   ANTHROPIC_BASE_URL  optional, default https://api.anthropic.com
 // SUPABASE_URL and SUPABASE_ANON_KEY are provided by Supabase.
 import { createClient } from 'jsr:@supabase/supabase-js@2';
@@ -16,6 +17,7 @@ const env = {
   ANTHROPIC_API_KEY: Deno.env.get('ANTHROPIC_API_KEY') || '',
   SCRIM_AI_MODEL: Deno.env.get('SCRIM_AI_MODEL') || '',
   DAILY_CALL_CAP: Deno.env.get('DAILY_CALL_CAP') || '',
+  TEAM_DAILY_CALL_CAP: Deno.env.get('TEAM_DAILY_CALL_CAP') || '',   // V1.16: whole staff per day, default 600
   ANTHROPIC_BASE_URL: Deno.env.get('ANTHROPIC_BASE_URL') || '',   // optional: a company proxy, or a local stand-in in tests
 };
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;

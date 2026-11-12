@@ -182,7 +182,8 @@ export function captureUi(ctx) {
   }
   function debriefSection(title, fid) {
     const on = !!ai();
-    return `<details class="capdump"><summary>Say it once: one note, AI fills the fields${on ? '' : ' (website only)'}</summary>
+    // V1.16: first thing on the form, and open when AI is on: one dictated note replaces typing four boxes.
+    return `<details class="capdump"${on ? ' open' : ''}><summary>Say it once: one note, AI fills the fields${on ? '' : ' (website only)'}</summary>
       <p class="note">Dictate with your phone keyboard's microphone or type freely (Indonesian, English or mixed). The AI only moves your own words into the fields below; check them before saving. Performance only: health or personal details are left out.</p>
       <label class="field" for="rp-${fid}-dump">Your note<textarea rows="4" id="rp-${fid}-dump" maxlength="${LIMITS.debriefChars}" placeholder="e.g. Fokus rotasi early ke turtle. Draft bagus, Kevin cepat rotasi. Lord fight masih telat. Next: set up vision sebelum lord."></textarea></label>
       <div class="toolbar">${on && micOk() ? `<button class="btn" type="button" data-cap-mic="${esc(`${title}|id-ID`)}" aria-pressed="${MIC.fid === fid && MIC.lang === 'id-ID'}">${MIC.fid === fid && MIC.lang === 'id-ID' ? '■ Stop' : '🎙 Bicara (ID)'}</button><button class="btn" type="button" data-cap-mic="${esc(`${title}|en-US`)}" aria-pressed="${MIC.fid === fid && MIC.lang === 'en-US'}">${MIC.fid === fid && MIC.lang === 'en-US' ? '■ Stop' : '🎙 Speak (EN)'}</button>` : ''}${on ? `<button class="btn" type="button" data-cap-debrief="${esc(title)}">Fill the fields</button>` : ''}<span class="msg" id="capDbMsg-${fid}" role="status"></span></div>
