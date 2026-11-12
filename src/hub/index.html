@@ -284,6 +284,8 @@ nav.tabs a[aria-current="page"]::after{height:3px;background:var(--gold);box-sha
 @media (max-width:640px){.field.wide{grid-column:auto}}
 .field input,.field select,.field textarea{width:100%}
 .grid2 textarea,.panel>.field textarea{font-family:inherit;font-size:13.5px;min-height:64px}
+/* V1.16 phones: 16px fields so iOS does not zoom in on focus; long tags wrap instead of widening the page. Kept last so it wins. */
+@media(max-width:600px){input:not([type=checkbox]):not([type=radio]):not([type=file]),select,textarea,.rp textarea,.grid2 textarea,.panel>.field textarea{font-size:16px}.tag{white-space:normal;max-width:100%}}
 
 /* ---------- Coach Donny's system (embedded) ---------- */
 .rd-frame{border:1px solid var(--line-2);background:#fff;height:min(78vh,860px);min-height:520px}
