@@ -15,6 +15,7 @@ cross-title view for management.
 | Screenshot storage | Manual clean-up; 1 GB fills in about a month | Users & access shows storage used (warnings at 60% and 80%) and deletes screenshots older than 90 days after a confirmation. Games read from them are kept |
 | AI spend | Per-person daily limit only | Plus a whole-staff daily limit (`TEAM_DAILY_CALL_CAP`, default 600 calls); "is AI on?" needs sign-in |
 | Phones | 13px fields made iPhones zoom in; Dota Team page wider than the screen | 16px fields on phones; long tags wrap |
+| New: Trends tab in every title | — | Weekly lines over 4–8 weeks: team win rate / points, plan followed, PUBGM placement and early exits; per player KDA, K, D, A from confirmed games (MLBB, MLBB Women, Dota 2). "Better"/"Worse" only when the last 2 weeks differ from the 2 before beyond chance, with 6+ values each side. Objectives accepted in the period listed alongside |
 | New: Staff → Practice quality | — | One row per title: planned sessions held, objectives, reports, reports filed by next day, plan followed, follow-ups on time, proposals reviewed; score and change from the previous period |
 
 ## Put it live (about 10 minutes)
