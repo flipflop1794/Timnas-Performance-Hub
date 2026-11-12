@@ -56,7 +56,8 @@ import { guidePage } from './guide.js';
 import { dailySessionsUi, dailyLink } from './daily_sessions_ui.js';
 import { dailyText } from './daily_sessions_strings.js';
 import { canAddDailyReport, canWriteSession } from '../core/daily_sessions.js';
-import { gameOf } from '../core/capture.js';
+import { gameOf, latestGames } from '../core/capture.js';
+import { weeks as trendWeeks, teamTrends, playerTrends, VERDICT_WEEKS, MIN_VALUES as TR_MIN } from '../core/trends.js';
 import { practiceQuality, PARTS as PQ_PARTS, MIN_SESSIONS as PQ_MIN } from '../core/practice_quality.js';
 import { statGoal } from '../core/patterns.js';
 
@@ -261,13 +262,13 @@ const GAME_HUBS = [
   { id: 'cs2', label: 'CS2', title: 'CS2', team: 't-cs2' },
   { id: 'cs2w', label: 'CS2 Women', title: 'CS2 Women', team: 't-cs2w' },
 ];
-const hubTabs = (h) => [[h.team, 'Team'], [`${h.team}-scrims`, 'Scrims & practice'], [`${h.team}-reports`, 'Scrim reports'], ...(gameOf(h.title) && FEAT.capture ? [[`${h.team}-patterns`, 'Patterns']] : []), [`${h.team}-rivals`, 'Competitors'], ...(h.draftRoom && FEAT.draftRoom ? [[`${h.team}-draft`, 'Draft Room']] : [])];
+const hubTabs = (h) => [[h.team, 'Team'], [`${h.team}-scrims`, 'Scrims & practice'], [`${h.team}-reports`, 'Scrim reports'], [`${h.team}-trends`, 'Trends'], ...(gameOf(h.title) && FEAT.capture ? [[`${h.team}-patterns`, 'Patterns']] : []), [`${h.team}-rivals`, 'Competitors'], ...(h.draftRoom && FEAT.draftRoom ? [[`${h.team}-draft`, 'Draft Room']] : [])];
 const TITLES = [
   { id: 'home', label: 'Today', tabs: [['today', 'My day'], ...(HUB_USER ? [['daily-sessions', 'Daily sessions']] : []), ['board', 'Juara Umum board'], ['reports-all', 'Scrim reports'], ['brief', 'Weekly brief']] },
   { id: 'comp', label: 'Competitors', tabs: [['comp-overview', 'All nations'], ['comp-nation', 'Nation profile'], ['comp-rosters', 'Rosters & players'], ['comp-card', 'Opponent card'], ['comp-coverage', 'Scouting coverage']] },
   { id: 'tour', label: 'Tournament', tabs: [['tour-runbook', 'Match-day runbook'], ['tour-series', 'Between games']] },
-  { id: 'dota', label: 'Dota 2', tabs: [['dota-team', 'Team'], ['dota-scrims', 'Scrims & practice'], ['dota-reports', 'Scrim reports'], ...(FEAT.capture ? [['dota-patterns', 'Patterns']] : []), ['dota-post', 'Post-match'], ['dota-scout', 'Competitors'], ['dota-draft', 'Draft room'], ['dota-review', 'Series review']] },
-  { id: 'pubgm', label: 'PUBG Mobile', tabs: [['pubgm-team', 'Team'], ['pubgm-scrims', 'Scrims & practice'], ['pubgm-reports', 'Scrim reports'], ['pubgm-log', 'Log & import'], ['pubgm-rivals', 'Competitors'], ['pubgm-sim', 'Strategy sim'], ['pubgm-review', 'Match-day review']] },
+  { id: 'dota', label: 'Dota 2', tabs: [['dota-team', 'Team'], ['dota-scrims', 'Scrims & practice'], ['dota-reports', 'Scrim reports'], ['dota-trends', 'Trends'], ...(FEAT.capture ? [['dota-patterns', 'Patterns']] : []), ['dota-post', 'Post-match'], ['dota-scout', 'Competitors'], ['dota-draft', 'Draft room'], ['dota-review', 'Series review']] },
+  { id: 'pubgm', label: 'PUBG Mobile', tabs: [['pubgm-team', 'Team'], ['pubgm-scrims', 'Scrims & practice'], ['pubgm-reports', 'Scrim reports'], ['pubgm-trends', 'Trends'], ['pubgm-log', 'Log & import'], ['pubgm-rivals', 'Competitors'], ['pubgm-sim', 'Strategy sim'], ['pubgm-review', 'Match-day review']] },
   ...GAME_HUBS.map((h) => ({ id: h.id, label: h.label, tabs: hubTabs(h) })),
   { id: 'well', label: 'Performance', tabs: [['readiness', 'Athlete readiness'], ['players', 'Player plans'], ['well-day', 'Wellbeing check'], ['well-log', 'Log check-in & load']] },
   { id: 'guide', label: 'Guide', tabs: [['guide', 'How to use the hub']] },
@@ -517,6 +518,46 @@ function reportTrends(title) {
     </div><p class="note">Days without a report are left empty. Hover or tap a day for its numbers; the full list is under "Day by day".</p></div>`;
 }
 
+// ---------- V1.16 Trends (src/core/trends.js): weekly, team and players, with a fair "is it moving?" verdict ----------
+const VERDICT_TAG = { better: ['c-High', 'Better'], worse: ['c-Blocked', 'Worse'], 'no clear change': ['c-Medium', 'No clear change'], 'not enough data': ['c-Low', 'Not enough data'] };
+const verdictTag = (v) => tag(...(VERDICT_TAG[v] || ['c-Low', v]));
+const trFmt = (m, v) => (v == null ? '—' : m.type === 'prop' ? `${Math.round(v * 100)}%` : `${round(v, 1)}`);
+function trendChart(m, W) {
+  const prop = m.type === 'prop'; const vals = m.values.map((v) => (v == null ? null : prop ? Math.round(v * 100) : round(v, 2)));
+  const have = vals.filter((v) => v != null);
+  const [min, max] = prop ? [0, 100] : m.key === 'plan' ? [1, 5] : [0, Math.max(1, Math.ceil(Math.max(...have, 0) * 1.15))];
+  const ticks = prop ? [0, 50, 100] : m.key === 'plan' ? [1, 3, 5] : [0, round(max / 2, 1), max];
+  return trendSvg({ days: W.map((w) => w.to), values: vals, kind: 'line', min, max, ticks, fmt: (v) => (prop ? `${v}%` : `${v}`), label: m.label,
+    tip: (i) => `Week ${W[i].from} to ${W[i].to}: ${trFmt(m, m.values[i])} (${m.counts[i]} value${m.counts[i] === 1 ? '' : 's'})` });
+}
+function trendsPage(title) {
+  if (S.mode === 'demo') return `<div class="panel">${DEMO_BANNER}<p class="empty">Trends use operational records only.</p></div>`;
+  const n = S.trWeeks || 6; const W = trendWeeks(today(), n);
+  let pubgm = null;
+  if (title === 'PUBG Mobile') { const d = pubgmData(); pubgm = { rows: d.rows, team: d.team, points: (r) => d.sc.total(r) }; }
+  const team = teamTrends(title, { reports: S.reports, pubgm }, W);
+  const games = gameOf(title) && FEAT.capture ? latestGames((S.games || []).filter((g) => g.title === title)) : [];
+  const players = playerTrends(games, W);
+  const changes = S.cycle.filter((o) => o.title === title).flatMap((o) => (o.reviews || []).filter((r) => ['accepted', 'modified'].includes(r.decision) && String(r.at).slice(0, 10) >= W[0].from).map((r) => ({ at: String(r.at).slice(0, 10), what: o.rec?.problem || o.id, drill: o.objective?.drill || '' })))
+    .sort((a, b) => a.at.localeCompare(b.at));
+  const head = (m) => `<div class="toolbar"><b>${esc(m.label)}</b> ${verdictTag(m.verdict)} <span class="note">last ${VERDICT_WEEKS} weeks ${trFmt(m, m.after)} (${m.nAfter}) vs ${trFmt(m, m.before)} (${m.nBefore}) before</span></div>`;
+  const wk = (w) => `${w.to.slice(8)}/${w.to.slice(5, 7)}`;
+  return `<div class="panel"><div class="lead">${esc(title)}: <em>trends</em></div>
+    <p>Is practice turning into improvement? Week by week from scrim reports${gameOf(title) ? ', confirmed scrim games (per player)' : ''}${title === 'PUBG Mobile' ? ' and the match log' : ''}. Nothing extra to type.</p>
+    <div class="form"><label class="field" for="trWeeks">Period<select id="trWeeks">${[4, 6, 8].map((k) => `<option value="${k}" ${k === n ? 'selected' : ''}>Last ${k} weeks</option>`).join('')}</select></label></div>
+    ${S.reportLoad === 'error' ? banner('block', '<div>Scrim reports could not be loaded: these trends are incomplete.</div>') : ''}
+    <p class="note">"Better" or "Worse" only when the last ${VERDICT_WEEKS} weeks differ from the ${VERDICT_WEEKS} before by more than chance (95% interval), with at least ${TR_MIN} games or reports on each side. Partner strength changes week to week: read a change against who you played (Scrim reports). It shows a change in practice numbers, not in tournament chances.</p></div>
+  ${team.length ? `<div class="panel"><h2>Team</h2>${team.map((m) => `<div class="trendrow">${head(m)}<div class="trends">${trendChart(m, W)}</div></div>`).join('')}</div>`
+    : `<div class="panel"><h2>Team</h2><p class="empty">No scrim reports in this period yet. File reports under Scrim reports and the lines appear here.</p></div>`}
+  ${gameOf(title) ? `<div class="panel"><h2>Players</h2>${players.length ? `<div class="tw"><table><thead><tr><th>Player</th><th>Per game</th>${W.map((w) => `<th class="n">${wk(w)}</th>`).join('')}<th>Last ${VERDICT_WEEKS} weeks</th></tr></thead><tbody>
+      ${players.flatMap((p) => p.measures.map((m, i) => `<tr>${i ? '<td></td>' : `<td><b>${esc(p.player)}</b><br><span class="note">${p.games} game${p.games === 1 ? '' : 's'}</span></td>`}<td>${esc(m.label)}${m.better === 'down' ? ' <span class="note">(lower is better)</span>' : ''}</td>${m.values.map((v, k) => `<td class="n" title="${m.counts[k]} game(s)">${trFmt(m, v)}</td>`).join('')}<td>${verdictTag(m.verdict)}</td></tr>`)).join('')}</tbody></table></div>
+      <p class="note">From coach-confirmed scrim games only (screenshot capture or typed in). Weekly averages per game; stand-ins are left out.</p>`
+    : `<p class="empty">No confirmed scrim games in this period. Add games to a scrim report (screenshot or by hand) to see each player's line.</p>`}</div>` : ''}
+  <div class="panel"><h2>What the staff changed in this period</h2>${changes.length ? `<ul class="plain">${changes.map((c) => `<li><b>${esc(c.at)}</b> accepted: ${esc(c.what)}${c.drill ? ` <span class="note">— drill: ${esc(c.drill)}</span>` : ''}</li>`).join('')}</ul>` : '<p class="empty">No objective accepted in this period.</p>'}
+    <p class="note">Read the lines against these dates: a change after an objective started is a hint, not proof, that the practice worked.</p></div>`;
+}
+for (const [view, title] of [['dota-trends', 'Dota 2'], ['pubgm-trends', 'PUBG Mobile']]) V[view] = () => trendsPage(title);
+
 function reportsPanel(title) {
   const record = HUB_USER && viewParams().get('record');
   if (record) return linkedRecord(title, S.reports.find((r) => r.title === title && r.id === record), S.reportLoad, reportCard);
@@ -758,6 +799,7 @@ for (const h of GAME_HUBS) {
   V[h.team] = () => teamPage(h.title);
   V[`${h.team}-scrims`] = () => scrimsPanel(h.title);
   V[`${h.team}-reports`] = () => reportsPanel(h.title);
+  V[`${h.team}-trends`] = () => trendsPage(h.title);
   if (gameOf(h.title)) V[`${h.team}-patterns`] = () => capUi().patternsPage(h.title);
   if (h.draftRoom) V[`${h.team}-draft`] = () => (FEAT.draftRoom ? drUi().page(h.title) : `<div class="panel">${banner('warn', '<div>The Draft Room switches on after the V1.14 database update.</div>')}</div>`);
   V[`${h.team}-rivals`] = () => competitorsPanel(h.title);
@@ -1956,6 +1998,7 @@ document.addEventListener('change', (e) => {
   if (id === 'plP') { S.planPlayer = e.target.value; render(); }
   if (id === 'brD') { S.briefDate = e.target.value || today(); render(); }
   if (id === 'pqDays') { S.pqDays = Number(e.target.value) || 7; render(); }
+  if (id === 'trWeeks') { S.trWeeks = Number(e.target.value) || 6; render(); }
   if (id === 'wD') { S.wellDate = e.target.value; render(); }
   if (id === 'dFirst') { S.draft.firstUs = e.target.value === 'us'; S.draft.steps = []; render(); }
   if (id === 'dOpp') { S.draft.opp = e.target.value; render(); }

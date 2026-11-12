@@ -323,6 +323,29 @@ test('V1.16 practice quality: leadership compares titles; a title coach sees onl
   assert.deepEqual([...indra.d.querySelectorAll('#main tbody tr')].map((tr) => tr.cells[0].textContent), ['MLBB']);
 });
 
+test('V1.16 trends: weekly team lines and per-player table with a fair verdict', async () => {
+  const B = world();
+  const t0 = localDay(); const at = new Date().toISOString();
+  const doc = (table, id, title, data) => B.tables[table].push({ id, title, data: { id, title, origin: 'operational', ...data }, created_by: 'u-indra', created_at: at, updated_at: at });
+  // Two weeks ago and before: mostly losses; the last two weeks: mostly wins.
+  [[20, 0, 4], [17, 1, 3], [10, 4, 0], [3, 3, 1], [1, 4, 0]].forEach(([ago, won, lost], i) => doc('scrim_reports', `r${i}`, 'MLBB', {
+    date: shiftDay(t0, -ago), by: 'x', partner: 'p', result: { mode: 'wl', won, lost, drawn: 0 }, focus: 'f', progress: 3, worked: 'w', adjust: 'a', notes: [], createdAt: at }));
+  [[20, 6], [18, 7], [17, 6], [16, 5], [15, 6], [16, 7], [4, 2], [3, 1], [2, 2], [2, 1], [1, 2], [1, 1]].forEach(([ago, deaths], i) => doc('scrim_games', `g${i}`, 'MLBB', {
+    game: 'mlbb', reportId: 'r0', date: shiftDay(t0, -ago), result: 'win', createdAt: at,
+    players: [{ team: 'ours', player: 'Aran', hero: 'Ling', stats: { kills: 3, deaths, assists: 6 } }] }));
+  const aufa = await open(B, 'aufa', 'mlbb-trends');
+  for (let i = 0; i < 40 && !/Players/.test(aufa.text()); i++) await sleep(50);
+  assert.match(aufa.text(), /MLBB: trends/);
+  assert.match(aufa.text(), /Scrim win rate\s*Better/);
+  assert.match(aufa.text(), /Plan followed \(1–5\)\s*No clear change|Plan followed \(1–5\)\s*Not enough data/);
+  const deaths = [...aufa.d.querySelectorAll('#main tbody tr')].find((tr) => /D \(lower is better\)/.test(tr.textContent));
+  assert.ok(deaths, 'deaths row'); assert.match(deaths.textContent, /Better$/);
+  assert.equal(aufa.d.querySelectorAll('#main figure.trend').length, 2);
+  // eFootball has reports only: team lines, no player table.
+  await aufa.go('t-efootball-trends');
+  assert.match(aufa.text(), /No scrim reports in this period/); assert.doesNotMatch(aufa.text(), /Players/);
+});
+
 test("Coach Donny's system inside the hub: staff sign-in, team saved once in the database, other devices load it, title coaches kept out", async () => {
   const B = world();
   const donny = await open(B, 'donny', 'readiness');
