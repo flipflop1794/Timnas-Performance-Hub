@@ -69,7 +69,19 @@ export function captureUi(ctx) {
   }
   const flagOf = (p, field) => (p.flags || []).find((f) => f.field === field);
   const cell = (p, field) => { const f = flagOf(p, field); return f ? ` class="flag" title="${esc(f.reason)}" aria-invalid="true"` : ''; };
-  const heroHelp = (title) => { const gs = gamesOf(title); return { memory: heroMemory(gs), playerHeroes: playerHeroes(gs) }; };
+  // V1.20: each player's Draft Room pool (main / can play) first, then the heroes they used in confirmed games.
+  const poolsOf = (title) => {
+    const out = {};
+    for (const p of (S.dr_pools || []).filter((x) => x.title === title)) out[p.player] = Object.entries(p.heroes || {}).filter(([, v]) => ['main', 'can'].includes(v.tier)).sort((a, b) => (a[1].tier === 'main' ? -1 : 1) - (b[1].tier === 'main' ? -1 : 1)).map(([h]) => h);
+    return out;
+  };
+  const heroHelp = (title) => {
+    const gs = gamesOf(title); const used = playerHeroes(gs); const pools = poolsOf(title);
+    const merged = Object.fromEntries([...new Set([...Object.keys(used), ...Object.keys(pools)])].map((p) => [p, [...new Set([...(pools[p] || []), ...(used[p] || [])])].slice(0, 6)]));
+    return { memory: heroMemory(gs), playerHeroes: merged };
+  };
+  // Pools for filling an unsure hero: the Draft Room pool, else (Dota, no Draft Room) heroes used 2+ times in scrims.
+  const fillPools = (title) => { const p = poolsOf(title); if (Object.keys(p).length) return p; return playerHeroes(gamesOf(title)); };
   function editorHtml(title, fid, pend) {
     const g = pend.base; const game = gameOf(title); const sides = GAME_SIDES[game]; const defs = STAT_DEFS[game]; const roster = rosterOf(title);
     const block = g.issues.some((i) => i.level === 'block');
@@ -327,7 +339,7 @@ export function captureUi(ctx) {
       }
       if (kind === 'more') {
         if (!s.pending) throw new Error('Add the end-of-game screenshot first.');
-        const b = proposeGame({ title, raw: out.raw, roster: rosterOf(title), aliases: aliasesOf(title), heroes });
+        const b = proposeGame({ title, raw: out.raw, roster: rosterOf(title), aliases: aliasesOf(title), heroes, pools: fillPools(title) });
         if (b.issues.some((i) => i.level === 'block')) throw new Error(b.issues[0].text);
         const m = mergeGames(s.pending.base, b);
         s.pending.base = { ...m.game, issues: m.game.issues };
@@ -335,7 +347,7 @@ export function captureUi(ctx) {
         s.pending.captureIds = [...(s.pending.captureIds || []), out.captureId];
         return 'more';
       }
-      const p = proposeGame({ title, raw: out.raw, roster: rosterOf(title), aliases: aliasesOf(title), heroes });
+      const p = proposeGame({ title, raw: out.raw, roster: rosterOf(title), aliases: aliasesOf(title), heroes, pools: fillPools(title) });
       if (p.issues.some((i) => i.level === 'block')) { s.pending = { base: p, ai: JSON.parse(JSON.stringify(p)), captureIds: [out.captureId], draft: null, fromScreenshot: true }; return 'blocked'; }
       const dup = findDuplicate(p, [...s.ready, ...gamesOf(title).filter((g) => g.date === day())]);
       if (dup) p.issues.unshift({ level: 'check', text: `This looks like a game already added (${dup}): same kill score and duration. Discard it if it is the same game.` });
@@ -475,5 +487,5 @@ export function captureUi(ctx) {
     db.collection('player_aliases').onSnapshot((snap) => { S.aliases = Object.fromEntries(snap.docs.map((x) => x.data()).filter((x) => x?.origin === 'operational' && x.title).map((x) => [x.title, x])); }, () => {});
   }
 
-  return { gamesSection, reportGames, debriefSection, beforeSave, afterSave, patternsPage, trailPanel, goalStatNote, goalStatFields, standInLine, waitingCount, onChange, onClick, subscribe };
+  return { gamesSection, reportGames, debriefSection, beforeSave, afterSave, patternsPage, trailPanel, goalStatNote, goalStatFields, standInLine, waitingCount, onChange, onClick, subscribe, prepImage };
 }

@@ -89,7 +89,8 @@ const numOrNull = (v, decimal) => { const n = Number(v); if (v === null || v ===
 // ---------------------------------------------------------------- scoreboard proposal
 // raw: the model's JSON (scrim_spec.scoreboardSchema). Returns what the confirm screen shows:
 // values, a flag per uncertain cell (with the reason) and issues for the whole game.
-export function proposeGame({ title, raw, roster = [], aliases = {}, heroes }) {
+// pools (V1.20): { player: [heroes the coach rated main / can play] } from the Draft Room.
+export function proposeGame({ title, raw, roster = [], aliases = {}, heroes, pools = {} }) {
   const game = gameOf(title); if (!game) throw new Error(`Screenshot capture is not set up for ${title}.`);
   const sides = GAME_SIDES[game]; const defs = STAT_DEFS[game];
   const issues = [];
@@ -106,9 +107,11 @@ export function proposeGame({ title, raw, roster = [], aliases = {}, heroes }) {
     const guess = heroes.find(p.hero);
     const sure = p.hero_sure === true && !!guess;
     const candidates = [...new Set([guess, ...(Array.isArray(p.hero_candidates) ? p.hero_candidates : []).map((h) => heroes.find(h))].filter(Boolean))].slice(0, 4);
-    const hero = sure ? guess : '';
-    if (!hero) flags.push({ field: 'hero', reason: guess ? `AI not sure (best guess ${guess})` : p.hero ? `"${String(p.hero).slice(0, 30)}" is not in the hero list` : 'hero not recognised' });
     const player = matchPlayer(p.name_seen, roster, aliases);
+    // V1.20: unsure, but exactly one of the AI's candidates is in this player's hero pool → fill it, still flagged.
+    const inPool = !sure && player ? candidates.filter((h) => (pools[player] || []).includes(h)) : [];
+    const hero = sure ? guess : inPool.length === 1 ? inPool[0] : '';
+    if (!sure) flags.push({ field: 'hero', reason: hero ? `filled from ${player}'s hero pool (AI unsure): check` : guess ? `AI not sure (best guess ${guess})` : p.hero ? `"${String(p.hero).slice(0, 30)}" is not in the hero list` : 'hero not recognised' });
     const stats = {};
     for (const d of defs) {
       const v = numOrNull(p[d.key], d.decimal);
