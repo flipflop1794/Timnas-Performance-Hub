@@ -8,7 +8,7 @@ import { T, lang, setLang } from './strings';
 declare const __HUB_CONFIG__: { url: string; key: string };
 declare const __TEST_HOOKS__: boolean;
 
-export type Role = 'admin' | 'head_coach' | 'assistant_coach' | 'readiness_owner' | 'title_coach' | 'analyst';
+export type Role = 'admin' | 'head_coach' | 'assistant_coach' | 'readiness_owner' | 'title_coach' | 'analyst' | 'leadership';
 export interface HubUser { id: string; email: string; name: string; staffKey: string | null; roles: Role[]; titles: string[]; isAdmin: boolean; canWellbeing: boolean; seesAllTitles: boolean }
 
 const W = window as unknown as Record<string, any>;
@@ -72,7 +72,8 @@ export async function loadMe(client: SupabaseClient, id: string): Promise<HubUse
     id, email: prof.email || '', name: prof.display_name || prof.email || '', staffKey: prof.staff_key || null, roles,
     titles: ((t.data || []) as { title: string }[]).map((x) => x.title),
     isAdmin: roles.includes('admin'), canWellbeing: roles.includes('admin') || roles.includes('readiness_owner'),
-    seesAllTitles: roles.some((x) => ['admin', 'head_coach', 'assistant_coach'].includes(x)),
+    // V1.19: Leadership (Ketua BTN, Dewan Pengawas) reads every title; the database refuses its writes.
+    seesAllTitles: roles.some((x) => ['admin', 'head_coach', 'assistant_coach', 'leadership'].includes(x)),
   };
 }
 

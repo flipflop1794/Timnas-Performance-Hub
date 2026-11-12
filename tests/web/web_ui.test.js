@@ -337,6 +337,33 @@ test('V1.16 one form: a scrim report filed by the title coach is also the daily 
   await indra.go('daily-sessions?title=MLBB'); assert.match(indra.text(), /File it under Scrim reports instead/);
 });
 
+test('V1.19 leadership: lands on the Main dashboard, sees every title, cannot save; Home returns to the dashboard', async () => {
+  const B = world();
+  people.ketua = { id: 'u-ketua', email: 'ketua@example.test', password: 'pw-ketua-123', name: 'Ketua BTN', roles: ['leadership'], titles: [] };
+  B.addUser(people.ketua);
+  const day = localDay(); const at = new Date().toISOString();
+  B.tables.scrim_reports.push({ id: 'r-m', title: 'MLBB', data: { id: 'r-m', title: 'MLBB', date: day, by: 'x', partner: 'p', result: { mode: 'wl', won: 2, lost: 1, drawn: 0 }, focus: 'f', progress: 4, worked: 'w', adjust: 'a', notes: [], origin: 'operational', createdAt: at }, created_by: 'u-indra', created_at: at });
+  B.tables.wec_matches.push({ id: 'm1', title: 'Dota 2', data: { id: 'm1', title: 'Dota 2', date: '2026-12-16', time: '10:00', opponent: 'Mongolia', stage: 'Group', origin: 'operational' }, created_by: 'u-aufa', created_at: at, updated_at: at });
+  const k = await open(B, 'ketua', null);
+  for (let i = 0; i < 40 && !/Main dashboard/.test(k.text()); i++) await sleep(50);
+  assert.equal(k.w.location.hash, '#overview');
+  assert.match(k.text(), /Days to WEC|WEC/);
+  const rows = [...k.d.querySelectorAll('#main tbody tr')].map((tr) => tr.cells[0].textContent);
+  assert.deepEqual(rows, ['MLBB', 'MLBB Women', 'Dota 2', 'PUBG Mobile', 'eFootball', 'CS2', 'CS2 Women']);
+  assert.match(k.d.querySelector('#main tbody tr').textContent, /2-1/);
+  assert.match(k.text(), /vs Mongolia/);
+  assert.doesNotMatch(k.nav(), /Users & access/);
+  // Other pages say read-only; the backend refuses a save.
+  await k.go('mlbb-reports'); assert.match(k.text(), /Read-only view for leadership/);
+  const forged = await B.client('u-ketua').from('scrim_reports').insert({ id: 'x', data: { title: 'MLBB', origin: 'operational' } });
+  assert.ok(forged.error, 'leadership cannot write');
+  // Home button returns to the dashboard, for every user.
+  await k.click('#homeBtn'); await sleep(40); assert.equal(k.w.location.hash, '#overview');
+  const indra = await open(B, 'indra', 'mlbb-reports'); assert.ok(indra.d.getElementById('homeBtn'));
+  await indra.click('#homeBtn'); await sleep(40);
+  assert.deepEqual([...indra.d.querySelectorAll('#main tbody tr')].map((tr) => tr.cells[0].textContent), ['MLBB'], 'a title coach sees only his title on the dashboard');
+});
+
 test('V1.16 practice quality: leadership compares titles; a title coach sees only his own', async () => {
   const B = world();
   const day = localDay();

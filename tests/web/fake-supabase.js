@@ -15,7 +15,7 @@ export function backend() {
   const roles = (id) => B.tables.user_roles.filter((r) => r.user_id === id).map((r) => r.role);
   const titles = (id) => B.tables.user_titles.filter((r) => r.user_id === id).map((r) => r.title);
   const has = (id, r) => roles(id).includes(r);
-  const canRead = (id, t) => has(id, 'admin') || has(id, 'head_coach') || has(id, 'assistant_coach') || (roles(id).length > 0 && (t == null || titles(id).includes(t)));
+  const canRead = (id, t) => has(id, 'admin') || has(id, 'head_coach') || has(id, 'assistant_coach') || has(id, 'leadership') || (roles(id).length > 0 && (t == null || titles(id).includes(t)));
   const canWrite = (id, t) => has(id, 'admin') || has(id, 'head_coach') || (roles(id).length > 0 && t != null && titles(id).includes(t));
   const canWell = (id) => has(id, 'admin') || has(id, 'readiness_owner');
   const deny = { code: '42501', message: 'new row violates row-level security policy' };

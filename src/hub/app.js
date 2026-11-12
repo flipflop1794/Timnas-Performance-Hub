@@ -24,10 +24,12 @@ const PLATFORM = (typeof window !== 'undefined' && window.__HUB_PLATFORM__) || n
 // V1.16: approvers are the Head Coach, admins and every assistant coach (enforced in the database). On the
 // website the approver and reviewer are always the signed-in person; the artifact build keeps typed names.
 const CAN_APPROVE = !HUB_USER || HUB_USER.roles.some((r) => ['admin', 'head_coach', 'assistant_coach'].includes(r));
+// V1.19: an account with only the Leadership role reads everything and saves nothing (the database refuses).
+const LEADERSHIP_ONLY = !!HUB_USER && HUB_USER.roles.length > 0 && HUB_USER.roles.every((r) => r === 'leadership');
 // V1.15: newer parts switch on only when the live database / server has them (all on in the artifact build).
 const FEAT = { capture: true, draftRoom: true, donny: true, pelatnas: true, ai: true, aiPlan: true, ...(PLATFORM?.features || {}) };
 if (HUB_USER && !HUB_USER.staffKey) {
-  const ROLE_LABEL = { admin: 'Admin', head_coach: 'Head Coach', assistant_coach: 'Assistant coach', readiness_owner: 'Readiness owner', title_coach: 'Title coach', analyst: 'Analyst' };
+  const ROLE_LABEL = { admin: 'Admin', head_coach: 'Head Coach', assistant_coach: 'Assistant coach', readiness_owner: 'Readiness owner', title_coach: 'Title coach', analyst: 'Analyst', leadership: 'Leadership' };
   STAFF.push({ id: 'user', name: HUB_USER.name, role: HUB_USER.roles.map((r) => ROLE_LABEL[r] || r).join(', '), focus: HUB_USER.titles.length ? HUB_USER.titles : WEC_TITLES.map((t) => t.id) });
 }
 import { staffObservation, recommendationRecord } from '../core/records.js';
@@ -275,7 +277,7 @@ const GAME_HUBS = [
 ];
 const hubTabs = (h) => [[h.team, 'Team'], [`${h.team}-scrims`, 'Scrims & practice'], [`${h.team}-reports`, 'Scrim reports'], [`${h.team}-trends`, 'Trends'], ...(gameOf(h.title) && FEAT.capture ? [[`${h.team}-patterns`, 'Patterns']] : []), [`${h.team}-rivals`, 'Competitors'], ...(h.draftRoom && FEAT.draftRoom ? [[`${h.team}-draft`, 'Draft Room']] : [])];
 const TITLES = [
-  { id: 'home', label: 'Today', tabs: [['today', 'My day'], ...(HUB_USER ? [['daily-sessions', 'Daily sessions']] : []), ['board', 'Juara Umum board'], ['reports-all', 'Scrim reports'], ['brief', 'Weekly brief']] },
+  { id: 'home', label: 'Today', tabs: [['today', 'My day'], ['overview', 'Main dashboard'], ...(HUB_USER ? [['daily-sessions', 'Daily sessions']] : []), ['board', 'Juara Umum board'], ['reports-all', 'Scrim reports'], ['brief', 'Weekly brief']] },
   ...(FEAT.pelatnas ? [{ id: 'pelatnas', label: 'Pelatnas', tabs: [['pel-day', 'Schedule & attendance'], ['pel-avail', 'Availability']] }] : []),
   { id: 'comp', label: 'Competitors', tabs: [['comp-overview', 'All nations'], ['comp-nation', 'Nation profile'], ['comp-rosters', 'Rosters & players'], ['comp-card', 'Opponent card'], ['comp-coverage', 'Scouting coverage']] },
   { id: 'tour', label: 'Tournament', tabs: [['tour-runbook', 'Match-day runbook'], ['tour-series', 'Between games']] },
@@ -292,7 +294,9 @@ function renderNav(view) {
   const title = TITLES.find((t) => t.tabs.some(([id]) => id === view));
   const pending = S.cycle.filter((o) => o.status === 'proposed').length;
   const me = STAFF.find((x) => x.id === S.me);
-  $('#titles').innerHTML = (HUB_USER ? `<span class="me" title="${esc(HUB_USER.email)}">${esc(HUB_USER.name)}</span><button type="button" id="signOutBtn" class="mode">Sign out</button>`
+  // V1.19: Home always returns to the Main dashboard.
+  const home = `<button type="button" id="homeBtn" class="home" data-go="overview" aria-label="Home: Main dashboard" aria-pressed="${view === 'overview'}">⌂ Home</button>`;
+  $('#titles').innerHTML = home + (HUB_USER ? `<span class="me" title="${esc(HUB_USER.email)}">${esc(HUB_USER.name)}</span><button type="button" id="signOutBtn" class="mode">Sign out</button>`
     : `<label class="me" for="meSel">I am <select id="meSel">${STAFF.map((x) => `<option value="${x.id}" ${x.id === S.me ? 'selected' : ''}>${esc(x.name.split(' ')[0])}</option>`).join('')}</select></label>`) + TITLES.filter(groupVisible).map((t) => `<button type="button" data-go="${t.tabs[0][0]}" aria-pressed="${t === title}">${esc(t.label)}${t.id === 'staff' && pending ? ` · ${pending}` : ''}</button>`).join('')
     + `<button type="button" id="langBtn" class="lang" aria-label="${S.lang === 'id' ? 'Switch to English' : 'Ganti ke Bahasa Indonesia'}"><b${S.lang === 'en' ? ' class="on"' : ''}>EN</b><b${S.lang === 'id' ? ' class="on"' : ''}>ID</b></button>`
     + `<button type="button" id="modeBtn" class="mode ${S.mode}" aria-pressed="${S.mode === 'demo'}">${S.mode === 'demo' ? 'Leave demo sandbox' : 'Demo sandbox'}</button>`
@@ -742,7 +746,7 @@ function reportForm(title, { fid, spec, pts, unit, planned, t0 }) {
 
 
 // ---------- website: users & access (admins only; the database enforces it too) ----------
-const ROLES = [['admin', 'Admin'], ['head_coach', 'Head Coach'], ['assistant_coach', 'Assistant coach'], ['readiness_owner', 'Readiness owner'], ['title_coach', 'Title coach'], ['analyst', 'Analyst']];
+const ROLES = [['admin', 'Admin'], ['head_coach', 'Head Coach'], ['assistant_coach', 'Assistant coach'], ['readiness_owner', 'Readiness owner'], ['title_coach', 'Title coach'], ['analyst', 'Analyst'], ['leadership', 'Leadership: Ketua BTN, Dewan Pengawas (read only)']];
 async function loadAdminUsers() {
   S.admin = { ...(S.admin || {}), loading: true, error: '' };
   try { S.admin.users = await PLATFORM.admin.listUsers(); } catch (e) { S.admin.error = e.message; }
@@ -800,6 +804,7 @@ V['admin-users'] = () => {
   return `<div class="panel"><div class="lead">Users &amp; <em>access</em></div>
     <p>Who can sign in and what they can see. The database enforces these rules for every request; this page only changes them.</p>
     <ul class="plain"><li><b>Admin, Head Coach, assistant coaches:</b> read every title. Admin and Head Coach write every title; assistant coaches write their assigned titles. Head Coach and every assistant coach approve proposals, draft books and opponent cards for all titles.</li>
+    <li><b>Leadership (Ketua BTN, Dewan Pengawas):</b> read every title and land on the Main dashboard; they cannot save, approve or see wellbeing data.</li>
     <li><b>Title coaches, analysts:</b> read and write only their assigned titles.</li><li><b>Wellbeing:</b> readiness owner and admins only (until visibility is decided).</li></ul>
     <p class="note">To add someone: Supabase dashboard → Authentication → Users → Invite user (their email). They set a password from the email, then appear here with no access until you tick a role.</p>
     <div class="toolbar"><button class="btn" type="button" id="adReload">Reload list</button><button class="btn" type="button" id="adExport">Export all data (JSON)</button><span class="msg" id="adExportMsg" role="status"></span></div>
@@ -1102,6 +1107,52 @@ function cycleCard(o) {
       <div class="toolbar"><button class="btn primary" type="button" data-act="decide" data-id="${esc(o.id)}">Save decision</button></div></details>` : ''}
     <div class="msg" id="msg-${esc(o.id)}" role="status"></div></article>`;
 }
+// V1.19 Main dashboard: one page for the Ketua BTN, the Dewan Pengawas and the staff. Built only from the records
+// the staff keep (reports, sessions, objectives, WEC matches), team level only: no individual wellbeing, no
+// compensation, no win probabilities. Every number links to the page it comes from.
+const dayGap = (a, b) => Math.round((Date.parse(b) - Date.parse(a)) / 86400000);
+V.overview = () => {
+  if (S.mode === 'demo') return `<div class="panel">${DEMO_BANNER}<p class="empty">The dashboard uses operational records only.</p></div>`;
+  const t0 = today(); const titles = PQ_ORDER.filter(titleVisible);
+  const pq = practiceQuality(titles, { scrims: S.scrims, reports: S.reports, cycle: S.cycle }, t0, 7);
+  const W = trendWeeks(t0, 4);
+  const toWec = dayGap(t0, EVENT.start); const inWec = t0 >= EVENT.start && t0 <= EVENT.end;
+  const overdue = S.scrims.filter((s) => titles.includes(s.title) && s.followUp && s.followUp.status !== 'Done' && s.followUp.due < t0);
+  const waiting = S.cycle.filter((o) => titles.includes(o.title) && o.status === 'proposed');
+  const scored = pq.filter((r) => r.score != null);
+  const upcoming = S.wecMatches.filter((m) => titles.includes(m.title) && m.date >= t0 && !m.result).sort((a, b) => a.date.localeCompare(b.date) || String(a.time).localeCompare(String(b.time)));
+  const tile = (k, v, note = '', href = '') => `<div class="stat"><span class="k">${esc(k)}</span><span class="v">${href ? `<a href="${href}">${v}</a>` : v}</span>${note ? `<span class="note">${note}</span>` : ''}</div>`;
+  const row = (title) => {
+    const q = pq.find((r) => r.title === title); const sm = reportSummary(S.reports, title, t0); const spec = GAME_SPEC[title];
+    const tr = teamTrends(title, { reports: S.reports }, W).find((m) => m.key === (spec.mode === 'points' ? 'ppm' : 'win'));
+    const next = upcoming.find((m) => m.title === title);
+    const od = overdue.filter((s) => s.title === title).length;
+    const base = title === 'Dota 2' ? 'dota' : title === 'PUBG Mobile' ? 'pubgm' : GAME_HUBS.find((h) => h.title === title)?.team;
+    return `<tr><td><a href="#${esc(TEAM_TAB[title])}"><b>${esc(title)}</b></a></td>
+      <td class="n">${q.score == null ? '<span class="note">—</span>' : `<a href="#staff-quality">${q.score}</a>${q.change != null ? ` <span class="note">${q.change > 0 ? '▲' : q.change < 0 ? '▼' : '='}${Math.abs(q.change)}</span>` : ''}`}</td>
+      <td class="n">${sm.sessions ? `${spec.mode === 'points' ? `${sm.points} pts / ${sm.matches}` : `${sm.won}-${sm.lost}${sm.drawn ? `-${sm.drawn}` : ''}`} <span class="note">(${sm.sessions})</span>` : '<span class="note">no report</span>'}</td>
+      <td class="n">${sm.progress != null ? `${sm.progress}/5` : '<span class="note">—</span>'}</td>
+      <td>${tr ? `<a href="#${esc(base)}-trends">${verdictTag(tr.verdict)}</a>` : '<span class="note">—</span>'}</td>
+      <td>${next ? `${esc(next.date.slice(8))}/${esc(next.date.slice(5, 7))} vs ${esc(next.opponent)}` : '<span class="note">—</span>'}</td>
+      <td class="n">${od ? tag('c-Blocked', String(od)) : '0'}</td></tr>`;
+  };
+  return `<div class="panel"><div class="lead">Main <em>dashboard</em></div>
+    <p>Where each national team stands before IESF WEC 2026 (${esc(EVENT.start.slice(8))}–${esc(EVENT.end.slice(8))} December, ${esc(EVENT.venue)}). From the staff's own records; team level only: no individual wellbeing values, no compensation, no win probabilities.</p>
+    <div class="stats">
+      ${tile(inWec ? 'WEC' : toWec > 0 ? 'Days to WEC' : 'WEC', inWec ? 'Now' : toWec > 0 ? String(toWec) : 'Done', inWec ? `day ${dayGap(EVENT.start, t0) + 1} of ${dayGap(EVENT.start, EVENT.end) + 1}` : '')}
+      ${tile('Sessions, last 7 days', String(pq.reduce((a, r) => a + r.sessions, 0)), `${pq.filter((r) => r.sessions).length} of ${titles.length} titles`, '#reports-all')}
+      ${tile('Practice quality', scored.length ? String(Math.round(scored.reduce((a, r) => a + r.score, 0) / scored.length)) : '—', 'average of titles with records, 0–100', '#staff-quality')}
+      ${tile('Overdue follow-ups', String(overdue.length), 'next actions past their due date', HUB_USER ? '#daily-sessions' : '')}
+      ${tile('Proposals waiting', String(waiting.length), 'for Head Coach or assistant coach review', '#staff-cycle')}
+    </div></div>
+  ${S.scrimLoad === 'error' || S.reportLoad === 'error' ? `<div class="panel">${banner('block', '<div>Sessions or reports could not be loaded: these numbers are incomplete.</div>')}</div>` : ''}
+  <div class="panel"><h2>Titles</h2><div class="tw"><table><thead><tr><th>Title</th><th class="n">Practice quality</th><th class="n">Last 7 days</th><th class="n">Plan followed</th><th>Results trend</th><th>Next WEC match</th><th class="n">Overdue</th></tr></thead><tbody>
+    ${titles.map(row).join('')}</tbody></table></div>
+    <p class="note">Practice quality: how rigorously the title practises (sessions held, objectives, reports, follow-ups), 0–100, ▲▼ against the week before. Last 7 days: scrim record (or points) and number of sessions. Results trend: last 2 weeks against the 2 before; "Better" or "Worse" only when the change is beyond chance. Tap a title or a number for the detail.</p></div>
+  <div class="panel"><h2>WEC matches coming up</h2>${upcoming.length ? `<ul class="plain">${upcoming.slice(0, 8).map((m) => `<li><b>${esc(m.date)}</b>${m.time ? ` ${esc(m.time)}` : ''} · ${esc(m.title)} · ${esc(m.stage || 'stage TBD')} · vs ${esc(m.opponent)}</li>`).join('')}</ul>` : '<p class="empty">No WEC match entered yet (Tournament → Match-day runbook).</p>'}
+    <div class="toolbar"><a class="btn" href="#brief">Weekly brief</a><a class="btn" href="#staff-quality">Practice quality</a></div></div>`;
+};
+
 // V1.16: practice quality across titles (src/core/practice_quality.js). Priority titles first (decided 12 Nov 2026).
 const PQ_ORDER = ['MLBB', 'MLBB Women', 'Dota 2', 'PUBG Mobile', 'eFootball', 'CS2', 'CS2 Women'];
 V['staff-quality'] = () => {
@@ -1605,6 +1656,7 @@ function render() {
     translateDom(document.querySelector('header.top'), 'id'); translateDom($('#main'), 'id');
     if (ORIGINAL_LANG_VIEWS.test(view)) $('#main').insertAdjacentHTML('afterbegin', '<p class="note lang-note">Catatan: temuan analisis otomatis, catatan staf, nama dan sumber data ditampilkan dalam bahasa aslinya (Inggris).</p>');
   }
+  if (LEADERSHIP_ONLY && view !== 'overview') $('#main').insertAdjacentHTML('afterbegin', `<p class="note" data-readonly>Read-only view for leadership: forms here are for the coaching staff and will not save. <a href="#overview">Back to the Main dashboard</a></p>`);
   if (HUB_USER && !HUB_USER.seesAllTitles) {
     const vt = viewTitle(view);
     if (vt && !HUB_USER.titles.includes(vt)) $('#main').insertAdjacentHTML('afterbegin', `<div class="panel">${banner('synth', `<div><b>You are not assigned to ${esc(vt)}.</b> Its records are hidden and you cannot save here. Ask the admin if you need access.</div>`)}</div>`);
@@ -2093,5 +2145,7 @@ if (HUB_USER) {
   document.addEventListener('submit', DAILY.submit);
 }
 if (restricted() && HUB_USER.titles[0] && (!location.hash || location.hash === '#')) history.replaceState(null, '', `#${REPORT_TAB[HUB_USER.titles[0]]}`);
+// V1.19: Leadership (Ketua BTN, Dewan Pengawas) land on the Main dashboard.
+if (LEADERSHIP_ONLY && (!location.hash || location.hash === '#')) history.replaceState(null, '', '#overview');
 render();
 initCaps();
