@@ -8,11 +8,11 @@ import { HEROES } from '../supabase/functions/_shared/catalog.gen.js';
 const WEBP = Buffer.from('UklGRiIAAABXRUJQVlA4IBYAAAAwAQCdASoBAAEADsD+JaQAA3AAAAAA', 'base64').toString('base64');
 const FAKE = Buffer.from('hello, not an image at all').toString('base64');
 
-function setup({ assigned = true, used = 0, ai = null, aiStatus = 200, statuses = null, key = 'sk-test', uploadError = null } = {}) {
+function setup({ assigned = true, used = 0, teamUsed = 0, ai = null, aiStatus = 200, statuses = null, key = 'sk-test', uploadError = null, signedIn = true } = {}) {
   const log = { uploads: [], inserts: [], calls: [], waits: [] };
   const db = {
-    auth: { getUser: async () => ({ data: { user: { id: 'u1' } }, error: null }) },
-    rpc: async (fn) => (fn === 'can_write_title' ? { data: assigned, error: null } : { data: used, error: null }),
+    auth: { getUser: async () => (signedIn ? { data: { user: { id: 'u1' } }, error: null } : { data: { user: null }, error: { message: 'invalid JWT' } }) },
+    rpc: async (fn) => (fn === 'can_write_title' ? { data: assigned, error: null } : fn === 'ai_calls_today_all' ? { data: teamUsed, error: null } : { data: used, error: null }),
     storage: { from: (b) => ({ upload: async (path, bytes, o) => { log.uploads.push({ b, path, n: bytes.length, type: o.contentType }); return { error: uploadError }; } }) },
     from: (t) => ({ insert: async (row) => { log.inserts.push({ t, row }); return { error: null }; } }),
   };
@@ -108,4 +108,15 @@ test('ping: tells the hub whether AI is switched on, without an AI call or a usa
   const on = setup(); const r = await on.call({ action: 'ping' });
   assert.equal(r.status, 200); assert.deepEqual(r.body, { ok: true, ai: true }); assert.equal(on.log.calls.length, 0); assert.equal(on.log.inserts.length, 0);
   const off = setup({ key: '' }); assert.deepEqual((await off.call({ action: 'ping' })).body, { ok: true, ai: false });
+  // V1.16: no answer without a signed-in session.
+  assert.equal((await setup().call({ action: 'ping' }, {})).status, 401);
+  assert.equal((await setup({ signedIn: false }).call({ action: 'ping' })).status, 401);
+});
+
+test('V1.16 team-wide daily limit: refused before any upload or AI call; a custom limit is honoured', async () => {
+  const full = setup({ teamUsed: 600 });
+  const r = await full.call({ action: 'scoreboard', title: 'MLBB', image: { data: WEBP } });
+  assert.equal(r.status, 429); assert.match(r.body.error, /staff's daily AI limit is reached \(600/);
+  assert.equal(full.log.uploads.length, 0); assert.equal(full.log.calls.length, 0);
+  assert.equal((await setup({ teamUsed: 599 }).call({ action: 'debrief', title: 'MLBB', text: 'x' })).status, 200);
 });
