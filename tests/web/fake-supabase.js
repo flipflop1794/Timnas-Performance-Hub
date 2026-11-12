@@ -48,6 +48,7 @@ export function backend() {
     if (table === 'profiles') return has(uid, 'admin') || row.id === uid ? null : deny;
     return deny;
   };
+  B.roles = roles;
   B.canApprove = (id) => has(id, 'admin') || has(id, 'head_coach') || has(id, 'assistant_coach');
   B.notify = (table) => { for (const ch of B.channels) for (const h of ch.handlers) if (h.table === table) setTimeout(h.cb, 0); };
   B.client = (sessionUserId) => client(B, sessionUserId);
@@ -159,11 +160,24 @@ function client(B, sessionUserId) {
         r.updated_by = me; r.updated_at = new Date(Date.now() + ++tick).toISOString();
         B.notify(args.p_table); return { data: structuredClone(r.data), error: null };
       }
+      // V1.16 screenshot storage (tests fill B.files = [{ name, size, created_at }]).
+      if (name === 'capture_storage' || name === 'old_capture_files') {
+        if (!B.roles(uid()).includes('admin')) return { data: null, error: { code: '42501', message: 'Admins only.' } };
+        const files = B.files || [];
+        if (name === 'capture_storage') return { data: [{ files: files.length, bytes: files.reduce((s, f) => s + f.size, 0), oldest: files.map((f) => f.created_at).sort()[0] || null }], error: null };
+        const cut = new Date(Date.now() - args.days * 86400000).toISOString();
+        return { data: files.filter((f) => f.created_at < cut).map((f) => f.name), error: null };
+      }
       if (name !== 'set_roster') return { error: { message: 'unknown rpc' } };
       const err = B.write(uid(), 'roster_players', 'insert', {}); if (err) return { error: err };
       for (const [title, list] of Object.entries(args.p)) { B.tables.roster_players = B.tables.roster_players.filter((r) => r.title !== title); list.forEach((ign, i) => B.tables.roster_players.push({ title, ign, sort_order: i })); }
       B.notify('roster_players'); return { error: null };
     },
+    storage: { from: () => ({ remove: async (names) => {
+      if (!B.roles(uid()).includes('admin')) return { data: null, error: { message: 'new row violates row-level security policy' } };
+      const gone = (B.files || []).filter((f) => names.includes(f.name)); B.files = (B.files || []).filter((f) => !names.includes(f.name));
+      return { data: gone, error: null };
+    } }) },
     channel: () => { const ch = { handlers: [], on(_t, f, cb) { ch.handlers.push({ table: f.table, cb }); return ch; }, subscribe() { B.channels.add(ch); return ch; } }; return ch; },
     removeChannel: (ch) => { B.channels.delete(ch); },
   };

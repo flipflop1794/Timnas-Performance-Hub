@@ -120,6 +120,27 @@ function adminApi(client: SupabaseClient) {
       }
       return rows;
     },
+    // V1.16: screenshot storage (Supabase Free has 1 GB) and the 90-day retention.
+    async storageUsage() {
+      const { data, error } = await client.rpc('capture_storage');
+      if (error) throw new Error(error.message);
+      const r = (Array.isArray(data) ? data[0] : data) as { files: number; bytes: number; oldest: string | null } | undefined;
+      return { files: Number(r?.files || 0), bytes: Number(r?.bytes || 0), oldest: r?.oldest || null };
+    },
+    async oldCaptures(days = 90) {
+      const { data, error } = await client.rpc('old_capture_files', { days });
+      if (error) throw new Error(error.message);
+      return ((data || []) as unknown[]).map((x) => (typeof x === 'string' ? x : String((x as Record<string, unknown>).old_capture_files ?? '')));
+    },
+    async removeCaptures(names: string[]) {
+      let removed = 0;
+      for (let i = 0; i < names.length; i += 100) {
+        const { data, error } = await client.storage.from('scrim-captures').remove(names.slice(i, i + 100));
+        if (error) throw new Error(`Deleted ${removed} of ${names.length}; then: ${error.message}`);
+        removed += (data || []).length;
+      }
+      return removed;
+    },
     // Everything this account can read, as one JSON file (admins can read every table).
     async exportAll() {
       const tables = ['profiles', 'user_roles', 'user_titles', 'disciplines', 'roster_players', 'app_config', 'scrim_sessions', 'scrim_reports', 'scrim_report_corrections',

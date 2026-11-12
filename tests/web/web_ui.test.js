@@ -293,6 +293,22 @@ test('V1.16 a failed load is shown, not mistaken for "no records"; the next good
   assert.equal(fayad.d.querySelector('[data-load-error]'), null);
 });
 
+test('V1.16 screenshot storage: admin sees how full it is and deletes screenshots past 90 days after confirming', async () => {
+  const B = world();
+  const day = (n) => new Date(Date.now() - n * 86400000).toISOString();
+  B.files = [{ name: 'mlbb/old-1.webp', size: 400 * 1024 ** 2, created_at: day(120) }, { name: 'mlbb/old-2.webp', size: 300 * 1024 ** 2, created_at: day(95) },
+    { name: 'mlbb/new.webp', size: 200 * 1024 ** 2, created_at: day(3) }];
+  const aufa = await open(B, 'aufa', 'admin-users');
+  for (let i = 0; i < 40 && !aufa.d.getElementById('storagePanel'); i++) await sleep(50);
+  assert.match(aufa.text(), /900 MB of 1 GB/); assert.match(aufa.text(), /Storage 88% full/);
+  await aufa.click('#stFind');
+  assert.match(aufa.text(), /Delete 2 screenshots older than 90 days\?/);
+  assert.equal(B.files.length, 3, 'nothing deleted before confirming');
+  await aufa.click('#stPurge'); await sleep(60);
+  assert.deepEqual(B.files.map((f) => f.name), ['mlbb/new.webp']);
+  assert.match(aufa.text(), /Deleted 2 screenshots/); assert.match(aufa.text(), /200 MB of 1 GB/);
+});
+
 test("Coach Donny's system inside the hub: staff sign-in, team saved once in the database, other devices load it, title coaches kept out", async () => {
   const B = world();
   const donny = await open(B, 'donny', 'readiness');

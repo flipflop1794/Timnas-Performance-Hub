@@ -664,6 +664,7 @@ async function loadAdminUsers() {
   try { S.admin.users = await PLATFORM.admin.listUsers(); } catch (e) { S.admin.error = e.message; }
   // AI usage this calendar month (WIB); a missing table (AI not set up yet) just hides the panel.
   if (PLATFORM.admin.aiUsage) { try { S.admin.usage = await PLATFORM.admin.aiUsage(`${localDay().slice(0, 8)}01T00:00:00+07:00`); } catch { S.admin.usage = null; } }
+  if (PLATFORM.admin.storageUsage && FEAT.capture) { try { S.admin.storage = await PLATFORM.admin.storageUsage(); } catch { S.admin.storage = null; } }
   S.admin.loading = false; render();
 }
 // V1.15: what the live database and server already have; the rest stays hidden until switched on.
@@ -677,6 +678,19 @@ function featuresPanel() {
     ${row(f.donny, "Coach Donny's readiness system (V1.15)", 'same SQL file')}
     ${row(f.ai, 'AI: read screenshots, Say it once, Look for patterns', 'deploy the <code>scrim-ai</code> function and set the Claude API key (docs/HUB_V1_13.md, steps 2–3)')}
   </ul><p class="note">Pending parts are hidden for everyone, and the rest of the hub works as before. Reload after switching something on.</p></div>`;
+}
+// V1.16: screenshot storage. Supabase Free holds 1 GB; screenshots are kept 90 days (policy), then removed
+// here by an admin after a confirmation. The confirmed games and their numbers stay.
+const STORAGE_LIMIT = 1024 ** 3; const CAPTURE_KEEP_DAYS = 90;
+function storagePanel(st, old) {
+  if (!st) return '';
+  const share = st.bytes / STORAGE_LIMIT; const mb = (b) => `${(b / 1024 ** 2).toFixed(0)} MB`;
+  return `<div class="panel" id="storagePanel"><h2>Screenshot storage</h2>
+    <p><b>${mb(st.bytes)}</b> of 1 GB (Supabase Free) · ${st.files} file${st.files === 1 ? '' : 's'}${st.oldest ? ` · oldest ${esc(String(st.oldest).slice(0, 10))}` : ''}</p>
+    ${share >= 0.8 ? banner('block', `<div><b>Storage ${Math.round(share * 100)}% full.</b> New screenshots will fail when it is full. Delete screenshots older than ${CAPTURE_KEEP_DAYS} days below.</div>`) : share >= 0.6 ? banner('warn', `<div>Storage ${Math.round(share * 100)}% full.</div>`) : ''}
+    ${old && old.length ? `${banner('block', `<div><b>Delete ${old.length} screenshot${old.length === 1 ? '' : 's'} older than ${CAPTURE_KEEP_DAYS} days?</b> This cannot be undone. The games read from them stay saved.</div>`)}
+      <div class="toolbar"><button class="btn primary" type="button" id="stPurge">Delete ${old.length} file${old.length === 1 ? '' : 's'}</button><button class="btn" type="button" id="stCancel">Cancel</button><span class="msg" id="stMsg" role="status"></span></div>`
+    : `<div class="toolbar"><button class="btn" type="button" id="stFind">Find screenshots older than ${CAPTURE_KEEP_DAYS} days</button><span class="msg" id="stMsg" role="status"></span></div>`}</div>`;
 }
 function usagePanel(rows) {
   if (!rows) return '';
@@ -700,13 +714,14 @@ V['admin-users'] = () => {
     <div class="toolbar"><button class="btn primary" type="button" data-admin-save="${esc(u.id)}">Save access</button><span class="msg" id="adMsg-${u.id}" role="status"></span></div></div>`;
   return `<div class="panel"><div class="lead">Users &amp; <em>access</em></div>
     <p>Who can sign in and what they can see. The database enforces these rules for every request; this page only changes them.</p>
-    <ul class="plain"><li><b>Admin, Head Coach, assistant coaches:</b> read every title. Admin and Head Coach write every title; assistant coaches write their assigned titles and approve proposals there.</li>
+    <ul class="plain"><li><b>Admin, Head Coach, assistant coaches:</b> read every title. Admin and Head Coach write every title; assistant coaches write their assigned titles. Head Coach and every assistant coach approve proposals, draft books and opponent cards for all titles.</li>
     <li><b>Title coaches, analysts:</b> read and write only their assigned titles.</li><li><b>Wellbeing:</b> readiness owner and admins only (until visibility is decided).</li></ul>
     <p class="note">To add someone: Supabase dashboard → Authentication → Users → Invite user (their email). They set a password from the email, then appear here with no access until you tick a role.</p>
     <div class="toolbar"><button class="btn" type="button" id="adReload">Reload list</button><button class="btn" type="button" id="adExport">Export all data (JSON)</button><span class="msg" id="adExportMsg" role="status"></span></div>
     ${S.admin.error ? banner('block', `<div>${esc(S.admin.error)}</div>`) : ''}</div>
   ${featuresPanel()}
   ${usagePanel(S.admin.usage)}
+  ${storagePanel(S.admin.storage, S.admin.old)}
   <div class="panel"><h2>People (${users.length})</h2>${S.admin.loading && !users.length ? '<p>Loading…</p>' : users.map(row).join('') || '<p class="empty">Nobody yet.</p>'}</div>`;
 };
 // Title coaches and analysts see only their assigned games (the database hides the rest anyway).
@@ -1764,6 +1779,16 @@ async function onClick(e) {
   }
   if (id === 'signOutBtn') { await PLATFORM?.signOut(); return; }
   if (id === 'adReload') { S.admin = { users: null, loading: false, error: '' }; render(); return; }
+  if (id === 'stFind' || id === 'stPurge' || id === 'stCancel') {
+    try {
+      if (id === 'stCancel') { S.admin.old = null; render(); return; }
+      if (id === 'stFind') { setMsg('stMsg', 'Looking…'); S.admin.old = await PLATFORM.admin.oldCaptures(CAPTURE_KEEP_DAYS); render(); if (!S.admin.old.length) setMsg('stMsg', `No screenshot is older than ${CAPTURE_KEEP_DAYS} days.`, 'ok'); return; }
+      setMsg('stMsg', 'Deleting…');
+      const n = await PLATFORM.admin.removeCaptures(S.admin.old || []);
+      S.admin.old = null; S.admin.storage = await PLATFORM.admin.storageUsage(); render(); setMsg('stMsg', `Deleted ${n} screenshot${n === 1 ? '' : 's'}. The confirmed games and their numbers are kept.`, 'ok');
+    } catch (err) { setMsg('stMsg', err.message, 'err'); }
+    return;
+  }
   if (id === 'adExport') {
     try { setMsg('adExportMsg', 'Exporting…'); const json = await PLATFORM.admin.exportAll(); await PLATFORM.download({ filename: `timnas-hub-export-${localDay()}.json`, data: json }); setMsg('adExportMsg', 'Saved. It may contain wellbeing data: store it securely.', 'ok'); }
     catch (err) { setMsg('adExportMsg', err.message, 'err'); }
