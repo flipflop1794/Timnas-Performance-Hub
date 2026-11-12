@@ -71,6 +71,11 @@ test('quick picks, progress buttons, highlighted errors, kept setup and drafts',
   await click('[data-rp-clear="MLBB"]'); assert.equal(d.getElementById('rp-MLBB-focus').value, '');
   const copy = [...d.querySelectorAll('.chip')].find((b) => b.textContent === 'Copy setup from last report'); copy.click(); await h.wait();
   assert.equal(d.getElementById('rp-MLBB-partner').value, 'Team X'); assert.equal(d.getElementById('rp-MLBB-focus').value, 'Early rotations');
+  // V1.16: last report's adjustment is one tap away as the next focus
+  const cont = [...d.querySelectorAll('.chip')].find((b) => b.textContent === 'Continue from last time: Faster turtle'); assert.ok(cont, 'continue chip'); cont.click(); await h.wait();
+  assert.equal(d.getElementById('rp-MLBB-focus').value, 'Faster turtle');
+  // "Say it once" comes before the games and the result
+  const html = d.querySelector('.panel.rp').innerHTML; assert.ok(html.indexOf('Say it once') < html.indexOf('>Result<'));
 });
 
 test('a session planned for today is one tap: partner filled and the session closed on save', async () => {

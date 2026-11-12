@@ -624,7 +624,7 @@ function draftField(el) {
 }
 function fillReport(fid, values) {
   for (const [k, v] of Object.entries(values)) {
-    const el = document.getElementById(`rp-${fid}-${k}`); if (!el) continue;
+    const el = document.getElementById(`rp-${fid}-${k}`); if (!el || el.readOnly) continue;   // the signed-in author is never overwritten
     if (el.tagName === 'SELECT' && v && ![...el.options].some((o) => o.value === v)) continue;
     el.value = v; draftField(el);
     if (k === 'progress') document.querySelectorAll(`[data-rp-prog="${fid}"]`).forEach((x) => x.setAttribute('aria-pressed', String(x.dataset.v === String(v))));
@@ -649,6 +649,8 @@ function reportForm(title, { fid, spec, pts, unit, planned, t0 }) {
   const partners = uniq(mine.map((r) => r.partner)).filter((p) => !plannedToday.some((x) => x.partner === p)).slice(0, 5);
   const objectives = S.cycle.filter((o) => o.title === title && ['accepted', 'modified'].includes(o.status)).map((o) => o.rec.problem);
   const focuses = uniq([...objectives, ...mine.map((r) => r.focus)]).slice(0, 5);
+  // A planned session's objectives become the report's focus (one tap instead of retyping).
+  const plannedFocus = (x) => (x.objectives || []).map((id) => S.cycle.find((o) => o.id === id)?.rec?.problem).filter(Boolean).join('; ');
   const scores = title === 'eFootball' ? [['1-0', 1, 0, 0], ['0-1', 0, 1, 0], ['Draw', 0, 0, 1], ['2-0', 2, 0, 0], ['1-1', 1, 1, 0], ['0-2', 0, 2, 0]] : [['2-0', 2, 0, 0], ['2-1', 2, 1, 0], ['1-2', 1, 2, 0], ['0-2', 0, 2, 0], ['1-0', 1, 0, 0], ['0-1', 0, 1, 0]];
   const hasDraft = Object.keys(d).some((k) => k !== 'at' && d[k] !== '');
   const isDefault = (k, v) => (k === 'roster' && v === ROSTER_PLAYED[0]) || (k === 'format' && pts && v === 'Lobby (BR)');
@@ -660,15 +662,17 @@ function reportForm(title, { fid, spec, pts, unit, planned, t0 }) {
   const sel = (k, label, opts, def = '') => `<label class="field" for="rp-${fid}-${k}">${label}<select id="rp-${fid}-${k}">${opts.map(([v, l]) => `<option value="${esc(v)}" ${v === dv(k, def) ? 'selected' : ''}>${esc(l)}</option>`).join('')}</select></label>`;
   const prog = dv('progress');
   return `<div class="panel rp"><h2>File a scrim report — ${esc(title)}</h2>
-    <p class="note">One report per sparring partner, the same day. Required fields first; everything under "More details" is optional. Reports cannot be edited afterwards: add a correction note instead. Performance notes only: no health, personal or contact details (wellbeing goes through Coach Donny).</p>
+    <p class="note">One report per sparring partner. Tap a chip where you can; "More details" is optional. Saved reports are fixed (add a correction instead). Performance notes only.</p>
     ${hasDraft ? `<p class="note draftnote">Draft kept on this device${d.at ? ` (last typed ${esc(new Date(d.at).toTimeString().slice(0, 5))})` : ''}. <button type="button" class="linkbtn" data-rp-clear="${esc(fid)}">Clear form</button></p>` : ''}
     ${last ? `<div class="toolbar">${chip(fid, { partner: last.partner, level: last.partnerLevel, format: last.format, roster: last.roster, focus: last.focus, by: last.by }, 'Copy setup from last report', ' wide')}<span class="note">vs ${esc(last.partner)}, ${esc(last.date)}</span></div>` : ''}
     <div class="form">
       <label class="field" for="rp-${fid}-date">Date<input type="date" id="rp-${fid}-date" value="${esc(dv('date', t0))}" max="${t0}"></label>
-      <label class="field" for="rp-${fid}-by">Written by<input type="text" id="rp-${fid}-by" list="staffNames" value="${esc(dv('by', meName()))}"></label>
+      ${HUB_USER ? `<label class="field" for="rp-${fid}-by">Written by<input type="text" id="rp-${fid}-by" value="${esc(HUB_USER.name)}" readonly></label>`
+        : `<label class="field" for="rp-${fid}-by">Written by<input type="text" id="rp-${fid}-by" list="staffNames" value="${esc(dv('by', meName()))}"></label>`}
       <label class="field" for="rp-${fid}-partner">Sparring partner<input type="text" id="rp-${fid}-partner" list="pbList-${fid}" placeholder="Team name, or internal" value="${esc(dv('partner'))}"></label>
     </div><datalist id="pbList-${fid}">${S.partners.filter((p) => p.title === title).map((p) => `<option value="${esc(p.name)}">${esc(p.level)}${p.resembles ? ` · like ${esc(p.resembles)}` : ''}</option>`).join('')}</datalist>
-    ${plannedToday.length || partners.length ? `<div class="chips"><span class="note">Quick pick:</span>${plannedToday.map((x) => chip(fid, { partner: x.partner, scrim: x.id, format: x.format, level: x.partnerLevel }, `Planned today: ${x.partner}`, ' planned')).join('')}${partners.map((p) => chip(fid, { partner: p }, p)).join('')}</div>` : ''}
+    ${plannedToday.length || partners.length ? `<div class="chips"><span class="note">Quick pick:</span>${plannedToday.map((x) => chip(fid, { partner: x.partner, scrim: x.id, format: x.format, level: x.partnerLevel, ...(plannedFocus(x) ? { focus: plannedFocus(x) } : {}) }, `Planned today: ${x.partner}`, ' planned')).join('')}${partners.map((p) => chip(fid, { partner: p }, p)).join('')}</div>` : ''}
+    ${capUi().debriefSection(title, fid)}
     ${capUi().gamesSection(title, fid)}
     <div class="h3">Result</div>
     ${gameOf(title) && (S.cap?.[fid]?.ready || []).length ? '<p class="note">Filled from the confirmed games above.</p>' : ''}
@@ -677,9 +681,8 @@ function reportForm(title, { fid, spec, pts, unit, planned, t0 }) {
     ${pts ? `${num('played', 'Matches played')}${num('points', 'Total points')}` : `${num('won', `${esc(cap(unit))} won`)}${num('lost', `${esc(cap(unit))} lost`)}`}
     </div>
     <div class="h3">Progress</div>
-    ${capUi().debriefSection(title, fid)}
     ${txt('focus', 'What was this session meant to practise?', 'e.g. Early rotations; fallback drop; set-piece defending')}
-    ${focuses.length ? `<div class="chips"><span class="note">Recent and active objectives:</span>${focuses.map((f) => chip(fid, { focus: f }, f.length > 48 ? `${f.slice(0, 46)}…` : f)).join('')}</div>` : ''}
+    ${focuses.length || last?.adjust ? `<div class="chips"><span class="note">Tap to fill:</span>${last?.adjust ? chip(fid, { focus: last.adjust }, `Continue from last time: ${last.adjust.length > 40 ? `${last.adjust.slice(0, 38)}…` : last.adjust}`, ' planned') : ''}${focuses.filter((f) => f !== last?.adjust).map((f) => chip(fid, { focus: f }, f.length > 48 ? `${f.slice(0, 46)}…` : f)).join('')}</div>` : ''}
     <div class="field"><span id="rp-${fid}-proglabel">How closely did the team follow the plan?</span><input type="hidden" id="rp-${fid}-progress" value="${esc(prog)}">
       <div class="seg" role="group" aria-labelledby="rp-${fid}-proglabel">${PROGRESS.map(([n, l]) => `<button type="button" data-rp-prog="${esc(fid)}" data-v="${n}" aria-pressed="${String(prog) === String(n)}" title="${esc(l)}"><b>${n}</b> ${esc(PROG_SHORT[n])}</button>`).join('')}</div></div>
     <div class="form">${txt('worked', 'What worked', '', true)}${txt('failed', 'What failed', '', true)}</div>

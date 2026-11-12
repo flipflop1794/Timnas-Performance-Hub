@@ -309,6 +309,17 @@ test('V1.16 screenshot storage: admin sees how full it is and deletes screenshot
   assert.match(aufa.text(), /Deleted 2 screenshots/); assert.match(aufa.text(), /200 MB of 1 GB/);
 });
 
+test('V1.16 scrim report: the author is the signed-in coach and cannot be changed, even by "copy setup"', async () => {
+  const B = world();
+  const indra = await open(B, 'indra', 'mlbb-reports');
+  const by = indra.d.getElementById('rp-MLBB-by');
+  assert.equal(by.value, 'Coach Indra'); assert.ok(by.readOnly);
+  B.tables.scrim_reports.push({ id: 'r-old', title: 'MLBB', data: { id: 'r-old', title: 'MLBB', date: localDay(), by: 'Fayad', partner: 'Team Q', result: { mode: 'wl', won: 1, lost: 0, drawn: 0 }, focus: 'f', progress: 3, worked: 'w', adjust: 'Ward earlier', notes: [], origin: 'operational', createdAt: new Date().toISOString() }, created_by: 'u-fayad', created_at: new Date().toISOString() });
+  B.notify('scrim_reports'); await sleep(400);
+  const copy = [...indra.d.querySelectorAll('.chip')].find((b) => b.textContent === 'Copy setup from last report'); assert.ok(copy); copy.click(); await sleep(60);
+  assert.equal(indra.d.getElementById('rp-MLBB-by').value, 'Coach Indra'); assert.equal(indra.d.getElementById('rp-MLBB-partner').value, 'Team Q');
+});
+
 test('V1.16 practice quality: leadership compares titles; a title coach sees only his own', async () => {
   const B = world();
   const day = localDay();
