@@ -15,9 +15,11 @@ export const TABLES: Record<string, string> = {
   draft_pools: 'draft_pools', draft_books: 'draft_books', mock_drafts: 'mock_drafts', draft_drills: 'draft_drills', pro_games: 'pro_games',
   // V1.15 Coach Donny's readiness system
   readiness_store: 'readiness_store',
+  // V1.16 Pelatnas board
+  pelatnas_availability: 'pelatnas_availability', pelatnas_attendance: 'pelatnas_attendance',
 };
 const WELLBEING = new Set(['wellbeing_checkins', 'wellbeing_load', 'readiness_store']);
-const CONFIG_KEYS = new Set(['runbooks', 'rules']);
+const CONFIG_KEYS = new Set(['runbooks', 'rules', 'pelatnas']);
 const PAGE = 1000;
 
 type Doc = Record<string, unknown>;

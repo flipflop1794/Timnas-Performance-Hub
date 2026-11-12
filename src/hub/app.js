@@ -22,7 +22,7 @@ import { STAFF, TITLES as WEC_TITLES, WELLBEING, owner, ownerNote, reviewersFor,
 const HUB_USER = (typeof window !== 'undefined' && window.__HUB_USER__) || null;
 const PLATFORM = (typeof window !== 'undefined' && window.__HUB_PLATFORM__) || null;
 // V1.15: newer parts switch on only when the live database / server has them (all on in the artifact build).
-const FEAT = { capture: true, draftRoom: true, donny: true, ai: true, ...(PLATFORM?.features || {}) };
+const FEAT = { capture: true, draftRoom: true, donny: true, pelatnas: true, ai: true, ...(PLATFORM?.features || {}) };
 if (HUB_USER && !HUB_USER.staffKey) {
   const ROLE_LABEL = { admin: 'Admin', head_coach: 'Head Coach', assistant_coach: 'Assistant coach', readiness_owner: 'Readiness owner', title_coach: 'Title coach', analyst: 'Analyst' };
   STAFF.push({ id: 'user', name: HUB_USER.name, role: HUB_USER.roles.map((r) => ROLE_LABEL[r] || r).join(', '), focus: HUB_USER.titles.length ? HUB_USER.titles : WEC_TITLES.map((t) => t.id) });
@@ -49,6 +49,7 @@ import { usageSummary, PRICES_READ } from '../core/ai_cost.js';
 import { checkin, session as loadSession, teamDay, ITEMS, ITEM_LABEL, THRESHOLDS, MIN_BASELINE_DAYS } from '../core/wellbeing.js';
 import { captureUi } from './capture_ui.js';
 import { draftRoomUi } from './draftroom_ui.js';
+import { pelatnasUi } from './pelatnas_ui.js';
 import { guidePage } from './guide.js';
 import { gameOf } from '../core/capture.js';
 import { statGoal } from '../core/patterns.js';
@@ -86,6 +87,9 @@ const CAP_OFF = { gamesSection: () => '', reportGames: () => '', debriefSection:
 const capUi = () => (FEAT.capture ? capUiReal() : CAP_OFF);
 let DR = null;
 const drUi = () => (DR ||= draftRoomUi({ S, esc, tag, banner, setMsg, val, render, meName, sid }));
+let PL = null;
+const canSetDates = () => !HUB_USER || HUB_USER.isAdmin || HUB_USER.roles.includes('head_coach');
+const plUi = () => (PL ||= pelatnasUi({ S, esc, tag, banner, setMsg, val, render, meName, sid, localDay, shiftDay, titleVisible: (t) => titleVisible(t), canSetDates }));
 const heroByName = () => Object.fromEntries(Object.values(S.heroes).map((h) => [h.name.toLowerCase(), h.id]));
 const accounts = () => Object.values(S.players).map((p) => p.account);
 const WEC_DOTA = ['Greece', 'South Africa', 'Egypt', 'Venezuela', 'Argentina', 'Kazakhstan', 'Mongolia', 'Iran', 'Belarus', 'North Macedonia', 'New Zealand'];
@@ -188,6 +192,7 @@ async function initCaps() {
     db.collection('scrim_reports').onSnapshot((snap) => { S.reports = snap.docs.map((d) => d.data()).filter((x) => x?.origin === 'operational'); render(); }, () => {});
     if (FEAT.capture) try { capUi().subscribe(db); } catch { /* older store without the V1.13 collections */ }
     if (FEAT.draftRoom) try { drUi().subscribe(db); } catch { /* older store without the V1.14 collections */ }
+    if (FEAT.pelatnas) try { plUi().subscribe(db); } catch { /* older store without the V1.16 collections */ }
     db.collection('wec_matches').onSnapshot((snap) => { S.wecMatches = snap.docs.map((d) => d.data()).filter((x) => x?.origin === 'operational'); render(); }, () => {});
     db.doc('config/runbooks').onSnapshot((d) => { const x = d.data(); if (x?.runbooks) S.runbooks = x.runbooks; render(); }, () => {});
     db.collection('vods').onSnapshot((snap) => { S.vods = snap.docs.map((d) => ({ ...d.data(), id: d.id })).filter((x) => x?.origin === 'operational'); render(); }, () => {});
@@ -247,6 +252,7 @@ const GAME_HUBS = [
 const hubTabs = (h) => [[h.team, 'Team'], [`${h.team}-scrims`, 'Scrims & practice'], [`${h.team}-reports`, 'Scrim reports'], ...(gameOf(h.title) && FEAT.capture ? [[`${h.team}-patterns`, 'Patterns']] : []), [`${h.team}-rivals`, 'Competitors'], ...(h.draftRoom && FEAT.draftRoom ? [[`${h.team}-draft`, 'Draft Room']] : [])];
 const TITLES = [
   { id: 'home', label: 'Today', tabs: [['today', 'My day'], ['board', 'Juara Umum board'], ['reports-all', 'Scrim reports'], ['brief', 'Weekly brief']] },
+  ...(FEAT.pelatnas ? [{ id: 'pelatnas', label: 'Pelatnas', tabs: [['pel-day', 'Schedule & attendance'], ['pel-avail', 'Availability']] }] : []),
   { id: 'comp', label: 'Competitors', tabs: [['comp-overview', 'All nations'], ['comp-nation', 'Nation profile'], ['comp-rosters', 'Rosters & players'], ['comp-card', 'Opponent card'], ['comp-coverage', 'Scouting coverage']] },
   { id: 'tour', label: 'Tournament', tabs: [['tour-runbook', 'Match-day runbook'], ['tour-series', 'Between games']] },
   { id: 'dota', label: 'Dota 2', tabs: [['dota-team', 'Team'], ['dota-scrims', 'Scrims & practice'], ['dota-reports', 'Scrim reports'], ...(FEAT.capture ? [['dota-patterns', 'Patterns']] : []), ['dota-post', 'Post-match'], ['dota-scout', 'Competitors'], ['dota-draft', 'Draft room'], ['dota-review', 'Series review']] },
@@ -301,6 +307,8 @@ function wellTodayPanel() {
     ${rows.map((r) => `<tr><td>${esc(r.t)}</td><td class="n">${r.d.total ? `${r.d.done}/${r.d.total}` : 'roster not entered'}</td><td class="n">${r.d.toCheck.length}</td></tr>`).join('')}</tbody></table></div>
     ${flagged.length ? `<ul class="plain">${flagged.map((f) => `<li><b>${esc(f.player)}</b> (${esc(f.title)}): ${f.flags.filter((x) => x.level === 'check').map((x) => esc(x.text)).join(' ')}</li>`).join('')}</ul>` : '<p class="note">No flags today.</p>'}<div class="toolbar"><a class="btn" href="#well-day">Daily check</a></div></div>`;
 }
+V['pel-day'] = () => plUi().dayPage();
+V['pel-avail'] = () => plUi().availPage();
 V.today = () => {
   if (S.mode === 'demo') return `<div class="panel">${DEMO_BANNER}<p>Today shows operational evidence only. Leave the demo sandbox to see it.</p></div>`;
   const me = STAFF.find((x) => x.id === S.me) || STAFF[0];
@@ -316,6 +324,7 @@ V.today = () => {
   return `<div class="panel"><div class="lead">What do we <em>train today</em>?</div>
     <p>Accepted objectives first. Anything not yet reviewed is a proposal, not a training decision. Choose who you are at the top to see your queue.</p></div>
     ${queueHtml(me.id)}
+    ${FEAT.pelatnas ? (() => { const x = plUi().todayLine(); return `<div class="panel"><h2>Pelatnas</h2><ul class="plain"><li>${esc(x.campText)}</li><li>${x.open ? `<b>${x.open}</b> player${x.open === 1 ? '' : 's'} have not answered about availability. <a href="#pel-avail">Availability</a>` : 'Every player has answered about availability.'}</li><li>${x.sessions ? `Attendance taken for ${x.taken} of ${x.sessions} session${x.sessions === 1 ? '' : 's'} today. <a href="#pel-day">Take attendance</a>` : 'No sessions planned today.'}</li></ul></div>`; })() : ''}
     ${me.id === 'donny' || me.id === 'fayad' ? wellTodayPanel() : ''}
     ${(() => { const mine = me.id === 'aufa' || me.id === 'user' ? me.focus : WEC_TITLES.map((t) => t.id); const up = S.scrims.filter((x) => mine.includes(x.title) && x.status === 'planned').sort((a, b) => a.date.localeCompare(b.date)).slice(0, 6);
       return up.length ? `<div class="panel"><h2>Scrims and practice coming up</h2><ul class="plain">${up.map((x) => `<li><b>${esc(x.date)}</b> ${esc(x.time)} · ${esc(x.title)} · ${esc(x.kind)}${x.partner ? ` vs ${esc(x.partner)}` : ''}${x.mirrors ? ` (stand-in for ${esc(x.mirrors)})` : ''}${x.date < today() ? ' — <b>result not logged</b>' : ''}</li>`).join('')}</ul></div>` : ''; })()}
@@ -641,6 +650,7 @@ function featuresPanel() {
     ${row(f.capture, 'Scrim capture, Patterns, player trail (V1.13)', 'run <code>supabase/RUN_ON_LIVE_V1_13_TO_V1_15.sql</code> once in Supabase → SQL Editor')}
     ${row(f.draftRoom, 'Draft Room (V1.14)', 'same SQL file')}
     ${row(f.donny, "Coach Donny's readiness system (V1.15)", 'same SQL file')}
+    ${row(f.pelatnas, 'Pelatnas board: dates, availability, attendance (V1.16)', 'apply <code>supabase/migrations/20261116120000_pelatnas.sql</code> in Supabase → SQL Editor')}
     ${row(f.ai, 'AI: read screenshots, Say it once, Look for patterns', 'deploy the <code>scrim-ai</code> function and set the Claude API key (docs/HUB_V1_13.md, steps 2–3)')}
   </ul><p class="note">Pending parts are hidden for everyone, and the rest of the hub works as before. Reload after switching something on.</p></div>`;
 }
@@ -1480,6 +1490,7 @@ async function onClick(e) {
   // V1.13 capture / patterns buttons only, so every other click stays synchronous until its own first await.
   if (Object.keys(t.dataset).some((k) => /^(cap|pat)[A-Z]/.test(k)) && await capUi().onClick(t)) return;
   if (Object.keys(t.dataset).some((k) => /^dr[A-Z]/.test(k)) && await drUi().onClick(t)) return;
+  if (Object.keys(t.dataset).some((k) => /^pl[A-Z]/.test(k)) && await plUi().onClick(t)) return;
   if (t.dataset.guideJump) { document.getElementById(`guide-${t.dataset.guideJump}`)?.scrollIntoView?.({ behavior: 'smooth', block: 'start' }); return; }
   if (t.dataset.rdMode) { S.rd.mode = t.dataset.rdMode; S.rd.key = null; render(); return; }
   const id = t.id;
@@ -1836,6 +1847,7 @@ for (const ev of ['input', 'change']) document.addEventListener(ev, (e) => draft
 
 document.addEventListener('change', (e) => {
   if (e.target.dataset?.drBookopp || e.target.dataset?.drCsvfile) { drUi().onChange(e); return; }
+  if (e.target.dataset?.plPickday) { plUi().onChange(e); return; }
   if (e.target.dataset?.capShot || e.target.dataset?.capDraft || e.target.dataset?.capMore || e.target.dataset?.patPeriod) { capUi().onChange(e); return; }
   const id = e.target.id;
   if (id === 'meSel') { S.me = e.target.value; try { localStorage.setItem('hub-me', S.me); } catch { /* per-viewer convenience only */ } render(); }

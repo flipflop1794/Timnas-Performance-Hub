@@ -161,7 +161,7 @@ function aiApi(client: SupabaseClient) {
 
 // V1.15: which newer parts the live database and server already have. The website can be updated before the
 // database: anything not switched on yet stays hidden instead of failing (Staff → Users & access lists them).
-export type Features = { capture: boolean; draftRoom: boolean; donny: boolean; ai: boolean };
+export type Features = { capture: boolean; draftRoom: boolean; donny: boolean; pelatnas: boolean; ai: boolean };
 export async function probeFeatures(client: SupabaseClient): Promise<Features> {
   const has = async (table: string) => {
     try {
@@ -172,8 +172,8 @@ export async function probeFeatures(client: SupabaseClient): Promise<Features> {
   const ai = async () => {
     try { const { data, error } = await client.functions.invoke('scrim-ai', { body: { action: 'ping' } }); return !error && !!(data as { ai?: boolean })?.ai; } catch { return false; }
   };
-  const [capture, draftRoom, donny, aiOn] = await Promise.all([has('scrim_games'), has('draft_books'), has('readiness_store'), ai()]);
-  return { capture, draftRoom, donny, ai: aiOn };
+  const [capture, draftRoom, donny, pelatnas, aiOn] = await Promise.all([has('scrim_games'), has('draft_books'), has('readiness_store'), has('pelatnas_availability'), ai()]);
+  return { capture, draftRoom, donny, pelatnas, ai: aiOn };
 }
 
 async function start(client: SupabaseClient, userId: string) {

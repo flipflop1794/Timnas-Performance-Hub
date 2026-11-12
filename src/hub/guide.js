@@ -34,6 +34,21 @@ export const GUIDE = [
       'Catatan pemain hanya soal performa. Tanpa kesehatan, keluarga atau kontak (hub menolak nomor HP dan nomor ID).',
       'Laporan tersimpan tidak bisa diubah: tambahkan koreksi bertanggal di bawahnya.',
     ] }),
+  S('pelatnas', 'pelatnas', { en: 'All staff; camp dates: Head Coach, admins', id: 'Semua staf; tanggal pelatnas: Head Coach, admin' }, 'pel-day',
+    { title: 'Pelatnas: dates, availability, attendance', steps: [
+      'Pelatnas → Availability: the camp dates stay "TBD" until the Head Coach or an admin records them, and "proposed" until PB ESI confirms them.',
+      'Send players the ready message (Bahasa Indonesia or English, "Copy message"). It asks only for dates and a reason category, and says the SK and compensation will come officially from PB ESI.',
+      'Record each answer: status, available from–to, dates not possible with a reason category. No health, family or contact details.',
+      'Plan every session (scrim, review, individual practice, physical) in your game\'s Scrims & practice tab. It then shows on Pelatnas → Schedule & attendance.',
+      'Take attendance per session: "Everyone present", then change who was late, absent or excused, and press "Save attendance". Today shows how many players have not answered and how many sessions still need attendance.',
+    ] },
+    { title: 'Pelatnas: tanggal, ketersediaan, kehadiran', steps: [
+      'Pelatnas → Availability: tanggal pelatnas tetap "TBD" sampai Head Coach atau admin mencatatnya, dan "usulan" sampai PB ESI mengonfirmasi.',
+      'Kirim pesan siap pakai ke pemain (Bahasa Indonesia atau English, "Copy message"). Pesan hanya menanyakan tanggal dan kategori alasan, dan menyebut SK serta kompensasi akan diinformasikan resmi oleh PB ESI.',
+      'Catat setiap jawaban: status, tersedia dari–sampai, tanggal yang tidak bisa dengan kategori alasan. Tanpa info kesehatan, keluarga atau kontak.',
+      'Rencanakan setiap sesi (scrim, review, latihan individu, fisik) di tab Scrims & practice game Anda. Sesi lalu muncul di Pelatnas → Schedule & attendance.',
+      'Isi kehadiran per sesi: "Everyone present", lalu ubah yang terlambat, absen atau izin, tekan "Save attendance". Today menunjukkan berapa pemain belum menjawab dan berapa sesi belum diisi kehadirannya.',
+    ] }),
   S('capture', 'capture', { en: 'MLBB, MLBB Women, Dota 2 coaches', id: 'Pelatih MLBB, MLBB Women, Dota 2' }, 'mlbb-reports',
     { title: 'Games from end-of-game screenshots', steps: [
       'In the report form, under Games, press "Read a screenshot" and pick the end-of-game screenshot (Dota: add the second screen with "Add another screenshot").',
