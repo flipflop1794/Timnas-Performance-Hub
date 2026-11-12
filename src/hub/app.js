@@ -177,6 +177,9 @@ async function initCaps() {
     S.db = db; S.dbState = 'live';
     const t = setTimeout(() => { S.dbState = 'slow'; render(); }, 10000);
     const fail = () => { S.dbState = 'off'; render(); };
+    // V1.16: a failed load shows a notice instead of looking like "no records yet" (cleared by the next good load).
+    const on = (ref, label, next) => ref.onSnapshot((x) => { if (S.loadErr?.[label]) delete S.loadErr[label]; next(x); },
+      (e) => { if (e?.code === 'permission_denied') return; S.loadErr = { ...(S.loadErr || {}), [label]: true }; render(); });
     db.collection('dota_matches').onSnapshot((snap) => {
       clearTimeout(t);
       for (const d of snap.docs) { const x = d.data(); if (x?.m && x.origin === 'operational') S.matches[x.m.id] = { m: x.m, origin: 'operational', retrieved: x.retrieved || x.at?.slice(0, 10), source: x.source || 'Shared store' }; }
@@ -188,8 +191,8 @@ async function initCaps() {
       S.pubgm.logged = { matches: m, fights: f }; render();
     }, fail);
     db.collection('cycle').onSnapshot((snap) => { S.cycle = snap.docs.map((d) => d.data()).filter((o) => o?.origin === 'operational'); render(); }, fail);
-    db.collection('rivals').onSnapshot((snap) => { S.rivals = snap.docs.map((d) => d.data()).filter((x) => x?.origin === 'operational'); render(); }, () => {});
-    db.collection('rival_tiers').onSnapshot((snap) => { S.tiers = Object.fromEntries(snap.docs.map((d) => { const x = d.data(); return [`${x.title}|${x.nation}`, x]; })); render(); }, () => {});
+    on(db.collection('rivals'), 'Scouting notes', (snap) => { S.rivals = snap.docs.map((d) => d.data()).filter((x) => x?.origin === 'operational'); render(); });
+    on(db.collection('rival_tiers'), 'Threat tiers', (snap) => { S.tiers = Object.fromEntries(snap.docs.map((d) => { const x = d.data(); return [`${x.title}|${x.nation}`, x]; })); render(); });
     db.collection('scrims').onSnapshot((snap) => {
       S.scrims = snap.docs.map((d) => d.data()).filter((x) => x?.origin === 'operational');
       S.scrimLoad = 'ready'; S.scrimRefreshFailed = false; render();
@@ -201,22 +204,22 @@ async function initCaps() {
     db.collection('scrim_reports').onSnapshot((snap) => { S.reports = snap.docs.map((d) => d.data()).filter((x) => x?.origin === 'operational'); S.reportLoad = 'ready'; render(); }, () => { S.reportLoad = 'error'; render(); });
     if (FEAT.capture) try { capUi().subscribe(db); } catch { /* older store without the V1.13 collections */ }
     if (FEAT.draftRoom) try { drUi().subscribe(db); } catch { /* older store without the V1.14 collections */ }
-    db.collection('wec_matches').onSnapshot((snap) => { S.wecMatches = snap.docs.map((d) => d.data()).filter((x) => x?.origin === 'operational'); render(); }, () => {});
-    db.doc('config/runbooks').onSnapshot((d) => { const x = d.data(); if (x?.runbooks) S.runbooks = x.runbooks; render(); }, () => {});
-    db.collection('vods').onSnapshot((snap) => { S.vods = snap.docs.map((d) => ({ ...d.data(), id: d.id })).filter((x) => x?.origin === 'operational'); render(); }, () => {});
-    db.collection('partners').onSnapshot((snap) => { S.partners = snap.docs.map((d) => ({ ...d.data(), id: d.id })).filter((x) => x?.origin === 'operational'); render(); }, () => {});
-    db.collection('player_plans').onSnapshot((snap) => { S.plans = Object.fromEntries(snap.docs.map((d) => [d.id, d.data()]).filter(([, x]) => x?.origin === 'operational')); render(); }, () => {});
-    db.collection('rival_rosters').onSnapshot((snap) => { S.rosterEdits = Object.fromEntries(snap.docs.map((d) => d.data()).filter((x) => x?.origin === 'operational' && x.key).map((x) => [x.key, x])); render(); }, () => {});
-    db.collection('opp_cards').onSnapshot((snap) => { S.oppCards = Object.fromEntries(snap.docs.map((d) => d.data()).filter((x) => x?.origin === 'operational' && x.key).map((x) => [x.key, x])); render(); }, () => {});
-    db.doc('config/roster').onSnapshot((d) => { const x = d.data(); if (x?.roster) S.roster = { ...S.roster, ...x.roster }; render(); }, () => {});
+    on(db.collection('wec_matches'), 'WEC matches', (snap) => { S.wecMatches = snap.docs.map((d) => d.data()).filter((x) => x?.origin === 'operational'); render(); });
+    on(db.doc('config/runbooks'), 'Runbooks', (d) => { const x = d.data(); if (x?.runbooks) S.runbooks = x.runbooks; render(); });
+    on(db.collection('vods'), 'VOD library', (snap) => { S.vods = snap.docs.map((d) => ({ ...d.data(), id: d.id })).filter((x) => x?.origin === 'operational'); render(); });
+    on(db.collection('partners'), 'Sparring partners', (snap) => { S.partners = snap.docs.map((d) => ({ ...d.data(), id: d.id })).filter((x) => x?.origin === 'operational'); render(); });
+    on(db.collection('player_plans'), 'Player plans', (snap) => { S.plans = Object.fromEntries(snap.docs.map((d) => [d.id, d.data()]).filter(([, x]) => x?.origin === 'operational')); render(); });
+    on(db.collection('rival_rosters'), 'Rival rosters', (snap) => { S.rosterEdits = Object.fromEntries(snap.docs.map((d) => d.data()).filter((x) => x?.origin === 'operational' && x.key).map((x) => [x.key, x])); render(); });
+    on(db.collection('opp_cards'), 'Opponent cards', (snap) => { S.oppCards = Object.fromEntries(snap.docs.map((d) => d.data()).filter((x) => x?.origin === 'operational' && x.key).map((x) => [x.key, x])); render(); });
+    on(db.doc('config/roster'), 'Rosters', (d) => { const x = d.data(); if (x?.roster) S.roster = { ...S.roster, ...x.roster }; render(); });
     // Wellbeing collections are readable and writable by editors only (declared in the page's db rules).
     db.collection('wellbeing_checkins').onSnapshot((snap) => { S.well.checkins = snap.docs.map((d) => d.data()).filter((x) => x?.origin === 'operational'); S.wellAccess = 'ok'; render(); }, () => { S.wellAccess = 'denied'; render(); });
-    db.collection('wellbeing_load').onSnapshot((snap) => { S.well.loads = snap.docs.map((d) => d.data()).filter((x) => x?.origin === 'operational'); render(); }, () => {});
-    db.doc('config/rules').onSnapshot((d) => { const x = d.data(); if (x?.rules) S.rules = x.rules; render(); }, () => {});
-    db.collection('dota_pools').onSnapshot((snap) => {
+    on(db.collection('wellbeing_load'), 'Training load', (snap) => { S.well.loads = snap.docs.map((d) => d.data()).filter((x) => x?.origin === 'operational'); render(); });
+    on(db.doc('config/rules'), 'Rules', (d) => { const x = d.data(); if (x?.rules) S.rules = x.rules; render(); });
+    on(db.collection('dota_pools'), 'Dota hero pools', (snap) => {
       for (const d of snap.docs) { const x = d.data(); if (x?.games && S.players[d.id]) { S.players[d.id].games = x.games; S.freshPools[d.id] = x.at; } }
       render();
-    }, () => {});
+    });
   } catch { S.dbState = 'off'; render(); }
 }
 async function browserFetchText(url) {
@@ -1479,6 +1482,8 @@ function render() {
   renderNav(view); LAST = { recs: {} };
   document.documentElement.classList.toggle('demo', S.mode === 'demo');
   try { $('#main').innerHTML = V[view](); } catch (e) { $('#main').innerHTML = `<div class="panel">${banner('block', `<div>Something failed while building this view: ${esc(e.message)}</div>`)}</div>`; console.error(e); }
+  const failed = S.mode === 'live' ? Object.keys(S.loadErr || {}) : [];
+  if (failed.length) $('#main').insertAdjacentHTML('afterbegin', `<div class="panel" data-load-error>${banner('block', `<div><b>Some records could not be loaded:</b> ${esc(failed.join(', '))}. This page may be incomplete. Check the connection, then reload.</div>`)}</div>`);
   document.documentElement.lang = S.lang;
   if (S.lang === 'id') {
     translateDom(document.querySelector('header.top'), 'id'); translateDom($('#main'), 'id');

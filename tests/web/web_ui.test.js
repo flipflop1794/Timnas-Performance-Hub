@@ -283,6 +283,16 @@ test('V1.16 approvals: a title coach cannot approve; the writer cannot approve h
   assert.match(aufa.text(), /approved by Aufa Bassam/);
 });
 
+test('V1.16 a failed load is shown, not mistaken for "no records"; the next good load clears it', async () => {
+  const B = world();
+  B.failRead = new Set(['rival_vods']);
+  const fayad = await open(B, 'fayad', 'today');
+  for (let i = 0; i < 20 && !fayad.d.querySelector('[data-load-error]'); i++) await sleep(25);
+  assert.match(fayad.text(), /Some records could not be loaded: VOD library/);
+  B.failRead.clear(); fayad.w.dispatchEvent(new fayad.w.Event('focus')); await sleep(400);
+  assert.equal(fayad.d.querySelector('[data-load-error]'), null);
+});
+
 test("Coach Donny's system inside the hub: staff sign-in, team saved once in the database, other devices load it, title coaches kept out", async () => {
   const B = world();
   const donny = await open(B, 'donny', 'readiness');
