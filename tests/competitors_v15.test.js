@@ -37,7 +37,7 @@ test('coverage suggests unscouted nations, multi-title first', () => {
 });
 
 test('page: competitors tab — overview, nation profile, coverage', async () => {
-  const dom = new JSDOM(`<!doctype html><html><body>${html}</body></html>`, { runScripts: 'dangerously', url: 'https://example.test/#comp-overview', beforeParse(w) { w.claude = { use: async () => null }; w.console.error = (...a) => { throw new Error(a.join(' ')); }; } });
+  const dom = new JSDOM(`<!doctype html><html><body>${html}</body></html>`, { runScripts: 'dangerously', url: 'https://example.test/#comp-overview', beforeParse(w) { w.localStorage.setItem('hub-lang', 'en'); w.claude = { use: async () => null }; w.console.error = (...a) => { throw new Error(a.join(' ')); }; } });
   const wait = () => new Promise((r) => setTimeout(r, 25)); await wait();
   const d = dom.window.document; const main = () => d.getElementById('main').textContent;
   assert.match(main(), /Competitor analysis/); assert.match(main(), /Egypt/);

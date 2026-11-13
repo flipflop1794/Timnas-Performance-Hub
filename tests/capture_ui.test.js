@@ -21,7 +21,7 @@ const dataTab = (i) => { const r = clone(REAL[i].raw); r.screen_kind = 'stats_de
 
 async function hub(aiImpl) {
   const calls = [];
-  const dom = new JSDOM(`<!doctype html><html><body>${html}</body></html>`, { runScripts: 'dangerously', url: 'https://example.test/#mlbb-reports', beforeParse(w) {
+  const dom = new JSDOM(`<!doctype html><html><body>${html}</body></html>`, { runScripts: 'dangerously', url: 'https://example.test/#mlbb-reports', beforeParse(w) { w.localStorage.setItem('hub-lang', 'en');
     w.claude = { use: async () => null };
     if (aiImpl) w.__HUB_PLATFORM__ = { ai: { call: async (b) => { calls.push(b); return aiImpl(b); } } };
     w.console.error = (...a) => { throw new Error(a.join(' ')); };
@@ -158,6 +158,9 @@ test('V1.17: result screen and draft picked together → the draft is recognised
   const f = () => new h.dom.window.File([new Uint8Array([0x89, 0x50, 0x4e, 0x47, 1])], 's.png', { type: 'image/png' });
   Object.defineProperty(input, 'files', { value: [f(), f()] });
   input.dispatchEvent(new h.dom.window.Event('change', { bubbles: true })); await wait(250);
+  // Two files are read one after the other; slower machines need more than 250 ms (wait up to 3 s).
+  for (let i = 0; i < 55 && h.calls.length < 3; i++) await wait(50);
+  await wait(50);
   assert.deepEqual(h.calls.map((c) => c.action), ['scoreboard', 'scoreboard', 'draft']);
   assert.match(h.d.getElementById('capMsg-MLBB').textContent, /draft read: heroes filled/);
   assert.match(h.text(), /Draft/, 'the draft table is shown on the check screen');
@@ -167,7 +170,7 @@ test('V1.17: result screen and draft picked together → the draft is recognised
 
 test('V1.17: microphone buttons fill the Say it once note (browser speech recognition)', async () => {
   let inst = null;
-  const dom = new JSDOM(`<!doctype html><html><body>${html}</body></html>`, { runScripts: 'dangerously', url: 'https://example.test/#mlbb-reports', beforeParse(w) {
+  const dom = new JSDOM(`<!doctype html><html><body>${html}</body></html>`, { runScripts: 'dangerously', url: 'https://example.test/#mlbb-reports', beforeParse(w) { w.localStorage.setItem('hub-lang', 'en');
     w.claude = { use: async () => null };
     w.__HUB_PLATFORM__ = { ai: { call: async () => ({ raw: {}, model: 'm' }) } };
     w.webkitSpeechRecognition = class { constructor() { inst = this; this.started = false; } start() { this.started = true; } stop() { this.started = false; this.onend?.(); } };

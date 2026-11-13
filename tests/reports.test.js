@@ -33,6 +33,11 @@ test('PUBG Mobile records points, not wins and losses', () => {
   assert.throws(() => scrimReport({ ...base, title: 'PUBG Mobile', played: 0, points: 10 }), /Matches played/);
   assert.throws(() => scrimReport({ ...base, title: 'PUBG Mobile', played: 3, points: '' }), /points/i);
   assert.throws(() => scrimReport({ ...base, title: 'PUBG Mobile', played: 3, points: 10, avgPlacement: 40 }), /between 1 and 25/);
+  // V1.21: wins cannot exceed matches; winning every match means first place every time.
+  assert.throws(() => scrimReport({ ...base, title: 'PUBG Mobile', played: 3, points: 60, chicken: 4 }), /Wins \(4\) cannot be more than matches played \(3\)/);
+  assert.throws(() => scrimReport({ ...base, title: 'PUBG Mobile', played: 2, points: 60, chicken: 2, avgPlacement: 3 }), /must be 1/);
+  assert.equal(scrimReport({ ...base, title: 'PUBG Mobile', played: 2, points: 60, chicken: 2, avgPlacement: 1 }).result.wins, 2);
+  assert.equal(scrimReport({ ...base, title: 'PUBG Mobile', played: 6, points: 71, chicken: 1, avgPlacement: 5.5 }).result.wins, 1);
 });
 
 test('eFootball and CS2 use their own wording; round scores are allowed in notes', () => {
@@ -76,4 +81,17 @@ test('CSV export keeps quotes and commas intact and includes corrections', () =>
   const csv = reportsCsv([r]); const lines = csv.split('\n');
   assert.equal(lines.length, 2); assert.match(lines[1], /"Said ""go"", then went"/); assert.match(lines[1], /"a,b"/); assert.match(lines[1], /Fayad: fix/);
   assert.match(lines[0], /^id,date,time,title,coach/);
+});
+
+test('CSV is safe in Excel: formulas neutralised, numbers kept, UTF-8 mark on request, WIB dates for corrections', () => {
+  const r = scrimReport({ ...base, worked: '=HYPERLINK("http://x","click")', failed: '+1 rotation late', detail: '-rotate early', playerNotes: '@Aran strong lane', adjust: 'Faster turtle' });
+  // A correction written at 23:30 UTC on 10 Nov is 06:30 WIB on 11 Nov: the team's day is 11 Nov.
+  const c = { ...r, notes: [{ text: 'fix', by: 'Fayad', at: '2026-11-10T23:30:00.000Z' }] };
+  const csv = reportsCsv([c]); const row = csv.split('\r\n')[1];
+  assert.match(row, /"'=HYPERLINK\(""http:\/\/x"",""click""\)"/);
+  assert.match(row, /,'\+1 rotation late,/); assert.match(row, /,'-rotate early,/); assert.match(row, /,'@Aran strong lane,/);
+  assert.match(row, /,2,1,0,/, 'won / lost / drawn stay numbers');
+  assert.match(row, /2026-11-11 Fayad: fix/);
+  assert.equal(csv.split('\r\n').length, 2, 'CRLF line ends');
+  assert.ok(!csv.startsWith('﻿')); assert.ok(reportsCsv([c], { bom: true }).startsWith('﻿'));
 });

@@ -41,7 +41,7 @@ function mock() {
 
 test('page: a scrim that practises an accepted objective logs a linked session', async () => {
   const db = mock();
-  const dom = new JSDOM(`<!doctype html><html><body>${html}</body></html>`, { runScripts: 'dangerously', url: 'https://example.test/#dota-team', beforeParse(w) { w.claude = { use: async (nm) => (nm === 'db' ? db : null) }; w.console.error = (...a) => { throw new Error(a.join(' ')); }; } });
+  const dom = new JSDOM(`<!doctype html><html><body>${html}</body></html>`, { runScripts: 'dangerously', url: 'https://example.test/#dota-team', beforeParse(w) { w.localStorage.setItem('hub-lang', 'en'); w.claude = { use: async (nm) => (nm === 'db' ? db : null) }; w.console.error = (...a) => { throw new Error(a.join(' ')); }; } });
   const wait = () => new Promise((r) => setTimeout(r, 20)); await wait();
   const d = dom.window.document; const go = async (h) => { dom.window.location.hash = h; dom.window.dispatchEvent(new dom.window.HashChangeEvent('hashchange')); await wait(); };
   d.querySelector('[data-propose]').click(); await wait();

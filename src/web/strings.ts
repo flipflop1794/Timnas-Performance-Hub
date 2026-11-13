@@ -13,6 +13,7 @@ const ID: Record<string, string> = {
   'Your account has no role yet. Ask the admin to grant access, then reload this page.': 'Akun Anda belum punya peran. Minta admin memberi akses, lalu muat ulang halaman ini.',
   'Sign out': 'Keluar',
 };
-export const lang = (): 'en' | 'id' => { try { return localStorage.getItem('hub-lang') === 'id' ? 'id' : 'en'; } catch { return 'en'; } };
+// V1.21: Bahasa Indonesia by default; English only when the viewer chose it (stored per device).
+export const lang = (): 'en' | 'id' => { try { return localStorage.getItem('hub-lang') === 'en' ? 'en' : 'id'; } catch { return 'id'; } };
 export const setLang = (l: 'en' | 'id') => { try { localStorage.setItem('hub-lang', l); } catch { /* per-device only */ } };
 export const T = (s: string) => (lang() === 'id' ? ID[s] ?? s : s);

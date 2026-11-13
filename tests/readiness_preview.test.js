@@ -35,7 +35,7 @@ test('view renders the preview label, all five components, and only the provider
 });
 
 test('page: Performance → Athlete readiness (preview) loads, filters by title and date', async () => {
-  const dom = new JSDOM(`<!doctype html><html><body>${html}</body></html>`, { runScripts: 'dangerously', url: 'https://example.test/#readiness', beforeParse(w) { w.claude = { use: async () => null }; w.console.error = (...a) => { throw new Error(a.join(' ')); }; } });
+  const dom = new JSDOM(`<!doctype html><html><body>${html}</body></html>`, { runScripts: 'dangerously', url: 'https://example.test/#readiness', beforeParse(w) { w.localStorage.setItem('hub-lang', 'en'); w.claude = { use: async () => null }; w.console.error = (...a) => { throw new Error(a.join(' ')); }; } });
   const wait = () => new Promise((r) => setTimeout(r, 30)); await wait();
   const d = dom.window.document; const main = () => d.getElementById('main').textContent;
   // V1.15: opens on Coach Donny's own system, running inside the hub (his screens in a shadow root).

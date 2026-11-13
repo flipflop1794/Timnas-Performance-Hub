@@ -66,7 +66,7 @@ function mock() {
 
 test('page: runbook, WEC match, between-games, VOD, partner, player plan and brief', async () => {
   const db = mock(); let saved = null;
-  const dom = new JSDOM(`<!doctype html><html><body>${html}</body></html>`, { runScripts: 'dangerously', url: 'https://example.test/#tour-runbook', beforeParse(w) {
+  const dom = new JSDOM(`<!doctype html><html><body>${html}</body></html>`, { runScripts: 'dangerously', url: 'https://example.test/#tour-runbook', beforeParse(w) { w.localStorage.setItem('hub-lang', 'en');
     w.claude = { use: async (nm) => (nm === 'db' ? db : nm === 'downloads' ? { save: async (x) => { saved = x; return { status: 'saved' }; } } : null) };
     w.console.error = (...a) => { throw new Error(a.join(' ')); }; } });
   const wait = () => new Promise((r) => setTimeout(r, 25)); await wait();

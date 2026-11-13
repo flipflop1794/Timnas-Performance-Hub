@@ -3,6 +3,7 @@
 // the title coach writes the plan. Draft until the title's focus owner (or title coach) approves it.
 
 import { dotaPool } from './rosters.js';
+import { formOf } from './competitors.js';
 
 const need = (c, m) => { if (!c) throw new Error(m); };
 // A note older than this is shown as "re-check": rosters, patches and form move faster than a month.
@@ -41,7 +42,9 @@ export function autoCard({ title, nation, per, team, data, heroes = {}, ours = [
     observed: notes.filter((n) => n.kind === 'observed').slice(0, 5), hypotheses: notes.filter((n) => n.kind === 'hypothesis').slice(0, 3),
     vods: (per?.vods || []).filter((v) => v.reviewed && v.reviewNote).map((v) => ({ event: v.event, url: v.url, takeaway: v.reviewNote })),
     roster, coach: team?.coach || '', banCandidates, contested, scrimsDone: per?.scrimsDone || 0, standIns: (per?.standIns || []).map((p) => p.name), gaps,
-    wecMatches: (per?.wecMatches || []).map((m) => ({ date: m.date, stage: m.stage, result: m.result })) };
+    wecMatches: (per?.wecMatches || []).map((m) => ({ date: m.date, stage: m.stage, result: m.result })),
+    // V1.21: published national-team results (desk research), shown apart from the staff's own notes.
+    results: formOf(title, nation).slice(0, 4) };
 }
 
 export function cardPlan(x) {
@@ -77,6 +80,10 @@ export function cardMarkdown(a, plan) {
   for (const n of a.observed) L.push(`- ${n.note} (${n.source}, ${n.date}${n.stale ? `, ${n.ageDays} days old: re-check` : ''})`);
   for (const n of a.hypotheses) L.push(`- Unconfirmed: ${n.note} (${n.source})`);
   for (const v of a.vods) L.push(`- VOD ${v.event}: ${v.takeaway}`);
+  if (a.results?.length) {
+    L.push('', '## Recent results (public)');
+    for (const r of a.results) L.push(`- ${r.event} (${r.date}): ${r.result}${r.club ? ' [club]' : ''}${r.check ? ' [to confirm]' : ''} — ${r.source}`);
+  }
   if (a.gaps.length) { L.push('', '## Gaps'); for (const g of a.gaps) L.push(`- ${g}`); }
   return L.join('\n');
 }

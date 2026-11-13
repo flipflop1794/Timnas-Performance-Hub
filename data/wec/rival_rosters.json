@@ -310,7 +310,14 @@
      "flags": []
     }
    ],
-   "checks": []
+   "checks": [
+    {
+     "date": "2026-11-13",
+     "by": "Hub (re-read from the IESF site)",
+     "names": ["*Sunshine", "Harikasın Samet", "intangible", "Saviom", "Zeichnen"],
+     "coach": "Jeff"
+    }
+   ]
   },
   {
    "title": "MLBB Women",
@@ -509,7 +516,14 @@
      "flags": []
     }
    ],
-   "checks": []
+   "checks": [
+    {
+     "date": "2026-11-13",
+     "by": "Hub (re-read from the IESF site)",
+     "names": ["*J3X", "Coin", "Dear", "Niko", "Shyco"],
+     "coach": "Thet Lynn Htut"
+    }
+   ]
   },
   {
    "title": "PUBG Mobile",
@@ -964,9 +978,11 @@
      "flags": []
     },
     {
-     "ign": "Zavier nz",
+     "ign": "Zaviernz",
      "captain": false,
-     "flags": []
+     "flags": [
+      "Spelled \"Zaviernz\" on the site 13 Nov 2026 (read as \"Zavier nz\" on 3 Nov)."
+     ]
     }
    ],
    "checks": []
@@ -1115,19 +1131,25 @@
      "flags": []
     }
    ],
-   "checks": []
+   "checks": [
+    {
+     "date": "2026-11-13",
+     "by": "Hub (re-read from the IESF site)",
+     "names": ["*Linnn", "Ayzen", "Darkside", "Runnn", "Wickyyy"]
+    }
+   ]
   },
   {
    "title": "MLBB",
    "nation": "Dominican Republic",
    "code": "DOM",
-   "coach": "L O Y A LRibel Cruz",
+   "coach": "L O Y A L",
    "players": [
     {
-     "ign": "JunnJose Ortiz",
+     "ign": "Junn",
      "captain": true,
      "flags": [
-      "Tag and real name run together on the site (decision log v6); tag uncertain."
+      "Tag confirmed on the site 13 Nov 2026 (the 3 Nov read had the real name run into it)."
      ]
     },
     {
@@ -1136,10 +1158,10 @@
      "flags": []
     },
     {
-     "ign": "INSTNCTElio Olivero",
+     "ign": "INSTNCT",
      "captain": false,
      "flags": [
-      "Tag and real name run together on the site (decision log v6); tag uncertain."
+      "Tag confirmed on the site 13 Nov 2026 (the 3 Nov read had the real name run into it)."
      ]
     },
     {
@@ -1148,10 +1170,10 @@
      "flags": []
     },
     {
-     "ign": "Ricky.Ricky Consuegra",
+     "ign": "Ricky.",
      "captain": false,
      "flags": [
-      "Tag and real name run together on the site (decision log v6); tag uncertain."
+      "Tag confirmed on the site 13 Nov 2026 (the 3 Nov read had the real name run into it)."
      ]
     }
    ],
@@ -1373,7 +1395,14 @@
      "flags": []
     }
    ],
-   "checks": [],
+   "checks": [
+    {
+     "date": "2026-11-13",
+     "by": "Hub (re-read from the IESF site)",
+     "names": ["*Reyes", "COLMadeon", "COLvictex", "Molina"],
+     "coach": "Hades"
+    }
+   ],
    "note": "The page reader joined the word \"Player\"/\"Coach\" to each name; removed. Check spellings on the site."
   },
   {

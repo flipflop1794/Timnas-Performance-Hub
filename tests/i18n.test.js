@@ -16,7 +16,7 @@ test('dictionary, prefixes and patterns; data and blank text untouched', () => {
 });
 
 test('page in Bahasa Indonesia: toggle, stable redraws, option values kept, logic still works', async () => {
-  const dom = new JSDOM(`<!doctype html><html><body>${html}</body></html>`, { runScripts: 'dangerously', url: 'https://example.test/#readiness', beforeParse(w) { w.claude = { use: async () => null }; w.console.error = (...a) => { throw new Error(a.join(' ')); }; } });
+  const dom = new JSDOM(`<!doctype html><html><body>${html}</body></html>`, { runScripts: 'dangerously', url: 'https://example.test/#readiness', beforeParse(w) { w.localStorage.setItem('hub-lang', 'en'); w.claude = { use: async () => null }; w.console.error = (...a) => { throw new Error(a.join(' ')); }; } });
   const wait = () => new Promise((r) => setTimeout(r, 30)); await wait();
   const d = dom.window.document; const main = () => d.getElementById('main').textContent;
   assert.match(main(), /Athlete readiness|Preview|Coach Donny/);
@@ -42,10 +42,11 @@ test('page in Bahasa Indonesia: toggle, stable redraws, option values kept, logi
 });
 
 test('V1.9 report pages and title hubs are translated; data and option values stay as written', async () => {
-  const dom = new JSDOM(`<!doctype html><html><body>${html}</body></html>`, { runScripts: 'dangerously', url: 'https://example.test/#reports-all', beforeParse(w) { w.claude = { use: async () => null }; w.localStorage.setItem('hub-lang', 'id'); } });
+  const dom = new JSDOM(`<!doctype html><html><body>${html}</body></html>`, { runScripts: 'dangerously', url: 'https://example.test/#reports-all', beforeParse(w) { w.claude = { use: async () => null }; } }); // V1.21: no stored choice → Bahasa Indonesia by default
   const wait = () => new Promise((r) => setTimeout(r, 30)); await wait();
   const d = dom.window.document; const go = async (h) => { dom.window.location.hash = h; dom.window.dispatchEvent(new dom.window.HashChangeEvent('hashchange')); await wait(); };
   const main = () => d.getElementById('main').textContent;
+  assert.equal(d.documentElement.lang, 'id', 'Bahasa Indonesia is the default');
   assert.match(main(), /Laporan scrim/); assert.match(main(), /Sesi 7 h/);
   await go('mlbb-reports'); assert.match(main(), /Isi laporan scrim — MLBB/); assert.match(main(), /Simpan laporan/); assert.match(main(), /Game menang/); assert.match(main(), /Satu perubahan konkret|Penyesuaian untuk sesi berikutnya/);
   assert.equal(d.getElementById('rp-MLBB-roster').options[0].value, 'Full national roster', 'option values stay English');

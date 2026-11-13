@@ -1,4 +1,5 @@
 import { hasContactNumber } from './pii.js';
+import { localDay } from './dates.js';
 // Daily scrim reports: what a coach writes after a scrim session. One report = one session
 // (one sparring partner). The daily roll-up groups the day's sessions. Reports are never edited
 // or deleted: a mistake is fixed with a dated correction note, so the record stays trustworthy.
@@ -47,7 +48,10 @@ export function scrimReport(x) {
     const played = int(x.played, 'Matches played'); const points = int(x.points, 'Points');
     need(played, 'Matches played is required (at least 1).'); need(points != null, 'Total points is required.');
     const avgPlacement = num(x.avgPlacement); if (avgPlacement != null) need(avgPlacement >= 1 && avgPlacement <= 25, 'Average placement must be between 1 and 25.');
-    result = { mode: 'points', played, points, avgPlacement, wins: int(x.chicken, 'Wins') ?? 0 };
+    const wins = int(x.chicken, 'Wins') ?? 0;
+    need(wins <= played, `Wins (${wins}) cannot be more than matches played (${played}).`);
+    if (avgPlacement != null && wins) need(avgPlacement >= 1 && (wins < played || avgPlacement === 1), 'Average placement must be 1 when every match was a win.');
+    result = { mode: 'points', played, points, avgPlacement, wins };
   } else {
     const won = int(x.won, 'Won') ?? 0; const lost = int(x.lost, 'Lost') ?? 0; const drawn = int(x.drawn, 'Drawn') ?? 0;
     need(won + lost + drawn > 0, `Record at least one ${spec.unit.slice(0, -1)} played (won, lost or drawn).`);
@@ -119,12 +123,25 @@ export function reportSummary(reports, title, asOf, windowDays = 7) {
   };
 }
 
-const csvCell = (v) => { const s = String(v ?? ''); return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s; };
-export function reportsCsv(reports) {
+// V1.21: safe to open in Excel / Google Sheets. Text that starts with = + - @ (or a tab / carriage return)
+// is run as a formula by spreadsheets, so it gets a leading apostrophe. Plain numbers (scores, points,
+// placements) are left as they are so they still add up.
+const FORMULA = /^[=+\-@\t\r]/;
+const csvCell = (v) => {
+  let s = String(v ?? '');
+  if (typeof v !== 'number' && FORMULA.test(s) && !/^-?\d+(\.\d+)?$/.test(s)) s = `'${s}`;
+  return /[",\n\r]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+};
+// Correction notes carry an ISO time (UTC); show the team's day (WIB), as everywhere else in the hub.
+const noteDay = (at) => { const d = new Date(at); return Number.isNaN(d.getTime()) ? String(at || '').slice(0, 10) : localDay(d); };
+// The byte-order mark tells Excel the file is UTF-8, so names like "Türkiye" and dashes are not garbled.
+export const CSV_BOM = '﻿';
+export function reportsCsv(reports, { bom = false } = {}) {
   const head = ['id', 'date', 'time', 'title', 'coach', 'partner', 'partner_level', 'format', 'roster', 'won', 'lost', 'drawn', 'matches_played', 'points', 'avg_placement', 'plan_followed_1_5', 'focus', 'detail', 'worked', 'failed', 'player_notes', 'next_adjustment', 'previous_adjustment', 'previous_adjustment_check', 'vod', 'corrections'];
   const rows = [...reports].sort((a, b) => a.date.localeCompare(b.date) || a.createdAt.localeCompare(b.createdAt)).map((r) => {
     const p = r.result.mode === 'points';
-    return [r.id, r.date, r.time, r.title, r.by, r.partner, r.partnerLevel, r.format, r.roster, p ? '' : r.result.won, p ? '' : r.result.lost, p ? '' : r.result.drawn, p ? r.result.played : '', p ? r.result.points : '', p ? (r.result.avgPlacement ?? '') : '', r.progress, r.focus, r.detail, r.worked, r.failed, r.playerNotes, r.adjust, r.prevAdjust || '', r.fixCheck || '', r.vod, (r.notes || []).map((n) => `${n.at.slice(0, 10)} ${n.by}: ${n.text}`).join(' | ')];
+    return [r.id, r.date, r.time, r.title, r.by, r.partner, r.partnerLevel, r.format, r.roster, p ? '' : r.result.won, p ? '' : r.result.lost, p ? '' : r.result.drawn, p ? r.result.played : '', p ? r.result.points : '', p ? (r.result.avgPlacement ?? '') : '', r.progress, r.focus, r.detail, r.worked, r.failed, r.playerNotes, r.adjust, r.prevAdjust || '', r.fixCheck || '', r.vod, (r.notes || []).map((n) => `${noteDay(n.at)} ${n.by}: ${n.text}`).join(' | ')];
   });
-  return [head, ...rows].map((row) => row.map(csvCell).join(',')).join('\n');
+  // CRLF line ends: what Excel on Windows expects; other tools read it too.
+  return (bom ? CSV_BOM : '') + [head, ...rows].map((row) => row.map(csvCell).join(',')).join('\r\n');
 }

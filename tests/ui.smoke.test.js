@@ -9,7 +9,7 @@ const VIEWS = ['today', 'mlbb', 'dota-team', 'dota-draft', 'dota-post', 'dota-sc
 
 test('hub: every view renders without errors', async () => {
   const errors = [];
-  const dom = new JSDOM(`<!doctype html><html><body>${html}</body></html>`, { runScripts: 'dangerously', url: 'https://example.test/#today' });
+  const dom = new JSDOM(`<!doctype html><html><body>${html}</body></html>`, { runScripts: 'dangerously', url: 'https://example.test/#today', beforeParse(w) { w.localStorage.setItem('hub-lang', 'en'); } });
   dom.window.addEventListener('error', (e) => errors.push(e.message));
   dom.window.console.error = (...a) => errors.push(a.join(' '));
   const main = dom.window.document.getElementById('main');
@@ -23,7 +23,7 @@ test('hub: every view renders without errors', async () => {
 });
 
 test('hub: draft room locks heroes and compares drafts', async () => {
-  const dom = new JSDOM(`<!doctype html><html><body>${html}</body></html>`, { runScripts: 'dangerously', url: 'https://example.test/#dota-draft' });
+  const dom = new JSDOM(`<!doctype html><html><body>${html}</body></html>`, { runScripts: 'dangerously', url: 'https://example.test/#dota-draft', beforeParse(w) { w.localStorage.setItem('hub-lang', 'en'); } });
   const d = dom.window.document;
   // Click the first suggestion 8 times (walks bans + picks for both sides).
   for (let i = 0; i < 8; i++) d.querySelector('.sugg button')?.click();
@@ -36,7 +36,7 @@ test('hub: draft room locks heroes and compares drafts', async () => {
 });
 
 test('hub: PUBGM CSV validation rejects a broken log and accepts a good one', async () => {
-  const dom = new JSDOM(`<!doctype html><html><body>${html}</body></html>`, { runScripts: 'dangerously', url: 'https://example.test/#pubgm-log' });
+  const dom = new JSDOM(`<!doctype html><html><body>${html}</body></html>`, { runScripts: 'dangerously', url: 'https://example.test/#pubgm-log', beforeParse(w) { w.localStorage.setItem('hub-lang', 'en'); } });
   const d = dom.window.document;
   await new Promise((r) => setTimeout(r, 30)); // let the capability probe finish its first render
   d.getElementById('lMatches').value = 'match_id,map,team,placement,elims\nX,Erangel,INA,1,3\nX,Erangel,B,1,2';

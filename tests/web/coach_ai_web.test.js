@@ -31,7 +31,7 @@ const doc = (B, table, id, title, data, by = 'u-indra') => B.tables[table].push(
 const report = (B, id, title, ago, failed, extra = {}) => doc(B, 'scrim_reports', id, title, { date: shiftDay(t0, -ago), by: 'x', partner: 'Team Q', result: { mode: 'wl', won: 1, lost: 2, drawn: 0 }, focus: 'f', progress: 3, worked: 'w', failed, adjust: 'ward earlier', notes: [], createdAt: at, ...extra });
 async function open(B, who, hash) {
   const dom = new JSDOM(html, { runScripts: 'dangerously', pretendToBeVisual: true, url: `https://hub.example.test/#${hash}`,
-    beforeParse(w) { w.__HUB_TEST_CLIENT__ = B.client(people[who].id); w.URL.createObjectURL = () => 'blob:x'; w.URL.revokeObjectURL = () => {}; } });
+    beforeParse(w) { w.localStorage.setItem('hub-lang', 'en'); w.__HUB_TEST_CLIENT__ = B.client(people[who].id); w.URL.createObjectURL = () => 'blob:x'; w.URL.revokeObjectURL = () => {}; } });
   const d = dom.window.document;
   for (let i = 0; i < 60 && /Loading/.test(d.getElementById('main')?.textContent || 'Loading'); i++) await sleep(25);
   await sleep(120);

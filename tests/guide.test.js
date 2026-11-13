@@ -24,7 +24,7 @@ test('guide: parts not switched on are marked; the admin section only for admins
 });
 
 test('guide page in the hub: in the menu for everyone, jump links work, language switch translates it', async () => {
-  const dom = new JSDOM(`<!doctype html><html><body>${html}</body></html>`, { runScripts: 'dangerously', url: 'https://example.test/#guide', beforeParse(w) { w.claude = { use: async () => null }; w.console.error = (...a) => { throw new Error(a.join(' ')); }; } });
+  const dom = new JSDOM(`<!doctype html><html><body>${html}</body></html>`, { runScripts: 'dangerously', url: 'https://example.test/#guide', beforeParse(w) { w.localStorage.setItem('hub-lang', 'en'); w.claude = { use: async () => null }; w.console.error = (...a) => { throw new Error(a.join(' ')); }; } });
   const wait = () => new Promise((r) => setTimeout(r, 30)); await wait();
   const d = dom.window.document; const main = () => d.getElementById('main').textContent;
   assert.match(main(), /How to use the hub/); assert.match(main(), /Draft Room/); assert.match(main(), /Coach Donny's system/);

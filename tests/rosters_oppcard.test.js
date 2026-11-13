@@ -14,13 +14,16 @@ test('seeded rosters cover every published rival team in six titles, with flags 
   const R = seedRosters(DATA.rivalRosters);
   for (const [t, f] of Object.entries(FIELDS)) if (t !== 'eFootball') for (const n of f) assert.ok(R[rosterKey(t, n)], `${t} ${n}`);
   assert.equal(R['PUBG Mobile|Egypt'].players.map((p) => p.ign).join(), 'AGA1N,APKRINO,NASSER74,ZUXXY隋');
-  assert.match(R['MLBB|Cambodia'].players.find((p) => p.ign === 'PPPPPP').flags[0], /five/);
+  const camSeed = DATA.rivalRosters.teams.find((t) => t.title === 'MLBB' && t.nation === 'Cambodia');
+  assert.match(camSeed.players.find((p) => p.ign === 'PPPPPP').flags[0], /five/);
   assert.equal(R['Dota 2|Mongolia'].players.find((p) => p.ign === 'NARMAN').account, '343084576');
   assert.ok(R['Dota 2|Greece'].players.find((p) => p.ign === 'SsaSpartan-').flags.some((f) => /probable/.test(f)));
 });
 
 test('player edits, weekly check flags added and removed players, check due after 7 days', () => {
-  const tm = seedRosters(DATA.rivalRosters)['MLBB|Myanmar'];
+  // The 3 Nov read only (the shipped 13 Nov site check is tested separately below).
+  const firstRead = { ...DATA.rivalRosters, teams: DATA.rivalRosters.teams.filter((t) => t.title === 'MLBB' && t.nation === 'Myanmar').map((t) => ({ ...t, checks: [] })) };
+  const tm = seedRosters(firstRead)['MLBB|Myanmar'];
   assert.throws(() => editPlayers(tm, { KidX: { note: 'call 0812345678901' } }, 'Aufa'), /phone/);
   const e = editPlayers(tm, { KidX: { role: 'Jungle', club: 'Falcon' } }, 'Aufa Bassam');
   assert.equal(e.players[0].role, 'Jungle');
@@ -30,6 +33,22 @@ test('player edits, weekly check flags added and removed players, check due afte
   assert.equal(checkStatus(c, '2026-11-12').due, false); assert.equal(checkStatus(c, '2026-11-17').due, true);
   assert.equal(checkStatus(c, '2026-11-12').changed.length, 1);
   assert.equal(recordCheck(c, { date: '2026-11-17', by: 'A', names: 'KidX, Lucky, NewCold, Op, NewGuy' }).checks.at(-1).result, 'no change');
+});
+
+test('13 Nov site re-read ships as a dated check: who joined, who left, captain and coach', () => {
+  const R = seedRosters(DATA.rivalRosters);
+  const my = R['MLBB|Myanmar']; const last = my.checks.at(-1);
+  assert.equal(my.checks.length, 2); assert.equal(last.date, '2026-11-13'); assert.equal(last.result, 'changed');
+  assert.deepEqual(last.added, ['J3X', 'Coin', 'Dear', 'Niko', 'Shyco']); assert.deepEqual(last.removed, ['KidX', 'Lucky', 'NewCold', 'Op', 'Ps']);
+  assert.equal(my.players.find((p) => p.captain).ign, 'J3X'); assert.equal(my.coach, 'Thet Lynn Htut'); assert.equal(last.coachFrom, 'Jina');
+  assert.ok(my.players.every((p) => p.flags.some((f) => /2026-11-13 check/.test(f))));
+  const cam = R['MLBB|Cambodia'].checks.at(-1);
+  assert.deepEqual(cam.added, ['Ayzen', 'Darkside', 'Runnn']); assert.deepEqual(cam.removed, ['SryimFelix', 'PPPPPP', 'Saa']);
+  assert.equal(R['MLBB|Cambodia'].players.find((p) => p.captain).ign, 'Linnn');
+  const col = R['PUBG Mobile|Colombia']; assert.equal(col.checks.at(-1).result, 'no change'); assert.equal(col.coach, 'Hades');
+  assert.equal(checkStatus(col, '2026-11-14').changed.length, 1, 'a coach change counts as a change');
+  assert.equal(checkStatus(R['Dota 2|Belarus'], '2026-11-14').changed.length, 0);
+  assert.ok(R['MLBB|Dominican Republic'].players.some((p) => p.ign === 'Junn' && p.captain));
 });
 
 test('Dota pools for rivals: shipped OpenDota aggregates and Mongolia, no data marked', () => {
@@ -64,7 +83,7 @@ function mock() {
 
 test('page: rosters tab, weekly check, opponent card write → approve → download', async () => {
   const db = mock(); let saved = null;
-  const dom = new JSDOM(`<!doctype html><html><body>${html}</body></html>`, { runScripts: 'dangerously', url: 'https://example.test/#comp-rosters', beforeParse(w) {
+  const dom = new JSDOM(`<!doctype html><html><body>${html}</body></html>`, { runScripts: 'dangerously', url: 'https://example.test/#comp-rosters', beforeParse(w) { w.localStorage.setItem('hub-lang', 'en');
     w.claude = { use: async (nm) => (nm === 'db' ? db : nm === 'downloads' ? { save: async (x) => { saved = x; return { status: 'saved' }; } } : null) }; w.print = () => {};
     w.console.error = (...a) => { throw new Error(a.join(' ')); }; } });
   const wait = () => new Promise((r) => setTimeout(r, 25)); await wait();
@@ -95,7 +114,7 @@ test('page: rosters tab, weekly check, opponent card write → approve → downl
   assert.match(saved.filename, /opponent-card-Dota_2-Mongolia\.md/); assert.match(saved.data, /Fbz: lane vs NARMAN/);
   // from the nation profile
   await go('comp-nation'); d.getElementById('cnN').value = 'Myanmar'; d.getElementById('cnN').dispatchEvent(new dom.window.Event('change', { bubbles: true })); await wait();
-  assert.match(main(), /KidX \(C\)/);
+  assert.match(main(), /J3X \(C\)/); assert.match(main(), /roster changed/);
   d.querySelector('[data-card="MLBB|Myanmar"]').click(); await wait(); dom.window.dispatchEvent(new dom.window.HashChangeEvent('hashchange')); await wait();
   assert.match(main(), /Indonesia vs Myanmar/); assert.match(main(), /Asian Games/);
 });

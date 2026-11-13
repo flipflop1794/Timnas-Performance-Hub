@@ -10,9 +10,20 @@ export const rosterKey = (title, nation) => `${title}|${nation}`;
 export function seedRosters(data) {
   const out = {};
   for (const t of data.teams) {
-    out[rosterKey(t.title, t.nation)] = { title: t.title, nation: t.nation, code: t.code, coach: t.coach, note: t.note || '',
+    let team = { title: t.title, nation: t.nation, code: t.code, coach: t.coach, note: t.note || '',
       players: t.players.map((p) => ({ ign: p.ign, captain: !!p.captain, role: '', club: p.club || '', account: p.account || '', accountNote: p.accountNote || '', note: '', flags: [...(p.flags || [])] })),
       checks: [{ date: data.read, by: 'Hub (read from the IESF site)', result: 'seeded', added: [], removed: [] }], origin: 'operational' };
+    // V1.21: later re-reads of the site ship as dated checks, so a change shows as "roster changed" with who
+    // joined and who left, instead of silently replacing the first read. "*" marks the captain.
+    for (const c of t.checks || []) {
+      if (!c.date || !Array.isArray(c.names)) continue;
+      const names = c.names.map((n) => n.replace(/^\*/, ''));
+      team = recordCheck(team, { date: c.date, by: c.by || 'Hub (re-read from the IESF site)', names: names.join('\n') });
+      const cap = c.names.find((n) => n.startsWith('*'))?.slice(1);
+      if (cap) team.players = team.players.map((p) => ({ ...p, captain: p.ign === cap }));
+      if (c.coach && c.coach !== team.coach) { team.checks.at(-1).coachFrom = team.coach; team.checks.at(-1).coachTo = c.coach; team.coach = c.coach; }
+    }
+    out[rosterKey(t.title, t.nation)] = team;
   }
   return out;
 }
@@ -47,7 +58,7 @@ export function recordCheck(team, { date, by, names }) {
 export function checkStatus(team, today) {
   const last = team.checks.at(-1);
   const days = Math.round((Date.parse(today) - Date.parse(last.date)) / 86400000);
-  const changed = team.checks.filter((c) => c.result === 'changed');
+  const changed = team.checks.filter((c) => c.result === 'changed' || c.coachTo);
   return { last, days, due: days >= CHECK_EVERY_DAYS, changed };
 }
 

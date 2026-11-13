@@ -36,7 +36,7 @@ function mockDb() {
 }
 async function hub(hash, db = mockDb()) {
   const dom = new JSDOM(`<!doctype html><html><body>${html}</body></html>`, { runScripts: 'dangerously', url: `https://example.test/#${hash}`,
-    beforeParse(w) { w.claude = { use: async (name) => (name === 'db' ? db : null) }; w.console.error = (...a) => { throw new Error(a.join(' ')); }; } });
+    beforeParse(w) { w.localStorage.setItem('hub-lang', 'en'); w.claude = { use: async (name) => (name === 'db' ? db : null) }; w.console.error = (...a) => { throw new Error(a.join(' ')); }; } });
   await new Promise((r) => setTimeout(r, 30));
   const d = dom.window.document;
   const go = async (h) => { dom.window.location.hash = h; dom.window.dispatchEvent(new dom.window.HashChangeEvent('hashchange')); await new Promise((r) => setTimeout(r, 5)); };
