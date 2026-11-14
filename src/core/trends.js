@@ -22,13 +22,32 @@ export function weeks(asOf, n = 6) {
 }
 const weekOf = (W, date) => W.findIndex((w) => date >= w.from && date <= w.to);
 
+// V1.28 Trends page period: 1, 2 or 4 weeks ending on `asOf`. 1 and 2 weeks are shown day by day, 4 weeks week by
+// week. The verdict compares the whole period with the equally long period just before it.
+export const PERIOD_WEEKS = [1, 2, 4];
+export function period(asOf, nWeeks = 4) {
+  const n = PERIOD_WEEKS.includes(nWeeks) ? nWeeks : 4; const days = 7 * n; const from = shiftDay(asOf, -(days - 1));
+  const by = n <= 2 ? 'day' : 'week';
+  const W = by === 'day' ? Array.from({ length: days }, (_, i) => { const d = shiftDay(from, i); return { from: d, to: d }; }) : weeks(asOf, n);
+  W.by = by; W.weeks = n;
+  W.compare = { from, to: asOf, prevFrom: shiftDay(from, -days), prevTo: shiftDay(from, -1) };
+  return W;
+}
+
 // measure: { key, label, type: 'prop'|'mean', better: 'up'|'down', fmt } ; samples: [{ date, v }]
 function series(measure, samples, W) {
   const per = W.map(() => []);
   for (const s of samples) { const i = weekOf(W, s.date); if (i >= 0 && s.v != null && Number.isFinite(s.v)) per[i].push(s.v); }
   const values = per.map((xs) => (xs.length ? mean(xs) : null));
-  const k = Math.min(VERDICT_WEEKS, Math.floor(W.length / 2));
-  const after = per.slice(-k).flat(); const before = per.slice(-2 * k, -k).flat();
+  let after; let before;
+  if (W.compare) {
+    const c = W.compare; const ok = (s) => s.v != null && Number.isFinite(s.v);
+    after = samples.filter((s) => ok(s) && s.date >= c.from && s.date <= c.to).map((s) => s.v);
+    before = samples.filter((s) => ok(s) && s.date >= c.prevFrom && s.date <= c.prevTo).map((s) => s.v);
+  } else {
+    const k = Math.min(VERDICT_WEEKS, Math.floor(W.length / 2));
+    after = per.slice(-k).flat(); before = per.slice(-2 * k, -k).flat();
+  }
   const c = compareWindows(measure, before, after, { minN: MIN_VALUES });
   const verdict = c.status === 'insufficient' || c.flags.length ? 'not enough data' : c.status;
   return { ...measure, values, counts: per.map((xs) => xs.length), verdict, before: before.length ? mean(before) : null, after: after.length ? mean(after) : null, nBefore: before.length, nAfter: after.length };

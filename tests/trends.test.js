@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { weeks, teamTrends, playerTrends, MIN_VALUES } from '../src/core/trends.js';
+import { weeks, period, teamTrends, playerTrends, MIN_VALUES } from '../src/core/trends.js';
 import { shiftDay } from '../src/core/dates.js';
 
 const asOf = '2026-11-16';
@@ -38,6 +38,19 @@ test('team: PUBG Mobile reports and match log; lower placement is better', () =>
   assert.equal(t.find((m) => m.key === 'ppm').values[5], 10);
   const place = t.find((m) => m.key === 'place'); assert.equal(place.verdict, 'better'); assert.ok(place.after < place.before);
   assert.equal(t.find((m) => m.key === 'early').verdict, 'better');
+});
+
+test('V1.28 period: 1 and 2 weeks by day, 4 weeks by week; verdict against the equally long period before', () => {
+  const P1 = period(asOf, 1); assert.equal(P1.length, 7); assert.equal(P1.by, 'day'); assert.deepEqual(P1[6], { from: asOf, to: asOf });
+  assert.deepEqual(P1.compare, { from: '2026-11-10', to: asOf, prevFrom: '2026-11-03', prevTo: '2026-11-09' });
+  const P2 = period(asOf, 2); assert.equal(P2.length, 14); assert.equal(P2.compare.prevFrom, '2026-10-20');
+  const P4 = period(asOf, 4); assert.equal(P4.length, 4); assert.equal(P4.by, 'week'); assert.deepEqual(P4[3], { from: '2026-11-10', to: asOf }); assert.equal(P4.compare.prevFrom, '2026-09-22');
+  assert.equal(period(asOf, 6).length, 4, 'anything else falls back to 4 weeks');
+  // This week 7 of 7 won, the week before 1 of 8: better; the day of each report holds its games.
+  const reports = [rep('2026-11-04', 1, 4, 3), rep('2026-11-06', 0, 3, 3), rep('2026-11-11', 4, 0, 4), rep('2026-11-15', 3, 0, 5), rep('2026-10-01', 9, 0, 5)];
+  const win = teamTrends('MLBB', { reports }, P1).find((m) => m.key === 'win');
+  assert.equal(win.nAfter, 7); assert.equal(win.nBefore, 8); assert.equal(win.verdict, 'better');
+  assert.equal(win.counts[1], 4); assert.equal(win.values[0], null);
 });
 
 test('players: per-game KDA and K/D/A from confirmed games; stand-ins and the other team left out', () => {

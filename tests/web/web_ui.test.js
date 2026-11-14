@@ -391,6 +391,11 @@ test('V1.16 trends: weekly team lines and per-player table with a fair verdict',
   const aufa = await open(B, 'aufa', 'mlbb-trends');
   for (let i = 0; i < 40 && !/Players/.test(aufa.text()); i++) await sleep(50);
   assert.match(aufa.text(), /MLBB: trends/);
+  // V1.28: default 4 weeks (all of these fall inside it, nothing before: no verdict); 2 weeks compares with the 2 before.
+  assert.equal(aufa.d.querySelector('[data-tr-weeks="4"]').getAttribute('aria-pressed'), 'true');
+  assert.match(aufa.text(), /Scrim win rate\s*Not enough data/);
+  aufa.d.querySelector('[data-tr-weeks="2"]').click(); await sleep(100);
+  assert.match(aufa.text(), /Day by day/); assert.equal(aufa.d.querySelectorAll('#main thead th.n').length, 14);
   assert.match(aufa.text(), /Scrim win rate\s*Better/);
   assert.match(aufa.text(), /Plan followed \(1–5\)\s*No clear change|Plan followed \(1–5\)\s*Not enough data/);
   const deaths = [...aufa.d.querySelectorAll('#main tbody tr')].find((tr) => /D \(lower is better\)/.test(tr.textContent));

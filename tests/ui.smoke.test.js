@@ -5,7 +5,7 @@ import { JSDOM } from 'jsdom';
 
 // Renders every hub view in a headless DOM and checks it produced content without errors.
 const html = readFileSync(new URL('../dist/hub.html', import.meta.url), 'utf8');
-const VIEWS = ['today', 'mlbb', 'dota-team', 'dota-draft', 'dota-post', 'dota-scout', 'dota-review', 'pubgm-team', 'pubgm-log', 'pubgm-sim', 'pubgm-review', 'staff-measure', 'staff-sources'];
+const VIEWS = ['today', 'mlbb', 'dota-team', 'dota-draft', 'dota-post', 'dota-scout', 'dota-review', 'pubgm-team', 'pubgm-log', 'pubgm-sim','staff-measure', 'staff-sources'];
 
 test('hub: every view renders without errors', async () => {
   const errors = [];

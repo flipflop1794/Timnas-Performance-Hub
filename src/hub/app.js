@@ -82,7 +82,7 @@ import { gameBreakdown, breakdownText, BASE_MIN, FLAG_PCT, ownVod, addMark, vodT
 import { tagsOf } from '../core/weakness.js';
 import { coachAiUi } from './coach_ai_ui.js';
 import { standInRecord } from '../core/patterns.js';
-import { weeks as trendWeeks, teamTrends, playerTrends, VERDICT_WEEKS, MIN_VALUES as TR_MIN } from '../core/trends.js';
+import { weeks as trendWeeks, period as trendPeriod, PERIOD_WEEKS as TR_PERIODS, teamTrends, playerTrends, MIN_VALUES as TR_MIN } from '../core/trends.js';
 import { practiceQuality, PARTS as PQ_PARTS, MIN_SESSIONS as PQ_MIN } from '../core/practice_quality.js';
 import { statGoal } from '../core/patterns.js';
 
@@ -129,7 +129,7 @@ const coUi = () => (CO ||= coachAiUi({ S, esc, tag, banner, setMsg, val, render,
   aiOn: () => FEAT.ai && FEAT.coachAi && FEAT.coachAiFn && !!PLATFORM?.ai }));
 // Focus mode (website only, per device): hide screens that are not used yet, so coaches see what matters before WEC.
 // Nothing is deleted; "Show all tools" brings everything back.
-const FOCUS_HIDE = new Set(['board', 'staff-measure', 'tour-series', 'dota-post', 'dota-draft', 'dota-review', 'pubgm-sim', 'pubgm-review', ...(FEAT.donny ? ['well-day', 'well-log'] : [])]);
+const FOCUS_HIDE = new Set(['board', 'staff-measure', 'tour-series', 'dota-post', 'dota-draft', 'dota-review', 'pubgm-sim', ...(FEAT.donny ? ['well-day', 'well-log'] : [])]);
 const focusOn = () => !!HUB_USER && !S.showAll;
 const tabShown = (id, view) => !focusOn() || !FOCUS_HIDE.has(id) || id === view;
 const canSetDates = () => !HUB_USER || HUB_USER.isAdmin || HUB_USER.roles.includes('head_coach');
@@ -311,7 +311,7 @@ const TITLES = [
   { id: 'comp', label: 'Competitors', tabs: [['comp-overview', 'All nations'], ['comp-nation', 'Nation profile'], ['comp-rosters', 'Rosters & players'], ['comp-card', 'Opponent card'], ['comp-coverage', 'Scouting coverage']] },
   { id: 'tour', label: 'Tournament', tabs: [['tour-scout', 'Live scouting'], ['tour-runbook', 'Match-day runbook'], ...(FEAT.coachAi ? [['tour-prep', 'Preparation packs']] : []), ['tour-series', 'Between games']] },
   { id: 'dota', label: 'Dota 2', tabs: [['dota-team', 'Team'], ['dota-scrims', 'Scrims & practice'], ['dota-reports', 'Scrim reports'], ['dota-trends', 'Trends'], ...(FEAT.coachAi ? [['dota-weak', 'Weaknesses']] : []), ...(FEAT.capture ? [['dota-patterns', 'Patterns']] : []), ['dota-post', 'Post-match'], ['dota-scout', 'Competitors'], ['dota-meta', 'Meta'], ...(FEAT.brainAi ? [['dota-brain', 'Brainstorm']] : []), ['dota-draft', 'Draft room'], ['dota-review', 'Series review']] },
-  { id: 'pubgm', label: 'PUBG Mobile', tabs: [['pubgm-team', 'Team'], ['pubgm-scrims', 'Scrims & practice'], ['pubgm-reports', 'Scrim reports'], ['pubgm-trends', 'Trends'], ...(FEAT.coachAi ? [['pubgm-weak', 'Weaknesses']] : []), ['pubgm-log', 'Log & import'], ['pubgm-rivals', 'Competitors'], ['pubgm-meta', 'Meta'], ...(FEAT.brainAi ? [['pubgm-brain', 'Brainstorm']] : []), ['pubgm-sim', 'Strategy sim'], ['pubgm-review', 'Match-day review']] },
+  { id: 'pubgm', label: 'PUBG Mobile', tabs: [['pubgm-team', 'Team'], ['pubgm-scrims', 'Scrims & practice'], ['pubgm-reports', 'Scrim reports'], ['pubgm-trends', 'Trends'], ...(FEAT.coachAi ? [['pubgm-weak', 'Weaknesses']] : []), ['pubgm-log', 'Log & import'], ['pubgm-rivals', 'Competitors'], ['pubgm-meta', 'Meta'], ...(FEAT.brainAi ? [['pubgm-brain', 'Brainstorm']] : []), ['pubgm-sim', 'Strategy sim']] },
   ...GAME_HUBS.map((h) => ({ id: h.id, label: h.label, tabs: hubTabs(h) })),
   { id: 'well', label: 'Performance', tabs: [['readiness', 'Athlete readiness'], ['players', 'Player plans'], ['well-day', 'Wellbeing check'], ['well-log', 'Log check-in & load']] },
   { id: 'guide', label: 'Guide', tabs: [['guide', 'How to use the hub']] },
@@ -822,11 +822,12 @@ function trendChart(m, W) {
   const [min, max] = prop ? [0, 100] : m.key === 'plan' ? [1, 5] : [0, Math.max(1, Math.ceil(Math.max(...have, 0) * 1.15))];
   const ticks = prop ? [0, 50, 100] : m.key === 'plan' ? [1, 3, 5] : [0, round(max / 2, 1), max];
   return trendSvg({ days: W.map((w) => w.to), values: vals, kind: 'line', min, max, ticks, fmt: (v) => (prop ? `${v}%` : `${v}`), label: m.label,
-    tip: (i) => `Week ${W[i].from} to ${W[i].to}: ${trFmt(m, m.values[i])} (${m.counts[i]} value${m.counts[i] === 1 ? '' : 's'})` });
+    tip: (i) => `${W.by === 'day' ? W[i].to : `Week ${W[i].from} to ${W[i].to}`}: ${trFmt(m, m.values[i])} (${m.counts[i]} value${m.counts[i] === 1 ? '' : 's'})` });
 }
+const periodLabel = (n) => (n === 1 ? 'Last 1 week' : `Last ${n} weeks`);
 function trendsPage(title) {
   if (S.mode === 'demo') return `<div class="panel">${DEMO_BANNER}<p class="empty">Trends use operational records only.</p></div>`;
-  const n = S.trWeeks || 6; const W = trendWeeks(today(), n);
+  const n = TR_PERIODS.includes(S.trWeeks) ? S.trWeeks : 4; const W = trendPeriod(today(), n);
   let pubgm = null;
   if (title === 'PUBG Mobile') { const d = pubgmData(); pubgm = { rows: d.rows, team: d.team, points: (r) => d.sc.total(r) }; }
   const team = teamTrends(title, { reports: S.reports, pubgm }, W);
@@ -834,18 +835,19 @@ function trendsPage(title) {
   const players = playerTrends(games, W);
   const changes = S.cycle.filter((o) => o.title === title).flatMap((o) => (o.reviews || []).filter((r) => ['accepted', 'modified'].includes(r.decision) && String(r.at).slice(0, 10) >= W[0].from).map((r) => ({ at: String(r.at).slice(0, 10), what: o.rec?.problem || o.id, drill: o.objective?.drill || '' })))
     .sort((a, b) => a.at.localeCompare(b.at));
-  const head = (m) => `<div class="toolbar"><b>${esc(m.label)}</b> ${verdictTag(m.verdict)} <span class="note">last ${VERDICT_WEEKS} weeks ${trFmt(m, m.after)} (${m.nAfter}) vs ${trFmt(m, m.before)} (${m.nBefore}) before</span></div>`;
+  const head = (m) => `<div class="toolbar"><b>${esc(m.label)}</b> ${verdictTag(m.verdict)} <span class="note">this period ${trFmt(m, m.after)} (${m.nAfter}) vs ${trFmt(m, m.before)} (${m.nBefore}) the ${n === 1 ? 'week' : `${n} weeks`} before</span></div>`;
   const wk = (w) => `${w.to.slice(8)}/${w.to.slice(5, 7)}`;
   return `<div class="panel"><div class="lead">${esc(title)}: <em>trends</em></div>
-    <p>Is practice turning into improvement? Week by week from scrim reports${gameOf(title) ? ', confirmed scrim games (per player)' : ''}${title === 'PUBG Mobile' ? ' and the match log' : ''}. Nothing extra to type.</p>
-    <div class="form"><label class="field" for="trWeeks">Period<select id="trWeeks">${[4, 6, 8].map((k) => `<option value="${k}" ${k === n ? 'selected' : ''}>Last ${k} weeks</option>`).join('')}</select></label></div>
+    <p>Is practice turning into improvement? ${W.by === 'day' ? 'Day by day' : 'Week by week'} from scrim reports${gameOf(title) ? ', confirmed scrim games (per player)' : ''}${title === 'PUBG Mobile' ? ' and the match log' : ''}. Nothing extra to type.</p>
+    <div class="toolbar" role="group" aria-label="Period"><span class="note">Period</span>${TR_PERIODS.map((k) => `<button class="btn${k === n ? ' primary' : ''}" type="button" data-tr-weeks="${k}" aria-pressed="${k === n}">${periodLabel(k)}</button>`).join('')}</div>
+    <p class="note">${esc(W.compare.from)} to ${esc(W.compare.to)}, compared with ${esc(W.compare.prevFrom)} to ${esc(W.compare.prevTo)}.</p>
     ${S.reportLoad === 'error' ? banner('block', '<div>Scrim reports could not be loaded: these trends are incomplete.</div>') : ''}
-    <p class="note">"Better" or "Worse" only when the last ${VERDICT_WEEKS} weeks differ from the ${VERDICT_WEEKS} before by more than chance (95% interval), with at least ${TR_MIN} games or reports on each side. Partner strength changes week to week: read a change against who you played (Scrim reports). It shows a change in practice numbers, not in tournament chances.</p></div>
+    <p class="note">"Better" or "Worse" only when this period differs from the period before by more than chance (95% interval), with at least ${TR_MIN} games or reports on each side. Partner strength changes week to week: read a change against who you played (Scrim reports). It shows a change in practice numbers, not in tournament chances.</p></div>
   ${team.length ? `<div class="panel"><h2>Team</h2>${team.map((m) => `<div class="trendrow">${head(m)}<div class="trends">${trendChart(m, W)}</div></div>`).join('')}</div>`
     : `<div class="panel"><h2>Team</h2><p class="empty">No scrim reports in this period yet. File reports under Scrim reports and the lines appear here.</p></div>`}
-  ${gameOf(title) ? `<div class="panel"><h2>Players</h2>${players.length ? `<div class="tw"><table><thead><tr><th>Player</th><th>Per game</th>${W.map((w) => `<th class="n">${wk(w)}</th>`).join('')}<th>Last ${VERDICT_WEEKS} weeks</th></tr></thead><tbody>
+  ${gameOf(title) ? `<div class="panel"><h2>Players</h2>${players.length ? `<div class="tw"><table><thead><tr><th>Player</th><th>Per game</th>${W.map((w) => `<th class="n">${wk(w)}</th>`).join('')}<th>Change</th></tr></thead><tbody>
       ${players.flatMap((p) => p.measures.map((m, i) => `<tr>${i ? '<td></td>' : `<td><b>${esc(p.player)}</b><br><span class="note">${p.games} game${p.games === 1 ? '' : 's'}</span></td>`}<td>${esc(m.label)}${m.better === 'down' ? ' <span class="note">(lower is better)</span>' : ''}</td>${m.values.map((v, k) => `<td class="n" title="${m.counts[k]} game(s)">${trFmt(m, v)}</td>`).join('')}<td>${verdictTag(m.verdict)}</td></tr>`)).join('')}</tbody></table></div>
-      <p class="note">From coach-confirmed scrim games only (screenshot capture or typed in). Weekly averages per game; stand-ins are left out.</p>`
+      <p class="note">From coach-confirmed scrim games only (screenshot capture or typed in). ${W.by === 'day' ? 'Daily' : 'Weekly'} averages per game; stand-ins are left out.</p>`
     : `<p class="empty">No confirmed scrim games in this period. Add games to a scrim report (screenshot or by hand) to see each player's line.</p>`}</div>` : ''}
   <div class="panel"><h2>What the staff changed in this period</h2>${changes.length ? `<ul class="plain">${changes.map((c) => `<li><b>${esc(c.at)}</b> accepted: ${esc(c.what)}${c.drill ? ` <span class="note">— drill: ${esc(c.drill)}</span>` : ''}</li>`).join('')}</ul>` : '<p class="empty">No objective accepted in this period.</p>'}
     <p class="note">Read the lines against these dates: a change after an objective started is a hint, not proof, that the practice worked.</p></div>`;
@@ -1296,19 +1298,48 @@ export function checkPubgmImport(mText, fText) {
   if (!rows.length && !fights.length) errs.push('Paste or load at least one CSV.');
   return { rows, fights, errs };
 }
+// V1.28: the log page in plain steps, with a column guide a coach can read (what to write, an example, needed or not).
+const MATCH_GUIDE = [
+  ['match_id', 'Match code; the same for every team in that match and in the fight rows', true],
+  ['date', 'Date, YYYY-MM-DD', true], ['session', 'Session or day code', true], ['event', 'Name of the scrim or event'], ['map', 'Map name', true],
+  ['lobby_strength', 'How strong the lobby was, 1–5 (staff estimate)'], ['team', 'Team tag as shown in the lobby', true], ['placement', 'Final place, 1–16', true],
+  ['elims', 'Total kills', true], ['elims_early, elims_mid, elims_late', 'Kills early, mid and late game (optional; must add up to elims)'],
+  ['survival_s', 'Seconds survived'], ['drop_spot', 'Where the team landed'], ['drop_contested', '1 if another team landed there too, else 0'],
+  ['vehicle_by_3min', '1 if the team had a vehicle by minute 3, else 0'], ['died_phase', 'Zone in which the team was wiped out; 0 = alive at the end', true],
+  ['zone_entry', 'early, late or forced'], ['position', 'edge or center'], ['strategy', 'aggressive, balanced or passive'],
+];
+const FIGHT_GUIDE = [
+  ['match_id', 'Same match code as in the match rows', true], ['team', 'Team tag (usually ours)', true], ['t_s', 'When the fight started, seconds from match start'],
+  ['phase', 'Zone number at the time'], ['initiator', 'us or them: who started it'], ['zone_forced', '1 if the zone forced the fight, else 0'],
+  ['knocks_for, knocks_against', 'Knocks we made / knocks we took'], ['finishes_for', 'Finishes we made'], ['team_deaths', 'Our players who died'],
+  ['third_party', '1 if a third team joined, else 0'], ['notes', 'One short line'],
+];
+function guideTable(rows, template) {
+  const [head, ex] = template.split('\n').map((l) => l.split(',')); const exOf = (cols) => cols.split(', ').map((c) => ex[head.indexOf(c)] ?? '').join(', ');
+  return `<div class="tw"><table><thead><tr><th>Column</th><th>What to write</th><th>Example</th><th>Needed</th></tr></thead><tbody>${rows.map(([c, what, need]) => `<tr><td><code data-no-tr>${esc(c)}</code></td><td>${esc(what)}</td><td data-no-tr>${esc(exOf(c))}</td><td>${need ? '✓' : ''}</td></tr>`).join('')}</tbody></table></div>`;
+}
 V['pubgm-log'] = () => `${FEAT.coachAi ? coUi().brSection() : ''}<div class="panel"><h2>Log scrims and fights</h2>
   ${S.mode === 'demo' ? DEMO_BANNER + '<p class="empty">Logging is switched off in the demo sandbox.</p>' : `
-  <p>One row per team per match (the whole lobby), plus one row per fight tagged from VOD. Rows are checked, stamped as operational and saved to the shared log.</p>
+  <p>Record every PUBG Mobile scrim match here. Team, Trends and the Strategy sim read from this log.</p>
   ${S.dbState === 'live' ? banner('real', '<div><b>Shared log connected.</b></div>') : banner('synth', `<div><b>Shared log not connected</b> (${esc(S.dbState)}). Rows stay in this browser tab only and are lost on reload.</div>`)}
-  <div class="cols"><div><label class="field" for="lMatches">Match rows (CSV)<textarea id="lMatches" placeholder="${esc(MATCH_TEMPLATE)}"></textarea></label>
-    <div class="toolbar"><input type="file" id="lMatchFile" accept=".csv,text/csv" aria-label="Load match CSV file"><button class="btn" type="button" data-copy="match">Copy template</button></div></div>
-  <div><label class="field" for="lFights">Fight rows (CSV)<textarea id="lFights" placeholder="${esc(FIGHT_TEMPLATE)}"></textarea></label>
-    <div class="toolbar"><input type="file" id="lFightFile" accept=".csv,text/csv" aria-label="Load fight CSV file"><button class="btn" type="button" data-copy="fight">Copy template</button></div></div></div>
+  <div class="stats"><div class="stat"><span class="k">Match rows logged</span><span class="v">${S.pubgm.logged.matches.length}</span></div><div class="stat"><span class="k">Fight rows logged</span><span class="v">${S.pubgm.logged.fights.length}</span></div></div>
+  <h3>How to log</h3><ol>
+    <li>Press <b>Copy template</b> and paste it into a spreadsheet (Excel or Google Sheets). Fill one row per team per match, the whole lobby, not only us.</li>
+    <li>Optional: fill the fight template, one row per fight you tag from the VOD.</li>
+    <li>Copy the filled rows (with the header row) into the boxes below, or load the CSV file.</li>
+    <li>Press <b>Check and save</b>. If a row is wrong, the hub says which row and why; nothing is saved until every row is right.</li></ol>
+  <div class="cols"><div><h3>1. Match results <span class="note">(needed)</span></h3><p class="note">One row per team per match.</p>
+    <label class="field" for="lMatches">Match rows (CSV)<textarea id="lMatches" placeholder="${esc(MATCH_TEMPLATE)}"></textarea></label>
+    <div class="toolbar"><button class="btn" type="button" data-copy="match">Copy template</button><input type="file" id="lMatchFile" accept=".csv,text/csv" aria-label="Load match CSV file"></div></div>
+  <div><h3>2. Fights <span class="note">(optional)</span></h3><p class="note">One row per fight, with the same match code.</p>
+    <label class="field" for="lFights">Fight rows (CSV)<textarea id="lFights" placeholder="${esc(FIGHT_TEMPLATE)}"></textarea></label>
+    <div class="toolbar"><button class="btn" type="button" data-copy="fight">Copy template</button><input type="file" id="lFightFile" accept=".csv,text/csv" aria-label="Load fight CSV file"></div></div></div>
   <div class="toolbar"><button class="btn primary" type="button" id="lSave">Check and save</button></div><div id="lMsg" class="msg" role="status"></div>
-  <details><summary class="note">Column guide</summary><ul class="plain note">
-    <li><b>lobby_strength</b> 1–5 staff estimate · <b>died_phase</b> 0 = alive at end · <b>drop_contested</b>, <b>vehicle_by_3min</b> 0/1</li>
-    <li><b>zone_entry</b> early / late / forced · <b>position</b> edge / center · <b>strategy</b> aggressive / balanced / passive</li></ul></details>
-  <p class="note">${S.pubgm.logged.matches.length} match rows · ${S.pubgm.logged.fights.length} fight rows logged.</p>`}</div>`;
+  <p class="note">${S.pubgm.logged.matches.length} match rows · ${S.pubgm.logged.fights.length} fight rows logged.</p></div>
+  <div class="panel"><h2>What to write in each column</h2>
+    <details open><summary><b>Match rows</b></summary>${guideTable(MATCH_GUIDE, MATCH_TEMPLATE)}</details>
+    <details><summary><b>Fight rows</b></summary>${guideTable(FIGHT_GUIDE, FIGHT_TEMPLATE)}</details>
+    <p class="note">0/1 columns: 1 = yes, 0 = no. Leave a cell empty when you do not know; never guess a number.</p>`}</div>`;
 
 V['pubgm-sim'] = () => {
   const d = pubgmData();
@@ -1330,15 +1361,6 @@ V['pubgm-sim'] = () => {
     ${Object.entries(cfg.assumptions).map(([k, a]) => `<tr><td>${esc(a.label)}</td><td><input type="number" step="0.1" id="as-${k}-elimMult" value="${a.elimMult}" aria-label="${esc(a.label)} elimination multiplier"></td><td><input type="number" step="0.01" id="as-${k}-earlyExitAdd" value="${a.earlyExitAdd}" aria-label="${esc(a.label)} early exit change"></td><td><input type="number" step="1" id="as-${k}-placeShift" value="${a.placeShift}" aria-label="${esc(a.label)} placement shift"></td></tr>`).join('')}</tbody></table></div><p class="note">Staff judgements, not measured effects.</p></div>`;
 };
 
-V['pubgm-review'] = () => {
-  const d = pubgmData();
-  const sessions = [...new Set(d.rows.map((r) => r.session))].sort();
-  if (!sessions.length) return `<div class="panel"><h2>Match-day review</h2>${pubgmHeader(d)}<p class="empty">No logged sessions.</p></div>`;
-  if (!sessions.includes(S.selDay)) S.selDay = sessions.at(-1);
-  const day = pubgmRun(d, (r) => r.session === S.selDay);
-  return `<div class="panel"><h2>Match-day review</h2>${pubgmHeader(d)}<label class="field" for="dayS">Session<select id="dayS">${sessions.map((s) => `<option ${s === S.selDay ? 'selected' : ''}>${esc(s)}</option>`).join('')}</select></label>
-    ${day.insufficient ? banner('block', `<div>${esc(day.insufficient)} Single-day findings need a full session.</div>`) : findingList(day.evidence)}</div>`;
-};
 
 // Staff: coaching cycle
 const opt = (arr, sel) => arr.map((x) => `<option ${x === sel ? 'selected' : ''}>${esc(x)}</option>`).join('');
@@ -2374,6 +2396,7 @@ async function onClick(e) {
       S.asOf = Math.floor(Date.now() / 1000); render();
     } catch (err) { setMsg('poolMsg', err.message, 'err'); }
   }
+  if (t.dataset.trWeeks) { S.trWeeks = Number(t.dataset.trWeeks); render(); return; }
   if (t.dataset.copy) { const txt = t.dataset.copy === 'match' ? MATCH_TEMPLATE : FIGHT_TEMPLATE; try { await navigator.clipboard.writeText(txt); t.textContent = 'Copied'; } catch { const ta = t.dataset.copy === 'match' ? $('#lMatches') : $('#lFights'); ta.value = txt; ta.select(); } }
   if (id === 'lSave') {
     const { rows, fights, errs } = checkPubgmImport(val('lMatches').trim(), val('lFights').trim());
@@ -2943,14 +2966,12 @@ document.addEventListener('change', (e) => {
   if (id === 'plP') { S.planPlayer = e.target.value; render(); }
   if (id === 'brD') { S.briefDate = e.target.value || today(); render(); }
   if (id === 'pqDays') { S.pqDays = Number(e.target.value) || 7; render(); }
-  if (id === 'trWeeks') { S.trWeeks = Number(e.target.value) || 6; render(); }
   if (id === 'wD') { S.wellDate = e.target.value; render(); }
   if (id === 'dFirst') { S.draft.firstUs = e.target.value === 'us'; S.draft.steps = []; render(); }
   if (id === 'dOpp') { S.draft.opp = e.target.value; render(); }
   if (id === 'mSel') { S.selMatch = +e.target.value; S.importReport = null; render(); }
   if (id === 'nSel') { S.selNation = e.target.value; render(); }
   if (id === 'pTeam') { S.pubgm.team = e.target.value; render(); }
-  if (id === 'dayS') { S.selDay = e.target.value; render(); }
   if (id === 'mSplit') { S.splitDate = e.target.value; render(); }
   if (id === 'mFile') { const f = e.target.files?.[0]; if (!f) return; const r = new FileReader(); r.onload = () => doImport(String(r.result), `OpenDota JSON file ${f.name}`); r.readAsText(f); }
   if (id === 'lMatchFile' || id === 'lFightFile') { const f = e.target.files?.[0]; if (!f) return; const r = new FileReader(); r.onload = () => { (id === 'lMatchFile' ? $('#lMatches') : $('#lFights')).value = r.result; }; r.readAsText(f); }

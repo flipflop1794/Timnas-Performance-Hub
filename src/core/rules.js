@@ -11,7 +11,7 @@ export const DEFAULT_RULES = [
   { id: 'dota-draft-order', title: 'Dota 2', label: 'Draft order', version: 'CM 24-step, observed 7.41', status: 'provisional',
     source: 'Observed in 2 OpenDota tournament drafts. IESF WEC draft rules not published.', affects: ['dota-draft'] },
   { id: 'pubgm-scoring', title: 'PUBG Mobile', label: 'Scoring table', version: 'standard_10_6 v1', status: 'unverified',
-    source: 'Common 10-6-5-4-3-2-1-1 + 1/elimination. No rulebook retrieved; WEC table not published.', affects: ['pubgm-team', 'pubgm-sim', 'pubgm-review', 'staff-measure'] },
+    source: 'Common 10-6-5-4-3-2-1-1 + 1/elimination. No rulebook retrieved; WEC table not published.', affects: ['pubgm-team', 'pubgm-sim', 'staff-measure'] },
   { id: 'wec-live-coaching', title: 'All', label: 'Live coaching / external tools during matches', version: 'unknown', status: 'blocked',
     source: 'Not published. Owner: PB ESI international relations.', affects: ['pubgm-sim', 'dota-draft'] },
 ];
