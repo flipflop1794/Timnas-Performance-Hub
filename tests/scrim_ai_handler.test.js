@@ -106,7 +106,7 @@ test('digest: staff marks on earlier findings travel with the request', async ()
 
 test('ping: tells the hub whether AI is switched on, without an AI call or a usage row', async () => {
   const on = setup(); const r = await on.call({ action: 'ping' });
-  assert.equal(r.status, 200); assert.deepEqual(r.body, { ok: true, ai: true, actions: ['scoreboard', 'draft', 'debrief', 'digest', 'plan', 'summary', 'prep', 'tags', 'br_result'] }); assert.equal(on.log.calls.length, 0); assert.equal(on.log.inserts.length, 0);
+  assert.equal(r.status, 200); assert.deepEqual(r.body, { ok: true, ai: true, actions: ['scoreboard', 'draft', 'debrief', 'digest', 'plan', 'summary', 'prep', 'tags', 'br_result', 'weekly', 'meta_extract', 'meta_fit', 'prematch', 'scout_day', 'brainstorm'] }); assert.equal(on.log.calls.length, 0); assert.equal(on.log.inserts.length, 0);
   const off = setup({ key: '' }); assert.equal((await off.call({ action: 'ping' })).body.ai, false);
   // V1.18: no answer without a signed-in session.
   assert.equal((await setup().call({ action: 'ping' }, {})).status, 401);

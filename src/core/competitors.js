@@ -99,19 +99,46 @@ export const FORM = [
   { title: 'eFootball', nation: 'Brazil', date: '2025-07', event: 'eFootball Championship 2025 World Finals, Tokyo', result: 'Mobile division won by Brazil\'s Juninho (individual event).', source: 'gekisaka.jp; sportsdunia.com', check: true, club: true },
 ];
 const byDate = (a, b) => (b.date || '').localeCompare(a.date || '');
-// Everything on record for one nation in one title: its own results plus the podiums it stood on.
-export function formOf(title, nation) {
+// V1.23: staff keep the public results up to date in the hub. They are stored with the scouting notes
+// (same collection, same title rules) but marked kind "result" (add or correct) or "result-retire" (hide one,
+// with a reason), so they never count as scouting notes. A result is identified by title, nation, event and date:
+// a staff result with the same key replaces the shipped one (a correction).
+export const formKey = (f) => `${f.title}|${f.nation}|${(f.event || '').trim().toLowerCase()}|${f.date || ''}`;
+export const isNote = (n) => !n.kind || n.kind === 'observed' || n.kind === 'hypothesis';
+const RESULT_DATE = /^\d{4}(-\d{2}(-\d{2})?)?$/;
+export function rivalResult(x) {
+  for (const k of ['title', 'nation', 'event', 'date', 'result', 'source', 'by']) if (!x[k] || !String(x[k]).trim()) throw new Error(`${({ by: 'Who entered it', event: 'Event', date: 'Date', result: 'Result', source: 'Source', title: 'Title', nation: 'Nation' })[k]} is required.`);
+  if (!FIELDS[x.title]?.includes(x.nation)) throw new Error(`${x.nation} is not in the published ${x.title} field.`);
+  const date = String(x.date).trim();
+  if (!RESULT_DATE.test(date)) throw new Error('Date must be YYYY, YYYY-MM or YYYY-MM-DD.');
+  if (x.asOf && date > x.asOf) throw new Error('A result cannot be dated in the future.');
+  return { kind: 'result', title: x.title, nation: x.nation, event: x.event.trim(), date, result: x.result.trim(), source: x.source.trim(),
+    club: !!x.club, check: !!x.check, by: x.by.trim(), at: new Date().toISOString(), origin: 'operational' };
+}
+export function retireResult(x) {
+  if (!x.key || !x.title) throw new Error('Pick the result to retire.');
+  if (!x.why || !x.why.trim()) throw new Error('Say why it is retired (wrong, duplicate, superseded).');
+  if (!x.by || !x.by.trim()) throw new Error('Who entered it is required.');
+  return { kind: 'result-retire', title: x.title, nation: x.nation || '', key: x.key, why: x.why.trim(), by: x.by.trim(), at: new Date().toISOString(), origin: 'operational' };
+}
+// Everything on record for one nation in one title: its own results plus the podiums it stood on,
+// with the staff's additions, corrections and retirements applied.
+export function formOf(title, nation, staff = []) {
   const podium = EVENTS.filter((e) => e.title === title && [e.gold, e.silver, ...(e.bronze || [])].includes(nation))
     .map((e) => ({ title, nation, date: e.date, event: e.event, result: e.gold === nation ? 'Gold' : e.silver === nation ? 'Silver' : 'Bronze', source: e.source, check: !!e.check, podium: true }));
-  const own = FORM.filter((f) => f.title === title && f.nation === nation);
+  const mine = staff.filter((s) => s.title === title && s.nation === nation && s.kind === 'result')
+    .sort((a, b) => (a.at || '').localeCompare(b.at || ''));
+  const latest = new Map(); for (const s of mine) latest.set(formKey(s), { ...s, staff: true });   // newest correction wins
+  const retired = new Set(staff.filter((s) => s.title === title && s.kind === 'result-retire').map((s) => s.key));
+  const own = [...FORM.filter((f) => f.title === title && f.nation === nation && !latest.has(formKey(f))), ...latest.values()];
   // A nation's own line for the same event says more than the bare medal: keep the richer one.
   const kept = podium.filter((p) => !own.some((o) => o.event === p.event));
-  return [...own, ...kept].sort(byDate);
+  return [...own, ...kept].filter((f) => !retired.has(formKey(f))).sort(byDate);
 }
 // One title: recent podiums, and which nations in its field have any public result on record.
-export function fieldForm(title) {
+export function fieldForm(title, staff = []) {
   const field = FIELDS[title] || [];
-  const rows = field.map((nation) => ({ nation, form: formOf(title, nation) }));
+  const rows = field.map((nation) => ({ nation, form: formOf(title, nation, staff) }));
   return { title, events: EVENTS.filter((e) => e.title === title).sort(byDate), withResults: rows.filter((r) => r.form.length), without: rows.filter((r) => !r.form.length).map((r) => r.nation) };
 }
 
@@ -130,7 +157,7 @@ export function rivalNote(x) {
 // One title's competitor board: field, notes per nation, staff tier, coverage.
 export function board(title, notes = [], tiers = {}) {
   const field = FIELDS[title] || [];
-  const all = [...KNOWN.filter((k) => k.title === title), ...notes.filter((n) => n.title === title)];
+  const all = [...KNOWN.filter((k) => k.title === title), ...notes.filter((n) => n.title === title && isNote(n))];
   const rows = field.map((nation) => {
     const ns = all.filter((n) => n.nation === nation).sort((a, b) => b.date.localeCompare(a.date));
     const t = tiers[`${title}|${nation}`];
@@ -151,7 +178,7 @@ const lc = (s) => (s || '').toLowerCase();
 export function nationProfile(nation, { rivals = [], tiers = {}, vods = [], partners = [], scrims = [], matches = [] } = {}) {
   const titles = TITLE_ORDER.filter((t) => FIELDS[t]?.includes(nation));
   const per = titles.map((title) => {
-    const notes = [...KNOWN, ...rivals].filter((n) => n.title === title && n.nation === nation).sort((a, b) => (b.date || '').localeCompare(a.date || ''));
+    const notes = [...KNOWN, ...rivals.filter(isNote)].filter((n) => n.title === title && n.nation === nation).sort((a, b) => (b.date || '').localeCompare(a.date || ''));
     const t = tiers[`${title}|${nation}`];
     const v = vods.filter((x) => x.title === title && x.nation === nation);
     const standIns = partners.filter((p) => p.title === title && p.resembles === nation);

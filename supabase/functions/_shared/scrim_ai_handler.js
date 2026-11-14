@@ -13,10 +13,12 @@ import {
   PROMPT_VERSION, DEFAULT_MODEL, LIMITS, gameOf, scoreboardSchema, draftSchema, debriefSchema, digestSchema, planSchema,
   scoreboardPrompt, draftPrompt, debriefPrompt, digestPrompt, planPrompt, messagesRequest, imageBlock, parseModelJson, usageOf, capturePath,
   tagsSchema, tagsPrompt, tagsOf, summarySchema, summaryPrompt, prepSchema, prepPrompt, brResultSchema, brResultPrompt,
+  weeklySchema, weeklyPrompt, metaExtractSchema, metaExtractPrompt, metaFitSchema, metaFitPrompt,
+  prematchSchema, prematchPrompt, scoutDaySchema, scoutDayPrompt, brainstormSchema, brainstormPrompt,
 } from './scrim_spec.js';
 
 // V1.20: summary (weekly, all titles), prep (one WEC match), tags (weakness labels), br_result (PUBG Mobile screenshot).
-const ACTIONS = ['scoreboard', 'draft', 'debrief', 'digest', 'plan', 'summary', 'prep', 'tags', 'br_result'];
+const ACTIONS = ['scoreboard', 'draft', 'debrief', 'digest', 'plan', 'summary', 'prep', 'tags', 'br_result', 'weekly', 'meta_extract', 'meta_fit', 'prematch', 'scout_day', 'brainstorm'];
 const IMAGE_ACTIONS = ['scoreboard', 'draft', 'br_result'];
 // Calls per day (WIB) for the whole staff, unless the TEAM_DAILY_CALL_CAP secret says otherwise.
 export const TEAM_DAILY_CAP = 600;
@@ -111,12 +113,40 @@ export async function handle(req, deps) {
       if (payload.length < 20) return fail(400, 'Nothing to summarise yet.');
       if (payload.length > 60000) return fail(413, 'Too much material for one call.');
       request = messagesRequest({ model, system: action === 'summary' ? summaryPrompt() : prepPrompt(title), schema: action === 'summary' ? summarySchema() : prepSchema(), maxTokens: 2500, content: [{ type: 'text', text: payload }] });
+    } else if (action === 'weekly' || action === 'meta_fit') {
+      const payload = JSON.stringify(body.material || {});
+      if (payload.length < 20) return fail(400, 'Nothing to draft from yet.');
+      if (payload.length > 60000) return fail(413, 'Too much material for one call.');
+      request = messagesRequest({ model, system: action === 'weekly' ? weeklyPrompt(title) : metaFitPrompt(title), schema: action === 'weekly' ? weeklySchema() : metaFitSchema(), maxTokens: action === 'weekly' ? 1200 : 2000, content: [{ type: 'text', text: payload }] });
+    } else if (action === 'prematch' || action === 'scout_day') {
+      const payload = JSON.stringify(body.material || {});
+      if (payload.length < 20) return fail(400, 'Nothing to brief from yet: log some observations first.');
+      if (payload.length > 60000) return fail(413, 'Too much material for one call.');
+      request = messagesRequest({ model, system: action === 'prematch' ? prematchPrompt(title) : scoutDayPrompt(title), schema: action === 'prematch' ? prematchSchema() : scoutDaySchema(), maxTokens: 1800, content: [{ type: 'text', text: payload }] });
+    } else if (action === 'brainstorm') {
+      const question = String(body.question || '').trim();
+      if (!question) return fail(400, 'Ask a question first.');
+      if (question.length > 1500) return fail(413, 'Keep the question under 1,500 characters.');
+      const history = (Array.isArray(body.history) ? body.history : []).slice(-8).map((h) => ({ role: h.role === 'ai' ? 'ai' : 'staff', text: String(h.text || '').slice(0, 1500) }));
+      const material = JSON.stringify(body.material || {});
+      if (material.length > 50000) return fail(413, 'Too much material for one call.');
+      // The material is the same for every message of a session: cached after the first one.
+      request = messagesRequest({ model, system: `${brainstormPrompt(title, body.purpose)}\n\nMATERIAL:\n${material}`, schema: brainstormSchema(), maxTokens: 1500,
+        content: [{ type: 'text', text: JSON.stringify({ PREFS: (Array.isArray(body.prefs) ? body.prefs : []).slice(0, 10).map((p) => String(p).slice(0, 200)), HISTORY: history, QUESTION: question }) }] });
+    } else if (action === 'meta_extract') {
+      const text = String(body.text || '').trim();
+      if (!text) return fail(400, 'Paste the text first.');
+      if (text.length > LIMITS.metaChars) return fail(413, `Paste at most ${LIMITS.metaChars} characters at a time.`);
+      request = messagesRequest({ model, system: metaExtractPrompt(title), schema: metaExtractSchema(), maxTokens: 3000, content: [{ type: 'text', text: JSON.stringify({ SOURCE: String(body.source || '').slice(0, 200), TEXT: text }) }] });
     } else if (action === 'debrief') {
       const text = String(body.text || '').trim();
       if (!text) return fail(400, 'Type or dictate the note first.');
       if (text.length > LIMITS.debriefChars) return fail(413, `Keep the note under ${LIMITS.debriefChars} characters.`);
       const roster = (Array.isArray(body.roster) ? body.roster : []).map(String).slice(0, 12);
-      request = messagesRequest({ model, system: debriefPrompt(title, roster), schema: debriefSchema(), maxTokens: 2048, content: [{ type: 'text', text }] });
+      // V1.26: the session's planned drills, so the note can be read per drill.
+      const blocks = (Array.isArray(body.blocks) ? body.blocks : []).slice(0, 4).map((b, i) => `${i}. ${String(b.name || '').slice(0, 80)} — criterion: ${String(b.criterion || '').slice(0, 200)}`);
+      const content = blocks.length ? `PLANNED DRILLS:\n${blocks.join('\n')}\n\nNOTE:\n${text}` : text;
+      request = messagesRequest({ model, system: debriefPrompt(title, roster), schema: debriefSchema(), maxTokens: 2048, content: [{ type: 'text', text: content }] });
     } else if (action === 'plan') {
       const clip = (v, n = 400) => String(v ?? '').slice(0, n);
       const reports = (Array.isArray(body.reports) ? body.reports : []).slice(0, LIMITS.planReports).map((r) => ({
@@ -125,7 +155,11 @@ export async function handle(req, deps) {
       if (!reports.length) return fail(400, 'No scrim reports yet for this title: file one first.');
       const findings = (Array.isArray(body.findings) ? body.findings : []).slice(0, LIMITS.planFindings).map((f) => ({ id: clip(f.id, 60), claim: clip(f.claim), staff_mark: clip(f.status, 20) }));
       const objectives = (Array.isArray(body.objectives) ? body.objectives : []).slice(0, 8).map((o) => clip(o, 200));
-      request = messagesRequest({ model, system: planPrompt(title), schema: planSchema(), maxTokens: 1200, content: [{ type: 'text', text: JSON.stringify({ REPORTS: reports, FINDINGS: findings, OBJECTIVES: objectives }) }] });
+      // V1.26: what the timed drills should start from (computed by the hub).
+      const m = body.material || {};
+      const list = (v, n) => (Array.isArray(v) ? v : []).slice(0, n);
+      request = messagesRequest({ model, system: planPrompt(title), schema: planSchema(), maxTokens: 2000, content: [{ type: 'text', text: JSON.stringify({ REPORTS: reports, FINDINGS: findings, OBJECTIVES: objectives,
+        UNFIXED: list(m.unfixed, 4), WEAKNESSES: list(m.weaknesses, 6), THEMES: list(m.themes, 4) }) }] });
     } else {
       const facts = (Array.isArray(body.facts) ? body.facts : []).slice(0, LIMITS.digestFacts);
       const feedback = (Array.isArray(body.feedback) ? body.feedback : []).slice(0, LIMITS.digestFeedback);

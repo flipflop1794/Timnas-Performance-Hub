@@ -15,6 +15,18 @@ test('dictionary, prefixes and patterns; data and blank text untouched', () => {
   assert.equal(tr('   '), null); assert.equal(tr('NARMAN'), null); assert.equal(tr('Winter Wyvern'), null);
 });
 
+test('V1.22 sweep: scrim report messages, Trends, Pelatnas and the leadership dashboard read in Bahasa Indonesia', () => {
+  assert.equal(tr('Write the adjustment for the next session.'), 'Tulis penyesuaian untuk sesi berikutnya.');
+  assert.equal(tr('Won must be a whole number from 0 to 999.'), 'Menang harus bilangan bulat dari 0 sampai 999.');
+  assert.equal(tr('Player notes: remove phone or ID numbers; keep performance notes only.'), 'Catatan pemain: hapus nomor telepon atau nomor identitas; tulis catatan performa saja.');
+  assert.equal(tr('Wins (4) cannot be more than matches played (3).'), 'Kemenangan (4) tidak boleh lebih dari jumlah match (3).');
+  assert.equal(tr('Record at least one map played (won, lost or drawn).'), 'Catat minimal satu map yang dimainkan (menang, kalah atau seri).');
+  assert.equal(tr('Is practice turning into improvement? Week by week from scrim reports. Nothing extra to type.'), 'Apakah latihan menghasilkan peningkatan? Minggu demi minggu dari laporan scrim. Tidak perlu mengetik apa-apa lagi.');
+  assert.equal(tr('0 of 15 players have answered.'), '0 dari 15 pemain sudah menjawab.');
+  assert.equal(tr("Nothing planned for 2026-11-13. Plan sessions in a title's Scrims & practice tab."), 'Belum ada rencana untuk 2026-11-13. Rencanakan sesi di tab Scrim & latihan tiap title.');
+  assert.equal(tr('average of titles with records, 0–100'), 'rata-rata title yang punya catatan, 0–100');
+});
+
 test('page in Bahasa Indonesia: toggle, stable redraws, option values kept, logic still works', async () => {
   const dom = new JSDOM(`<!doctype html><html><body>${html}</body></html>`, { runScripts: 'dangerously', url: 'https://example.test/#readiness', beforeParse(w) { w.localStorage.setItem('hub-lang', 'en'); w.claude = { use: async () => null }; w.console.error = (...a) => { throw new Error(a.join(' ')); }; } });
   const wait = () => new Promise((r) => setTimeout(r, 30)); await wait();

@@ -90,6 +90,8 @@ function client(B, sessionUserId) {
       if (B.missing?.has(table)) return { data: null, error: { code: 'PGRST205', message: `Could not find the table 'public.${table}' in the schema cache` } };
       // Tests can simulate a dropped connection for reads of some tables (B.failRead = Set of tables).
       if (action === 'select' && B.failRead?.has(table)) return { data: null, error: { message: 'Failed to fetch' } };
+      // V1.25: ... and for writes (B.failWrite = Set of tables), e.g. weak venue internet.
+      if (action !== 'select' && B.failWrite?.has(table)) return { data: null, error: { message: 'Failed to fetch' } };
       const T = B.tables[table]; const id = uid();
       if (action === 'select') {
         let rows = T.filter((r) => match(r) && B.readable(id, table, r)).map((r) => structuredClone(r));

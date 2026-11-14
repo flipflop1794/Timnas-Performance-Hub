@@ -27,13 +27,26 @@ const CAN_APPROVE = !HUB_USER || HUB_USER.roles.some((r) => ['admin', 'head_coac
 // V1.19: an account with only the Leadership role reads everything and saves nothing (the database refuses).
 const LEADERSHIP_ONLY = !!HUB_USER && HUB_USER.roles.length > 0 && HUB_USER.roles.every((r) => r === 'leadership');
 // V1.15: newer parts switch on only when the live database / server has them (all on in the artifact build).
-const FEAT = { capture: true, draftRoom: true, donny: true, pelatnas: true, ai: true, aiPlan: true, coachAi: true, coachAiFn: true, ...(PLATFORM?.features || {}) };
+const FEAT = { capture: true, draftRoom: true, donny: true, pelatnas: true, ai: true, aiPlan: true, coachAi: true, coachAiFn: true, practiceAi: true, brainAi: true, ...(PLATFORM?.features || {}) };
+// V1.27 pre-match brief, day scouting summary and Brainstorm: only when the deployed function has those actions.
+const brainAiOn = () => S.mode !== 'demo' && FEAT.ai && FEAT.brainAi && !!PLATFORM?.ai;
+// V1.27 feedback on an AI output: useful / not useful / wrong (+ one line). It is how the AI gets better over time.
+function feedbackBar(feature, ref, title) {
+  if (S.mode === 'demo') return '';
+  const mine = feedbackFor(S.rivals, feature, ref).filter((r) => r.by === (meName() || S.me) && r.rating !== 'edited');
+  const fid = sid(`${feature}-${ref}`);
+  if (mine.length) return `<p class="note">Thanks: you marked this ${esc(mine.at(-1).rating)}${mine.at(-1).reason ? ` (${esc(mine.at(-1).reason)})` : ''}.</p>`;
+  return `<div class="toolbar fb"><span class="note">Was this useful?</span>${FEEDBACK_RATINGS.map((r) => `<button class="btn small" type="button" data-fb="${esc(JSON.stringify({ feature, ref, title, rating: r }))}">${esc(r)}</button>`).join('')}
+    <input type="text" id="fbR-${fid}" maxlength="200" placeholder="Why (one line; needed for wrong)" aria-label="Why"><span class="msg" id="fbM-${fid}" role="status"></span></div>`;
+}
+// V1.26 AI buttons for practice and meta: only when the deployed function has the new actions.
+const practiceAiOn = () => S.mode !== 'demo' && FEAT.ai && FEAT.practiceAi && !!PLATFORM?.ai;
 if (HUB_USER && !HUB_USER.staffKey) {
   const ROLE_LABEL = { admin: 'Admin', head_coach: 'Head Coach', assistant_coach: 'Assistant coach', readiness_owner: 'Readiness owner', title_coach: 'Title coach', analyst: 'Analyst', leadership: 'Leadership' };
   STAFF.push({ id: 'user', name: HUB_USER.name, role: HUB_USER.roles.map((r) => ROLE_LABEL[r] || r).join(', '), focus: HUB_USER.titles.length ? HUB_USER.titles : WEC_TITLES.map((t) => t.id) });
 }
 import { staffObservation, recommendationRecord } from '../core/records.js';
-import { FIELDS, FIELD_SOURCE, TIERS, board as rivalBoard, rivalNote, crossTitle, nationProfile, coverage, formOf, fieldForm, FORM_READ } from '../core/competitors.js';
+import { FIELDS, FIELD_SOURCE, TIERS, board as rivalBoard, rivalNote, crossTitle, nationProfile, coverage, formOf, fieldForm, FORM_READ, formKey, rivalResult, retireResult } from '../core/competitors.js';
 import { planScrim, completeScrim, summary as scrimSummary, FORMATS, KINDS as SCRIM_KINDS } from '../core/scrims.js';
 import { EVENT, defaultRunbook, tLabel, wecMatch, tick, setResult, gameNote, markApplied } from '../core/matchday.js';
 import { VOD_TAGS, vod, reviewVod, LEVELS, partner as partnerRec, partnerStats, AREAS, GOAL_STATUS, goal as goalRec, updateGoal, plan as newPlan } from '../core/library.js';
@@ -52,7 +65,12 @@ import { translateDom, tr as trId } from './i18n.js';
 import { autoCard, cardPlan, approveCard, cardMarkdown } from '../core/oppcard.js';
 import { usageSummary, PRICES_READ } from '../core/ai_cost.js';
 import { checkin, session as loadSession, teamDay, ITEMS, ITEM_LABEL, THRESHOLDS, MIN_BASELINE_DAYS } from '../core/wellbeing.js';
-import { captureUi } from './capture_ui.js';
+import { captureUi, heroesFor } from './capture_ui.js';
+import { META_CATEGORIES, OD_MIN, OURS_MIN, metaEntry, confirmMeta, retireMeta, metaOf, currentPatch, extractedEntries, openDotaRows, ourFacts, metaFit, metaFitMaterial } from '../core/meta.js';
+import { sessionBlocks, drillResults, planMaterial, cameBack, weeklyTrend, weeklyText, weeklyMaterial, MAX_BLOCKS, DRILL_MET, blocksMinutes } from '../core/practice.js';
+import { liveEntry, liveOf, liveSummary, opponentBrief, preMatchBrief, approveBrief, approvedBrief, briefShareText, LIVE_TYPES, LIVE_PHASES, POINT_MAX, prematchMaterial, materialIds, scoutDayMaterial, daySummaryRecord } from '../core/scouting.js';
+import { BRAIN_MAX, planBrainMaterial, checkReply, sessionText } from '../core/brainstorm.js';
+import { numbersIn, numbersOk, grounded, aiFeedback, aiEdit, feedbackFor, feedbackStats, FEEDBACK_RATINGS } from '../core/ai_feedback.js';
 import { draftRoomUi } from './draftroom_ui.js';
 import { pelatnasUi } from './pelatnas_ui.js';
 import { guidePage } from './guide.js';
@@ -60,6 +78,8 @@ import { dailySessionsUi, dailyLink } from './daily_sessions_ui.js';
 import { dailyText } from './daily_sessions_strings.js';
 import { canAddDailyReport, canWriteSession, sessionFromReport } from '../core/daily_sessions.js';
 import { gameOf, latestGames } from '../core/capture.js';
+import { gameBreakdown, breakdownText, BASE_MIN, FLAG_PCT, ownVod, addMark, vodThemes, THEME_AT, partnerPlan, STANDIN_DAYS, IDLE_DAYS, daySummary, dayText } from '../core/analyst.js';
+import { tagsOf } from '../core/weakness.js';
 import { coachAiUi } from './coach_ai_ui.js';
 import { standInRecord } from '../core/patterns.js';
 import { weeks as trendWeeks, teamTrends, playerTrends, VERDICT_WEEKS, MIN_VALUES as TR_MIN } from '../core/trends.js';
@@ -213,7 +233,7 @@ async function initCaps() {
       S.pubgm.logged = { matches: m, fights: f }; render();
     }, fail);
     db.collection('cycle').onSnapshot((snap) => { S.cycle = snap.docs.map((d) => d.data()).filter((o) => o?.origin === 'operational'); render(); }, fail);
-    on(db.collection('rivals'), 'Scouting notes', (snap) => { S.rivals = snap.docs.map((d) => d.data()).filter((x) => x?.origin === 'operational'); render(); });
+    on(db.collection('rivals'), 'Scouting notes', (snap) => { S.rivals = snap.docs.map((d) => d.data()).filter((x) => x?.origin === 'operational'); render(); if (liveQueue().length) syncLive(); });   // V1.25: send live entries left on this phone
     on(db.collection('rival_tiers'), 'Threat tiers', (snap) => { S.tiers = Object.fromEntries(snap.docs.map((d) => { const x = d.data(); return [`${x.title}|${x.nation}`, x]; })); render(); });
     db.collection('scrims').onSnapshot((snap) => {
       S.scrims = snap.docs.map((d) => d.data()).filter((x) => x?.origin === 'operational');
@@ -284,14 +304,14 @@ const GAME_HUBS = [
   { id: 'cs2', label: 'CS2', title: 'CS2', team: 't-cs2' },
   { id: 'cs2w', label: 'CS2 Women', title: 'CS2 Women', team: 't-cs2w' },
 ];
-const hubTabs = (h) => [[h.team, 'Team'], [`${h.team}-scrims`, 'Scrims & practice'], [`${h.team}-reports`, 'Scrim reports'], [`${h.team}-trends`, 'Trends'], ...(FEAT.coachAi ? [[`${h.team}-weak`, 'Weaknesses']] : []), ...(gameOf(h.title) && FEAT.capture ? [[`${h.team}-patterns`, 'Patterns']] : []), [`${h.team}-rivals`, 'Competitors'], ...(h.draftRoom && FEAT.draftRoom ? [[`${h.team}-draft`, 'Draft Room']] : [])];
+const hubTabs = (h) => [[h.team, 'Team'], [`${h.team}-scrims`, 'Scrims & practice'], [`${h.team}-reports`, 'Scrim reports'], [`${h.team}-trends`, 'Trends'], ...(FEAT.coachAi ? [[`${h.team}-weak`, 'Weaknesses']] : []), ...(gameOf(h.title) && FEAT.capture ? [[`${h.team}-patterns`, 'Patterns']] : []), [`${h.team}-rivals`, 'Competitors'], [`${h.team}-meta`, 'Meta'], ...(FEAT.brainAi ? [[`${h.team}-brain`, 'Brainstorm']] : []), ...(h.draftRoom && FEAT.draftRoom ? [[`${h.team}-draft`, 'Draft Room']] : [])];
 const TITLES = [
   { id: 'home', label: 'Today', tabs: [['today', 'My day'], ['overview', 'Main dashboard'], ...(HUB_USER ? [['daily-sessions', 'Daily sessions']] : []), ['board', 'Juara Umum board'], ['reports-all', 'Scrim reports'], ['brief', 'Weekly brief']] },
   ...(FEAT.pelatnas ? [{ id: 'pelatnas', label: 'Pelatnas', tabs: [['pel-day', 'Schedule & attendance'], ['pel-avail', 'Availability']] }] : []),
   { id: 'comp', label: 'Competitors', tabs: [['comp-overview', 'All nations'], ['comp-nation', 'Nation profile'], ['comp-rosters', 'Rosters & players'], ['comp-card', 'Opponent card'], ['comp-coverage', 'Scouting coverage']] },
-  { id: 'tour', label: 'Tournament', tabs: [['tour-runbook', 'Match-day runbook'], ...(FEAT.coachAi ? [['tour-prep', 'Preparation packs']] : []), ['tour-series', 'Between games']] },
-  { id: 'dota', label: 'Dota 2', tabs: [['dota-team', 'Team'], ['dota-scrims', 'Scrims & practice'], ['dota-reports', 'Scrim reports'], ['dota-trends', 'Trends'], ...(FEAT.coachAi ? [['dota-weak', 'Weaknesses']] : []), ...(FEAT.capture ? [['dota-patterns', 'Patterns']] : []), ['dota-post', 'Post-match'], ['dota-scout', 'Competitors'], ['dota-draft', 'Draft room'], ['dota-review', 'Series review']] },
-  { id: 'pubgm', label: 'PUBG Mobile', tabs: [['pubgm-team', 'Team'], ['pubgm-scrims', 'Scrims & practice'], ['pubgm-reports', 'Scrim reports'], ['pubgm-trends', 'Trends'], ...(FEAT.coachAi ? [['pubgm-weak', 'Weaknesses']] : []), ['pubgm-log', 'Log & import'], ['pubgm-rivals', 'Competitors'], ['pubgm-sim', 'Strategy sim'], ['pubgm-review', 'Match-day review']] },
+  { id: 'tour', label: 'Tournament', tabs: [['tour-scout', 'Live scouting'], ['tour-runbook', 'Match-day runbook'], ...(FEAT.coachAi ? [['tour-prep', 'Preparation packs']] : []), ['tour-series', 'Between games']] },
+  { id: 'dota', label: 'Dota 2', tabs: [['dota-team', 'Team'], ['dota-scrims', 'Scrims & practice'], ['dota-reports', 'Scrim reports'], ['dota-trends', 'Trends'], ...(FEAT.coachAi ? [['dota-weak', 'Weaknesses']] : []), ...(FEAT.capture ? [['dota-patterns', 'Patterns']] : []), ['dota-post', 'Post-match'], ['dota-scout', 'Competitors'], ['dota-meta', 'Meta'], ...(FEAT.brainAi ? [['dota-brain', 'Brainstorm']] : []), ['dota-draft', 'Draft room'], ['dota-review', 'Series review']] },
+  { id: 'pubgm', label: 'PUBG Mobile', tabs: [['pubgm-team', 'Team'], ['pubgm-scrims', 'Scrims & practice'], ['pubgm-reports', 'Scrim reports'], ['pubgm-trends', 'Trends'], ...(FEAT.coachAi ? [['pubgm-weak', 'Weaknesses']] : []), ['pubgm-log', 'Log & import'], ['pubgm-rivals', 'Competitors'], ['pubgm-meta', 'Meta'], ...(FEAT.brainAi ? [['pubgm-brain', 'Brainstorm']] : []), ['pubgm-sim', 'Strategy sim'], ['pubgm-review', 'Match-day review']] },
   ...GAME_HUBS.map((h) => ({ id: h.id, label: h.label, tabs: hubTabs(h) })),
   { id: 'well', label: 'Performance', tabs: [['readiness', 'Athlete readiness'], ['players', 'Player plans'], ['well-day', 'Wellbeing check'], ['well-log', 'Log check-in & load']] },
   { id: 'guide', label: 'Guide', tabs: [['guide', 'How to use the hub']] },
@@ -371,7 +391,10 @@ function attentionItems(me) {
   const teams = rivalTitles.flatMap((title) => (FIELDS[title] || []).map((nation) => ({ title, nation, tm: rosterOf(title, nation) }))).filter((x) => x.tm);
   const changed = teams.filter((x) => checkStatus(x.tm, t0).changed.some((c) => c.date >= since));
   add('today', 'Rival rosters changed in the last 14 days', changed.length, changed.map((x) => `${x.nation} (${SHORT[x.title] || x.title})`).join(', '), '#comp-rosters', 'Re-check scouting');
-  add('week', 'Rival roster checks due (weekly)', teams.filter((x) => checkStatus(x.tm, t0).due).length, '', '#comp-rosters', 'Check rosters');
+  // Grouped per title, so a batch of seeded rosters reads as "CS2: 11" instead of one long count.
+  const due = teams.filter((x) => checkStatus(x.tm, t0).due);
+  const dueBy = [...new Set(due.map((x) => x.title))].map((ti) => `${SHORT[ti] || ti}: ${due.filter((x) => x.title === ti).length}`).join(' · ');
+  add('week', 'Rival roster checks due (weekly)', due.length, dueBy, '#comp-rosters', 'Check rosters');
   const order = { now: 0, today: 1, week: 2 };
   return items.sort((a, b) => order[a.level] - order[b.level]);
 }
@@ -415,6 +438,7 @@ V.today = () => {
   return `<div class="panel"><div class="lead">What do we <em>train today</em>?</div>
     <p>Accepted objectives first. Anything not yet reviewed is a proposal, not a training decision. Choose who you are at the top to see your queue.</p></div>
     ${attentionPanel(me)}
+    ${dayPanel(me)}
     ${queueHtml(me.id)}
     ${FEAT.pelatnas ? (() => { const x = plUi().todayLine(); return `<div class="panel"><h2>Pelatnas</h2><ul class="plain"><li>${esc(x.campText)}</li><li>${x.open ? `<b>${x.open}</b> player${x.open === 1 ? '' : 's'} have not answered about availability. <a href="#pel-avail">Availability</a>` : 'Every player has answered about availability.'}</li><li>${x.sessions ? `Attendance taken for ${x.taken} of ${x.sessions} session${x.sessions === 1 ? '' : 's'} today. <a href="#pel-day">Take attendance</a>` : 'No sessions planned today.'}</li></ul></div>`; })() : ''}
     ${me.id === 'donny' || me.id === 'fayad' ? wellTodayPanel() : ''}
@@ -482,12 +506,12 @@ V.board = () => {
 // ---------- competitors & scrims (all titles) ----------
 const sid = (x) => x.replace(/[^A-Za-z0-9_\-.]/g, '_');
 // V1.21: one public result line (event podium or nation result), with club / to-confirm flags.
-const formLine = (f) => `<div>${tag(f.result === 'Gold' ? 'c-Blocked' : f.podium ? 'c-Medium' : 'k-observed', f.podium ? f.result : f.event)} ${f.podium ? esc(f.event) : esc(f.result)}${f.club ? ` ${tag('c-Low', 'club')}` : ''}${f.check ? ` ${tag('c-Low', 'to confirm')}` : ''} <span class="note">— ${esc(f.date)} · ${esc(f.source)}</span></div>`;
+const formLine = (f) => `<div>${tag(f.result === 'Gold' ? 'c-Blocked' : f.podium ? 'c-Medium' : 'k-observed', f.podium ? f.result : f.event)} ${f.podium ? esc(f.event) : esc(f.result)}${f.club ? ` ${tag('c-Low', 'club')}` : ''}${f.check ? ` ${tag('c-Low', 'to confirm')}` : ''} <span class="note">— ${esc(f.date)} · ${esc(f.source)}${f.staff ? ` · entered by ${esc(f.by)}` : ''}</span></div>`;
 const noteLine = (n) => `<div>${tag(`k-${n.kind}`, n.kind)} ${esc(n.note)} <span class="note">— ${esc(n.source)}, ${esc(n.date)}${n.by ? `, ${esc(n.by)}` : ''}</span></div>`;
 // First few lines, the rest folded so a long history does not push the table off the screen.
 const firstOf = (xs, k, line) => `${xs.slice(0, k).map(line).join('')}${xs.length > k ? `<details><summary class="note">${xs.length - k} more</summary>${xs.slice(k).map(line).join('')}</details>` : ''}`;
 function fieldFormPanel(title) {
-  const F = fieldForm(title);
+  const F = fieldForm(title, S.rivals);
   if (!F.events.length && !F.withResults.length) return '';
   const inField = (n) => (n && (FIELDS[title] || []).includes(n) ? `<b>${esc(n)}</b>` : esc(n || '—'));
   return `<div class="panel"><h2>Recent results on record — ${esc(title)}</h2>
@@ -501,22 +525,111 @@ function rivalChanges(title, nation, notes = []) {
   const tm = rosterOf(title, nation); const t = S.tiers[`${title}|${nation}`];
   const roster = tm ? checkStatus(tm, today()).changed.map((c) => ({ date: c.date, what: 'roster' })) : [];
   const all = [...notes.map((n) => ({ date: n.date, what: 'note' })), ...(t?.at ? [{ date: t.at.slice(0, 10), what: 'tier' }] : []), ...roster,
-    ...formOf(title, nation).map((f) => ({ date: f.date, what: 'result' }))].filter((x) => x.date).sort((a, b) => b.date.localeCompare(a.date));
+    ...formOf(title, nation, S.rivals).map((f) => ({ date: f.date, what: 'result' }))].filter((x) => x.date).sort((a, b) => b.date.localeCompare(a.date));
   return { last: all[0] || null, rosterChanged: roster.length ? roster.sort((a, b) => b.date.localeCompare(a.date))[0].date : null };
 }
 const CHANGE_LABEL = { roster: 'roster change', note: 'staff note', tier: 'tier set', result: 'public result' };
 // A public result, offered as a pre-filled staff note: the coach checks it and saves (nothing is saved for them).
-const formNoteBtn = (title, f) => (S.mode === 'demo' ? '' : ` <button type="button" class="linkbtn small" data-form-note="${esc(JSON.stringify({ title, nation: f.nation, note: `${f.event} (${f.date}): ${f.result}`, source: f.source, kind: f.check ? 'hypothesis' : 'observed' }))}">Use as note</button>`);
+const formNoteBtn = (title, f) => (S.mode === 'demo' ? '' : ` <button type="button" class="linkbtn small" data-form-note="${esc(JSON.stringify({ title, nation: f.nation, note: `${f.event} (${f.date}): ${f.result}`, source: f.source, kind: f.check ? 'hypothesis' : 'observed' }))}">Use as note</button>`
+  // V1.23: correct or retire a public result in place (fills the results form below; nothing is saved until Save).
+  + ` <button type="button" class="linkbtn small" data-result-edit="${esc(JSON.stringify({ title, nation: f.nation, event: f.event, date: f.date, result: f.result, source: f.source, club: !!f.club, check: !!f.check }))}">Correct</button>`
+  + ` <button type="button" class="linkbtn small" data-result-pick="${esc(JSON.stringify({ title, key: formKey({ ...f, title }) }))}">Retire</button>`);
+// V1.23: the staff keep the public results current: add a result, correct one (same event and date replaces
+// the shipped line) or retire one with a reason. Stored with the scouting notes, title rules apply.
+function resultsEditor(title) {
+  if (S.mode === 'demo') return '';
+  const fid = sid(title);
+  const all = (FIELDS[title] || []).flatMap((n) => formOf(title, n, S.rivals));
+  return `<details id="rrD-${fid}"><summary class="btn">Add, correct or retire a public result</summary>
+    <p class="note">For published national-team results only (tournaments, qualifiers, rankings), with a source. Same event and date as an existing line = a correction that replaces it.</p>
+    <div class="form">
+      <label class="field" for="rrN-${fid}">Nation<select id="rrN-${fid}">${(FIELDS[title] || []).map((n) => `<option>${esc(n)}</option>`).join('')}</select></label>
+      <label class="field" for="rrE-${fid}">Event<input type="text" id="rrE-${fid}" placeholder="e.g. WEC26 regional qualifier"></label>
+      <label class="field" for="rrDt-${fid}">Date<input type="text" id="rrDt-${fid}" placeholder="YYYY-MM-DD (or YYYY-MM)"></label>
+      <label class="field" for="rrB-${fid}">By<input type="text" id="rrB-${fid}" value="${esc(meName())}"></label></div>
+    <label class="field" for="rrR-${fid}">Result<input type="text" id="rrR-${fid}" placeholder="e.g. Gold: 3–1 over Malaysia in the final"></label>
+    <label class="field" for="rrS-${fid}">Source<input type="text" id="rrS-${fid}" placeholder="Link or publisher, read date"></label>
+    <div class="form"><label class="field" for="rrC-${fid}"><input type="checkbox" id="rrC-${fid}"> Club result (players may differ)</label><label class="field" for="rrK-${fid}"><input type="checkbox" id="rrK-${fid}"> To confirm (read from a summary)</label></div>
+    <div class="toolbar"><button class="btn primary" type="button" data-result-save="${esc(title)}">Save result</button></div>
+    <div class="form"><label class="field" for="rrX-${fid}">Retire a result<select id="rrX-${fid}"><option value="">—</option>${all.map((f) => `<option value="${esc(formKey({ ...f, title }))}">${esc(`${f.nation} · ${f.event} (${f.date})`)}</option>`).join('')}</select></label>
+      <label class="field" for="rrW-${fid}">Why (required)<input type="text" id="rrW-${fid}" placeholder="Wrong, duplicate or superseded"></label></div>
+    <div class="toolbar"><button class="btn" type="button" data-result-retire="${esc(title)}">Retire selected result</button><span class="msg" id="rrMsg-${fid}" role="status"></span></div></details>`;
+}
+// ---------- V1.24 analyst and coach helpers (computed from the hub's own records; nothing predicted) ----------
+// 5. Game breakdown draft per confirmed game (Patterns tab).
+function breakdownPanel(title) {
+  const games = latestGames((S.games || []).filter((g) => g.title === title)).sort((a, b) => b.date.localeCompare(a.date) || String(b.createdAt).localeCompare(String(a.createdAt))).slice(0, 6);
+  if (!games.length) return '';
+  const all = S.games || [];
+  return `<div class="panel"><h2>Game breakdowns — ${esc(title)}</h2>
+    <p class="note">A first draft per confirmed game for the analyst: the draft, the time, and each player's numbers against their own usual level (median of at least ${BASE_MIN} earlier confirmed games; ${FLAG_PCT}% or more away is a stand-out). Edit it, add your notes, then add it to the scrim report as a follow-up note.</p>
+    ${games.map((g) => { const b = gameBreakdown(g, all); const rep = S.reports.find((r) => r.id === g.reportId); const fid = sid(g.id);
+      return `<details class="obj"><summary><b>${esc(g.date)} · game ${g.gameNo} vs ${esc(g.partner || '—')}</b> · ${esc(g.result)} · ${esc(b.duration)}${b.flagged ? ` ${tag('c-Medium', `${b.flagged} stand-out${b.flagged > 1 ? 's' : ''}`)}` : ''}</summary>
+        <div class="tw"><table><thead><tr><th>Player</th><th>Hero</th><th>K/D/A</th><th>Against usual level</th></tr></thead><tbody>${b.players.map((p) => `<tr><td>${esc(p.player)}</td><td>${esc(p.hero)}</td><td>${esc(p.kda)}</td><td>${p.flags.length ? p.flags.map((f) => `${tag(f.better ? 'c-Verified' : 'c-Blocked', `${f.stat} ${f.pct > 0 ? '+' : ''}${f.pct}%`)} <span class="note">${f.value} vs ${f.usual}</span>`).join(' ') : `<span class="note">${p.baseN >= BASE_MIN ? 'Nothing stands out' : 'Not enough earlier games'}</span>`}</td></tr>`).join('')}</tbody></table></div>
+        <label class="field" for="bd-${fid}">Breakdown (edit before adding)<textarea id="bd-${fid}" rows="6">${esc(breakdownText(b, S.lang))}</textarea></label>
+        <div class="toolbar">${rep && S.mode !== 'demo' ? `<button class="btn primary" type="button" data-bd-note="${esc(g.id)}">Add to the scrim report</button>` : '<span class="note">No scrim report linked to this game.</span>'}<span class="msg" id="bdMsg-${fid}" role="status"></span></div></details>`; }).join('')}</div>`;
+}
+// 6. VOD review of our own games: timestamped marks with a label, grouped into recurring themes (Weaknesses tab).
+function ownVodPanel(title) {
+  if (S.mode === 'demo') return '';
+  const fid = sid(title); const t0 = today();
+  const vods = S.vods.filter((v) => v.kind === 'own' && v.title === title).sort((a, b) => b.date.localeCompare(a.date)).slice(0, 8);
+  const themes = vodThemes(S.vods, title, t0);
+  const roster = ['Team', ...((S.roster[title] || []).map((p) => (typeof p === 'string' ? p : p.name || p.ign)).filter(Boolean))];
+  const labels = tagsOf(title);
+  return `<div class="panel"><h2>VOD review — our games</h2>
+    <p class="note">Analysts mark moments in our own scrim or match videos: time, player (or Team), a label from the same list as Weaknesses, and one line. The same label for the same player marked ${THEME_AT}+ times in two or more games in 28 days becomes a recurring theme, with links that open each moment.</p>
+    ${themes.length ? `<div class="h3">Themes (28 days)</div><ul class="plain">${themes.slice(0, 8).map((x) => `<li>${x.recurring ? tag('c-Blocked', 'recurring') : tag('k-observed', `${x.n}×`)} <b>${esc(x.player)}</b> · ${esc(x.tag)} <span class="note">${x.n} mark(s) in ${x.games} game(s)</span>
+      <details><summary class="note">Moments</summary><ul class="plain">${x.clips.slice(0, 6).map((c) => `<li><a href="${esc(c.url)}" target="_blank" rel="noopener noreferrer">${esc(c.t)}</a> ${esc(c.event)} — ${esc(c.note)}</li>`).join('')}</ul></details>
+      ${x.recurring ? `<button class="btn small" type="button" data-ov-theme="${esc(JSON.stringify({ title, player: x.player, tag: x.tag, n: x.n, games: x.games }))}">Turn into a proposal</button>` : ''}</li>`).join('')}</ul>` : '<p class="note">No marks in the last 28 days yet.</p>'}
+    <details><summary class="btn">Add a VOD of our game</summary><div class="form">
+      <label class="field" for="ovU-${fid}">Video link<input type="text" id="ovU-${fid}" placeholder="https://…"></label>
+      <label class="field" for="ovE-${fid}">Which game<input type="text" id="ovE-${fid}" placeholder="Scrim vs Team X, game 2"></label>
+      <label class="field" for="ovD-${fid}">Date<input type="date" id="ovD-${fid}" value="${esc(t0)}" max="${esc(t0)}"></label></div>
+      <div class="toolbar"><button class="btn primary" type="button" data-ov-add="${esc(title)}">Add VOD</button></div></details>
+    ${vods.length ? `<div class="form">
+      <label class="field" for="ovV-${fid}">VOD<select id="ovV-${fid}">${vods.map((v) => `<option value="${esc(v.id)}">${esc(`${v.date} · ${v.event} (${(v.marks || []).length})`)}</option>`).join('')}</select></label>
+      <label class="field" for="ovT-${fid}">Time<input type="text" id="ovT-${fid}" placeholder="12:30" inputmode="numeric"></label>
+      <label class="field" for="ovP-${fid}">Player<select id="ovP-${fid}">${roster.map((p) => `<option>${esc(p)}</option>`).join('')}</select></label>
+      <label class="field" for="ovL-${fid}">Label<select id="ovL-${fid}">${labels.map((l) => `<option>${esc(l)}</option>`).join('')}</select></label></div>
+      <label class="field" for="ovN-${fid}">What happened<input type="text" id="ovN-${fid}" placeholder="e.g. went in without vision on lord"></label>
+      <div class="toolbar"><button class="btn primary" type="button" data-ov-mark="${esc(title)}">Add mark</button></div>` : ''}
+    <span class="msg" id="ovMsg-${fid}" role="status"></span></div>`;
+}
+// 7. Sparring partner plan (Scrims & practice tab).
+function partnerPlanPanel(title) {
+  const P = partnerPlan(title, { partners: S.partners, reports: S.reports, wtags: S.wtags || [], tiers: S.tiers, scrims: S.scrims, asOf: today() });
+  if (!P.rows.length && !P.unbanked.length && !P.suggestions.length) return '';
+  return `<div class="panel"><h2>Sparring partner plan — ${esc(title)}</h2>
+    <p class="note">From scrim reports and the partner bank. Suggestions say why: a recurring weakness to re-test against the partner where it showed up, a stand-in for every rival the staff rate as main threat or contender (within ${STANDIN_DAYS} days), enough sessions against Tier 1, Tier 1 contacts not played for ${IDLE_DAYS}+ days.</p>
+    ${P.suggestions.length ? `<ul class="plain">${P.suggestions.map((s) => `<li>${tag(s.kind.startsWith('standin') ? 'c-Medium' : s.kind === 'weakness' ? 'c-Blocked' : 'c-Low', ({ weakness: 'weakness', standin: 'stand-in', 'standin-missing': 'stand-in', level: 'level', idle: 'contact' })[s.kind])} ${esc(s.text)}</li>`).join('')}</ul>` : '<p class="note">No suggestion right now.</p>'}
+    ${P.rows.length ? `<div class="tw"><table><thead><tr><th>Partner</th><th>Level</th><th>Plays like</th><th class="n">Sessions</th><th>Record</th><th class="n">Plan followed</th><th>Last</th><th>Labels against them</th></tr></thead><tbody>${P.rows.map((r) => `<tr><td>${esc(r.name)}</td><td>${esc(r.level)}</td><td>${esc(r.resembles || '—')}</td><td class="n">${r.sessions}</td><td>${r.sessions ? (r.matches ? `${r.points} pts / ${r.matches}` : `${r.won}-${r.lost}`) : '—'}</td><td class="n">${r.progress ?? '—'}</td><td class="note">${esc(r.last || '—')}</td><td class="note">${esc(Object.entries(r.labels).sort((a, b) => b[1] - a[1]).slice(0, 3).map(([k, n]) => `${k} ${n}`).join(', ') || '—')}</td></tr>`).join('')}</tbody></table></div>` : ''}
+    ${P.unbanked.length ? `<p class="note">In reports but not in the partner bank: ${P.unbanked.map(esc).join(', ')}. Add them to the bank to see them here.</p>` : ''}</div>`;
+}
+// 8. End-of-day summary (Today page), with a message to paste in the staff group.
+function dayPanel(me) {
+  const mine = me.id === 'aufa' || me.id === 'user' ? me.focus : WEC_TITLES.map((t) => t.id);
+  const rows = daySummary(mine.filter((t) => GAME_SPEC[t]), today(), { reports: S.reports, scrims: S.scrims, wtags: S.wtags || [] });
+  const active = rows.filter((r) => r.sessions || r.planned);
+  return `<div class="panel"><h2>End of day</h2>
+    ${active.length ? `<div class="cols">${active.map((r) => `<div class="obj"><h3>${esc(r.title)}</h3><p>${r.sessions} report(s)${r.result ? ` · <b>${esc(r.result)}</b>` : ''}${r.progress != null ? ` · plan followed ${r.progress}/5` : ''}${r.notLogged ? ` · <b>${r.notLogged} not logged</b>` : ''}</p>
+      ${Object.keys(r.fix).length ? `<p class="note">Did we fix it? ${Object.entries(r.fix).map(([k, n]) => `${esc(k)}: ${n}`).join(' · ')}</p>` : ''}
+      ${r.labels.length ? `<p class="note">What failed: ${r.labels.map((x) => `${esc(x.tag)} (${x.n})`).join(', ')}</p>` : ''}
+      ${r.priorities.length ? `<div class="h3">Tomorrow</div><ol>${r.priorities.map((p) => `<li>${esc(p.text)}</li>`).join('')}</ol>` : ''}</div>`).join('')}</div>
+      <div class="toolbar"><button class="btn" type="button" id="dayCopy">Copy for the staff group</button><span class="msg" id="dayMsg" role="status"></span></div>` : '<p class="empty">No sessions or reports today yet.</p>'}</div>`;
+}
 function competitorsPanel(title) {
+  // V1.27: a scouting note handed over from a Brainstorm session (one-shot pre-fill; the coach still saves it).
+  const np = S.notePrefill?.title === title ? S.notePrefill : null; if (np) S.notePrefill = null;
   const B = rivalBoard(title, S.rivals, S.tiers);
   const big = B.field > 20;
-  const shown0 = big ? B.rows.filter((r) => r.notes.length || r.tier !== 'not assessed' || formOf(title, r.nation).length) : B.rows;
+  const shown0 = big ? B.rows.filter((r) => r.notes.length || r.tier !== 'not assessed' || formOf(title, r.nation, S.rivals).length) : B.rows;
   const fid = sid(title);
   const recent = S.compSort === 'recent';
   const ch = Object.fromEntries(shown0.map((r) => [r.nation, rivalChanges(title, r.nation, r.notes)]));
   // Default order is the staff's threat tier (board order); "latest change first" puts fresh news on top.
   const shown = recent ? [...shown0].sort((a, b) => (ch[b.nation].last?.date || '').localeCompare(ch[a.nation].last?.date || '') || a.nation.localeCompare(b.nation)) : shown0;
-  const formCell = (r) => { const fm = formOf(title, r.nation); return fm.length ? firstOf(fm, 2, (f) => formLine(f).replace(/<\/div>$/, `${formNoteBtn(title, f)}</div>`)) : '<span class="note">None found</span>'; };
+  const formCell = (r) => { const fm = formOf(title, r.nation, S.rivals); return fm.length ? firstOf(fm, 2, (f) => formLine(f).replace(/<\/div>$/, `${formNoteBtn(title, f)}</div>`)) : '<span class="note">None found</span>'; };
   return `${fieldFormPanel(title)}<div class="panel"><h2>Competitors — ${esc(title)}</h2>
     <p class="note">Field: ${B.field} nations (${esc(FIELD_SOURCE)}). ${B.covered} with notes. Threat tiers are staff judgements with a reason, never computed.</p>
     <div class="drseg" role="group" aria-label="Sort"><button type="button" data-comp-sort="tier" aria-pressed="${!recent}">By threat tier</button><button type="button" data-comp-sort="recent" aria-pressed="${recent}">Latest change first</button></div>
@@ -525,23 +638,26 @@ function competitorsPanel(title) {
         <td class="note">${c.last ? `${esc(c.last.date)}<br>${esc(CHANGE_LABEL[c.last.what])}` : '—'}</td>
         <td>${r.notes.length ? firstOf(r.notes, 3, noteLine) : '<span class="note">Nothing yet</span>'}</td><td>${formCell(r)}</td></tr>`; }).join('')}</tbody></table></div>` : '<p class="empty">No nation assessed yet.</p>'}
     ${big ? `<details><summary class="note">Full field (${B.field})</summary><p class="note">${B.rows.map((r) => esc(r.nation)).join(' · ')}</p></details>` : ''}
-    ${S.mode === 'demo' ? '' : `<details id="rvD-${fid}"><summary class="btn">Add a note or set a tier</summary><div class="form">
-      <label class="field" for="rvN-${fid}">Nation<select id="rvN-${fid}">${(FIELDS[title] || []).map((n) => `<option>${esc(n)}</option>`).join('')}</select></label>
-      <label class="field" for="rvK-${fid}">Kind<select id="rvK-${fid}"><option value="observed">Observed</option><option value="hypothesis">Hypothesis</option></select></label>
-      <label class="field" for="rvS-${fid}">Source<input type="text" id="rvS-${fid}" placeholder="VOD link, tournament, Liquipedia page, scrim"></label>
+    ${S.mode === 'demo' ? '' : `<details id="rvD-${fid}"${np ? ' open' : ''}><summary class="btn">Add a note or set a tier</summary><div class="form">
+      <label class="field" for="rvN-${fid}">Nation<select id="rvN-${fid}">${(FIELDS[title] || []).map((n) => `<option ${np?.nation === n ? 'selected' : ''}>${esc(n)}</option>`).join('')}</select></label>
+      <label class="field" for="rvK-${fid}">Kind<select id="rvK-${fid}"><option value="observed">Observed</option><option value="hypothesis" ${np ? 'selected' : ''}>Hypothesis</option></select></label>
+      <label class="field" for="rvS-${fid}">Source<input type="text" id="rvS-${fid}" placeholder="VOD link, tournament, Liquipedia page, scrim" value="${esc(np?.source || '')}"></label>
       <label class="field" for="rvB-${fid}">By<input type="text" id="rvB-${fid}" value="${esc(STAFF.find((x) => x.id === S.me)?.name || '')}"></label></div>
-      <label class="field" for="rvT-${fid}">Note<input type="text" id="rvT-${fid}" placeholder="Roster, style, draft habits, recent results"></label>
+      <label class="field" for="rvT-${fid}">Note<input type="text" id="rvT-${fid}" placeholder="Roster, style, draft habits, recent results" value="${esc(np?.note || '')}"></label>
       <div class="toolbar"><button class="btn primary" type="button" data-rival-note="${esc(title)}">Save note</button></div>
       <div class="form"><label class="field" for="tiT-${fid}">Tier<select id="tiT-${fid}">${TIERS.map((t) => `<option>${t}</option>`).join('')}</select></label><label class="field" for="tiW-${fid}">Why (required)<input type="text" id="tiW-${fid}"></label></div>
-      <div class="toolbar"><button class="btn" type="button" data-rival-tier="${esc(title)}">Set tier for selected nation</button><span class="msg" id="rvMsg-${fid}"></span></div></details>`}</div>${vodPanel(title)}`;
+      <div class="toolbar"><button class="btn" type="button" data-rival-tier="${esc(title)}">Set tier for selected nation</button><span class="msg" id="rvMsg-${fid}"></span></div></details>`}${resultsEditor(title)}</div>${vodPanel(title)}`;
 }
 function scrimsPanel(title) {
+  // V1.27: a session idea handed over from a Brainstorm session (one-shot pre-fill of the plan form).
+  const pf = S.planPrefill?.[title] || null; if (pf) delete S.planPrefill[title];
   const Sm = scrimSummary(S.scrims, title, localDay());
   const objs = S.cycle.filter((o) => o.title === title && ['accepted', 'modified'].includes(o.status));
   const fid = sid(title);
   const objName = (id) => S.cycle.find((o) => o.id === id)?.rec.problem || id;
   const card = (sc) => `<div class="obj"><header><div><span class="note">${esc(sc.date)}${sc.time ? ` ${esc(sc.time)}` : ''} · ${esc(sc.kind)}${sc.format ? ` · ${esc(sc.format)}` : ''} · owner ${esc(sc.owner)}</span><h3>${sc.partner ? `vs ${esc(sc.partner)}` : esc(sc.kind)}${sc.mirrors ? ` <span class="note">(stand-in for ${esc(sc.mirrors)})</span>` : ''}</h3></div>${tag(sc.status === 'done' ? 'c-Verified' : sc.status === 'cancelled' ? 'c-Blocked' : 'c-Low', sc.status)}</header>
     ${sc.focus ? `<p><b>Focus:</b> ${esc(sc.focus)}${sc.drill ? ` <span class="note">· Drill: ${esc(sc.drill)}</span>` : ''}${sc.measure ? ` <span class="note">· Check: ${esc(sc.measure)}</span>` : ''}</p>` : ''}
+    ${(sc.blocks || []).length ? `<ol class="note">${sc.blocks.map((b) => `<li><b>${esc(b.name)}</b> · ${b.minutes} min · ${esc(b.objective)} <i>(${esc(b.criterion)})</i></li>`).join('')}</ol><p class="note">${blocksMinutes(sc.blocks)} min of drills</p>` : ''}
     ${sc.dailyReport ? `<p data-no-tr>${esc(sc.dailyReport.objective)}</p><a href="${esc(dailyLink('session', sc.id))}">${dailyLabel('Open session report')}</a>` : sc.objectives.length ? `<p class="note">Practising: ${sc.objectives.map((id) => esc(objName(id))).join('; ')}</p>` : '<p class="note">No objective attached: free scrim.</p>'}
     ${S.mode === 'live' && sc._version && canAddDailyReport(sc, HUB_USER) ? `<a href="${esc(dailyLink('session', sc.id))}">${dailyLabel('Add daily report')}</a>` : ''}
     ${sc.result ? `<p>${sc.result.score ? `<b>${esc(sc.result.score)}</b> · ` : ''}${sc.result.matchIds.length ? `matches ${sc.result.matchIds.map(esc).join(', ')} · ` : ''}${esc(sc.result.notes || sc.result.cancelledWhy)} <span class="note">— ${esc(sc.result.by)}</span></p>` : `<details><summary class="btn">Log result</summary><div class="form">
@@ -566,9 +682,10 @@ function scrimsPanel(title) {
     <label class="field" for="spL-${fid}">Partner level<select id="spL-${fid}"><option value=""></option><option>Tier 1 international</option><option>Tier 1 domestic</option><option>Tier 2</option><option>Academy / amateur</option></select></label>
     <label class="field" for="spMi-${fid}">Stand-in for (WEC rival)<select id="spMi-${fid}"><option value=""></option>${(FIELDS[title] || []).map((n) => `<option>${esc(n)}</option>`).join('')}</select></label>
     <label class="field" for="spO-${fid}">Owner<input type="text" id="spO-${fid}" value="${esc(STAFF.find((x) => x.id === S.me)?.name || '')}"></label>
-    <label class="field wide" for="spFo-${fid}">Focus of the session (optional)<input type="text" id="spFo-${fid}" maxlength="200" placeholder="e.g. Vision before lord"></label>
-    <label class="field wide" for="spDr-${fid}">Drill (optional)<input type="text" id="spDr-${fid}" maxlength="300"></label>
+    <label class="field wide" for="spFo-${fid}">Focus of the session (optional)<input type="text" id="spFo-${fid}" maxlength="200" placeholder="e.g. Vision before lord" value="${esc(pf?.focus || '')}"></label>
+    <label class="field wide" for="spDr-${fid}">Drill (optional)<input type="text" id="spDr-${fid}" maxlength="300" value="${esc(pf?.drill || '')}"></label>
     <label class="field wide" for="spMe-${fid}">How we will know it worked (optional)<input type="text" id="spMe-${fid}" maxlength="200"></label></div>
+    ${blockRows(fid)}
     ${objs.length ? `<fieldset class="objpick"><legend class="note">Objectives to practise</legend>${objs.map((o) => `<label><input type="checkbox" name="spObj-${fid}" value="${esc(o.id)}"> ${esc(o.rec.problem)}</label>`).join('')}</fieldset>` : '<p class="note">No accepted objective for this title yet: the scrim will be logged without one.</p>'}
     <div class="toolbar"><button class="btn primary" type="button" data-scrim-plan="${esc(title)}">Add to plan</button><span class="msg" id="spMsg-${fid}"></span></div></div>`}
   <div class="cols"><div class="panel"><h2>Upcoming${Sm.overdue.length ? ' and overdue' : ''}</h2>${[...Sm.overdue, ...Sm.upcoming].map(card).join('') || '<p class="empty">Nothing planned.</p>'}</div>
@@ -585,8 +702,44 @@ function planSuggestPanel(title, fid) {
     ${!n ? '<p class="empty">File a scrim report first.</p>' : ''}
     ${sug ? `<div class="obj"><header><div><span class="note">Suggestion · based on ${sug.based_on?.length ? esc(sug.based_on.join(', ')) : 'the reports'}</span><h3>${esc(sug.focus || 'Not enough material yet')}</h3></div>${tag('c-Low', 'suggestion')}</header>
       ${sug.drill ? `<p><b>Drill:</b> ${esc(sug.drill)}</p>` : ''}${sug.measure ? `<p><b>How we will know:</b> ${esc(sug.measure)}</p>` : ''}<p class="note">${esc(sug.why || '')}</p>
-      ${sug.alternatives?.length ? `<p class="note">Other options: ${sug.alternatives.map(esc).join(' · ')}</p>` : ''}
+      ${sug.alternatives?.length ? `<p class="note">Other options: ${sug.alternatives.map(esc).join(' · ')}</p>` : ''}${(sug.blocks || []).length ? `<ol class="note">${sug.blocks.map((b) => `<li><b>${esc(b.name)}</b> · ${esc(b.minutes)} min · ${esc(b.objective)} <i>(${esc(b.criterion)})</i></li>`).join('')}</ol>` : ''}${feedbackBar('plan', `${title}|${sug.focus || ''}`.slice(0, 120), title)}
       ${sug.focus ? `<div class="toolbar"><button class="btn primary" type="button" data-plan-use="${esc(title)}">Use in the plan below</button></div>` : ''}</div>` : ''}</div>`;
+}
+// ---------- V1.26 Focus 1: timed drills, drill results, weekly trend ----------
+const blocksOfScrim = (id) => (S.scrims.find((x) => x.id === id)?.blocks) || [];
+// Drill rows in "Plan a session" (filled by the AI suggestion or typed; the coach edits before "Add to plan").
+function blockRows(fid) {
+  const pre = S.planBlocks?.[fid] || [];
+  return `<details class="more"${pre.length ? ' open' : ''}><summary>Timed drills (optional)</summary>
+    <p class="note">Up to ${MAX_BLOCKS} drills, each with its minutes, objective and how we will know it worked. They come back in the scrim report as "met / not met / not tried".</p>
+    ${[0, 1, 2, 3].map((i) => { const b = pre[i] || {}; return `<div class="form">
+      <label class="field" for="spBn${i}-${fid}">Drill ${i + 1}<input type="text" id="spBn${i}-${fid}" maxlength="80" value="${esc(b.name || '')}"></label>
+      <label class="field" for="spBm${i}-${fid}">Minutes<input type="number" inputmode="numeric" min="5" max="180" id="spBm${i}-${fid}" value="${esc(b.minutes || '')}"></label>
+      <label class="field" for="spBo${i}-${fid}">Objective<input type="text" id="spBo${i}-${fid}" maxlength="200" value="${esc(b.objective || '')}"></label>
+      <label class="field" for="spBc${i}-${fid}">Success criterion<input type="text" id="spBc${i}-${fid}" maxlength="200" value="${esc(b.criterion || '')}"></label></div>`; }).join('')}</details>`;
+}
+const readBlocks = (fid) => sessionBlocks([0, 1, 2, 3].map((i) => ({ name: val(`spBn${i}-${fid}`), minutes: val(`spBm${i}-${fid}`), objective: val(`spBo${i}-${fid}`), criterion: val(`spBc${i}-${fid}`) })));
+// In the scrim report: the planned drills of the selected session, a call per drill, and what came back.
+function drillsSection(title, fid, dv) {
+  const blocks = blocksOfScrim(dv('scrim'));
+  const back = cameBack(title, { reports: S.reports, wtags: S.wtags || [], asOf: today() });
+  const backLines = [...back.unfixed.map((u) => `Still "No change" on ${u.date}: ${u.adjustment}`), ...back.flagged.map((f) => `Keeps coming back: ${f.label} (${f.n} in 14 days)`), ...back.drillsMissedTwice.map((d) => `Drill not met twice: ${d.name}`)];
+  return `${blocks.length ? `<div class="h3">Planned drills</div>${blocks.map((b, i) => `<div class="form"><label class="field" for="rp-${fid}-dr${i}">${esc(b.name)} <span class="note">(${b.minutes} min · ${esc(b.criterion)})</span><select id="rp-${fid}-dr${i}"><option value="">—</option>${DRILL_MET.map((m) => `<option value="${m}" ${dv(`dr${i}`) === m ? 'selected' : ''}>${esc(m === 'yes' ? 'met' : m === 'no' ? 'not met' : m)}</option>`).join('')}</select></label></div>`).join('')}` : ''}
+    ${backLines.length ? `<p class="note"><b>Compared with earlier sessions:</b> ${backLines.map(esc).join(' · ')}</p>` : ''}`;
+}
+// Trends tab: the weekly trend per title, computed; the AI may draft the wording; a coach approves before copying.
+function weeklyPanel(title) {
+  const w = weeklyTrend(title, { reports: S.reports, wtags: S.wtags || [], asOf: today() }); const fid = sid(title);
+  const draft = S.weekly?.[title]; const ok = S.weeklyOk?.[title];
+  return `<div class="panel"><h2>Weekly trend — ${esc(title)}</h2>
+    <p class="note">Last 14 days against the 14 before, from scrim reports, weakness labels and drill results. ${w.lowSample ? `Small sample (${w.reports} report(s)): early signs only.` : `${w.reports} report(s).`}</p>
+    <pre class="note" style="white-space:pre-wrap">${esc(weeklyText(w, S.lang))}</pre>
+    ${practiceAiOn() ? `<div class="toolbar"><button class="btn" type="button" data-wk-draft="${esc(title)}">${draft ? 'Draft again (AI)' : 'Draft the wording (AI)'}</button><span class="msg" id="wkMsg-${fid}" role="status"></span></div>` : ''}
+    ${draft ? `<div class="obj"><header><div><span class="note">AI draft · every number comes from the trend above</span><h3>${esc(draft.headline || '')}</h3></div>${tag(ok ? 'c-Verified' : 'c-Low', ok ? 'approved' : 'draft')}</header>
+      <ul class="plain">${(draft.lines || []).map((l) => `<li>${esc(l.text)} <span class="note">— ${esc((l.sources || []).join(', '))}</span></li>`).join('')}</ul>
+      ${draft.practise_next?.length ? `<p><b>Practise next:</b> ${draft.practise_next.map(esc).join(' · ')}</p>` : ''}
+      ${draft.dropped ? `<p class="note">${draft.dropped} line(s) left out: a number not in the trend.</p>` : ''}${feedbackBar('weekly', `${title}|${w.to}`, title)}
+      <div class="toolbar">${ok ? `<button class="btn" type="button" data-wk-copy="${esc(title)}">Copy for the staff group</button>` : `<button class="btn primary" type="button" data-wk-ok="${esc(title)}">Approve</button>`}</div></div>` : ''}</div>`;
 }
 const OBS_TITLES = ['MLBB', 'MLBB Women', 'eFootball', 'CS2', 'CS2 Women', 'Dota 2', 'PUBG Mobile'];
 function observationForm(defTitle) {
@@ -697,8 +850,8 @@ function trendsPage(title) {
   <div class="panel"><h2>What the staff changed in this period</h2>${changes.length ? `<ul class="plain">${changes.map((c) => `<li><b>${esc(c.at)}</b> accepted: ${esc(c.what)}${c.drill ? ` <span class="note">— drill: ${esc(c.drill)}</span>` : ''}</li>`).join('')}</ul>` : '<p class="empty">No objective accepted in this period.</p>'}
     <p class="note">Read the lines against these dates: a change after an objective started is a hint, not proof, that the practice worked.</p></div>`;
 }
-for (const [view, title] of [['dota-trends', 'Dota 2'], ['pubgm-trends', 'PUBG Mobile']]) V[view] = () => trendsPage(title);
-for (const [view, title] of [['dota-weak', 'Dota 2'], ['pubgm-weak', 'PUBG Mobile']]) V[view] = () => coUi().weaknessPage(title);
+for (const [view, title] of [['dota-trends', 'Dota 2'], ['pubgm-trends', 'PUBG Mobile']]) V[view] = () => trendsPage(title) + weeklyPanel(title);
+for (const [view, title] of [['dota-weak', 'Dota 2'], ['pubgm-weak', 'PUBG Mobile']]) V[view] = () => coUi().weaknessPage(title) + ownVodPanel(title);
 
 function reportsPanel(title) {
   const record = HUB_USER && viewParams().get('record');
@@ -744,7 +897,7 @@ V['reports-all'] = () => {
 
 // ---------- fast report entry: drafts, quick picks, progress buttons ----------
 // Drafts are a per-device convenience (this browser only). The saved report is what counts.
-const RP_KEYS = ['date', 'time', 'by', 'partner', 'level', 'format', 'roster', 'scrim', 'won', 'lost', 'drawn', 'played', 'points', 'avg', 'chicken', 'focus', 'progress', 'worked', 'failed', 'detail', 'players', 'adjust', 'vod', 'fix'];
+const RP_KEYS = ['date', 'time', 'by', 'partner', 'level', 'format', 'roster', 'scrim', 'won', 'lost', 'drawn', 'played', 'points', 'avg', 'chicken', 'focus', 'progress', 'worked', 'failed', 'detail', 'players', 'adjust', 'vod', 'fix', 'dr0', 'dr1', 'dr2', 'dr3'];
 const RP_RE = new RegExp(`^rp-(.+)-(${RP_KEYS.join('|')})$`);
 const RP_KEEP_AFTER_SAVE = ['time', 'by', 'level', 'format', 'roster', 'focus'];
 const cap = (x) => x.charAt(0).toUpperCase() + x.slice(1);
@@ -822,6 +975,7 @@ function reportForm(title, { fid, spec, pts, unit, planned, t0 }) {
     <div class="form">
     ${pts ? `${num('played', 'Matches played')}${num('points', 'Total points')}` : `${num('won', `${esc(cap(unit))} won`)}${num('lost', `${esc(cap(unit))} lost`)}`}
     </div>
+    ${drillsSection(title, fid, dv)}
     <div class="h3">Progress</div>
     ${last?.adjust ? `<div class="fixcheck"><span class="note">Last time (${esc(last.date)}, vs ${esc(last.partner)}) the adjustment was:</span> <b>${esc(last.adjust)}</b>
       <input type="hidden" id="rp-${fid}-prevadj" value="${esc(last.adjust)}">
@@ -884,6 +1038,13 @@ function storagePanel(st, old) {
       <div class="toolbar"><button class="btn primary" type="button" id="stPurge">Delete ${old.length} file${old.length === 1 ? '' : 's'}</button><button class="btn" type="button" id="stCancel">Cancel</button><span class="msg" id="stMsg" role="status"></span></div>`
     : `<div class="toolbar"><button class="btn" type="button" id="stFind">Find screenshots older than ${CAPTURE_KEEP_DAYS} days</button><span class="msg" id="stMsg" role="status"></span></div>`}</div>`;
 }
+// V1.27: what the staff think of each AI feature: the base for team preferences and quality reviews after WEC.
+function aiFeedbackPanel() {
+  const rows = feedbackStats(S.rivals);
+  return `<div class="panel"><h2>AI feedback from the staff</h2>
+    <p class="note">From "Was this useful?" under every AI output, and from coaches' edits of AI drafts before approving. After WEC this becomes each title's team preferences (approved by the Head Coach) and a monthly AI quality review.</p>
+    ${rows.length ? `<div class="tw"><table><thead><tr><th>AI feature</th><th class="n">Useful</th><th class="n">Not useful</th><th class="n">Wrong</th><th class="n">Edited before approval</th><th class="n">Useful share</th><th>Latest reasons</th></tr></thead><tbody>${rows.map((r) => `<tr><td>${esc(r.label)}</td><td class="n">${r.useful}</td><td class="n">${r.notUseful}</td><td class="n">${r.wrong}</td><td class="n">${r.edited}</td><td class="n">${r.usefulShare != null ? `${r.usefulShare}%` : '—'}${r.rated && r.rated < 10 ? ' <span class="note">(few)</span>' : ''}</td><td class="note">${r.reasons.map((x) => `${esc(x.title)}: ${esc(x.reason)}`).join(' · ') || '—'}</td></tr>`).join('')}</tbody></table></div>` : '<p class="empty">No feedback yet.</p>'}</div>`;
+}
 function usagePanel(rows) {
   if (!rows) return '';
   const u = usageSummary(rows); const usd = (x) => `$${x < 1 ? x.toFixed(3) : x.toFixed(2)}`;
@@ -913,7 +1074,7 @@ V['admin-users'] = () => {
     <div class="toolbar"><button class="btn" type="button" id="adReload">Reload list</button><button class="btn" type="button" id="adExport">Export all data (JSON)</button><span class="msg" id="adExportMsg" role="status"></span></div>
     ${S.admin.error ? banner('block', `<div>${esc(S.admin.error)}</div>`) : ''}</div>
   ${featuresPanel()}
-  ${usagePanel(S.admin.usage)}
+  ${usagePanel(S.admin.usage)}${aiFeedbackPanel()}
   ${storagePanel(S.admin.storage, S.admin.old)}
   <div class="panel"><h2>People (${users.length})</h2>${S.admin.loading && !users.length ? '<p>Loading…</p>' : users.map(row).join('') || '<p class="empty">Nobody yet.</p>'}</div>`;
 };
@@ -948,19 +1109,19 @@ function teamPage(title) {
 }
 for (const h of GAME_HUBS) {
   V[h.team] = () => teamPage(h.title);
-  V[`${h.team}-scrims`] = () => scrimsPanel(h.title);
+  V[`${h.team}-scrims`] = () => scrimsPanel(h.title) + partnerPlanPanel(h.title);
   V[`${h.team}-reports`] = () => reportsPanel(h.title);
-  V[`${h.team}-trends`] = () => trendsPage(h.title);
-  V[`${h.team}-weak`] = () => coUi().weaknessPage(h.title);
-  if (gameOf(h.title)) V[`${h.team}-patterns`] = () => capUi().patternsPage(h.title);
+  V[`${h.team}-trends`] = () => trendsPage(h.title) + weeklyPanel(h.title);
+  V[`${h.team}-weak`] = () => coUi().weaknessPage(h.title) + ownVodPanel(h.title);
+  if (gameOf(h.title)) V[`${h.team}-patterns`] = () => capUi().patternsPage(h.title) + breakdownPanel(h.title);
   if (h.draftRoom) V[`${h.team}-draft`] = () => (FEAT.draftRoom ? drUi().page(h.title) : `<div class="panel">${banner('warn', '<div>The Draft Room switches on after the V1.14 database update.</div>')}</div>`);
   V[`${h.team}-rivals`] = () => competitorsPanel(h.title);
 }
-V['dota-scrims'] = () => scrimsPanel('Dota 2');
+V['dota-scrims'] = () => scrimsPanel('Dota 2') + partnerPlanPanel('Dota 2');
 V['dota-reports'] = () => reportsPanel('Dota 2');
-V['dota-patterns'] = () => capUi().patternsPage('Dota 2');
+V['dota-patterns'] = () => capUi().patternsPage('Dota 2') + breakdownPanel('Dota 2');
 V.guide = () => guidePage({ lang: S.lang, feat: PLATFORM?.features ? FEAT : {}, isAdmin: HUB_USER ? HUB_USER.isAdmin : true, esc, tag });
-V['pubgm-scrims'] = () => scrimsPanel('PUBG Mobile');
+V['pubgm-scrims'] = () => scrimsPanel('PUBG Mobile') + partnerPlanPanel('PUBG Mobile');
 V['pubgm-reports'] = () => reportsPanel('PUBG Mobile');
 V['pubgm-rivals'] = () => competitorsPanel('PUBG Mobile');
 
@@ -1379,6 +1540,200 @@ async function saveMatch(m) {
 const liveRuleBanner = () => { const r = rule('wec-live-coaching'); return r && r.status !== 'confirmed' ? banner('block', `<div><b>WEC coaching-contact rules: ${esc(r.status)}.</b> IESF has not published when coaches may talk to players (between games, pauses, draft). Use the between-games sheet only within what the rules allow; Fayad confirms the rule before 15 Dec (Staff → Rules).</div>`) : ''; };
 const SIDES = { 'Dota 2': ['Radiant', 'Dire'], MLBB: ['Blue', 'Red'], 'MLBB Women': ['Blue', 'Red'], CS2: ['CT start', 'T start'], 'CS2 Women': ['CT start', 'T start'], 'PUBG Mobile': ['Erangel', 'Miramar', 'Sanhok', 'Vikendi', 'Livik', 'Rondo'], eFootball: ['Home', 'Away'] };
 
+// ---------- V1.25 Live scouting (WEC): log first on the phone, sync when the connection allows ----------
+// The queue lives in this browser (localStorage) until the database has the entry; the entry id is made on the
+// phone, so a retry never creates a duplicate. The page keeps working with no connection once it is open.
+const LIVE_Q = 'hub-live-queue';
+const liveQueue = () => { try { return JSON.parse(localStorage.getItem(LIVE_Q) || '[]') || []; } catch { return []; } };
+const setLiveQueue = (q) => { try { if (q.length) localStorage.setItem(LIVE_Q, JSON.stringify(q)); else localStorage.removeItem(LIVE_Q); } catch { /* storage blocked: entries stay in memory */ } };
+async function syncLive() {
+  if (!S.db || S.liveSyncing) return;
+  const q = liveQueue(); if (!q.length) return;
+  S.liveSyncing = true; const left = [];
+  for (const r of q) {
+    if (S.rivals.some((x) => x.id === r.id)) continue;                 // already in the database
+    try { await S.db.collection('rivals').doc(r.id).set(r); } catch (err) { if (!S.rivals.some((x) => x.id === r.id)) { left.push(r); S.liveErr = err.message; } }
+  }
+  setLiveQueue(left); S.liveSyncing = false; if (!left.length) S.liveErr = '';
+  if (viewOf() === 'tour-scout') render();
+}
+if (typeof window !== 'undefined') window.addEventListener('online', () => { syncLive(); });
+// Every live entry this device can see: the database's plus the ones still waiting on this phone.
+const allLive = () => { const have = new Set(S.rivals.map((r) => r.id)); return [...S.rivals.filter((r) => r.kind === 'live' || r.kind === 'brief' || r.kind === 'scout_day'), ...liveQueue().filter((r) => !have.has(r.id))]; };
+function scState() {
+  const me = STAFF.find((x) => x.id === S.me) || STAFF[0];
+  const mine = (me.id === 'aufa' || me.id === 'user' ? me.focus : WEC_TITLES.map((t) => t.id)).filter((t) => FIELDS[t]);
+  S.sc ||= {};
+  if (!FIELDS[S.sc.title]) S.sc.title = mine[0] || 'MLBB';
+  const field = FIELDS[S.sc.title];
+  if (!field.includes(S.sc.nation)) S.sc.nation = field[0];
+  if (!LIVE_TYPES.includes(S.sc.type)) S.sc.type = 'strategy';
+  return { mine, field };
+}
+function opponentBriefFor(title, nation) {
+  const { card, standIn, book } = prepCardFor(title, nation);
+  const tm = rosterOf(title, nation);
+  const ch = tm ? checkStatus(tm, today()).changed.filter((c) => c.result === 'changed' && c.date >= shiftDay(today(), -14)).at(-1) : null;
+  return opponentBrief({ title, nation, card, live: liveOf(allLive(), title, nation), standIn, book, rosterChanged: ch || null, days: allLive() });
+}
+const briefList = (xs, empty) => (xs.length ? `<ul class="plain">${xs.map((x) => `<li>${esc(x.text)} <span class="note">— ${esc(x.src)}</span></li>`).join('')}</ul>` : `<p class="note">${esc(empty)}</p>`);
+V['tour-scout'] = () => {
+  if (S.mode === 'demo') return `<div class="panel">${DEMO_BANNER}<p class="empty">Live scouting uses operational records only.</p></div>`;
+  const { mine, field } = scState(); const { title, nation, type } = S.sc; const t0 = today();
+  const matches = (S.wecMatches || []).filter((m) => m.title === title).sort((a, b) => a.date.localeCompare(b.date));
+  const match = matches.find((m) => m.id === S.sc.matchId) || null;
+  const heroes = heroesFor(title)?.names || [];
+  const opp = rosterOf(title, nation); const oppNames = (opp?.players || []).map((p) => p.ign);
+  const live = liveOf(allLive(), title, nation); const today0 = live.filter((e) => e.date === t0);
+  const waiting = liveQueue().length;
+  const B = opponentBriefFor(title, nation);
+  const P = preMatchBrief({ match, brief: B, liveToday: today0 });
+  const ok = approvedBrief(allLive(), title, nation, match?.id || '', t0);
+  const pmKey = `${title}|${nation}|${match?.id || ''}`; const aiPm = S.pmAI?.[pmKey];
+  const pts = ok ? ok.points : (aiPm?.key_points?.length ? aiPm.key_points.map((k) => k.text) : P.suggested); const sid0 = sid(`${title}-${nation}`);
+  const cites = (l) => `<span class="note">— ${esc((l.sources || []).join(', '))}</span>`;
+  const aiBlock = aiPm ? `<div class="obj"><header><div><span class="note">AI draft · each line cites the brief (K, T, W), the live log (LV-…) or counts (C…)</span><h3>AI pre-match draft</h3></div>${tag('c-Low', 'draft')}</header>
+      ${['likely', 'threats', 'watch'].map((k) => (aiPm[k] || []).length ? `<div class="h3">${esc({ likely: 'Likely', threats: 'Threats', watch: 'Watch during the match' }[k])}</div><ul class="plain">${aiPm[k].map((l) => `<li>${esc(l.text)} ${cites(l)}</li>`).join('')}</ul>` : '').join('')}
+      ${(aiPm.tbd || []).length ? `<p class="note">TBD: ${aiPm.tbd.map(esc).join(' · ')}</p>` : ''}${aiPm.dropped ? `<p class="note">${aiPm.dropped} line(s) left out: a number or source not in the records.</p>` : ''}
+      <p class="note">The key points below come from this draft: edit them, then approve.</p>${feedbackBar('prematch', pmKey, title)}</div>` : '';
+  // End of day: today's live log per opponent for this title; the AI may summarise; approved lines feed tomorrow's briefs.
+  const dayLive = allLive().filter((e) => e.kind === 'live' && e.title === title && e.date === t0);
+  const dayBy = {}; for (const e of dayLive) dayBy[e.nation] = (dayBy[e.nation] || 0) + 1;
+  const sd = S.sdAI?.[`${title}|${t0}`];
+  const dayPanel0 = Object.keys(dayBy).length ? `<div class="panel"><h2>End of day — scouting (${esc(title)})</h2>
+    <p class="note">Today's live log: ${Object.entries(dayBy).map(([n, c]) => `${esc(n)} ${c}`).join(' · ')}. Approved summaries feed tomorrow's opponent briefs.</p>
+    ${brainAiOn() ? `<div class="toolbar"><button class="btn" type="button" data-sd-draft="${esc(title)}">${sd ? 'Summarise again (AI)' : 'Summarise today (AI)'}</button><span class="msg" id="sdMsg" role="status"></span></div>` : ''}
+    ${sd ? `${sd.opponents.map((o) => { const done = allLive().some((r) => r.kind === 'scout_day' && r.title === title && r.nation === o.nation && r.date === t0); return `<div class="obj"><h3>${esc(o.nation)}</h3><ul class="plain">${o.learned.map((l) => `<li>${esc(l.text)} ${cites(l)}</li>`).join('')}</ul>${o.next_time.length ? `<p class="note">Next time: ${o.next_time.map(esc).join(' · ')}</p>` : ''}
+      <div class="toolbar">${done ? tag('c-Verified', 'approved') : `<button class="btn primary small" type="button" data-sd-ok="${esc(JSON.stringify({ title, nation: o.nation }))}">Approve for ${esc(o.nation)}</button>`}</div></div>`; }).join('')}
+      ${sd.dropped ? `<p class="note">${sd.dropped} line(s) left out: a number or source not in the log.</p>` : ''}${feedbackBar('scout_day', `${title}|${t0}`, title)}` : ''}</div>` : '';
+  return `<div class="panel"><div class="lead">Live <em>scouting</em></div>
+    <p class="note">While you watch an opponent: one tap for what you saw, one line, save. It is kept on this phone first and synced when the connection allows, so it keeps working on weak venue internet once the page is open.</p>
+    <div class="form">
+      <label class="field" for="scT">Title<select id="scT">${mine.map((x) => `<option ${x === title ? 'selected' : ''}>${esc(x)}</option>`).join('')}</select></label>
+      <label class="field" for="scN">Opponent<select id="scN">${field.map((x) => `<option ${x === nation ? 'selected' : ''}>${esc(x)}</option>`).join('')}</select></label>
+      <label class="field" for="scM">WEC match (optional)<select id="scM"><option value="">—</option>${matches.map((m) => `<option value="${esc(m.id)}" ${m.id === S.sc.matchId ? 'selected' : ''}>${esc(`${m.date} vs ${m.opponent}${m.stage ? ` · ${m.stage}` : ''}`)}</option>`).join('')}</select></label>
+      <label class="field" for="scW">Which match you are watching<input type="text" id="scW" value="${esc(S.sc.watch || '')}" placeholder="e.g. Malaysia vs Myanmar, game 2"></label></div>
+    <div class="drseg" role="group" aria-label="What you saw">${LIVE_TYPES.map((x) => `<button type="button" data-sc-type="${x}" aria-pressed="${x === type}">${esc(x)}</button>`).join('')}</div>
+    <input type="hidden" id="scY" value="${esc(type)}">
+    <div class="form">
+      <label class="field" for="scH">Hero / map / item<input type="text" id="scH" list="scHeroes" autocomplete="off"></label>
+      <label class="field" for="scP">Player<input type="text" id="scP" list="scPlayers" autocomplete="off"></label>
+      <label class="field" for="scQ">Phase<select id="scQ"><option value="">—</option>${LIVE_PHASES.map((x) => `<option>${esc(x)}</option>`).join('')}</select></label>
+      <label class="field" for="scTm">Time<input type="text" id="scTm" placeholder="12:30" inputmode="numeric"></label></div>
+    <datalist id="scHeroes">${heroes.map((n) => `<option value="${esc(n)}">`).join('')}</datalist><datalist id="scPlayers">${oppNames.map((n) => `<option value="${esc(n)}">`).join('')}</datalist>
+    <label class="field" for="scX">What you saw (one line)<input type="text" id="scX" maxlength="200" placeholder="e.g. rotates mid at 4:00, invades our jungle"></label>
+    <div class="toolbar"><button class="btn primary" type="button" id="scSave">Save</button>${waiting ? `<span class="tag c-Low">${waiting} waiting to sync</span> <button class="btn small" type="button" id="scSync">Sync now</button>` : '<span class="note">All synced.</span>'}<span class="msg" id="scMsg" role="status"></span></div>
+    ${S.liveErr && waiting ? `<p class="note">Last sync error: ${esc(S.liveErr)}</p>` : ''}</div>
+  <div class="panel"><h2>Log — ${esc(nation)} <span class="note">(${today0.length} today, ${live.length} in total)</span></h2>
+    ${live.length ? `<ul class="plain">${live.slice(0, 15).map((e) => `<li>${tag(e.type === 'pick' || e.type === 'ban' ? 'c-Medium' : e.type === 'player' ? 'c-Blocked' : 'k-observed', e.type)} ${e.hero ? `<b>${esc(e.hero)}</b> ` : ''}${e.player ? `<b>${esc(e.player)}</b> ` : ''}${esc(e.text)} <span class="note">— ${esc(e.date)}${e.t ? ` ${esc(e.t)}` : ''}${e.phase ? ` · ${esc(e.phase)}` : ''}${e.match ? ` · ${esc(e.match)}` : ''} · ${esc(e.by)}${liveQueue().some((q) => q.id === e.id) ? ' · not synced yet' : ''}</span></li>`).join('')}</ul>` : '<p class="note">Nothing logged for this opponent yet.</p>'}</div>
+  <div class="panel"><h2>Opponent brief — ${esc(nation)}</h2>
+    <p class="note">From the opponent card, public results, rosters, notes, VODs, stand-in scrims, the draft book and the live log. Each line says where it comes from.</p>
+    <div class="h3">Known</div>${briefList(B.known, 'Nothing on record yet.')}
+    <div class="h3">To confirm (TBD)</div>${briefList(B.tbd, 'Nothing open.')}
+    <div class="h3">Watch for</div>${briefList(B.watch, 'Nothing flagged yet.')}
+    <div class="toolbar"><button class="btn small" type="button" data-nation="${esc(nation)}">Nation profile</button></div></div>
+  <div class="panel"><h2>Pre-match brief — Indonesia vs ${esc(nation)}${match ? ` · ${esc(match.date)}` : ''}</h2>
+    <p class="note">One page for the players. Counts come from the live log (${P.totalN} entr${P.totalN === 1 ? 'y' : 'ies'}, ${P.todayN} today). The key points start as suggestions: edit them, then approve. Nothing is shared before a coach approves.</p>
+    <div class="cols"><div><div class="h3">Likely picks / bans</div>${P.likely.length ? `<ul class="plain">${P.likely.map((x) => `<li>${esc(x.text)} <span class="note">(${x.n}×)</span></li>`).join('')}</ul>` : '<p class="note">None logged yet.</p>'}</div>
+      <div><div class="h3">Tendencies</div>${P.tendencies.length ? `<ul class="plain">${P.tendencies.map((x) => `<li>${esc(x.text)} <span class="note">(${x.n}×${x.today ? ', seen today' : ''})</span></li>`).join('')}</ul>` : '<p class="note">None logged yet.</p>'}</div>
+      <div><div class="h3">Threats</div>${P.threats.length ? `<ul class="plain">${P.threats.map((x) => `<li>${esc(x.text)} <span class="note">(${x.n}×)</span></li>`).join('')}</ul>` : '<p class="note">None logged yet.</p>'}</div></div>
+    ${brainAiOn() && !ok ? `<div class="toolbar"><button class="btn" type="button" id="scAI">${aiPm ? 'Draft again (AI)' : 'Draft with AI'}</button><span class="msg" id="scAIMsg" role="status"></span></div>` : ''}${aiBlock}
+    <div class="h3">3 key points for the players</div>
+    ${[0, 1, 2].map((i) => `<label class="field" for="scK${i}">Point ${i + 1}<input type="text" id="scK${i}" maxlength="${POINT_MAX}" value="${esc(pts[i] || '')}"></label>`).join('')}
+    <div class="toolbar"><button class="btn primary" type="button" id="scApprove">Approve brief</button>${ok ? `<span class="tag c-Verified">approved by ${esc(ok.approvedBy)}</span> <button class="btn" type="button" id="scShare">Copy for the players</button>` : '<span class="note">Not approved yet: sharing is off.</span>'}<span class="msg" id="scBMsg" role="status"></span></div>
+    <input type="hidden" id="scBid" value="${esc(sid0)}"></div>${dayPanel0}`;
+};
+// ---------- V1.26 Focus 2: Meta tab per title ----------
+const META_LABEL = { patch: 'patch', change: 'change', strong: 'strong', weak: 'weak', strategy: 'strategy' };
+async function saveMeta(rec) { if (S.db) await S.db.collection('rivals').doc(rec.id).set(rec); else S.rivals = [...S.rivals.filter((x) => x.id !== rec.id), rec]; }
+function metaPage(title) {
+  if (S.mode === 'demo') return `<div class="panel">${DEMO_BANNER}<p class="empty">The meta tracker uses operational records only.</p></div>`;
+  const fid = sid(title); const entries = metaOf(S.rivals, title);
+  const rulePatch = (S.rules || []).find((r) => r.title === title && /patch/.test(r.id))?.version || '';
+  const patch = currentPatch(entries, rulePatch);
+  const facts = ourFacts(title, { games: S.games || [], pools: S.dr_pools || [] });
+  const fit = metaFit(entries, facts); const ai = S.metaFitAI?.[title]; const aiOk = S.metaFitOk?.[title];
+  const X = S.metaX?.[title]; const od = title === 'Dota 2' ? S.metaOD : null;
+  const row = (e) => `<tr><td>${tag(e.category === 'strong' ? 'c-Verified' : e.category === 'weak' ? 'c-Blocked' : 'k-observed', META_LABEL[e.category])}</td><td><b>${esc(e.item)}</b>${e.text ? `<br><span class="note">${esc(e.text)}</span>` : ''}${e.quote ? `<br><span class="note">“${esc(e.quote)}”</span>` : ''}</td>
+    <td class="note">${esc(e.source)}${e.patch ? ` · ${esc(e.patch)}` : ''}<br>${esc(e.by)}, ${esc(e.date)}</td>
+    <td>${e.check ? `${tag('c-Low', 'to confirm')} <button class="btn small" type="button" data-mt-confirm="${esc(e.id)}">Confirm</button>` : tag('c-Verified', `confirmed${e.confirmedBy ? ` · ${e.confirmedBy}` : ''}`)} <button class="linkbtn small" type="button" data-mt-retire="${esc(e.id)}">Retire</button></td></tr>`;
+  return `<div class="panel"><div class="lead">Meta — <em>${esc(title)}</em></div>
+    <p>${patch ? `Current patch: <b>${esc(patch.version)}</b> <span class="note">(${esc(patch.source)}${patch.check ? ', to confirm' : ''})</span>` : 'Current patch: <b>TBD</b> — add a "patch" entry.'}</p>
+    <p class="note">What is strong, weak, changed or working in the current patch, each with its source. Everything starts "to confirm" until an analyst checks it. Nothing here is our own data: see "Good for us / bad for us" below.</p></div>
+  <div class="panel"><h2>Tracker (${entries.length})</h2>
+    ${entries.length ? `<div class="tw"><table><thead><tr><th>Kind</th><th>Item</th><th>Source</th><th>Status</th></tr></thead><tbody>${entries.map(row).join('')}</tbody></table></div>` : '<p class="empty">No entries yet.</p>'}
+    <details><summary class="btn">Add an entry</summary><div class="form">
+      <label class="field" for="mtC-${fid}">Kind<select id="mtC-${fid}">${META_CATEGORIES.map((c) => `<option value="${c}">${esc(META_LABEL[c])}</option>`).join('')}</select></label>
+      <label class="field" for="mtI-${fid}">Hero / map / item / strategy<input type="text" id="mtI-${fid}" list="mtHeroes-${fid}"></label>
+      <label class="field" for="mtV-${fid}">Patch / version<input type="text" id="mtV-${fid}" value="${esc(patch?.version || '')}"></label>
+      <label class="field" for="mtS-${fid}">Source<input type="text" id="mtS-${fid}" placeholder="Link, tournament stats, or own observation"></label></div>
+      <datalist id="mtHeroes-${fid}">${(heroesFor(title)?.names || []).map((n) => `<option value="${esc(n)}">`).join('')}</datalist>
+      <label class="field" for="mtT-${fid}">What it says<input type="text" id="mtT-${fid}" maxlength="300"></label>
+      <label class="field" for="mtK-${fid}"><input type="checkbox" id="mtK-${fid}"> I checked it (confirmed)</label>
+      <div class="toolbar"><button class="btn primary" type="button" data-mt-add="${esc(title)}">Save entry</button></div></details>
+    <div class="form"><label class="field" for="mtR-${fid}">Retire<select id="mtR-${fid}"><option value="">—</option>${entries.map((e) => `<option value="${esc(e.id)}">${esc(`${META_LABEL[e.category]} · ${e.item}`)}</option>`).join('')}</select></label>
+      <label class="field" for="mtW-${fid}">Why<input type="text" id="mtW-${fid}" placeholder="Outdated, wrong or duplicate"></label></div>
+    <div class="toolbar"><button class="btn" type="button" data-mt-retire-go="${esc(title)}">Retire selected</button><span class="msg" id="mtMsg-${fid}" role="status"></span></div></div>
+  ${practiceAiOn() ? `<div class="panel"><h2>Add from text (AI)</h2>
+    <p class="note">Paste patch notes, tournament stats, a tier list or your notes (up to 12,000 characters). The AI pulls out entries; each must quote the text, or the hub drops it. Everything comes in "to confirm"; you choose what to add.</p>
+    <label class="field" for="mtP-${fid}">Text<textarea id="mtP-${fid}" rows="5"></textarea></label>
+    <label class="field" for="mtPS-${fid}">Source<input type="text" id="mtPS-${fid}" placeholder="e.g. Patch notes 1.9.42, official site, read 20 Nov"></label>
+    <div class="toolbar"><button class="btn" type="button" data-mt-extract="${esc(title)}">Extract entries</button><span class="msg" id="mtXMsg-${fid}" role="status"></span></div>
+    ${X ? `${X.patch ? `<p>Patch in the text: <b>${esc(X.patch)}</b></p>` : ''}${X.dropped ? `<p class="note">${X.dropped} entr${X.dropped === 1 ? 'y' : 'ies'} left out: no exact quote from the text.</p>` : ''}
+      ${X.entries.length ? `<ul class="plain">${X.entries.map((e, i) => `<li><label><input type="checkbox" id="mtX${i}-${fid}" checked> ${tag('k-observed', META_LABEL[e.category])} <b>${esc(e.item)}</b> ${esc(e.text)} <span class="note">“${esc(e.quote)}”</span></label></li>`).join('')}</ul>
+      <div class="toolbar"><button class="btn primary" type="button" data-mt-add-x="${esc(title)}">Add selected (to confirm)</button></div>` : '<p class="note">Nothing to add.</p>'}${feedbackBar('meta_extract', `${title}|${X.patch || today()}`, title)}` : ''}</div>` : ''}
+  ${title === 'Dota 2' ? `<div class="panel"><h2>Pro hero stats (OpenDota)</h2>
+    <p class="note">Public professional matches over OpenDota's recent window: picks, bans and win rate per hero. Under ${OD_MIN} picks is a small sample. Pro play is not our scrims: use it as context.</p>
+    <div class="toolbar"><button class="btn" type="button" data-mt-od="1">Load from OpenDota</button><span class="msg" id="mtODMsg" role="status"></span></div>
+    ${od?.length ? `<div class="tw"><table><thead><tr><th>Hero</th><th class="n">Picks</th><th class="n">Bans</th><th class="n">Win %</th><th></th></tr></thead><tbody>${od.slice(0, 20).map((r) => `<tr><td>${esc(r.hero)}${r.lowSample ? ` ${tag('c-Low', 'small sample')}` : ''}</td><td class="n">${r.picks}</td><td class="n">${r.bans}</td><td class="n">${r.winRate ?? '—'}</td>
+      <td><button class="linkbtn small" type="button" data-mt-od-add="${esc(JSON.stringify({ hero: r.hero, text: `Pro: ${r.picks} picks, ${r.bans} bans, ${r.winRate ?? '—'}% won (OpenDota)` }))}">Add as strong</button></td></tr>`).join('')}</tbody></table></div><p class="note">Read ${esc(S.metaODAt || '')}.</p>` : ''}</div>` : ''}
+  <div class="panel"><h2>Good for us / bad for us</h2>
+    <p class="note">The tracker against our own records: heroes our players used in confirmed scrim games (at least ${OURS_MIN} to count as "we play it") and the coaches' hero pools. Items we cannot judge from our data are TBD.</p>
+    <div class="cols"><div><div class="h3">Aligned</div>${fit.aligned.length ? `<ul class="plain">${fit.aligned.map((x) => `<li>${esc(x.text)}</li>`).join('')}</ul>` : '<p class="note">Nothing yet.</p>'}</div>
+      <div><div class="h3">Exposed</div>${fit.exposed.length ? `<ul class="plain">${fit.exposed.map((x) => `<li>${esc(x.text)}</li>`).join('')}</ul>` : '<p class="note">Nothing yet.</p>'}</div>
+      <div><div class="h3">TBD</div>${fit.tbd.length ? `<ul class="plain">${fit.tbd.map((x) => `<li>${esc(x.text)}</li>`).join('')}</ul>` : '<p class="note">Nothing open.</p>'}</div></div>
+    ${practiceAiOn() ? `<div class="toolbar"><button class="btn" type="button" data-mt-fit="${esc(title)}">${ai ? 'Draft again (AI)' : 'Draft the meta brief (AI)'}</button><span class="msg" id="mtFMsg-${fid}" role="status"></span></div>` : ''}
+    ${ai ? `<div class="obj"><header><div><span class="note">AI draft · each line cites tracker and our-record ids</span><h3>Meta brief — ${esc(title)}</h3></div>${tag(aiOk ? 'c-Verified' : 'c-Low', aiOk ? 'approved' : 'draft')}</header>
+      <p>${esc(ai.brief || '')}</p>
+      ${['aligned', 'exposed', 'practise'].map((k) => (ai[k] || []).length ? `<div class="h3">${esc({ aligned: 'Aligned', exposed: 'Exposed', practise: 'Practise' }[k])}</div><ul class="plain">${ai[k].map((x) => `<li>${esc(x.text)} <span class="note">— ${esc([...(x.meta_ids || []), ...(x.our_ids || [])].join(', '))}</span></li>`).join('')}</ul>` : '').join('')}
+      ${(ai.tbd || []).length ? `<p class="note">TBD: ${ai.tbd.map(esc).join(' · ')}</p>` : ''}${ai.dropped ? `<p class="note">${ai.dropped} line(s) left out: a number or id not in the material.</p>` : ''}${feedbackBar('meta_fit', `${title}|${today()}`, title)}
+      <div class="toolbar">${aiOk ? `<button class="btn" type="button" data-mt-fit-copy="${esc(title)}">Copy for the staff group</button>` : `<button class="btn primary" type="button" data-mt-fit-ok="${esc(title)}">Approve</button>`}</div></div>` : ''}</div>`;
+}
+// ---------- V1.27 Brainstorm per title ----------
+function brainState(title) {
+  S.brain ||= {};
+  return (S.brain[title] ||= { purpose: 'plan', nation: (FIELDS[title] || [])[0] || '', msgs: [] });
+}
+function brainMaterial(title, b) {
+  if (b.purpose === 'opponent') {
+    const { standIn, book } = prepCardFor(title, b.nation);
+    return { PURPOSE: `prepare for ${b.nation}`, TITLE: title, ...prematchMaterial({ brief: opponentBriefFor(title, b.nation), live: liveOf(allLive(), title, b.nation), standIn, book }) };
+  }
+  return planBrainMaterial(title, { reports: S.reports, wtags: S.wtags || [], vods: S.vods, partners: S.partners, tiers: S.tiers, scrims: S.scrims, asOf: today() });
+}
+function brainPage(title) {
+  if (S.mode === 'demo') return `<div class="panel">${DEMO_BANNER}<p class="empty">Brainstorm uses operational records only.</p></div>`;
+  const b = brainState(title); const fid = sid(title); const left = BRAIN_MAX - b.msgs.length;
+  const msg = (m, i) => m.role !== 'ai' ? `<div class="obj"><span class="note">${esc(m.by || 'Staff')}</span><p>${esc(m.text)}</p></div>`
+    : `<div class="obj"><span class="note">AI${m.sources.length ? ` · from ${esc(m.sources.join(', '))}` : ' · no record cited'}</span><p style="white-space:pre-wrap">${esc(m.text)}</p>
+      ${m.unverified.length ? `<p class="note">${tag('c-Blocked', 'check')} Numbers not found in the records: ${m.unverified.map(esc).join(', ')}. Treat them as unverified.</p>` : ''}
+      ${m.suggestions.length ? `<div class="toolbar">${m.suggestions.map((s, j) => `<button class="btn small" type="button" data-br-turn="${esc(JSON.stringify({ title, i, j }))}">${esc({ session: 'Turn into a session plan', proposal: 'Turn into a coaching proposal', note: 'Turn into a scouting note' }[s.kind])}: ${esc(s.title)}</button>`).join('')}</div>` : ''}
+      ${m.follow_ups.length ? `<div class="chips">${m.follow_ups.map((q) => `<button class="chip" type="button" data-br-ask="${esc(JSON.stringify({ title, q }))}">${esc(q)}</button>`).join('')}</div>` : ''}
+      ${feedbackBar('brainstorm', `${title}|${m.at}`, title)}</div>`;
+  return `<div class="panel"><div class="lead">Brainstorm — <em>${esc(title)}</em></div>
+    <p class="note">Think out loud with the AI. It reads only this title's records for the purpose you pick, names the records it used, and says TBD when the data is not there. Anything worth keeping becomes a session plan, coaching proposal or scouting note through the usual forms and approvals. Sessions are not stored: copy the summary at the end. Performance only.</p>
+    <div class="form"><label class="field" for="brP-${fid}">Purpose<select id="brP-${fid}" data-br-purpose="${esc(title)}"><option value="plan" ${b.purpose === 'plan' ? 'selected' : ''}>Plan next practice</option><option value="opponent" ${b.purpose === 'opponent' ? 'selected' : ''}>Opponent prep</option></select></label>
+      ${b.purpose === 'opponent' ? `<label class="field" for="brN-${fid}">Opponent<select id="brN-${fid}" data-br-nation="${esc(title)}">${(FIELDS[title] || []).map((n) => `<option ${n === b.nation ? 'selected' : ''}>${esc(n)}</option>`).join('')}</select></label>` : ''}</div></div>
+  <div class="panel">${b.msgs.length ? b.msgs.map(msg).join('') : '<p class="empty">Ask a first question, e.g. "What should tomorrow\'s session focus on?"</p>'}
+    ${brainAiOn() ? `<label class="field" for="brQ-${fid}">Your question<textarea id="brQ-${fid}" rows="3" maxlength="1500"></textarea></label>
+    <div class="toolbar"><button class="btn primary" type="button" data-br-send="${esc(title)}" ${left > 0 ? '' : 'disabled'}>Ask</button><span class="note">${left} of ${BRAIN_MAX} messages left</span>
+      ${b.msgs.length ? `<button class="btn" type="button" data-br-sum="${esc(title)}">Summarise the session</button><button class="btn" type="button" data-br-copy="${esc(title)}">Copy the session</button><button class="linkbtn" type="button" data-br-new="${esc(title)}">New session</button>` : ''}
+      <span class="msg" id="brMsg-${fid}" role="status"></span></div>` : '<p class="note">Brainstorm switches on after the V1.27 AI update.</p>'}</div>`;
+}
+for (const [view, title] of [['dota-brain', 'Dota 2'], ['pubgm-brain', 'PUBG Mobile']]) V[view] = () => brainPage(title);
+for (const h of GAME_HUBS) V[`${h.team}-brain`] = () => brainPage(h.title);
+for (const [view, title] of [['dota-meta', 'Dota 2'], ['pubgm-meta', 'PUBG Mobile']]) V[view] = () => metaPage(title);
+for (const h of GAME_HUBS) V[`${h.team}-meta`] = () => metaPage(h.title);
 V['tour-prep'] = () => coUi().prepPage();
 V['tour-runbook'] = () => {
   if (S.mode === 'demo') return `<div class="panel">${DEMO_BANNER}<p class="empty">The match tracker uses operational records only.</p></div>`;
@@ -1436,7 +1791,7 @@ V['tour-series'] = () => {
 
 function vodPanel(title) {
   const fid = sid(title);
-  const list = S.vods.filter((v) => v.title === title).sort((a, b) => a.nation.localeCompare(b.nation) || (b.date || '').localeCompare(a.date || ''));
+  const list = S.vods.filter((v) => v.title === title && v.kind !== 'own').sort((a, b) => a.nation.localeCompare(b.nation) || (b.date || '').localeCompare(a.date || ''));
   return `<div class="panel"><h2>Rival VOD library — ${esc(title)}</h2>
     <p class="note">Links to rival games, tagged so any coach can find them. A reviewed VOD can become a competitor note with the link as its source. The hub stores links only, not video.</p>
     ${list.length ? `<div class="tw"><table><thead><tr><th>Nation</th><th>Event</th><th>Tags</th><th>Notes</th><th>Review</th></tr></thead><tbody>${list.map((v) => `<tr><td><b>${esc(v.nation)}</b>${v.players ? `<br><span class="note">${esc(v.players)}</span>` : ''}</td>
@@ -1561,7 +1916,7 @@ V['comp-nation'] = () => {
     ${x.tierWhy ? `<p class="note">Tier by ${esc(x.tierBy)}: ${esc(x.tierWhy)}</p>` : ''}
     ${(() => { const tm = rosterOf(x.title, P.nation); if (!tm) return ''; const st = checkStatus(tm, today()); return `<div class="h3">Roster</div><p>${tm.players.map((p) => `${esc(p.ign)}${p.captain ? ' (C)' : ''}${p.role ? ` <span class="note">${esc(p.role)}</span>` : ''}`).join(', ')}${tm.coach ? ` <span class="note">· coach ${esc(tm.coach)}</span>` : ''}</p><p class="note">Checked ${esc(st.last.date)}${st.changed.length ? ' · <b>roster changed</b>' : ''}${st.due ? ' · check due' : ''}</p>`; })()}
     <div class="h3">What we know</div>${x.notes.length ? x.notes.map(noteLine).join('') : '<p class="note">Nothing yet.</p>'}
-    <div class="h3">Recent results</div>${(() => { const fm = formOf(x.title, P.nation); return fm.length ? fm.map(formLine).join('') : '<p class="note">No public result found yet.</p>'; })()}
+    <div class="h3">Recent results</div>${(() => { const fm = formOf(x.title, P.nation, S.rivals); return fm.length ? fm.map(formLine).join('') : '<p class="note">No public result found yet.</p>'; })()}
     <div class="h3">VODs</div>${x.vods.length ? `<ul class="plain">${x.vods.map((v) => `<li><a href="${esc(v.url)}" target="_blank" rel="noopener">${esc(v.event)}</a> ${v.tags.map((t) => tag('k-observed', t)).join(' ')} ${v.reviewed ? tag('c-Verified', 'reviewed') : tag('c-Low', 'not reviewed')}</li>`).join('')}</ul>` : '<p class="note">No VOD yet.</p>'}
     <div class="h3">Practice against their style</div><p>${x.standIns.length ? `Partners who play like them: ${x.standIns.map((p) => `<b>${esc(p.name)}</b> (${esc(p.level)})`).join(', ')}.` : 'No sparring partner in the bank plays like them yet.'} ${x.scrimsDone ? `${x.scrimsDone} stand-in scrim${x.scrimsDone > 1 ? 's' : ''} done, last ${esc(x.lastScrim)}.` : 'No stand-in scrim logged.'}${x.scrimsPlanned ? ` ${x.scrimsPlanned} planned.` : ''}</p>
     ${x.wecMatches.length ? `<div class="h3">WEC matches</div><ul class="plain">${x.wecMatches.map((m) => `<li>${esc(m.date)}${m.stage ? ` · ${esc(m.stage)}` : ''} — ${m.result ? `${esc(m.result.result)} ${esc(m.result.score)}` : 'to play'}${m.games.length ? ` · ${m.games.length} game note(s)` : ''}</li>`).join('')}</ul>` : ''}
@@ -1642,7 +1997,7 @@ function prepCardFor(title, nation) {
   let auto = {};
   try {
     const per = nationProfile(nation, compData()).per.find((x) => x.title === title);
-    auto = autoCard({ title, nation, per, team: rosterOf(title, nation), data: DATA, heroes: S.heroes, ours: title === 'Dota 2' ? dotaTeam().pools : [], asOf: today() });
+    auto = autoCard({ rivals: S.rivals, title, nation, per, team: rosterOf(title, nation), data: DATA, heroes: S.heroes, ours: title === 'Dota 2' ? dotaTeam().pools : [], asOf: today() });
   } catch { /* nation outside the published field (e.g. TBD): card stays empty */ }
   const games = latestGames((S.games || []).filter((g) => g.title === title));
   const standIn = gameOf(title) ? standInRecord(games, nation, { reports: S.reports, scrims: S.scrims, partners: S.partners }) : null;
@@ -1656,6 +2011,13 @@ async function proposeWeakness(title, label, w) {
   const ev = staffObservation({ title, observation: `${label}: ${w.n} reports in 14 days`, source: 'Recurring weaknesses (scrim report labels)', kind: 'observed', n: w.n, context: 'national', by: meName() || S.me });
   const rec = recommendationRecord({ problem: label, drill: 'Choose a drill that targets it in the next sessions', success: `Fewer reports labelled "${w.tag}" over the next 14 days`, explanation: `Labelled in ${w.n} scrim reports in the last 14 days (${w.prev} in the 14 days before).`, priority: 2, confidence: ev.confidence, area: 'staff', findings: [ev.id] }, [ev]);
   await saveObj(propose(rec, { title, by: meName() || S.me, rulesSnapshot: snapshot(S.rules, title === 'PUBG Mobile' ? ['pubgm-scoring'] : title === 'Dota 2' ? ['dota-patch'] : []) }));
+}
+// V1.24: a recurring VOD theme becomes a coaching proposal (the title coach still reviews it).
+async function proposeTheme(x) {
+  const label = `${x.player === 'Team' ? 'Team' : x.player}: ${x.tag}`;
+  const ev = staffObservation({ title: x.title, observation: `${label}: marked ${x.n} times in ${x.games} reviewed games (28 days)`, source: 'VOD review of our games', kind: 'observed', n: x.n, context: 'national', by: meName() || S.me });
+  const rec = recommendationRecord({ problem: `Recurring in VOD review: ${label}`, drill: 'Pick a drill that targets this moment; replay the marked clips with the player first', success: `Fewer "${x.tag}" marks for ${x.player} in the next 14 days of VOD review`, explanation: `Marked ${x.n} times across ${x.games} games in the last 28 days.`, priority: 2, confidence: ev.confidence, area: 'staff', findings: [ev.id] }, [ev]);
+  await saveObj(propose(rec, { title: x.title, by: meName() || S.me, rulesSnapshot: snapshot(S.rules, x.title === 'PUBG Mobile' ? ['pubgm-scoring'] : x.title === 'Dota 2' ? ['dota-patch'] : []) }));
 }
 async function savePubgmRows(rows) {
   const mr = tagOrigin(rows, 'operational');
@@ -1724,7 +2086,7 @@ V['comp-card'] = () => {
   if (S.mode === 'demo') return `<div class="panel">${DEMO_BANNER}<p class="empty">Operational records only.</p></div>`;
   const t = S.ocTitle; const field = FIELDS[t] || []; const n = field.includes(S.ocNation) ? S.ocNation : field[0];
   const per = nationProfile(n, compData()).per.find((x) => x.title === t);
-  const a = autoCard({ title: t, nation: n, per, team: rosterOf(t, n), data: DATA, heroes: S.heroes, ours: t === 'Dota 2' ? dotaTeam().pools : [], asOf: today() });
+  const a = autoCard({ rivals: S.rivals, title: t, nation: n, per, team: rosterOf(t, n), data: DATA, heroes: S.heroes, ours: t === 'Dota 2' ? dotaTeam().pools : [], asOf: today() });
   const plan = S.oppCards[rosterKey(t, n)] || null; const ours = S.roster[t] || [];
   return `<div class="noprint">${compHead('One page per opponent for the opponent brief two hours before a match. The hub fills in what the staff already hold; the title coach writes three key points and our answer, and the focus owner approves it.')}
     <div class="panel"><div class="form"><label class="field" for="ocT">Title${titleOpts('ocT', t, WEC_TITLES.map((x) => x.id))}</label><label class="field" for="ocN">Opponent<select id="ocN">${field.map((x) => `<option ${x === n ? 'selected' : ''}>${esc(x)}</option>`).join('')}</select></label></div>
@@ -1868,7 +2230,7 @@ async function onClick(e) {
       if (id === 'ocPrint') { window.print(); return; }
       if (id === 'ocDl') {
         const per = nationProfile(na, compData()).per.find((x) => x.title === ti);
-        const md = cardMarkdown(autoCard({ title: ti, nation: na, per, team: rosterOf(ti, na), data: DATA, heroes: S.heroes, ours: ti === 'Dota 2' ? dotaTeam().pools : [], asOf: today() }), S.oppCards[key] || null);
+        const md = cardMarkdown(autoCard({ rivals: S.rivals, title: ti, nation: na, per, team: rosterOf(ti, na), data: DATA, heroes: S.heroes, ours: ti === 'Dota 2' ? dotaTeam().pools : [], asOf: today() }), S.oppCards[key] || null);
         const dl = await window.claude?.use?.('downloads'); if (!dl) throw new Error('Downloads are not available in this view; use Print.');
         await dl.save({ filename: `opponent-card-${sid(ti)}-${sid(na)}.md`, data: md }); setMsg('ocMsg', 'Saved.', 'ok'); return;
       }
@@ -2047,6 +2409,258 @@ async function onClick(e) {
       S.lastFlag = { label: rule(rid).label, affected, objs }; render();
     } catch (err) { setMsg('ruMsg', err.message, 'err'); }
   }
+  // V1.27 Brainstorm.
+  if (t.dataset.brSend || t.dataset.brSum || t.dataset.brAsk) {
+    const ask = t.dataset.brAsk ? JSON.parse(t.dataset.brAsk) : null;
+    const title = t.dataset.brSend || t.dataset.brSum || ask.title; const fid = sid(title); const b = brainState(title);
+    if (ask) { const q = document.getElementById(`brQ-${fid}`); if (q) { q.value = ask.q; q.focus(); } return; }
+    const question = t.dataset.brSum ? 'Summarise this session for the staff: the decisions taken, the open questions (TBD), and the next steps with who does what.' : val(`brQ-${fid}`).trim();
+    try {
+      if (!question) throw new Error('Ask a question first.');
+      if (b.msgs.length >= BRAIN_MAX) throw new Error(`This session reached ${BRAIN_MAX} messages: copy it and start a new one.`);
+      const material = brainMaterial(title, b);
+      const history = b.msgs.map((m) => ({ role: m.role, text: m.text }));
+      b.msgs.push({ role: 'staff', text: question, by: meName() || S.me, at: new Date().toISOString() }); render();
+      setMsg(`brMsg-${fid}`, 'Thinking… (5–20 s)');
+      const out = await PLATFORM.ai.call({ action: 'brainstorm', title, purpose: b.purpose, material, history, question, prefs: [] });
+      const c = checkReply(out.raw, material, [...history, { text: question }]);
+      b.msgs.push({ role: 'ai', text: c.reply, sources: c.sources, follow_ups: c.follow_ups, suggestions: c.suggestions, unverified: c.unverified, at: new Date().toISOString() });
+      render();
+    } catch (err) { if (b.msgs.at(-1)?.role === 'staff' && b.msgs.at(-1).text === question) b.msgs.pop(); render(); setMsg(`brMsg-${fid}`, err.message, 'err'); }
+    return;
+  }
+  if (t.dataset.brTurn) {
+    const x = JSON.parse(t.dataset.brTurn); const b = brainState(x.title); const s = b.msgs[x.i]?.suggestions?.[x.j]; if (!s) return;
+    const fid = sid(x.title);
+    try {
+      if (s.kind === 'session') { S.planPrefill = { ...(S.planPrefill || {}), [x.title]: { focus: s.title.slice(0, 200), drill: s.detail.slice(0, 300) } }; location.hash = SCRIMS_TAB[x.title]; return; }
+      if (s.kind === 'note') { S.notePrefill = { title: x.title, nation: b.purpose === 'opponent' ? b.nation : '', note: `${s.title}: ${s.detail}`.slice(0, 300), source: `Brainstorm ${today()} (${(s.sources || []).join(', ')})` }; location.hash = TITLE_TAB[x.title]; return; }
+      const ev = staffObservation({ title: x.title, observation: `${s.title}: ${s.detail}`.slice(0, 400), source: `Brainstorm ${today()} (${(s.sources || []).join(', ')})`, kind: 'hypothesis', n: 1, context: 'national', by: meName() || S.me });
+      const rec = recommendationRecord({ problem: s.title.slice(0, 160), drill: s.detail.slice(0, 300), success: 'Set by the coach when reviewing this proposal', explanation: `From a Brainstorm session on ${today()}, based on ${(s.sources || []).join(', ')}.`, priority: 3, confidence: ev.confidence, area: 'staff', findings: [ev.id] }, [ev]);
+      await saveObj(propose(rec, { title: x.title, by: meName() || S.me, rulesSnapshot: snapshot(S.rules, x.title === 'PUBG Mobile' ? ['pubgm-scoring'] : x.title === 'Dota 2' ? ['dota-patch'] : []) }));
+      render(); setMsg(`brMsg-${fid}`, 'Sent to the title coach\'s review queue as a proposal.', 'ok');
+    } catch (err) { setMsg(`brMsg-${fid}`, err.message, 'err'); }
+    return;
+  }
+  if (t.dataset.brCopy) { const b = brainState(t.dataset.brCopy); try { await navigator.clipboard.writeText(sessionText(t.dataset.brCopy, b.msgs, S.lang)); setMsg(`brMsg-${sid(t.dataset.brCopy)}`, 'Copied.', 'ok'); } catch { setMsg(`brMsg-${sid(t.dataset.brCopy)}`, 'Copy is blocked here.', 'err'); } return; }
+  if (t.dataset.brNew) { brainState(t.dataset.brNew).msgs = []; render(); return; }
+  // V1.27 feedback on AI output.
+  if (t.dataset.fb) {
+    const x = JSON.parse(t.dataset.fb); const fid = sid(`${x.feature}-${x.ref}`);
+    try {
+      const rec = aiFeedback({ title: x.title, feature: x.feature, ref: x.ref, rating: x.rating, reason: val(`fbR-${fid}`), by: meName() || S.me });
+      if (S.db) await S.db.collection('rivals').doc(rec.id).set(rec); else S.rivals.push(rec);
+      render();
+    } catch (err) { setMsg(`fbM-${fid}`, err.message, 'err'); }
+    return;
+  }
+  // V1.27 AI pre-match draft and end-of-day scouting summary.
+  if (id === 'scAI') {
+    try {
+      const { title, nation } = S.sc; const match = (S.wecMatches || []).find((m) => m.id === S.sc.matchId) || null;
+      const { standIn, book } = prepCardFor(title, nation);
+      const material = prematchMaterial({ brief: opponentBriefFor(title, nation), live: liveOf(allLive(), title, nation), standIn, book });
+      setMsg('scAIMsg', 'Drafting… (10–20 s)');
+      const out = await PLATFORM.ai.call({ action: 'prematch', title, material });
+      const g = { allowed: numbersIn(material), ids: materialIds(material) }; const raw = out.raw || {}; let dropped = 0;
+      const keep = (k, max) => { const r = grounded(raw[k], g); dropped += r.dropped; return r.kept.slice(0, max); };
+      S.pmAI = { ...(S.pmAI || {}), [`${title}|${nation}|${match?.id || ''}`]: { likely: keep('likely', 5), threats: keep('threats', 3), key_points: keep('key_points', 3), watch: keep('watch', 3), tbd: (raw.tbd || []).slice(0, 4), dropped } };
+      render();
+    } catch (err) { setMsg('scAIMsg', err.message, 'err'); }
+    return;
+  }
+  if (t.dataset.sdDraft) {
+    const title = t.dataset.sdDraft;
+    try {
+      const material = scoutDayMaterial(allLive(), title, today());
+      setMsg('sdMsg', 'Summarising… (10–20 s)');
+      const out = await PLATFORM.ai.call({ action: 'scout_day', title, material });
+      const g = { allowed: numbersIn(material), ids: materialIds(material) }; let dropped = 0;
+      const opponents = ((out.raw || {}).opponents || []).filter((o) => material.LIVE[o.nation]).map((o) => { const r = grounded(o.learned, g); dropped += r.dropped; return { nation: o.nation, learned: r.kept, next_time: (o.next_time || []).filter((x) => numbersOk(x, g.allowed)).slice(0, 3) }; }).filter((o) => o.learned.length);
+      S.sdAI = { ...(S.sdAI || {}), [`${title}|${today()}`]: { opponents, dropped } }; render();
+    } catch (err) { setMsg('sdMsg', err.message, 'err'); }
+    return;
+  }
+  if (t.dataset.sdOk) {
+    const x = JSON.parse(t.dataset.sdOk); const sd = S.sdAI?.[`${x.title}|${today()}`]; const o = sd?.opponents.find((y) => y.nation === x.nation); if (!o) return;
+    try {
+      const rec = daySummaryRecord({ title: x.title, nation: x.nation, date: today(), lines: o.learned.map((l) => l.text), by: meName() || S.me });
+      if (S.db) { setLiveQueue([...liveQueue().filter((q) => q.id !== rec.id), rec]); syncLive(); } else S.rivals = [...S.rivals.filter((r) => r.id !== rec.id), rec];
+      render();
+    } catch (err) { setMsg('sdMsg', err.message, 'err'); }
+    return;
+  }
+  // V1.26 Meta tab.
+  if (t.dataset.mtAdd || t.dataset.mtRetireGo || t.dataset.mtConfirm || t.dataset.mtAddX || t.dataset.mtOdAdd) {
+    const e0 = t.dataset.mtConfirm ? S.rivals.find((x) => x.id === t.dataset.mtConfirm) : null;
+    const title = t.dataset.mtAdd || t.dataset.mtRetireGo || t.dataset.mtAddX || e0?.title || (t.dataset.mtOdAdd ? 'Dota 2' : ''); const fid = sid(title);
+    try {
+      const by = meName() || S.me;
+      if (t.dataset.mtAdd) await saveMeta(metaEntry({ title, category: val(`mtC-${fid}`), item: val(`mtI-${fid}`), patch: val(`mtV-${fid}`), source: val(`mtS-${fid}`), text: val(`mtT-${fid}`), confirmed: !!document.getElementById(`mtK-${fid}`)?.checked, by }));
+      if (e0) await saveMeta(confirmMeta(e0, by));
+      if (t.dataset.mtRetireGo) { const e = S.rivals.find((x) => x.id === val(`mtR-${fid}`)); if (!e) throw new Error('Pick the entry to retire.'); await saveMeta(retireMeta(e, { why: val(`mtW-${fid}`), by })); }
+      if (t.dataset.mtAddX) { const X = S.metaX?.[title]; const pick = (X?.entries || []).filter((_, i) => document.getElementById(`mtX${i}-${fid}`)?.checked); for (const e of pick) await saveMeta({ ...e, by }); S.metaX[title] = null; }
+      if (t.dataset.mtOdAdd) { const x = JSON.parse(t.dataset.mtOdAdd); await saveMeta(metaEntry({ title: 'Dota 2', category: 'strong', item: x.hero, text: x.text, source: `OpenDota pro hero stats, read ${S.metaODAt || today()}`, by })); }
+      render(); setMsg(`mtMsg-${fid}`, 'Saved.', 'ok');
+    } catch (err) { setMsg(`mtMsg-${fid}`, err.message, 'err'); }
+    return;
+  }
+  if (t.dataset.mtRetire) { const e = S.rivals.find((x) => x.id === t.dataset.mtRetire); if (!e) return; const fid = sid(e.title); const s = document.getElementById(`mtR-${fid}`); if (s) s.value = e.id; document.getElementById(`mtW-${fid}`)?.focus(); return; }
+  if (t.dataset.mtExtract) {
+    const title = t.dataset.mtExtract; const fid = sid(title);
+    try {
+      const text = val(`mtP-${fid}`); const source = val(`mtPS-${fid}`).trim();
+      if (!source) throw new Error('Source is required (link, publisher, tournament, or "own observation").');
+      setMsg(`mtXMsg-${fid}`, 'Reading the text… (10–30 s)');
+      const out = await PLATFORM.ai.call({ action: 'meta_extract', title, text, source });
+      S.metaX = { ...(S.metaX || {}), [title]: extractedEntries(out.raw, text, { title, source, by: meName() || S.me }) }; render();
+    } catch (err) { setMsg(`mtXMsg-${fid}`, err.message, 'err'); }
+    return;
+  }
+  if (t.dataset.mtOd) {
+    try {
+      setMsg('mtODMsg', 'Loading…');
+      const r = await fetch('https://api.opendota.com/api/heroStats'); if (!r.ok) throw new Error(`OpenDota answered ${r.status}. Try again later.`);
+      S.metaOD = openDotaRows(await r.json()); S.metaODAt = today(); render();
+    } catch (err) { setMsg('mtODMsg', /fetch/i.test(err.message) ? 'OpenDota could not be reached from here (network or blocked). Paste its numbers under "Add from text" instead.' : err.message, 'err'); }
+    return;
+  }
+  if (t.dataset.mtFit) {
+    const title = t.dataset.mtFit; const fid = sid(title);
+    try {
+      setMsg(`mtFMsg-${fid}`, 'Drafting… (10–20 s)');
+      const material = metaFitMaterial(title, metaOf(S.rivals, title), ourFacts(title, { games: S.games || [], pools: S.dr_pools || [] }));
+      const out = await PLATFORM.ai.call({ action: 'meta_fit', title, material });
+      // The hub checks: every number must be in the material, every meta id must exist; other lines are left out.
+      const json = JSON.stringify(material); const allowed = new Set(json.match(/\d+(\.\d+)?/g) || []); const ids = new Set(material.META.map((m) => m.id));
+      const okLine = (x) => (String(x.text).match(/\d+(\.\d+)?/g) || []).every((n) => allowed.has(n)) && (x.meta_ids || []).length && (x.meta_ids || []).every((m) => ids.has(m));
+      const raw = out.raw || {}; let dropped = 0;
+      const keep = (xs) => (xs || []).filter((x) => { const ok = okLine(x); if (!ok) dropped++; return ok; });
+      const okBrief = (String(raw.brief || '').match(/\d+(\.\d+)?/g) || []).every((n) => allowed.has(n));
+      S.metaFitAI = { ...(S.metaFitAI || {}), [title]: { brief: okBrief ? raw.brief : '', aligned: keep(raw.aligned), exposed: keep(raw.exposed), practise: keep(raw.practise), tbd: raw.tbd || [], dropped: dropped + (okBrief ? 0 : 1) } };
+      S.metaFitOk = { ...(S.metaFitOk || {}), [title]: false }; render();
+    } catch (err) { setMsg(`mtFMsg-${fid}`, err.message, 'err'); }
+    return;
+  }
+  if (t.dataset.mtFitOk) { S.metaFitOk = { ...(S.metaFitOk || {}), [t.dataset.mtFitOk]: true }; render(); return; }
+  if (t.dataset.mtFitCopy) {
+    const title = t.dataset.mtFitCopy; const a = S.metaFitAI?.[title]; if (!a) return;
+    const txt = [`Meta ${title}`, a.brief, ...['aligned', 'exposed', 'practise'].flatMap((k) => (a[k].length ? ['', `${k}:`, ...a[k].map((x) => `- ${x.text}`)] : []))].filter((x) => x != null).join('\n');
+    try { await navigator.clipboard.writeText(txt); setMsg(`mtFMsg-${sid(title)}`, 'Copied.', 'ok'); } catch { setMsg(`mtFMsg-${sid(title)}`, 'Copy is blocked here.', 'err'); }
+    return;
+  }
+  // V1.25 Live scouting.
+  if (t.dataset.scType) {
+    S.sc.type = t.dataset.scType; const y = document.getElementById('scY'); if (y) y.value = S.sc.type;
+    document.querySelectorAll('[data-sc-type]').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.scType === S.sc.type)));
+    document.getElementById(S.sc.type === 'pick' || S.sc.type === 'ban' ? 'scH' : S.sc.type === 'player' ? 'scP' : 'scX')?.focus();
+    return;
+  }
+  if (id === 'scSave') {
+    try {
+      S.sc.watch = val('scW');
+      const rec = liveEntry({ title: S.sc.title, nation: S.sc.nation, matchId: S.sc.matchId || '', match: S.sc.watch, type: S.sc.type, hero: val('scH'), player: val('scP'), phase: val('scQ'), t: val('scTm'), text: val('scX'), by: meName() || S.me });
+      if (S.db) { setLiveQueue([...liveQueue(), rec]); } else S.rivals.push(rec);
+      render(); setMsg('scMsg', S.db ? 'Saved on this phone; syncing…' : 'Saved.', 'ok');
+      document.getElementById('scX')?.focus();
+      syncLive().then(() => { if (viewOf() === 'tour-scout' && !liveQueue().length) setMsg('scMsg', 'Saved and synced.', 'ok'); });
+    } catch (err) { setMsg('scMsg', err.message, 'err'); }
+    return;
+  }
+  if (id === 'scSync') { await syncLive(); if (liveQueue().length) setMsg('scMsg', 'Still offline or refused: entries stay on this phone.', 'err'); return; }
+  if (id === 'scApprove') {
+    try {
+      const { title, nation } = S.sc;
+      const rec = approveBrief({ title, nation, matchId: S.sc.matchId || '', points: [0, 1, 2].map((i) => val(`scK${i}`)), by: meName() || S.me });
+      // V1.27: when the AI drafted the key points and the coach changed them, keep the before / after.
+      const pmKey = `${title}|${nation}|${S.sc.matchId || ''}`; const aiPts = S.pmAI?.[pmKey]?.key_points?.map((k) => k.text) || [];
+      const edit = aiPts.length ? aiEdit({ title, feature: 'prematch', ref: pmKey, before: aiPts.join(' | '), after: rec.points.join(' | '), by: meName() || S.me }) : null;
+      const recs = edit ? [rec, edit] : [rec];
+      if (S.db) { setLiveQueue([...liveQueue().filter((x) => !recs.some((r) => r.id === x.id)), ...recs]); syncLive(); } else S.rivals = [...S.rivals.filter((x) => x.id !== rec.id), ...recs];
+      render(); setMsg('scBMsg', 'Approved. You can now copy it for the players.', 'ok');
+    } catch (err) { setMsg('scBMsg', err.message, 'err'); }
+    return;
+  }
+  if (id === 'scShare') {
+    const { title, nation } = S.sc; const match = (S.wecMatches || []).find((m) => m.id === S.sc.matchId) || null;
+    const ok = approvedBrief(allLive(), title, nation, match?.id || '', today());
+    if (!ok) { setMsg('scBMsg', 'Approve the brief first.', 'err'); return; }
+    const P = preMatchBrief({ match, brief: opponentBriefFor(title, nation), liveToday: liveOf(allLive(), title, nation, today()) });
+    try { await navigator.clipboard.writeText(briefShareText(P, ok, S.lang)); setMsg('scBMsg', 'Copied. Paste it where the players will read it.', 'ok'); } catch { setMsg('scBMsg', 'Copy is blocked here.', 'err'); }
+    return;
+  }
+  // V1.24 analyst and coach helpers.
+  if (t.dataset.bdNote) {
+    const g = (S.games || []).find((x) => x.id === t.dataset.bdNote); const fid = sid(t.dataset.bdNote);
+    try {
+      const r = g && S.reports.find((x) => x.id === g.reportId); if (!r) throw new Error('No scrim report linked to this game.');
+      const n = reportNote(r, { text: val(`bd-${fid}`), by: meName() || S.me });
+      if (S.db) await S.db.collection('scrim_reports').doc(r.id).set(n); else Object.assign(r, n);
+      render(); setMsg(`bdMsg-${fid}`, 'Added to the scrim report as a follow-up note.', 'ok');
+    } catch (err) { setMsg(`bdMsg-${fid}`, err.message, 'err'); }
+    return;
+  }
+  if (t.dataset.ovAdd || t.dataset.ovMark) {
+    const title = t.dataset.ovAdd || t.dataset.ovMark; const fid = sid(title);
+    try {
+      if (S.mode === 'demo') throw new Error('Not available in the demo sandbox.');
+      let v;
+      if (t.dataset.ovAdd) v = ownVod({ title, url: val(`ovU-${fid}`), event: val(`ovE-${fid}`), date: val(`ovD-${fid}`), by: meName() || S.me });
+      else {
+        const cur = S.vods.find((x) => x.id === val(`ovV-${fid}`)); if (!cur) throw new Error('Pick the VOD first.');
+        v = addMark(cur, { t: val(`ovT-${fid}`), player: val(`ovP-${fid}`), tag: val(`ovL-${fid}`), note: val(`ovN-${fid}`), by: meName() || S.me });
+      }
+      if (S.db) await S.db.collection('vods').doc(v.id).set(v); else S.vods = [...S.vods.filter((x) => x.id !== v.id), v];
+      render(); setMsg(`ovMsg-${fid}`, t.dataset.ovAdd ? 'VOD added. Now mark the moments.' : 'Mark added.', 'ok');
+      if (t.dataset.ovMark) { const sel = document.getElementById(`ovV-${fid}`); if (sel) sel.value = v.id; }
+    } catch (err) { setMsg(`ovMsg-${fid}`, err.message, 'err'); }
+    return;
+  }
+  if (t.dataset.ovTheme) {
+    try { const x = JSON.parse(t.dataset.ovTheme); await proposeTheme(x); render(); setMsg(`ovMsg-${sid(x.title)}`, 'Proposal sent to the title coach for review.', 'ok'); }
+    catch (err) { setMsg(`ovMsg-${sid(JSON.parse(t.dataset.ovTheme).title)}`, err.message, 'err'); }
+    return;
+  }
+  if (id === 'dayCopy') {
+    const me = STAFF.find((x) => x.id === S.me) || STAFF[0];
+    const mine = me.id === 'aufa' || me.id === 'user' ? me.focus : WEC_TITLES.map((x) => x.id);
+    const txt = dayText(daySummary(mine.filter((x) => GAME_SPEC[x]), today(), { reports: S.reports, scrims: S.scrims, wtags: S.wtags || [] }), today(), S.lang);
+    try { await navigator.clipboard.writeText(txt); setMsg('dayMsg', 'Copied. Paste it in the staff group.', 'ok'); } catch { setMsg('dayMsg', 'Copy is blocked here.', 'err'); }
+    return;
+  }
+  // V1.23: public results kept current by the staff.
+  if (t.dataset.resultEdit || t.dataset.resultPick) {
+    try {
+      const x = JSON.parse(t.dataset.resultEdit || t.dataset.resultPick); const fid = sid(x.title);
+      const det = document.getElementById(`rrD-${fid}`); if (!det) return; det.open = true;
+      const put = (k, v) => { const el = document.getElementById(`${k}-${fid}`); if (!el) return; if (el.type === 'checkbox') el.checked = !!v; else el.value = v ?? ''; };
+      if (t.dataset.resultEdit) {
+        put('rrN', x.nation); put('rrE', x.event); put('rrDt', x.date); put('rrR', x.result); put('rrS', x.source); put('rrC', x.club); put('rrK', x.check);
+        setMsg(`rrMsg-${fid}`, 'Filled in from the result. Change what is wrong (keep event and date to replace it), then press Save result.', 'ok');
+        document.getElementById(`rrR-${fid}`)?.focus();
+      } else { put('rrX', x.key); setMsg(`rrMsg-${fid}`, 'Selected. Say why, then press Retire selected result.', 'ok'); document.getElementById(`rrW-${fid}`)?.focus(); }
+    } catch { /* malformed button data */ }
+    return;
+  }
+  if (t.dataset.resultSave || t.dataset.resultRetire) {
+    const title = t.dataset.resultSave || t.dataset.resultRetire; const fid = sid(title);
+    try {
+      if (S.mode === 'demo') throw new Error('Not available in the demo sandbox.');
+      const by = val(`rrB-${fid}`) || meName();
+      let rec;
+      if (t.dataset.resultSave) {
+        const box = (k) => !!document.getElementById(`${k}-${fid}`)?.checked;
+        rec = rivalResult({ title, nation: val(`rrN-${fid}`), event: val(`rrE-${fid}`), date: val(`rrDt-${fid}`), result: val(`rrR-${fid}`), source: val(`rrS-${fid}`), club: box('rrC'), check: box('rrK'), by, asOf: today() });
+      } else {
+        const key = val(`rrX-${fid}`);
+        rec = retireResult({ title, nation: key.split('|')[1] || '', key, why: val(`rrW-${fid}`), by });
+      }
+      if (S.db) await S.db.collection('rivals').add(rec); else S.rivals.push(rec);
+      render(); document.getElementById(`rrD-${fid}`)?.setAttribute('open', '');
+      setMsg(`rrMsg-${fid}`, t.dataset.resultSave ? 'Result saved.' : 'Result retired.', 'ok');
+    } catch (err) { setMsg(`rrMsg-${fid}`, err.message, 'err'); }
+    return;
+  }
   if (t.dataset.compSort) { S.compSort = t.dataset.compSort === 'recent' ? 'recent' : 'tier'; render(); return; }
   if (t.dataset.formNote) {
     // Pre-fill the note form from a public result; the coach reads it, adjusts and presses Save.
@@ -2106,7 +2720,29 @@ async function onClick(e) {
     catch (err) { setMsg(`adMsg-${uid}`, err.message, 'err'); }
     return;
   }
-  if (t.dataset.rpFill) { try { const { fid, v } = JSON.parse(t.dataset.rpFill); fillReport(fid, v); } catch { /* malformed chip */ } return; }
+  if (t.dataset.rpFill) { try { const { fid, v } = JSON.parse(t.dataset.rpFill); fillReport(fid, v); if (v.scrim && blocksOfScrim(v.scrim).length) render(); } catch { /* malformed chip */ } return; }   // V1.26: show that session's drills
+  if (t.dataset.wkDraft) {
+    const title = t.dataset.wkDraft; const fid = sid(title);
+    try {
+      setMsg(`wkMsg-${fid}`, 'Drafting… (5–15 s)');
+      const material = weeklyMaterial(weeklyTrend(title, { reports: S.reports, wtags: S.wtags || [], asOf: today() }));
+      const out = await PLATFORM.ai.call({ action: 'weekly', title, material });
+      // Lines with a number that is not in the trend are left out (the hub checks, not the AI).
+      const allowed = new Set(JSON.stringify(material).match(/\d+(\.\d+)?/g) || []);
+      const okNum = (s) => (String(s).match(/\d+(\.\d+)?/g) || []).every((n) => allowed.has(n));
+      const raw = out.raw || {}; const lines = (raw.lines || []).filter((l) => okNum(l.text));
+      S.weekly = { ...(S.weekly || {}), [title]: { headline: okNum(raw.headline) ? raw.headline : '', lines, practise_next: (raw.practise_next || []).filter(okNum), dropped: (raw.lines || []).length - lines.length } };
+      S.weeklyOk = { ...(S.weeklyOk || {}), [title]: false }; render();
+    } catch (err) { setMsg(`wkMsg-${fid}`, err.message, 'err'); }
+    return;
+  }
+  if (t.dataset.wkOk) { S.weeklyOk = { ...(S.weeklyOk || {}), [t.dataset.wkOk]: true }; render(); return; }
+  if (t.dataset.wkCopy) {
+    const title = t.dataset.wkCopy; const d = S.weekly?.[title]; if (!d) return;
+    const txt = [`${title}: ${d.headline}`, ...d.lines.map((l) => `- ${l.text}`), ...(d.practise_next.length ? ['', ...d.practise_next.map((p) => `• ${p}`)] : [])].join('\n');
+    try { await navigator.clipboard.writeText(txt); setMsg(`wkMsg-${sid(title)}`, 'Copied.', 'ok'); } catch { setMsg(`wkMsg-${sid(title)}`, 'Copy is blocked here.', 'err'); }
+    return;
+  }
   if (t.dataset.rpProg) { fillReport(t.dataset.rpProg, { progress: t.dataset.v }); return; }
   if (t.dataset.rpClear) { storeDraft(t.dataset.rpClear, {}); render(); return; }
   if (t.dataset.reportSave) {
@@ -2124,7 +2760,8 @@ async function onClick(e) {
       const newSession = asDaily && !g('scrim') ? `SC-${String(g('date')).replace(/-/g, '')}-${Math.random().toString(36).slice(2, 6)}` : '';
       const r = scrimReport({ title, date: g('date'), time: g('time'), by: g('by'), partner: g('partner'), partnerLevel: g('level'), format: g('format'), roster: g('roster'), scrimId: g('scrim') || newSession,
         won: g('won'), lost: g('lost'), drawn: g('drawn'), played: g('played'), points: g('points'), avgPlacement: g('avg'), chicken: g('chicken'),
-        focus: g('focus'), progress: g('progress'), worked: g('worked'), failed: g('failed'), detail: g('detail'), playerNotes: g('players'), adjust: g('adjust'), vod: g('vod'), prevAdjust: g('prevadj'), fixCheck: g('fix'), asOf: localToday() });
+        focus: g('focus'), progress: g('progress'), worked: g('worked'), failed: g('failed'), detail: g('detail'), playerNotes: g('players'), adjust: g('adjust'), vod: g('vod'), prevAdjust: g('prevadj'), fixCheck: g('fix'), asOf: localToday(),
+        drills: drillResults(blocksOfScrim(g('scrim')), [0, 1, 2, 3].map((i) => g(`dr${i}`))) });
       // Closing a planned session here avoids typing the same result twice.
       const sc = r.scrimId ? S.scrims.find((x) => x.id === r.scrimId && x.status === 'planned') : null;
       const done = sc ? completeScrim(sc, { score: resultText(r.result), notes: r.worked || r.failed, by: r.by, matchIds: [], perObjective: {} }) : null;
@@ -2173,13 +2810,17 @@ async function onClick(e) {
         .map((r) => ({ id: r.id, date: r.date, partner: r.partner, result: resultText(r.result), focus: r.focus, progress: r.progress, worked: r.worked, failed: r.failed, adjust: r.adjust, prevAdjust: r.prevAdjust || '', fixCheck: r.fixCheck || '' }));
       const findings = (S.findings || []).filter((x) => x.title === title && x.status !== 'wrong').slice(-8).map((x) => ({ id: x.id, claim: x.claim, status: x.status }));
       const objectives = S.cycle.filter((o) => o.title === title && ['accepted', 'modified'].includes(o.status)).map((o) => o.rec.problem);
-      const out = await PLATFORM.ai.call({ action: 'plan', title, reports, findings, objectives });
+      // V1.26: unfixed adjustments, recurring weaknesses and VOD themes, so the AI can propose timed drills.
+      const material = planMaterial(title, { reports: S.reports, wtags: S.wtags || [], vods: S.vods, asOf: today() });
+      const out = await PLATFORM.ai.call({ action: 'plan', title, reports, findings, objectives, material });
       S.planSug = { ...(S.planSug || {}), [title]: out.raw }; render();
     } catch (err) { setMsg(`psMsg-${fid}`, `${err.message}`, 'err'); }
     return;
   }
   if (t.dataset.planUse) {
     const title = t.dataset.planUse; const fid = sid(title); const sug = S.planSug?.[title]; if (!sug) return;
+    // V1.26: the suggested timed drills go into the drill rows (editable) before the coach adds the session.
+    if (Array.isArray(sug.blocks) && sug.blocks.length) { S.planBlocks = { ...(S.planBlocks || {}), [fid]: sug.blocks.slice(0, MAX_BLOCKS).map((b) => ({ name: b.name, minutes: b.minutes, objective: b.objective, criterion: b.criterion })) }; render(); }
     const put = (id, v) => { const el = document.getElementById(id); if (el) el.value = v || ''; };
     put(`spFo-${fid}`, sug.focus); put(`spDr-${fid}`, sug.drill); put(`spMe-${fid}`, sug.measure);
     document.getElementById(`spFo-${fid}`)?.scrollIntoView?.({ block: 'center' }); setMsg(`spMsg-${fid}`, 'Suggestion copied into the plan: pick the date and partner, then "Add to plan".', 'ok');
@@ -2189,8 +2830,13 @@ async function onClick(e) {
     const title = t.dataset.scrimPlan; const fid = sid(title);
     try {
       const objectives = [...document.querySelectorAll(`input[name="spObj-${fid}"]:checked`)].map((x) => x.value);
-      const sc = planScrim({ title, date: val(`spD-${fid}`), time: val(`spTm-${fid}`), kind: val(`spK-${fid}`), format: val(`spF-${fid}`), partner: val(`spP-${fid}`), partnerLevel: val(`spL-${fid}`), mirrors: val(`spMi-${fid}`), owner: val(`spO-${fid}`), focus: val(`spFo-${fid}`), drill: val(`spDr-${fid}`), measure: val(`spMe-${fid}`), objectives });
+      const sc = planScrim({ title, date: val(`spD-${fid}`), time: val(`spTm-${fid}`), kind: val(`spK-${fid}`), format: val(`spF-${fid}`), partner: val(`spP-${fid}`), partnerLevel: val(`spL-${fid}`), mirrors: val(`spMi-${fid}`), owner: val(`spO-${fid}`), focus: val(`spFo-${fid}`), drill: val(`spDr-${fid}`), measure: val(`spMe-${fid}`), objectives, blocks: readBlocks(fid) });
       if (S.db) await S.db.collection('scrims').doc(sc.id).set(sc); else S.scrims.push(sc);
+      // V1.27: the AI suggested drills and the coach changed them before adding the session: keep the before / after.
+      const sugB = S.planSug?.[title]?.blocks || []; const show = (bs) => bs.map((b) => `${b.name} ${b.minutes}m (${b.criterion})`).join(' | ');
+      const ed = S.planBlocks?.[fid] && sugB.length ? aiEdit({ title, feature: 'plan', ref: `${title}|${S.planSug[title].focus || ''}`.slice(0, 120), before: show(sugB), after: show(sc.blocks), by: meName() || S.me }) : null;
+      if (ed) { if (S.db) await S.db.collection('rivals').doc(ed.id).set(ed); else S.rivals.push(ed); }
+      if (S.planBlocks) delete S.planBlocks[fid];
       render();
     } catch (err) { setMsg(`spMsg-${fid}`, err.message, 'err'); }
     return;
@@ -2260,6 +2906,23 @@ document.addEventListener('click', async (e) => {
 for (const ev of ['input', 'change']) document.addEventListener(ev, (e) => draftField(e.target));
 
 document.addEventListener('change', (e) => {
+  // V1.27 Brainstorm purpose and opponent.
+  if (e.target.dataset?.brPurpose || e.target.dataset?.brNation) {
+    const b = brainState(e.target.dataset.brPurpose || e.target.dataset.brNation);
+    if (e.target.dataset.brPurpose) b.purpose = e.target.value; else b.nation = e.target.value;
+    render(); return;
+  }
+  // V1.26: picking the planned session in a report shows its drills.
+  if (/^rp-.+-scrim$/.test(e.target.id || '')) { draftField(e.target); render(); return; }
+  // V1.25 Live scouting selectors.
+  if (['scT', 'scN', 'scM', 'scW'].includes(e.target.id)) {
+    S.sc ||= {}; const v = e.target.value;
+    if (e.target.id === 'scT') { S.sc.title = v; S.sc.matchId = ''; S.sc.nation = ''; }
+    if (e.target.id === 'scN') { S.sc.nation = v; S.sc.matchId = ''; }
+    if (e.target.id === 'scM') { S.sc.matchId = v; const m = (S.wecMatches || []).find((x) => x.id === v); if (m && FIELDS[S.sc.title]?.includes(m.opponent)) S.sc.nation = m.opponent; }
+    if (e.target.id === 'scW') { S.sc.watch = v; return; }
+    render(); return;
+  }
   if (e.target.dataset?.drBookopp || e.target.dataset?.drCsvfile) { drUi().onChange(e); return; }
   if (e.target.dataset?.plPickday) { plUi().onChange(e); return; }
   if (e.target.dataset?.coBrFile) { coUi().onChange(e); return; }

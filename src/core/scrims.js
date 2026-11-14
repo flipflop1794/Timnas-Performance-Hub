@@ -18,6 +18,8 @@ export function planScrim(x) {
     title: x.title, date: x.date, time: x.time || '', kind: x.kind, format: x.format || '', partner: (x.partner || '').trim(),
     partnerLevel: x.partnerLevel || '', mirrors: (x.mirrors || '').trim(), owner: x.owner.trim(),
     focus: String(x.focus || '').trim().slice(0, 200), drill: String(x.drill || '').trim().slice(0, 300), measure: String(x.measure || '').trim().slice(0, 200),
+    // V1.26: timed drills (practice.sessionBlocks validates them before they get here).
+    blocks: Array.isArray(x.blocks) ? x.blocks : [],
     objectives: x.objectives || [], status: 'planned', result: null, origin: 'operational', createdAt: new Date().toISOString(),
   };
 }

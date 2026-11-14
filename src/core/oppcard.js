@@ -13,7 +13,7 @@ const LANE = { 1: 'safe lane', 2: 'mid', 3: 'off lane', 4: 'jungle' };
 
 // ours (Dota): our five's pools ({ player, pool: [{ hero, name, games }] }), for heroes both sides play.
 // asOf: YYYY-MM-DD, for the age of each note.
-export function autoCard({ title, nation, per, team, data, heroes = {}, ours = [], asOf = new Date().toISOString().slice(0, 10) }) {
+export function autoCard({ title, nation, per, team, data, heroes = {}, ours = [], asOf = new Date().toISOString().slice(0, 10), rivals = [] }) {
   const notes = (per?.notes || []).map((n) => ({ ...n, ageDays: n.date ? age(n.date, asOf) : null, stale: !!n.date && age(n.date, asOf) > STALE_DAYS }));
   const roster = (team?.players || []).map((p) => {
     const pool = title === 'Dota 2' ? dotaPool(nation, p.ign, data) : null;
@@ -44,7 +44,7 @@ export function autoCard({ title, nation, per, team, data, heroes = {}, ours = [
     roster, coach: team?.coach || '', banCandidates, contested, scrimsDone: per?.scrimsDone || 0, standIns: (per?.standIns || []).map((p) => p.name), gaps,
     wecMatches: (per?.wecMatches || []).map((m) => ({ date: m.date, stage: m.stage, result: m.result })),
     // V1.21: published national-team results (desk research), shown apart from the staff's own notes.
-    results: formOf(title, nation).slice(0, 4) };
+    results: formOf(title, nation, rivals).slice(0, 4) };
 }
 
 export function cardPlan(x) {

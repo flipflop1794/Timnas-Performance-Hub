@@ -426,8 +426,11 @@ export function captureUi(ctx) {
       try {
         const text = checkDebriefInput(val(`rp-${fid}-dump`));
         setMsg(`capDbMsg-${fid}`, 'Sorting your note into the fields…');
-        const res = await ai().call({ action: 'debrief', title, text, roster: rosterOf(title) });
+        // V1.26: the planned session's drills, so the note is also read per drill (met / not met / not tried).
+        const blocks = (S.scrims || []).find((x) => x.id === val(`rp-${fid}-scrim`))?.blocks || [];
+        const res = await ai().call({ action: 'debrief', title, text, roster: rosterOf(title), blocks: blocks.map((b) => ({ name: b.name, criterion: b.criterion })) });
         const { fields, flags, notPlaced } = checkDebriefSplit(text, res.raw, rosterOf(title));
+        for (const dr of res.raw?.drills || []) if (Number.isInteger(dr.index) && dr.index >= 0 && dr.index < blocks.length && ['yes', 'no', 'not tried'].includes(dr.met)) fields[`dr${dr.index}`] = dr.met;
         fillReport(fid, fields);
         if (fields.detail || fields.players) { const det = document.getElementById(`rp-${fid}-detail`)?.closest('details'); if (det) det.open = true; }
         setMsg(`capDbMsg-${fid}`, `Filled ${Object.keys(fields).length} field(s). Check them, then save.`, 'ok');

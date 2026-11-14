@@ -1,6 +1,8 @@
 // V1.15 "Guide" page: how to use the hub, per task, in English and Bahasa Indonesia. Each section says who
 // it is for, links to the screen, and says when a part is not switched on yet on this site.
 
+import { tr } from './i18n.js';
+
 // key: section id; en / id: the English and Indonesian text.
 const S = (key, feat, who, open, en, id) => ({ key, feat, who, open, en, id });
 export const GUIDE = [
@@ -194,14 +196,18 @@ export const GUIDE = [
     ] }),
 ];
 
+// V1.23: the Indonesian guide quotes button names. Buttons are translated on screen, so a quoted English label
+// is swapped for the same translation the button shows ("Copy setup from last report" → "Salin pengaturan…").
+const quoteLabels = (s) => s.replace(/"([A-Z][A-Za-z ,'()&\-]+)"/g, (m, label) => { const t = tr(label); return t ? `"${t}"` : m; });
 export function guidePage({ lang = 'en', feat = {}, isAdmin = false, esc, tag }) {
   const L = lang === 'id' ? 'id' : 'en';
+  const step = (s) => (L === 'id' ? quoteLabels(s) : s);
   const list = GUIDE.filter((g) => g.key !== 'admin' || isAdmin);
   const pending = (g) => g.feat && feat[g.feat] === false;
   const toc = list.map((g) => `<button type="button" class="chip" data-guide-jump="${g.key}">${esc(g[L].title)}${pending(g) ? ' ·' : ''}</button>`).join('');
   const sec = (g) => `<section class="panel guide-sec" id="guide-${g.key}"><h2>${esc(g[L].title)}</h2>
     <p class="note">${L === 'id' ? 'Untuk' : 'For'}: ${esc(g.who[L])}${pending(g) ? ` ${tag('s-proposed', L === 'id' ? 'belum aktif di situs ini' : 'not switched on yet on this site')}` : ''}${g.open ? ` · <a href="#${g.open}">${L === 'id' ? 'Buka' : 'Open'} →</a>` : ''}</p>
-    <ol class="guide-steps">${g[L].steps.map((s) => `<li>${esc(s)}</li>`).join('')}</ol></section>`;
+    <ol class="guide-steps">${g[L].steps.map((s) => `<li>${esc(step(s))}</li>`).join('')}</ol></section>`;
   return `<div class="panel hero-panel"><div class="lead">${L === 'id' ? 'Cara memakai <em>hub</em>' : 'How to use the <em>hub</em>'}</div>
     <p class="note">${L === 'id' ? 'Panduan singkat per tugas. Ganti bahasa dengan EN | ID di atas.' : 'Short how-tos per task. Switch language with EN | ID at the top.'}</p><div class="chips">${toc}</div></div>${list.map(sec).join('')}`;
 }

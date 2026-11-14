@@ -35,10 +35,14 @@ async function open(B, who, hash) {
   const d = dom.window.document;
   for (let i = 0; i < 60 && /Loading/.test(d.getElementById('main')?.textContent || 'Loading'); i++) await sleep(25);
   await sleep(120);
+  // The AI parts appear once the feature check returns; on a busy machine that is later than 120 ms (up to 3 s).
+  const aiShown = () => [...d.querySelectorAll('#main *')].some((e) => [...e.attributes].some((a) => a.name.startsWith('data-co-')));
+  for (let i = 0; i < 60 && !aiShown(); i++) await sleep(50);
   return { d, w: dom.window, text: () => d.getElementById('main').textContent, msg: (id) => d.getElementById(id)?.textContent || '',
     go: async (h) => { dom.window.location.hash = h; dom.window.dispatchEvent(new dom.window.HashChangeEvent('hashchange')); await sleep(60); },
     set: (id, v) => { const e = d.getElementById(id); e.value = v; e.dispatchEvent(new dom.window.Event('input', { bubbles: true })); },
-    click: async (sel) => { const e = d.querySelector(sel); assert.ok(e, `no ${sel}`); e.click(); await sleep(150); } };
+    // Under a full test run the AI buttons can appear later (feature check still loading): wait up to 3 s.
+    click: async (sel) => { let e = d.querySelector(sel); for (let i = 0; !e && i < 60; i++) { await sleep(50); e = d.querySelector(sel); } assert.ok(e, `no ${sel}`); e.click(); await sleep(150); } };
 }
 
 test('weekly summary: the Head Coach drafts with AI, an unchecked number is marked and left out, leadership sees the published text', async () => {

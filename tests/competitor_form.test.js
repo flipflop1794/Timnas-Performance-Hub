@@ -68,12 +68,58 @@ test('page: Today opens with a ranked "needs attention" list, each item linking 
   const levels = [...panel.querySelectorAll('li .tag')].map((x) => x.textContent);
   const rank = { now: 0, today: 1, 'this week': 2 };
   assert.deepEqual(levels, [...levels].sort((a, b) => rank[a] - rank[b]), 'most urgent first');
-  // Every seeded rival roster was read on 3 Nov, so weekly checks are due from 10 Nov.
-  assert.match(panel.textContent, /Rival roster checks due \(weekly\): \d+/);
   assert.ok([...panel.querySelectorAll('a.btn')].every((a) => a.getAttribute('href').startsWith('#')), 'each item links to a screen');
   // Panel comes before the personal queue.
   const panels = [...d.querySelectorAll('#main > .panel, #main .panel')];
   assert.ok(panels.indexOf(panel) < panels.findIndex((p) => /To review/.test(p.textContent)));
+  // The Head Coach follows every title. CS2 rosters were last read on 3 Nov (MLBB, Dota 2 and PUBG Mobile were
+  // re-read on 13 Nov), so their weekly checks are due, grouped per title.
+  const sel = d.getElementById('meSel'); sel.value = 'fayad'; sel.dispatchEvent(new dom.window.Event('change', { bubbles: true })); await wait();
+  const p2 = d.querySelector('#main .attention').textContent;
+  assert.match(p2, /Rival roster checks due \(weekly\): \d+/); assert.match(p2, /CS2: \d+/);
+  if (localDay() < '2026-11-20') assert.doesNotMatch(p2, /MLBB: \d+ ·|Dota: \d+/, 're-read on 13 Nov: not due before 20 Nov');
+});
+
+test('V1.23 staff keep public results current: add, correct (same event and date replaces), retire; never counted as notes', async () => {
+  const { rivalResult, retireResult, formKey, board } = await import('../src/core/competitors.js');
+  assert.throws(() => rivalResult({ title: 'MLBB', nation: 'Myanmar', event: 'X', date: '13-11-2026', result: 'r', source: 's', by: 'A' }), /YYYY/);
+  assert.throws(() => rivalResult({ title: 'MLBB', nation: 'Philippines', event: 'X', date: '2026-11', result: 'r', source: 's', by: 'A' }), /not in the published MLBB field/);
+  assert.throws(() => rivalResult({ title: 'MLBB', nation: 'Myanmar', event: 'X', date: '2026-12-30', result: 'r', source: 's', by: 'A', asOf: '2026-11-14' }), /future/);
+  assert.throws(() => rivalResult({ title: 'MLBB', nation: 'Myanmar', event: 'X', date: '2026-11', result: 'r', source: '', by: 'A' }), /Source is required/);
+  const added = rivalResult({ title: 'MLBB Women', nation: 'Argentina', event: 'WEC26 Americas qualifier', date: '2026-09', result: 'Qualified, 2–1 in the final', source: 'iesf.org', by: 'Aufa' });
+  const fix = rivalResult({ title: 'MLBB', nation: 'Myanmar', event: 'Asian Games 2026 Aichi-Nagoya', date: '2026-10-01', result: 'Gold: 4–0 over Indonesia (best of seven).', source: 'AESF', by: 'Aufa' });
+  const shipped = formOf('MLBB', 'Myanmar').find((f) => f.event === 'Asian Games 2026 Aichi-Nagoya');
+  const out = retireResult({ title: 'MLBB', nation: 'Nepal', key: formKey(formOf('MLBB', 'Nepal')[0]), why: 'superseded', by: 'Aufa' });
+  assert.throws(() => retireResult({ title: 'MLBB', key: 'x', why: '', by: 'A' }), /Say why/);
+  const staff = [added, fix, out];
+  assert.equal(formOf('MLBB Women', 'Argentina', staff).length, 1, 'gap filled by the staff');
+  assert.deepEqual(fieldForm('MLBB Women', staff).without, []);
+  const mm = formOf('MLBB', 'Myanmar', staff).filter((f) => f.event === 'Asian Games 2026 Aichi-Nagoya');
+  assert.equal(mm.length, 1); assert.equal(mm[0].staff, true); assert.notEqual(mm[0].result, shipped.result);
+  assert.equal(formOf('MLBB', 'Nepal', staff).length, formOf('MLBB', 'Nepal').length - 1, 'retired line hidden');
+  assert.equal(board('MLBB', staff).covered, board('MLBB').covered, 'results and retirements are not scouting notes');
+  assert.equal(coverage({ rivals: staff }).find((c) => c.title === 'MLBB Women').noted, coverage().find((c) => c.title === 'MLBB Women').noted);
+});
+
+test('page: a coach corrects a public result in the Competitors tab; the Indonesian guide quotes the Indonesian button names', async () => {
+  const html = readFileSync(new URL('../dist/hub.html', import.meta.url), 'utf8');
+  const dom = new JSDOM(`<!doctype html><html><body>${html}</body></html>`, { runScripts: 'dangerously', url: 'https://example.test/#mlbb-rivals', beforeParse(w) { w.localStorage.setItem('hub-lang', 'en'); w.claude = { use: async () => null }; w.console.error = (...a) => { throw new Error(a.join(' ')); }; } });
+  const wait = () => new Promise((r) => setTimeout(r, 30)); await wait();
+  const d = dom.window.document; const main = () => d.getElementById('main').textContent;
+  const btn = [...d.querySelectorAll('[data-result-edit]')].find((b) => JSON.parse(b.dataset.resultEdit).nation === 'Cambodia');
+  btn.click(); await wait();
+  assert.ok(d.getElementById('rrD-MLBB').open); assert.equal(d.getElementById('rrN-MLBB').value, 'Cambodia');
+  d.getElementById('rrR-MLBB').value = 'Silver in MLBB (0–3 to Malaysia) and in MLBB Women.'; d.getElementById('rrB-MLBB').value = 'Aufa Bassam';
+  d.querySelector('[data-result-save="MLBB"]').click(); await wait();
+  assert.match(main(), /Silver in MLBB \(0–3 to Malaysia\) and in MLBB Women\./); assert.match(main(), /entered by Aufa Bassam/);
+  assert.match(d.getElementById('rrMsg-MLBB').textContent, /Result saved/);
+  d.querySelector('[data-result-save="MLBB"]').click(); await wait();   // second save of the same line is just a newer correction
+  d.getElementById('rrW-MLBB').value = ''; d.getElementById('rrX-MLBB').value = ''; d.querySelector('[data-result-retire="MLBB"]').click(); await wait();
+  assert.match(d.getElementById('rrMsg-MLBB').textContent, /Pick the result/);
+  // Guide in Bahasa Indonesia
+  d.getElementById('langBtn').click(); await wait();
+  dom.window.location.hash = 'guide'; dom.window.dispatchEvent(new dom.window.HashChangeEvent('hashchange')); await wait();
+  assert.match(main(), /"Salin pengaturan dari laporan terakhir"/); assert.doesNotMatch(main(), /"Copy setup from last report"/);
 });
 
 test('opponent card carries recent public results in the markdown', () => {
