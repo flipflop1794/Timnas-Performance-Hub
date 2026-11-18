@@ -128,6 +128,14 @@ const EXACT = {
   'From coach-confirmed scrim games only (screenshot capture or typed in). Daily averages per game; stand-ins are left out.': 'Hanya dari game scrim yang dikonfirmasi pelatih (tangkapan layar atau diketik). Rata-rata harian per game; pemain pengganti tidak dihitung.',
   'From coach-confirmed scrim games only (screenshot capture or typed in). Weekly averages per game; stand-ins are left out.': 'Hanya dari game scrim yang dikonfirmasi pelatih (tangkapan layar atau diketik). Rata-rata mingguan per game; pemain pengganti tidak dihitung.',
   Period: 'Periode',
+  // V1.32 less noise
+  Analysis: 'Analisis', Weaknesses: 'Kelemahan', 'Notes per title': 'Catatan per title', 'How to read this': 'Cara membaca', 'Show all tools': 'Tampilkan semua', 'Focus mode': 'Mode fokus',
+  'Focus mode hides screens not in use yet': 'Mode fokus menyembunyikan layar yang belum dipakai',
+  'Did not take place?': 'Tidak jadi?', 'Why (optional)': 'Alasan (opsional)', 'Mark as cancelled': 'Tandai batal', 'Objectives of this session': 'Objektif sesi ini',
+  'Measured value (optional)': 'Nilai terukur (opsional)', 'partly-met': 'sebagian tercapai', 'not-met': 'tidak tercapai', 'not-measured': 'tidak diukur', 'Not available yet.': 'Belum tersedia.',
+  'About a minute: tap the result, tell the story (speak or type), check and save.': 'Sekitar satu menit: ketuk hasilnya, ceritakan sesinya (bicara atau ketik), cek lalu simpan.',
+  'One report per sparring partner · saved reports are fixed (add a correction) · performance notes only.': 'Satu laporan per sparring partner · laporan tersimpan tidak bisa diubah (tambahkan koreksi) · catatan performa saja.',
+  'Accepted objectives first. Anything not yet reviewed is a proposal, not a training decision.': 'Objektif yang diterima lebih dulu. Yang belum direview masih usulan, bukan keputusan latihan.',
   // V1.31 results on competitive settings
   'Per map (Active Duty pool)': 'Per map (map pool Active Duty)', 'Per match: placement and eliminations': 'Per match: peringkat dan eliminasi', 'Per match': 'Per match',
   'Per game (optional): side and result': 'Per game (opsional): side dan hasil', 'Rounds won': 'Ronde menang', 'Rounds lost': 'Ronde kalah', 'CT rounds won (optional)': 'Ronde CT menang (opsional)',

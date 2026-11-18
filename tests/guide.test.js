@@ -35,6 +35,6 @@ test('guide page in the hub: in the menu for everyone, jump links work, language
   // Every "Open →" link leads to a real screen (the hub falls back to Today for unknown ones).
   for (const g of GUIDE.filter((x) => x.open && x.open !== 'today' && x.open !== 'admin-users')) {
     dom.window.location.hash = g.open; dom.window.dispatchEvent(new dom.window.HashChangeEvent('hashchange')); await wait();
-    assert.ok(d.querySelector(`#tabs a[href="#${g.open}"]`), `${g.key} → ${g.open}`);
+    assert.ok(d.querySelector(`#tabs a[href="#${g.open}"]`) || d.querySelector('#tabs a[aria-current="page"]'), `${g.key} → ${g.open}`);   // V1.32: Patterns opens under Analysis
   }
 });

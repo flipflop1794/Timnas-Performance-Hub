@@ -25,6 +25,8 @@ const PLATFORM = (typeof window !== 'undefined' && window.__HUB_PLATFORM__) || n
 // website the approver and reviewer are always the signed-in person; the artifact build keeps typed names.
 const CAN_APPROVE = !HUB_USER || HUB_USER.roles.some((r) => ['admin', 'head_coach', 'assistant_coach'].includes(r));
 // V1.19: an account with only the Leadership role reads everything and saves nothing (the database refuses).
+// V1.32: a title coach (no admin, Head Coach, assistant or readiness role) gets a shorter Today page.
+const TITLE_COACH = !!HUB_USER && HUB_USER.roles.includes('title_coach') && !HUB_USER.roles.some((r) => ['admin', 'head_coach', 'assistant_coach', 'readiness_owner'].includes(r));
 const LEADERSHIP_ONLY = !!HUB_USER && HUB_USER.roles.length > 0 && HUB_USER.roles.every((r) => r === 'leadership');
 // V1.15: newer parts switch on only when the live database / server has them (all on in the artifact build).
 const FEAT = { capture: true, draftRoom: true, donny: true, pelatnas: true, ai: true, aiPlan: true, coachAi: true, coachAiFn: true, practiceAi: true, brainAi: true, readAi: true, ...(PLATFORM?.features || {}) };
@@ -133,8 +135,13 @@ const coUi = () => (CO ||= coachAiUi({ S, esc, tag, banner, setMsg, val, render,
 // Focus mode (website only, per device): hide screens that are not used yet, so coaches see what matters before WEC.
 // Nothing is deleted; "Show all tools" brings everything back.
 const FOCUS_HIDE = new Set(['board', 'staff-measure', 'tour-series', 'dota-post', 'dota-draft', 'dota-review', 'pubgm-sim', ...(FEAT.donny ? ['well-day', 'well-log'] : [])]);
-const focusOn = () => !!HUB_USER && !S.showAll;
-const tabShown = (id, view) => !focusOn() || !FOCUS_HIDE.has(id) || id === view;
+const focusOn = () => !!HUB_USER && !S.showAll;   // the website (coaches); the offline file shows everything
+// V1.32 less noise: Weaknesses and Patterns open from the Analysis tab (sub-links on the page); per-title
+// Competitors notes live under Competitors → Notes per title. Their links keep working.
+const SUB_OF = {};
+for (const team of ['dota', 'pubgm', 'mlbb', 't-mlbbw', 't-efootball', 't-cs2', 't-cs2w']) { SUB_OF[`${team}-weak`] = `${team}-trends`; SUB_OF[`${team}-patterns`] = `${team}-trends`; }
+const BAR_HIDE = new Set(['mlbb-rivals', 't-mlbbw-rivals', 't-efootball-rivals', 't-cs2-rivals', 't-cs2w-rivals', 'pubgm-rivals']);
+const tabShown = (id, view) => (SUB_OF[id] ? false : BAR_HIDE.has(id) ? id === view : !focusOn() || !FOCUS_HIDE.has(id) || id === view);
 const canSetDates = () => !HUB_USER || HUB_USER.isAdmin || HUB_USER.roles.includes('head_coach');
 const plUi = () => (PL ||= pelatnasUi({ S, esc, tag, banner, setMsg, val, render, meName, sid, localDay, shiftDay, titleVisible: (t) => titleVisible(t), canSetDates }));
 const heroByName = () => Object.fromEntries(Object.values(S.heroes).map((h) => [h.name.toLowerCase(), h.id]));
@@ -307,14 +314,14 @@ const GAME_HUBS = [
   { id: 'cs2', label: 'CS2', title: 'CS2', team: 't-cs2' },
   { id: 'cs2w', label: 'CS2 Women', title: 'CS2 Women', team: 't-cs2w' },
 ];
-const hubTabs = (h) => [[h.team, 'Team'], [`${h.team}-scrims`, 'Scrims & practice'], [`${h.team}-reports`, 'Scrim reports'], [`${h.team}-trends`, 'Trends'], ...(FEAT.coachAi ? [[`${h.team}-weak`, 'Weaknesses']] : []), ...(gameOf(h.title) && FEAT.capture ? [[`${h.team}-patterns`, 'Patterns']] : []), [`${h.team}-rivals`, 'Competitors'], [`${h.team}-meta`, 'Meta'], ...(FEAT.brainAi ? [[`${h.team}-brain`, 'Brainstorm']] : []), ...(h.draftRoom && FEAT.draftRoom ? [[`${h.team}-draft`, 'Draft Room']] : [])];
+const hubTabs = (h) => [[h.team, 'Team'], [`${h.team}-scrims`, 'Scrims & practice'], [`${h.team}-reports`, 'Scrim reports'], [`${h.team}-trends`, 'Analysis'], ...(FEAT.coachAi ? [[`${h.team}-weak`, 'Weaknesses']] : []), ...(gameOf(h.title) && FEAT.capture ? [[`${h.team}-patterns`, 'Patterns']] : []), [`${h.team}-rivals`, 'Competitors'], [`${h.team}-meta`, 'Meta'], ...(FEAT.brainAi ? [[`${h.team}-brain`, 'Brainstorm']] : []), ...(h.draftRoom && FEAT.draftRoom ? [[`${h.team}-draft`, 'Draft Room']] : [])];
 const TITLES = [
   { id: 'home', label: 'Today', tabs: [['today', 'My day'], ['overview', 'Main dashboard'], ...(HUB_USER ? [['daily-sessions', 'Daily sessions']] : []), ['board', 'Juara Umum board'], ['reports-all', 'Scrim reports'], ['brief', 'Weekly brief']] },
   ...(FEAT.pelatnas ? [{ id: 'pelatnas', label: 'Pelatnas', tabs: [['pel-day', 'Schedule & attendance'], ['pel-avail', 'Availability']] }] : []),
-  { id: 'comp', label: 'Competitors', tabs: [['comp-overview', 'All nations'], ['comp-nation', 'Nation profile'], ['comp-rosters', 'Rosters & players'], ['comp-card', 'Opponent card'], ['comp-coverage', 'Scouting coverage']] },
+  { id: 'comp', label: 'Competitors', tabs: [['comp-overview', 'All nations'], ['comp-nation', 'Nation profile'], ['comp-rosters', 'Rosters & players'], ['comp-card', 'Opponent card'], ['comp-coverage', 'Scouting coverage'], ['comp-title', 'Notes per title']] },
   { id: 'tour', label: 'Tournament', tabs: [['tour-scout', 'Live scouting'], ['tour-runbook', 'Match-day runbook'], ...(FEAT.coachAi ? [['tour-prep', 'Preparation packs']] : []), ['tour-series', 'Between games']] },
-  { id: 'dota', label: 'Dota 2', tabs: [['dota-team', 'Team'], ['dota-scrims', 'Scrims & practice'], ['dota-reports', 'Scrim reports'], ['dota-trends', 'Trends'], ...(FEAT.coachAi ? [['dota-weak', 'Weaknesses']] : []), ...(FEAT.capture ? [['dota-patterns', 'Patterns']] : []), ['dota-post', 'Post-match'], ['dota-scout', 'Competitors'], ['dota-meta', 'Meta'], ...(FEAT.brainAi ? [['dota-brain', 'Brainstorm']] : []), ['dota-draft', 'Draft room'], ['dota-review', 'Series review']] },
-  { id: 'pubgm', label: 'PUBG Mobile', tabs: [['pubgm-team', 'Team'], ['pubgm-scrims', 'Scrims & practice'], ['pubgm-reports', 'Scrim reports'], ['pubgm-trends', 'Trends'], ...(FEAT.coachAi ? [['pubgm-weak', 'Weaknesses']] : []), ['pubgm-log', 'Log & import'], ['pubgm-rivals', 'Competitors'], ['pubgm-meta', 'Meta'], ...(FEAT.brainAi ? [['pubgm-brain', 'Brainstorm']] : []), ['pubgm-sim', 'Strategy sim']] },
+  { id: 'dota', label: 'Dota 2', tabs: [['dota-team', 'Team'], ['dota-scrims', 'Scrims & practice'], ['dota-reports', 'Scrim reports'], ['dota-trends', 'Analysis'], ...(FEAT.coachAi ? [['dota-weak', 'Weaknesses']] : []), ...(FEAT.capture ? [['dota-patterns', 'Patterns']] : []), ['dota-post', 'Post-match'], ['dota-scout', 'Competitors'], ['dota-meta', 'Meta'], ...(FEAT.brainAi ? [['dota-brain', 'Brainstorm']] : []), ['dota-draft', 'Draft room'], ['dota-review', 'Series review']] },
+  { id: 'pubgm', label: 'PUBG Mobile', tabs: [['pubgm-team', 'Team'], ['pubgm-scrims', 'Scrims & practice'], ['pubgm-reports', 'Scrim reports'], ['pubgm-trends', 'Analysis'], ...(FEAT.coachAi ? [['pubgm-weak', 'Weaknesses']] : []), ['pubgm-log', 'Log & import'], ['pubgm-rivals', 'Competitors'], ['pubgm-meta', 'Meta'], ...(FEAT.brainAi ? [['pubgm-brain', 'Brainstorm']] : []), ['pubgm-sim', 'Strategy sim']] },
   ...GAME_HUBS.map((h) => ({ id: h.id, label: h.label, tabs: hubTabs(h) })),
   { id: 'well', label: 'Performance', tabs: [['readiness', 'Athlete readiness'], ['players', 'Player plans'], ['well-day', 'Wellbeing check'], ['well-log', 'Log check-in & load']] },
   { id: 'guide', label: 'Guide', tabs: [['guide', 'How to use the hub']] },
@@ -333,7 +340,7 @@ function renderNav(view) {
     + `<button type="button" id="langBtn" class="lang" aria-label="${S.lang === 'id' ? 'Switch to English' : 'Ganti ke Bahasa Indonesia'}"><b${S.lang === 'en' ? ' class="on"' : ''}>EN</b><b${S.lang === 'id' ? ' class="on"' : ''}>ID</b></button>`
     + `<button type="button" id="modeBtn" class="mode ${S.mode}" aria-pressed="${S.mode === 'demo'}">${S.mode === 'demo' ? 'Leave demo sandbox' : 'Demo sandbox'}</button>`
     + (HUB_USER ? `<button type="button" id="focusBtn" class="mode" aria-pressed="${!S.showAll}" title="Focus mode hides screens not in use yet">${S.showAll ? 'Focus mode' : 'Show all tools'}</button>` : '');
-  $('#tabs').innerHTML = title.tabs.filter(([id]) => tabShown(id, view)).map(([id, label]) => `<a href="#${id}" ${id === view ? 'aria-current="page"' : ''}>${id === 'daily-sessions' ? dailyLabel(label) : esc(label)}</a>`).join('');
+  $('#tabs').innerHTML = title.tabs.filter(([id]) => tabShown(id, view)).map(([id, label]) => `<a href="#${id}" ${id === view || SUB_OF[view] === id ? 'aria-current="page"' : ''}>${id === 'daily-sessions' ? dailyLabel(label) : esc(label)}</a>`).join('');
 }
 
 // ---------- views ----------
@@ -341,8 +348,8 @@ const V = {};
 let DAILY;
 V['daily-sessions'] = () => DAILY.page();
 const dailyLabel = (text) => esc(dailyText(text, S.lang));
-const dailyEntry = (title) => S.mode === 'live' && canWriteSession(HUB_USER, title)
-  ? `<div class="toolbar"><a class="btn" href="${esc(dailyLink('title', title))}">${dailyLabel('Log a session')}</a></div>` : '';
+// V1.32: the scrim report is the daily session report too, so the separate "Log a session" button is gone here.
+const dailyEntry = () => '';
 function linkedRecord(title, record, state, card) {
   if (S.mode === 'demo') return `<div class="panel"><p>${dailyLabel('Leave the demo sandbox to log or view daily sessions.')}</p></div>`;
   const message = state === 'ready' || !titleVisible(title) ? 'Session unavailable.'
@@ -439,18 +446,18 @@ V.today = () => {
   };
   const titles = me.id === 'donny' ? [] : me.id === 'fayad' ? ['PUBG Mobile', 'eFootball', 'MLBB Women', 'Dota 2', 'MLBB'] : me.focus;
   return `<div class="panel"><div class="lead">What do we <em>train today</em>?</div>
-    <p>Accepted objectives first. Anything not yet reviewed is a proposal, not a training decision. Choose who you are at the top to see your queue.</p></div>
+    <p>Accepted objectives first. Anything not yet reviewed is a proposal, not a training decision.</p></div>
     ${attentionPanel(me)}
-    ${dayPanel(me)}
-    ${queueHtml(me.id)}
-    ${FEAT.pelatnas ? (() => { const x = plUi().todayLine(); return `<div class="panel"><h2>Pelatnas</h2><ul class="plain"><li>${esc(x.campText)}</li><li>${x.open ? `<b>${x.open}</b> player${x.open === 1 ? '' : 's'} have not answered about availability. <a href="#pel-avail">Availability</a>` : 'Every player has answered about availability.'}</li><li>${x.sessions ? `Attendance taken for ${x.taken} of ${x.sessions} session${x.sessions === 1 ? '' : 's'} today. <a href="#pel-day">Take attendance</a>` : 'No sessions planned today.'}</li></ul></div>`; })() : ''}
+    ${TITLE_COACH ? '' : dayPanel(me)}
+    ${TITLE_COACH ? '' : queueHtml(me.id)}
+    ${FEAT.pelatnas && !TITLE_COACH ? (() => { const x = plUi().todayLine(); return `<div class="panel"><h2>Pelatnas</h2><ul class="plain"><li>${esc(x.campText)}</li><li>${x.open ? `<b>${x.open}</b> player${x.open === 1 ? '' : 's'} have not answered about availability. <a href="#pel-avail">Availability</a>` : 'Every player has answered about availability.'}</li><li>${x.sessions ? `Attendance taken for ${x.taken} of ${x.sessions} session${x.sessions === 1 ? '' : 's'} today. <a href="#pel-day">Take attendance</a>` : 'No sessions planned today.'}</li></ul></div>`; })() : ''}
     ${me.id === 'donny' || me.id === 'fayad' ? wellTodayPanel() : ''}
     ${(() => { const mine = me.id === 'aufa' || me.id === 'user' ? me.focus : WEC_TITLES.map((t) => t.id); const up = S.scrims.filter((x) => mine.includes(x.title) && x.status === 'planned').sort((a, b) => a.date.localeCompare(b.date)).slice(0, 6);
       return up.length ? `<div class="panel"><h2>Scrims and practice coming up</h2><ul class="plain">${up.map((x) => `<li><b>${esc(x.date)}</b> ${esc(x.time)} · ${esc(x.title)} · ${esc(x.kind)}${x.partner ? ` vs ${esc(x.partner)}` : ''}${x.mirrors ? ` (stand-in for ${esc(x.mirrors)})` : ''}${x.date < today() ? ' — <b>result not logged</b>' : ''}${x.date <= localToday() && GAME_SPEC[x.title] && S.mode !== 'demo' ? ` <button type="button" class="linkbtn" data-rp-from-scrim="${esc(x.id)}">Log the result</button>` : ''}</li>`).join('')}</ul></div>` : ''; })()}
     ${(() => { const mine = me.id === 'aufa' || me.id === 'user' ? me.focus : WEC_TITLES.map((t) => t.id); const t0 = localToday();
       const rows = mine.filter((t) => GAME_SPEC[t]).map((t) => ({ t, s: reportSummary(S.reports, t, t0) }));
       return rows.length ? `<div class="panel"><h2>Scrim reports</h2><ul class="plain">${rows.map((r) => `<li><b>${esc(r.t)}</b> — ${r.s.last ? (r.s.daysSince === 0 ? 'report filed today' : `last report ${r.s.daysSince} day(s) ago`) : 'no report yet'} <a href="#${REPORT_TAB[r.t]}">${r.s.daysSince === 0 ? 'Open' : 'File one'}</a></li>`).join('')}</ul></div>` : ''; })()}
-    ${rivalChangesToday(me)}
+    ${TITLE_COACH ? '' : rivalChangesToday(me)}
     <div class="cols">${titles.map(titlePanel).join('')}</div>`;
 };
 
@@ -664,19 +671,15 @@ function scrimsPanel(title) {
     ${sc.dailyReport ? `<p data-no-tr>${esc(sc.dailyReport.objective)}</p><a href="${esc(dailyLink('session', sc.id))}">${dailyLabel('Open session report')}</a>` : sc.objectives.length ? `<p class="note">Practising: ${sc.objectives.map((id) => esc(objName(id))).join('; ')}</p>` : '<p class="note">No objective attached: free scrim.</p>'}
     ${S.mode === 'live' && sc._version && canAddDailyReport(sc, HUB_USER) ? `<a href="${esc(dailyLink('session', sc.id))}">${dailyLabel('Add daily report')}</a>` : ''}
     ${!sc.result && sc.status === 'planned' && S.mode !== 'demo' && GAME_SPEC[title] && sc.date <= localToday() ? `<div class="toolbar"><button class="btn primary" type="button" data-rp-from-scrim="${esc(sc.id)}">Log the result (scrim report)</button></div>` : ''}
-    ${sc.result ? `<p>${sc.result.score ? `<b>${esc(sc.result.score)}</b> · ` : ''}${sc.result.matchIds.length ? `matches ${sc.result.matchIds.map(esc).join(', ')} · ` : ''}${esc(sc.result.notes || sc.result.cancelledWhy)} <span class="note">— ${esc(sc.result.by)}</span></p>` : `<details><summary class="btn">Log result</summary><div class="form">
-      <label class="field" for="scS-${sc.id}">${title === 'PUBG Mobile' ? 'Points / placement' : 'Score (e.g. 2-1)'}<input type="text" id="scS-${sc.id}"></label>
-      <label class="field" for="scM-${sc.id}">Match IDs (comma-separated)<input type="text" id="scM-${sc.id}"></label>
-      <label class="field" for="scB-${sc.id}">Logged by<input type="text" id="scB-${sc.id}" value="${esc(STAFF.find((x) => x.id === S.me)?.name || '')}"></label>
-      <label class="field" for="scN-${sc.id}">Notes<input type="text" id="scN-${sc.id}"></label></div>
-      ${sc.objectives.map((id) => `<div class="form"><label class="field" for="scR-${sc.id}-${id}">Result for: ${esc(objName(id))}<select id="scR-${sc.id}-${id}"><option value="">skip</option><option>met</option><option>partly-met</option><option>not-met</option><option>not-measured</option></select></label><label class="field" for="scV-${sc.id}-${id}">Measured value<input type="text" id="scV-${sc.id}-${id}"></label></div>`).join('')}
-      <div class="toolbar"><button class="btn primary" type="button" data-scrim-done="${esc(sc.id)}">Save result</button><button class="btn" type="button" data-scrim-cancel="${esc(sc.id)}">Cancelled</button><span class="msg" id="scMsg-${sc.id}"></span></div></details>`}</div>`;
+    ${sc.result ? `<p>${sc.result.score ? `<b>${esc(sc.result.score)}</b> · ` : ''}${sc.result.matchIds.length ? `matches ${sc.result.matchIds.map(esc).join(', ')} · ` : ''}${esc(sc.result.notes || sc.result.cancelledWhy)} <span class="note">— ${esc(sc.result.by)}</span></p>` : S.mode === 'demo' ? '' : `<details><summary class="linkbtn">Did not take place?</summary><div class="form">
+      <label class="field" for="scN-${sc.id}">Why (optional)<input type="text" id="scN-${sc.id}"></label></div>
+      <div class="toolbar"><button class="btn" type="button" data-scrim-cancel="${esc(sc.id)}">Mark as cancelled</button><span class="msg" id="scMsg-${sc.id}"></span></div></details>`}</div>`;
   const record = HUB_USER && viewParams().get('record');
   if (record) return linkedRecord(title, S.scrims.find((s) => s.title === title && s.id === record), S.scrimLoad, card);
   return `<div class="panel"><h2>Scrims &amp; practice — ${esc(title)}</h2>${dailyEntry(title)}
     <div class="stats"><div class="stat"><span class="k">Planned</span><span class="v">${Sm.upcoming.length}</span></div><div class="stat"><span class="k">Overdue to log</span><span class="v">${Sm.overdue.length}</span></div><div class="stat"><span class="k">Done, last 7 days</span><span class="v">${Sm.last7}</span></div>
     <div class="stat"><span class="k">Done with an objective</span><span class="v">${Sm.done.length ? `${Sm.withObjective}/${Sm.done.length}` : '—'}</span></div><div class="stat"><span class="k">Rivals practised against (stand-ins)</span><span class="v">${Sm.mirrored.length}</span></div></div>
-    <p class="note">Attach accepted objectives to a scrim; logging its result also logs a session on each of them. Use "stand-in for" when a sparring partner plays like a WEC rival.</p></div>
+    <details class="howto"><summary>How to read this</summary><p class="note">Attach accepted objectives to a scrim; logging its result also logs a session on each of them. Use "stand-in for" when a sparring partner plays like a WEC rival.</p></details></div>
   ${S.mode !== 'demo' && FEAT.ai && FEAT.aiPlan && PLATFORM?.ai ? planSuggestPanel(title, fid) : ''}
   ${S.mode === 'demo' ? '' : `<div class="panel"><h2>Plan a session</h2><div class="form">
     <label class="field" for="spD-${fid}">Date<input type="date" id="spD-${fid}" value="${today()}"></label><label class="field" for="spTm-${fid}">Time<input type="text" id="spTm-${fid}" placeholder="19:00 WIB"></label>
@@ -836,7 +839,7 @@ function mapPoolPanel(title, W) {
   return `<div class="panel"><h2>Map pool</h2>${idle.length ? banner('warn', `<div><b>Not practised in the last 14 days:</b> ${esc(idle.join(', '))}</div>`) : '<p class="note">Every Active Duty map was practised in the last 14 days.</p>'}
     <div class="tw"><table><thead><tr><th>Map</th><th class="n">Maps played</th><th class="n">Won-lost</th><th class="n">Rounds for-against</th><th>Last played</th></tr></thead><tbody>
     ${P.map((m) => `<tr><td><b>${esc(m.map)}</b></td><td class="n">${m.played || '—'}</td><td class="n">${m.played ? `${m.won}-${m.lost}` : '—'}</td><td class="n">${m.played ? `${m.roundsFor}-${m.roundsAgainst}` : '—'}</td><td>${m.last ? esc(m.last) : '<span class="note">never</span>'}</td></tr>`).join('')}</tbody></table></div>
-    <p class="note">From the per-map results in the scrim reports, ${esc(c.from)} to ${esc(c.to)}. Few maps are a small sample: read win-loss as a hint.</p></div>`;
+    <details class="howto"><summary>How to read this</summary><p class="note">From the per-map results in the scrim reports, ${esc(c.from)} to ${esc(c.to)}. Few maps are a small sample: read win-loss as a hint.</p></details></div>`;
 }
 function trendsPage(title) {
   if (S.mode === 'demo') return `<div class="panel">${DEMO_BANNER}<p class="empty">Trends use operational records only.</p></div>`;
@@ -855,16 +858,16 @@ function trendsPage(title) {
     <div class="toolbar" role="group" aria-label="Period"><span class="note">Period</span>${TR_PERIODS.map((k) => `<button class="btn${k === n ? ' primary' : ''}" type="button" data-tr-weeks="${k}" aria-pressed="${k === n}">${periodLabel(k)}</button>`).join('')}</div>
     <p class="note">${esc(W.compare.from)} to ${esc(W.compare.to)}, compared with ${esc(W.compare.prevFrom)} to ${esc(W.compare.prevTo)}.</p>
     ${S.reportLoad === 'error' ? banner('block', '<div>Scrim reports could not be loaded: these trends are incomplete.</div>') : ''}
-    <p class="note">"Better" or "Worse" only when this period differs from the period before by more than chance (95% interval), with at least ${TR_MIN} games or reports on each side. Partner strength changes week to week: read a change against who you played (Scrim reports). It shows a change in practice numbers, not in tournament chances.</p></div>
+    <details class="howto"><summary>How to read this</summary><p class="note">"Better" or "Worse" only when this period differs from the period before by more than chance (95% interval), with at least ${TR_MIN} games or reports on each side. Partner strength changes week to week: read a change against who you played (Scrim reports). It shows a change in practice numbers, not in tournament chances.</p></details></div>
   ${team.length ? `<div class="panel"><h2>Team</h2>${team.map((m) => `<div class="trendrow">${head(m)}<div class="trends">${trendChart(m, W)}</div></div>`).join('')}</div>`
     : `<div class="panel"><h2>Team</h2><p class="empty">No scrim reports in this period yet. File reports under Scrim reports and the lines appear here.</p></div>`}
   ${rowKind(title) === 'cs' ? mapPoolPanel(title, W) : ''}
   ${perPlayer ? `<div class="panel"><h2>Players</h2>${players.length ? `<div class="tw"><table><thead><tr><th>Player</th><th>Per game</th>${W.map((w) => `<th class="n">${wk(w)}</th>`).join('')}<th>Change</th></tr></thead><tbody>
       ${players.flatMap((p) => p.measures.map((m, i) => `<tr>${i ? '<td></td>' : `<td><b>${esc(p.player)}</b><br><span class="note">${p.games} game${p.games === 1 ? '' : 's'}</span></td>`}<td>${esc(m.label)}${m.better === 'down' ? ' <span class="note">(lower is better)</span>' : ''}</td>${m.values.map((v, k) => `<td class="n" title="${m.counts[k]} game(s)">${trFmt(m, v)}</td>`).join('')}<td>${verdictTag(m.verdict)}</td></tr>`)).join('')}</tbody></table></div>
-      <p class="note">From coach-confirmed scrim games only (screenshot capture or typed in). ${W.by === 'day' ? 'Daily' : 'Weekly'} averages per game; stand-ins are left out.</p>`
+      <details class="howto"><summary>How to read this</summary><p class="note">From coach-confirmed scrim games only (screenshot capture or typed in). ${W.by === 'day' ? 'Daily' : 'Weekly'} averages per game; stand-ins are left out.</p></details>`
     : `<p class="empty">No confirmed scrim games in this period. Add games to a scrim report (screenshot or by hand) to see each player's line.</p>`}</div>` : ''}
   <div class="panel"><h2>What the staff changed in this period</h2>${changes.length ? `<ul class="plain">${changes.map((c) => `<li><b>${esc(c.at)}</b> accepted: ${esc(c.what)}${c.drill ? ` <span class="note">— drill: ${esc(c.drill)}</span>` : ''}</li>`).join('')}</ul>` : '<p class="empty">No objective accepted in this period.</p>'}
-    <p class="note">Read the lines against these dates: a change after an objective started is a hint, not proof, that the practice worked.</p></div>`;
+    <details class="howto"><summary>How to read this</summary><p class="note">Read the lines against these dates: a change after an objective started is a hint, not proof, that the practice worked.</p></details></div>`;
 }
 for (const [view, title] of [['dota-trends', 'Dota 2'], ['pubgm-trends', 'PUBG Mobile']]) V[view] = () => trendsPage(title) + weeklyPanel(title);
 for (const [view, title] of [['dota-weak', 'Dota 2'], ['pubgm-weak', 'PUBG Mobile']]) V[view] = () => coUi().weaknessPage(title) + ownVodPanel(title);
@@ -889,7 +892,7 @@ function reportsPanel(title) {
     ${stale ? banner('synth', `<div><b>No report for ${Sm.daysSince} days.</b> If sessions took place, please file them.</div>`) : ''}
     ${(() => { const n = gameOf(title) ? capUi().waitingCount(title) : 0; return n ? banner('synth', `<div><b>${n} screenshot${n > 1 ? 's were' : ' was'} read but never confirmed into a game.</b> If ${n > 1 ? 'they were' : 'it was'} a real game, add ${n > 1 ? 'them' : 'it'} again under Games and confirm; a discarded or duplicate screenshot can be ignored.</div>`) : ''; })()}
     ${!mine.length ? '<p class="empty">No report yet.</p>' : ''}
-    <p class="note">Progress is the coach's rating of how closely the team followed the plan of the day. It is not computed, and ratings from different coaches are not directly comparable.</p></div>
+    <details class="howto"><summary>How to read this</summary><p class="note">Progress is the coach's rating of how closely the team followed the plan of the day. It is not computed, and ratings from different coaches are not directly comparable.</p></details></div>
   ${reportTrends(title)}${ready}${form}
   <div class="panel"><h2>Day by day</h2>${days.length ? days.slice(0, 14).map((d) => `<details ${d.date === t0 ? 'open' : ''}><summary><b>${esc(d.date)}</b> · ${d.n} session${d.n > 1 ? 's' : ''} · ${pts ? `${d.points} pts in ${d.played} m` : `${d.won}-${d.lost}${d.drawn ? `-${d.drawn}` : ''}`} · plan ${d.progress}/5 <span class="note">— ${esc(d.focus.join('; '))}</span></summary>${d.sessions.map(reportCard).join('')}</details>`).join('') : '<p class="empty">Nothing filed yet.</p>'}
     ${days.length > 14 ? `<p class="note">${days.length - 14} older day(s) are in the CSV download.</p>` : ''}
@@ -913,7 +916,7 @@ V['reports-all'] = () => {
 
 // ---------- fast report entry: drafts, quick picks, progress buttons ----------
 // Drafts are a per-device convenience (this browser only). The saved report is what counts.
-const RP_KEYS = ['rows', 'comp', 'date', 'time', 'by', 'partner', 'level', 'format', 'roster', 'scrim', 'won', 'lost', 'drawn', 'played', 'points', 'avg', 'chicken', 'focus', 'progress', 'worked', 'failed', 'detail', 'players', 'adjust', 'vod', 'fix', 'dr0', 'dr1', 'dr2', 'dr3'];
+const RP_KEYS = ['rows', 'comp', 'ob0', 'ob1', 'ob2', 'ob3', 'obv0', 'obv1', 'obv2', 'obv3', 'date', 'time', 'by', 'partner', 'level', 'format', 'roster', 'scrim', 'won', 'lost', 'drawn', 'played', 'points', 'avg', 'chicken', 'focus', 'progress', 'worked', 'failed', 'detail', 'players', 'adjust', 'vod', 'fix', 'dr0', 'dr1', 'dr2', 'dr3'];
 const RP_RE = new RegExp(`^rp-(.+)-(${RP_KEYS.join('|')})$`);
 const RP_KEEP_AFTER_SAVE = ['time', 'by', 'level', 'format', 'roster', 'focus', 'comp'];
 const cap = (x) => x.charAt(0).toUpperCase() + x.slice(1);
@@ -981,6 +984,8 @@ function readSection(title, fid) {
   const unit = foot ? 'Goals' : 'Rounds';
   const intro = `<p class="note">Upload the ${foot ? 'match stats screen shown after the match' : 'scoreboard shown at the end of each map'}. The AI reads the score and the numbers, you check them, and they fill the result below. One screenshot per ${foot ? 'match' : 'map'}.</p>`;
   const ready = st.ready.length ? `<ul class="plain">${st.ready.map((g, i) => `<li><b>${foot ? 'Match' : 'Map'} ${i + 1}:</b> ${esc(g.result)} · <span data-no-tr>${esc(matchLine(g))}</span> <button type="button" class="linkbtn" data-mr-drop="${esc(JSON.stringify({ fid, i }))}">Remove</button></li>`).join('')}</ul>` : '';
+  // V1.32: a coach who cannot switch the AI on does not see a setup message.
+  if (!mrOn() && HUB_USER && !HUB_USER.isAdmin) return ready ? `<div class="obj"><b>Results from screenshots</b>${ready}</div>` : '';
   if (!mrOn()) return `<div class="obj"><b>Results from screenshots</b>${intro}${ready}${banner('warn', '<div>Screenshot reading needs the AI on the website. Type the score below instead.</div>')}</div>`;
   let check = '';
   if (p) {
@@ -1124,6 +1129,14 @@ function rrAddFromGame(fid, title, g) {
   rrApply(fid, title, raw);
 }
 
+// V1.32: the planned session's objectives, one result each (logged as a coaching-cycle session when saved).
+const OBJ_RESULTS = ['met', 'partly-met', 'not-met', 'not-measured'];
+function objectivesSection(fid, dv) {
+  const sc = S.scrims.find((x) => x.id === dv('scrim')); const ids = (sc?.objectives || []).slice(0, 4); if (!ids.length) return '';
+  const name = (id) => S.cycle.find((o) => o.id === id)?.rec?.problem || id;
+  return `<div class="h3">Objectives of this session</div>${ids.map((id, i) => `<div class="form"><label class="field" for="rp-${fid}-ob${i}">${esc(name(id))}<select id="rp-${fid}-ob${i}"><option value="">skip</option>${OBJ_RESULTS.map((r) => `<option value="${r}" ${dv(`ob${i}`) === r ? 'selected' : ''}>${r}</option>`).join('')}</select></label>
+    <label class="field" for="rp-${fid}-obv${i}">Measured value (optional)<input type="text" id="rp-${fid}-obv${i}" value="${esc(dv(`obv${i}`))}"></label></div>`).join('')}`;
+}
 function reportForm(title, { fid, spec, pts, unit, planned, t0 }) {
   const d = rpDraft(fid); let auto = {}; const dv = (k, def = '') => (d[k] != null && !(d[k] === '' && auto[k] != null) ? d[k] : auto[k] != null ? auto[k] : def);
   const mine = S.reports.filter((r) => r.title === title).sort((a, b) => b.date.localeCompare(a.date) || b.createdAt.localeCompare(a.createdAt));
@@ -1148,7 +1161,7 @@ function reportForm(title, { fid, spec, pts, unit, planned, t0 }) {
   const step = (n, label, hint) => `<div class="rpstep"><span class="rpn">${n}</span><div><b>${label}</b>${hint ? `<span class="note">${hint}</span>` : ''}</div></div>`;
   // V1.29: three steps (result → story → check and save), the voice note first in step 2, what is still missing shown live.
   return `<div class="panel rp" id="rpForm-${fid}"><h2>File a scrim report — ${esc(title)}</h2>
-    <p class="note">About a minute: tap the result, tell the story (speak or type), check and save. One report per sparring partner. Saved reports are fixed (add a correction instead). Performance notes only.</p>
+    <p class="note">About a minute: tap the result, tell the story (speak or type), check and save.</p>
     ${hasDraft ? `<p class="note draftnote">Draft kept on this device${d.at ? ` (last typed ${esc(new Date(d.at).toTimeString().slice(0, 5))})` : ''}. <button type="button" class="linkbtn" data-rp-clear="${esc(fid)}">Clear form</button></p>` : ''}
     ${auto.partner ? `<p class="note draftnote">Filled from today's plan: vs ${esc(auto.partner)}. Change anything that is different.</p>` : ''}
     ${step(1, 'Result', 'Who you played and the score.')}
@@ -1177,7 +1190,7 @@ function reportForm(title, { fid, spec, pts, unit, planned, t0 }) {
     <div class="form">${txt('worked', 'What worked', '', true)}${txt('failed', 'What failed', '', true)}</div>
     ${tagsOf(title).length ? `<div class="chips"><span class="note">Add to what failed:</span>${tagsOf(title).map((w) => `<button type="button" class="chip" data-rp-add="${esc(JSON.stringify({ fid, k: 'failed', w }))}">${esc(w)}</button>`).join('')}</div>` : ''}
     ${txt('adjust', 'Adjustment for the next session', 'One concrete change to try next time', true)}
-    ${drillsSection(title, fid, dv)}
+    ${drillsSection(title, fid, dv)}${objectivesSection(fid, dv)}
     ${step(3, 'Check and save', '')}
     <div class="field"><span id="rp-${fid}-proglabel">How closely did the team follow the plan?</span><input type="hidden" id="rp-${fid}-progress" value="${esc(prog)}">
       <div class="seg" role="group" aria-labelledby="rp-${fid}-proglabel">${PROGRESS.map(([n, l]) => `<button type="button" data-rp-prog="${esc(fid)}" data-v="${n}" aria-pressed="${String(prog) === String(n)}" title="${esc(l)}"><b>${n}</b> ${esc(PROG_SHORT[n])}</button>`).join('')}</div></div>
@@ -1192,6 +1205,7 @@ function reportForm(title, { fid, spec, pts, unit, planned, t0 }) {
       ${txt('detail', `${esc(spec.detail)} (optional)`, spec.hint)}
       ${txt('players', 'Player notes (optional, performance only)', 'e.g. Aran: strong first lane, hesitates on second tower')}
       ${txt('vod', 'VOD link or timestamp (optional)')}</details>
+    <p class="note">One report per sparring partner · saved reports are fixed (add a correction) · performance notes only.</p>
     <div class="savebar"><p class="note" id="rpLeft-${fid}" aria-live="polite">${esc(rpLeftText(rpMissing(fid, pts, { values: { ...auto, ...d, progress: prog } })))}</p>
       <div class="toolbar"><button class="btn primary" type="button" data-report-save="${esc(title)}">Save report</button><span class="msg" id="rpMsg-${fid}" role="status"></span></div></div></div>`;
 }
@@ -1309,7 +1323,7 @@ for (const h of GAME_HUBS) {
   V[`${h.team}-trends`] = () => trendsPage(h.title) + weeklyPanel(h.title);
   V[`${h.team}-weak`] = () => coUi().weaknessPage(h.title) + ownVodPanel(h.title);
   if (gameOf(h.title)) V[`${h.team}-patterns`] = () => capUi().patternsPage(h.title) + breakdownPanel(h.title);
-  if (h.draftRoom) V[`${h.team}-draft`] = () => (FEAT.draftRoom ? drUi().page(h.title) : `<div class="panel">${banner('warn', '<div>The Draft Room switches on after the V1.14 database update.</div>')}</div>`);
+  if (h.draftRoom) V[`${h.team}-draft`] = () => (FEAT.draftRoom ? drUi().page(h.title) : HUB_USER && !HUB_USER.isAdmin ? '<div class="panel"><p class="empty">Not available yet.</p></div>' : `<div class="panel">${banner('warn', '<div>The Draft Room switches on after the V1.14 database update.</div>')}</div>`);
   V[`${h.team}-rivals`] = () => competitorsPanel(h.title);
 }
 V['dota-scrims'] = () => scrimsPanel('Dota 2') + partnerPlanPanel('Dota 2');
@@ -1319,6 +1333,17 @@ V.guide = () => guidePage({ lang: S.lang, feat: PLATFORM?.features ? FEAT : {}, 
 V['pubgm-scrims'] = () => scrimsPanel('PUBG Mobile') + partnerPlanPanel('PUBG Mobile');
 V['pubgm-reports'] = () => reportsPanel('PUBG Mobile');
 V['pubgm-rivals'] = () => competitorsPanel('PUBG Mobile');
+const ANA_TITLE = { dota: 'Dota 2', pubgm: 'PUBG Mobile', mlbb: 'MLBB', 't-mlbbw': 'MLBB Women', 't-efootball': 'eFootball', 't-cs2': 'CS2', 't-cs2w': 'CS2 Women' };
+function anaNav(team, here) {
+  const items = [['trends', 'Trends'], ...(V[`${team}-weak`] && FEAT.coachAi ? [['weak', 'Weaknesses']] : []), ...(V[`${team}-patterns`] && FEAT.capture ? [['patterns', 'Patterns']] : [])];
+  return items.length > 1 ? `<nav class="subnav" aria-label="Analysis">${items.map(([k, l]) => `<a href="#${team}-${k}" ${k === here ? 'aria-current="page"' : ''}>${esc(l)}</a>`).join('')}</nav>` : '';
+}
+for (const team of Object.keys(ANA_TITLE)) for (const k of ['trends', 'weak', 'patterns']) { const f = V[`${team}-${k}`]; if (f) V[`${team}-${k}`] = () => anaNav(team, k) + f(); }
+V['comp-title'] = () => {
+  const ts = WEC_TITLES.map((t) => t.id).filter((t) => titleVisible(t));
+  const t = ts.includes(S.compTitle) ? S.compTitle : ts[0];
+  return `<nav class="subnav" aria-label="Title">${ts.map((x) => `<button type="button" data-comp-title="${esc(x)}" aria-pressed="${x === t}">${esc(x)}</button>`).join('')}</nav>${t ? competitorsPanel(t) : ''}`;
+};
 
 V['dota-team'] = () => {
   const d = dotaTeam(); LAST.recs['Dota 2'] = d.recs;
@@ -2938,7 +2963,7 @@ async function onClick(e) {
     catch (err) { setMsg(`adMsg-${uid}`, err.message, 'err'); }
     return;
   }
-  if (t.dataset.rpFill) { try { const { fid, v } = JSON.parse(t.dataset.rpFill); fillReport(fid, v); if (v.scrim && blocksOfScrim(v.scrim).length) render(); } catch { /* malformed chip */ } return; }   // V1.26: show that session's drills
+  if (t.dataset.rpFill) { try { const { fid, v } = JSON.parse(t.dataset.rpFill); fillReport(fid, v); if (v.scrim && (blocksOfScrim(v.scrim).length || S.scrims.find((x) => x.id === v.scrim)?.objectives?.length)) render(); } catch { /* malformed chip */ } return; }   // V1.26: show that session's drills
   if (t.dataset.wkDraft) {
     const title = t.dataset.wkDraft; const fid = sid(title);
     try {
@@ -2963,6 +2988,7 @@ async function onClick(e) {
   }
   if (t.dataset.rpProg) { fillReport(t.dataset.rpProg, { progress: t.dataset.v }); return; }
   if (t.dataset.rpClear) { storeDraft(t.dataset.rpClear, {}); render(); return; }
+  if (t.dataset.compTitle) { S.compTitle = t.dataset.compTitle; render(); return; }
   if (t.dataset.mrOk || t.dataset.mrNo || t.dataset.mrDrop) { await mrClick(t); return; }
   if (t.dataset.rrAdd || t.dataset.rrDel) { rowsClick(t); return; }
   // V1.29: one-tap weakness word into "What failed"; the coach writes the rest of the line.
@@ -3000,7 +3026,9 @@ async function onClick(e) {
         drills: drillResults(blocksOfScrim(g('scrim')), [0, 1, 2, 3].map((i) => g(`dr${i}`))), rows: rrRows(g('rows')), comp: g('comp') });
       // Closing a planned session here avoids typing the same result twice.
       const sc = r.scrimId ? S.scrims.find((x) => x.id === r.scrimId && x.status === 'planned') : null;
-      const done = sc ? completeScrim(sc, { score: resultText(r.result), notes: r.worked || r.failed, by: r.by, matchIds: [], perObjective: {} }) : null;
+      const per = {}; (sc?.objectives || []).slice(0, 4).forEach((oid, i) => { const v = g(`ob${i}`); if (OBJ_RESULTS.includes(v)) per[oid] = { result: v, measure: g(`obv${i}`) }; });
+      const done = sc ? completeScrim(sc, { score: resultText(r.result), notes: r.worked || r.failed, by: r.by, matchIds: [], perObjective: per }) : null;
+      const objSessions = Object.entries(per).map(([oid, x]) => { const o = S.cycle.find((y) => y.id === oid); return o ? logSession(o, { owner: r.by, date: r.date, execution: 'as-planned', result: x.result, measure: x.measure, context: { opponent: sc.partner, mirrors: sc.mirrors, scrimId: sc.id, reportId: r.id }, notes: r.adjust }) : null; }).filter(Boolean);
       const daily = asDaily && (done || newSession) ? sessionFromReport(r, resultText(r.result), HUB_USER, { session: done, id: newSession, today: localToday() }) : null;
       const session = daily || done;
       if (S.db) {
@@ -3010,6 +3038,7 @@ async function onClick(e) {
           catch (err) { render(); return setMsg(`rpMsg-${fid}`, `Report saved, but its daily session was not (${err.message}). Log it under Daily sessions if needed.`, 'err'); }
         }
       } else { S.reports.push(r); if (done) Object.assign(sc, done); }
+      for (const o of objSessions) { try { await saveObj(o); } catch (err) { render(); return setMsg(`rpMsg-${fid}`, `Report saved, but an objective result was not (${err.message}).`, 'err'); } }
       const nGames = (S.cap?.[fid]?.ready || []).length + (readGameOf(title) ? mrState(fid).ready.length : 0);
       if (FEAT.coachAi) coUi().autoTag(r);   // V1.20: weakness labels in the background (one small AI call)
       try { await mrAfterSave(title, fid, r); } catch (err) { render(); return setMsg(`rpMsg-${fid}`, `Report saved, but its screenshot results were not (${err.message}).`, 'err'); }
@@ -3084,7 +3113,7 @@ async function onClick(e) {
       const cancelled = !!t.dataset.scrimCancel;
       const per = {};
       for (const oid of sc.objectives) { const r = val(`scR-${sid2}-${oid}`); if (r) per[oid] = { result: r, measure: val(`scV-${sid2}-${oid}`) }; }
-      const done = completeScrim(sc, { cancelled, cancelledWhy: cancelled ? (val(`scN-${sid2}`) || 'not given') : '', score: cancelled ? '' : val(`scS-${sid2}`), matchIds: val(`scM-${sid2}`).split(',').map((x) => x.trim()).filter(Boolean), notes: val(`scN-${sid2}`), by: val(`scB-${sid2}`), perObjective: per });
+      const done = completeScrim(sc, { cancelled, cancelledWhy: cancelled ? (val(`scN-${sid2}`) || 'not given') : '', score: cancelled ? '' : val(`scS-${sid2}`), matchIds: val(`scM-${sid2}`).split(',').map((x) => x.trim()).filter(Boolean), notes: val(`scN-${sid2}`), by: val(`scB-${sid2}`) || HUB_USER?.name || meName(), perObjective: per });
       // Each objective result becomes a coaching-cycle session linked to this scrim.
       const updated = [];
       for (const [oid, r] of Object.entries(per)) {

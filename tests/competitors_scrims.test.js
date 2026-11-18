@@ -54,8 +54,12 @@ test('page: a scrim that practises an accepted objective logs a linked session',
   d.querySelector('input[name="spObj-Dota_2"]').checked = true;
   d.querySelector('[data-scrim-plan="Dota 2"]').click(); await wait();
   const scId = [...db.store.keys()].find((k) => k.startsWith('scrims/')).split('/')[1];
-  d.getElementById(`scS-${scId}`).value = '2-1'; d.getElementById(`scR-${scId}-${id}`).value = 'partly-met'; d.getElementById(`scV-${scId}-${id}`).value = '1 of 2 reps';
-  d.querySelector(`[data-scrim-done="${scId}"]`).click(); await wait();
+  // V1.32: the result is logged through the scrim report ("Log the result"); the objective result is part of it.
+  d.querySelector(`[data-rp-from-scrim="${scId}"]`).click(); await wait(); await wait();
+  const f = (k, v) => { d.getElementById(`rp-Dota_2-${k}`).value = v; };
+  f('won', '2'); f('lost', '1'); f('focus', 'Draft vs Mongolia'); f('progress', '4'); f('worked', 'Lane swaps'); f('adjust', 'Faster smoke');
+  d.getElementById('rp-Dota_2-ob0').value = 'partly-met'; d.getElementById('rp-Dota_2-obv0').value = '1 of 2 reps';
+  d.querySelector('[data-report-save="Dota 2"]').click(); await wait(); await wait();
   const o = db.store.get(`cycle/${id}`);
   assert.equal(o.sessions.length, 1); assert.equal(o.sessions[0].result, 'partly-met'); assert.equal(o.sessions[0].context.scrimId, scId); assert.equal(o.sessions[0].context.mirrors, 'Mongolia');
   assert.equal(db.store.get(`scrims/${scId}`).status, 'done');
