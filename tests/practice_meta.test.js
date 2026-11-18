@@ -26,7 +26,7 @@ test('Focus 1 — timed drills: complete rows only, 5–180 minutes, a success c
 test('Focus 1 — drill results on the report (and CSV); what came back; plan material', () => {
   const r = rep('R1', '2026-11-20', { drills: [{ name: 'Lord setup', criterion: 'c', met: 'no' }, { name: 'bad', met: 'maybe' }], fixCheck: 'No change', prevAdjust: 'Ward before lord' });
   assert.deepEqual(r.drills.map((d) => d.met), ['no']);
-  assert.match(reportsCsv([r]).split('\r\n')[0], /,drills$/); assert.match(reportsCsv([r]), /Lord setup: no/);
+  assert.match(reportsCsv([r]).split('\r\n')[0], /,drills,per_map_or_match,competitive_settings$/); assert.match(reportsCsv([r]), /Lord setup: no/);
   const r2 = rep('R2', '2026-11-21', { drills: [{ name: 'Lord setup', met: 'no' }] });
   const wt = ['R1', 'R2', 'R3'].map((id, i) => ({ title: 'MLBB', reportId: id, date: `2026-11-1${8 + i}`, tags: ['vision'] }));
   const back = cameBack('MLBB', { reports: [r, r2], wtags: wt, asOf: '2026-11-21' });

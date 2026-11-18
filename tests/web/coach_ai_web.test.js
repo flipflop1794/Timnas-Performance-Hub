@@ -9,9 +9,13 @@ import { backend } from './fake-supabase.js';
 import { localDay, shiftDay } from '../../src/core/dates.js';
 
 let html;
-before(() => {
+before(async () => {
   execFileSync(process.execPath, ['tools/build.mjs', '--web-test'], { cwd: new URL('../..', import.meta.url) });
-  html = readFileSync(new URL('../../dist-web-test/index.html', import.meta.url), 'utf8');
+  // Other test files rebuild the same file in parallel: wait for a complete copy.
+  for (let i = 0; i < 100; i++) {
+    try { html = readFileSync(new URL('../../dist-web-test/index.html', import.meta.url), 'utf8'); if (/<\/html>\s*$/.test(html)) break; } catch { /* being rewritten */ }
+    await new Promise((r) => setTimeout(r, 100));
+  }
 });
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const people = {

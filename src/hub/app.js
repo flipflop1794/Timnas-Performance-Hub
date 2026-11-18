@@ -27,7 +27,7 @@ const CAN_APPROVE = !HUB_USER || HUB_USER.roles.some((r) => ['admin', 'head_coac
 // V1.19: an account with only the Leadership role reads everything and saves nothing (the database refuses).
 const LEADERSHIP_ONLY = !!HUB_USER && HUB_USER.roles.length > 0 && HUB_USER.roles.every((r) => r === 'leadership');
 // V1.15: newer parts switch on only when the live database / server has them (all on in the artifact build).
-const FEAT = { capture: true, draftRoom: true, donny: true, pelatnas: true, ai: true, aiPlan: true, coachAi: true, coachAiFn: true, practiceAi: true, brainAi: true, ...(PLATFORM?.features || {}) };
+const FEAT = { capture: true, draftRoom: true, donny: true, pelatnas: true, ai: true, aiPlan: true, coachAi: true, coachAiFn: true, practiceAi: true, brainAi: true, readAi: true, ...(PLATFORM?.features || {}) };
 // V1.27 pre-match brief, day scouting summary and Brainstorm: only when the deployed function has those actions.
 const brainAiOn = () => S.mode !== 'demo' && FEAT.ai && FEAT.brainAi && !!PLATFORM?.ai;
 // V1.27 feedback on an AI output: useful / not useful / wrong (+ one line). It is how the AI gets better over time.
@@ -78,6 +78,9 @@ import { dailySessionsUi, dailyLink } from './daily_sessions_ui.js';
 import { dailyText } from './daily_sessions_strings.js';
 import { canAddDailyReport, canWriteSession, sessionFromReport } from '../core/daily_sessions.js';
 import { gameOf, latestGames } from '../core/capture.js';
+import { readGameOf, proposeMatch, confirmMatch, matchLine, FOOTBALL_LABEL, CS_LABEL } from '../core/match_read.js';
+import { rowKind, cleanRows, rowsFields, rowsText, tiesOf, tiesText, mapPool, placementPoints, snapMap, CS2_MAPS, PUBGM_POINTS, MOBA_SIDES, COMP_QUESTION } from '../core/comp_rows.js';
+import { MAPS as PUBGM_MAPS } from '../pubgm/screenshot.js';
 import { gameBreakdown, breakdownText, BASE_MIN, FLAG_PCT, ownVod, addMark, vodThemes, THEME_AT, partnerPlan, STANDIN_DAYS, IDLE_DAYS, daySummary, dayText } from '../core/analyst.js';
 import { tagsOf } from '../core/weakness.js';
 import { coachAiUi } from './coach_ai_ui.js';
@@ -443,7 +446,7 @@ V.today = () => {
     ${FEAT.pelatnas ? (() => { const x = plUi().todayLine(); return `<div class="panel"><h2>Pelatnas</h2><ul class="plain"><li>${esc(x.campText)}</li><li>${x.open ? `<b>${x.open}</b> player${x.open === 1 ? '' : 's'} have not answered about availability. <a href="#pel-avail">Availability</a>` : 'Every player has answered about availability.'}</li><li>${x.sessions ? `Attendance taken for ${x.taken} of ${x.sessions} session${x.sessions === 1 ? '' : 's'} today. <a href="#pel-day">Take attendance</a>` : 'No sessions planned today.'}</li></ul></div>`; })() : ''}
     ${me.id === 'donny' || me.id === 'fayad' ? wellTodayPanel() : ''}
     ${(() => { const mine = me.id === 'aufa' || me.id === 'user' ? me.focus : WEC_TITLES.map((t) => t.id); const up = S.scrims.filter((x) => mine.includes(x.title) && x.status === 'planned').sort((a, b) => a.date.localeCompare(b.date)).slice(0, 6);
-      return up.length ? `<div class="panel"><h2>Scrims and practice coming up</h2><ul class="plain">${up.map((x) => `<li><b>${esc(x.date)}</b> ${esc(x.time)} · ${esc(x.title)} · ${esc(x.kind)}${x.partner ? ` vs ${esc(x.partner)}` : ''}${x.mirrors ? ` (stand-in for ${esc(x.mirrors)})` : ''}${x.date < today() ? ' — <b>result not logged</b>' : ''}</li>`).join('')}</ul></div>` : ''; })()}
+      return up.length ? `<div class="panel"><h2>Scrims and practice coming up</h2><ul class="plain">${up.map((x) => `<li><b>${esc(x.date)}</b> ${esc(x.time)} · ${esc(x.title)} · ${esc(x.kind)}${x.partner ? ` vs ${esc(x.partner)}` : ''}${x.mirrors ? ` (stand-in for ${esc(x.mirrors)})` : ''}${x.date < today() ? ' — <b>result not logged</b>' : ''}${x.date <= localToday() && GAME_SPEC[x.title] && S.mode !== 'demo' ? ` <button type="button" class="linkbtn" data-rp-from-scrim="${esc(x.id)}">Log the result</button>` : ''}</li>`).join('')}</ul></div>` : ''; })()}
     ${(() => { const mine = me.id === 'aufa' || me.id === 'user' ? me.focus : WEC_TITLES.map((t) => t.id); const t0 = localToday();
       const rows = mine.filter((t) => GAME_SPEC[t]).map((t) => ({ t, s: reportSummary(S.reports, t, t0) }));
       return rows.length ? `<div class="panel"><h2>Scrim reports</h2><ul class="plain">${rows.map((r) => `<li><b>${esc(r.t)}</b> — ${r.s.last ? (r.s.daysSince === 0 ? 'report filed today' : `last report ${r.s.daysSince} day(s) ago`) : 'no report yet'} <a href="#${REPORT_TAB[r.t]}">${r.s.daysSince === 0 ? 'Open' : 'File one'}</a></li>`).join('')}</ul></div>` : ''; })()}
@@ -660,6 +663,7 @@ function scrimsPanel(title) {
     ${(sc.blocks || []).length ? `<ol class="note">${sc.blocks.map((b) => `<li><b>${esc(b.name)}</b> · ${b.minutes} min · ${esc(b.objective)} <i>(${esc(b.criterion)})</i></li>`).join('')}</ol><p class="note">${blocksMinutes(sc.blocks)} min of drills</p>` : ''}
     ${sc.dailyReport ? `<p data-no-tr>${esc(sc.dailyReport.objective)}</p><a href="${esc(dailyLink('session', sc.id))}">${dailyLabel('Open session report')}</a>` : sc.objectives.length ? `<p class="note">Practising: ${sc.objectives.map((id) => esc(objName(id))).join('; ')}</p>` : '<p class="note">No objective attached: free scrim.</p>'}
     ${S.mode === 'live' && sc._version && canAddDailyReport(sc, HUB_USER) ? `<a href="${esc(dailyLink('session', sc.id))}">${dailyLabel('Add daily report')}</a>` : ''}
+    ${!sc.result && sc.status === 'planned' && S.mode !== 'demo' && GAME_SPEC[title] && sc.date <= localToday() ? `<div class="toolbar"><button class="btn primary" type="button" data-rp-from-scrim="${esc(sc.id)}">Log the result (scrim report)</button></div>` : ''}
     ${sc.result ? `<p>${sc.result.score ? `<b>${esc(sc.result.score)}</b> · ` : ''}${sc.result.matchIds.length ? `matches ${sc.result.matchIds.map(esc).join(', ')} · ` : ''}${esc(sc.result.notes || sc.result.cancelledWhy)} <span class="note">— ${esc(sc.result.by)}</span></p>` : `<details><summary class="btn">Log result</summary><div class="form">
       <label class="field" for="scS-${sc.id}">${title === 'PUBG Mobile' ? 'Points / placement' : 'Score (e.g. 2-1)'}<input type="text" id="scS-${sc.id}"></label>
       <label class="field" for="scM-${sc.id}">Match IDs (comma-separated)<input type="text" id="scM-${sc.id}"></label>
@@ -762,7 +766,7 @@ function reportCard(r) {
   const spec = GAME_SPEC[r.title];
   const pl = PROGRESS.find(([n]) => n === r.progress)?.[1] || '';
   return `<div class="obj"><header><div><span class="note">${esc(r.date)}${r.time ? ` ${esc(r.time)}` : ''}${r.format ? ` · ${esc(r.format)}` : ''} · ${esc(r.roster)} · written by ${esc(r.by)}${r._entered?.by && r._entered.by !== r.by ? ` (entered by ${esc(r._entered.by)}, ${esc(new Date(r._entered.at).toLocaleString('en-GB', { timeZone: 'Asia/Jakarta', dateStyle: 'medium', timeStyle: 'short' }))} WIB)` : ''}</span><h3>vs ${esc(r.partner)}${r.partnerLevel ? ` <span class="note">(${esc(r.partnerLevel)})</span>` : ''}</h3></div>${tag(r.progress >= 4 ? 'c-Verified' : r.progress <= 2 ? 'c-Blocked' : 'c-Low', `Plan ${r.progress}/5`)}</header>
-    <p><b>${esc(resultText(r.result))}</b> · <span class="note">Practised: ${esc(r.focus)} · ${esc(pl)}</span></p>
+    <p><b>${esc(resultText(r.result))}</b> · <span class="note">Practised: ${esc(r.focus)} · ${esc(pl)}</span></p>${r.rows?.length ? `<p class="note" data-no-tr>${esc(rowsText(r.title, r.rows))}</p>` : ''}${r.ties ? `<p class="note">${esc(tiesText(r.ties))}</p>` : ''}${r.comp ? `<p class="note">${esc(r.comp === 'yes' ? 'Played on competitive settings.' : 'Not played on competitive settings.')}</p>` : ''}
     ${r.worked ? `<p><b>Worked:</b> ${esc(r.worked)}</p>` : ''}${r.failed ? `<p><b>Failed:</b> ${esc(r.failed)}</p>` : ''}
     ${r.detail ? `<p><b>${esc(spec.detail)}:</b> ${esc(r.detail)}</p>` : ''}${r.playerNotes ? `<p><b>Player notes:</b> ${esc(r.playerNotes)}</p>` : ''}
     ${r.prevAdjust ? `<p class="note"><b>Last adjustment</b> (${esc(r.prevAdjust)}): ${esc(r.fixCheck || 'not checked')}</p>` : ''}
@@ -825,27 +829,37 @@ function trendChart(m, W) {
     tip: (i) => `${W.by === 'day' ? W[i].to : `Week ${W[i].from} to ${W[i].to}`}: ${trFmt(m, m.values[i])} (${m.counts[i]} value${m.counts[i] === 1 ? '' : 's'})` });
 }
 const periodLabel = (n) => (n === 1 ? 'Last 1 week' : `Last ${n} weeks`);
+// V1.31 CS2: the Active Duty pool over the chosen period, and maps not practised for 14 days.
+function mapPoolPanel(title, W) {
+  const c = W.compare; const P = mapPool(S.reports, title, { from: c.from, to: c.to, asOf: today() });
+  const idle = P.filter((m) => m.idle).map((m) => m.map);
+  return `<div class="panel"><h2>Map pool</h2>${idle.length ? banner('warn', `<div><b>Not practised in the last 14 days:</b> ${esc(idle.join(', '))}</div>`) : '<p class="note">Every Active Duty map was practised in the last 14 days.</p>'}
+    <div class="tw"><table><thead><tr><th>Map</th><th class="n">Maps played</th><th class="n">Won-lost</th><th class="n">Rounds for-against</th><th>Last played</th></tr></thead><tbody>
+    ${P.map((m) => `<tr><td><b>${esc(m.map)}</b></td><td class="n">${m.played || '—'}</td><td class="n">${m.played ? `${m.won}-${m.lost}` : '—'}</td><td class="n">${m.played ? `${m.roundsFor}-${m.roundsAgainst}` : '—'}</td><td>${m.last ? esc(m.last) : '<span class="note">never</span>'}</td></tr>`).join('')}</tbody></table></div>
+    <p class="note">From the per-map results in the scrim reports, ${esc(c.from)} to ${esc(c.to)}. Few maps are a small sample: read win-loss as a hint.</p></div>`;
+}
 function trendsPage(title) {
   if (S.mode === 'demo') return `<div class="panel">${DEMO_BANNER}<p class="empty">Trends use operational records only.</p></div>`;
   const n = TR_PERIODS.includes(S.trWeeks) ? S.trWeeks : 4; const W = trendPeriod(today(), n);
   let pubgm = null;
   if (title === 'PUBG Mobile') { const d = pubgmData(); pubgm = { rows: d.rows, team: d.team, points: (r) => d.sc.total(r) }; }
-  const team = teamTrends(title, { reports: S.reports, pubgm }, W);
-  const games = gameOf(title) && FEAT.capture ? latestGames((S.games || []).filter((g) => g.title === title)) : [];
+  const team = teamTrends(title, { reports: S.reports, pubgm, games: readGameOf(title) === 'efootball' && FEAT.capture ? latestGames((S.games || []).filter((g) => g.title === title)) : [] }, W);
+  const perPlayer = !!gameOf(title) || readGameOf(title) === 'cs2'; const games = perPlayer && FEAT.capture ? latestGames((S.games || []).filter((g) => g.title === title)) : [];
   const players = playerTrends(games, W);
   const changes = S.cycle.filter((o) => o.title === title).flatMap((o) => (o.reviews || []).filter((r) => ['accepted', 'modified'].includes(r.decision) && String(r.at).slice(0, 10) >= W[0].from).map((r) => ({ at: String(r.at).slice(0, 10), what: o.rec?.problem || o.id, drill: o.objective?.drill || '' })))
     .sort((a, b) => a.at.localeCompare(b.at));
   const head = (m) => `<div class="toolbar"><b>${esc(m.label)}</b> ${verdictTag(m.verdict)} <span class="note">this period ${trFmt(m, m.after)} (${m.nAfter}) vs ${trFmt(m, m.before)} (${m.nBefore}) the ${n === 1 ? 'week' : `${n} weeks`} before</span></div>`;
   const wk = (w) => `${w.to.slice(8)}/${w.to.slice(5, 7)}`;
   return `<div class="panel"><div class="lead">${esc(title)}: <em>trends</em></div>
-    <p>Is practice turning into improvement? ${W.by === 'day' ? 'Day by day' : 'Week by week'} from scrim reports${gameOf(title) ? ', confirmed scrim games (per player)' : ''}${title === 'PUBG Mobile' ? ' and the match log' : ''}. Nothing extra to type.</p>
+    <p>Is practice turning into improvement? ${W.by === 'day' ? 'Day by day' : 'Week by week'} from scrim reports${perPlayer ? ', confirmed scrim games (per player)' : ''}${title === 'PUBG Mobile' ? ' and the match log' : ''}. Nothing extra to type.</p>
     <div class="toolbar" role="group" aria-label="Period"><span class="note">Period</span>${TR_PERIODS.map((k) => `<button class="btn${k === n ? ' primary' : ''}" type="button" data-tr-weeks="${k}" aria-pressed="${k === n}">${periodLabel(k)}</button>`).join('')}</div>
     <p class="note">${esc(W.compare.from)} to ${esc(W.compare.to)}, compared with ${esc(W.compare.prevFrom)} to ${esc(W.compare.prevTo)}.</p>
     ${S.reportLoad === 'error' ? banner('block', '<div>Scrim reports could not be loaded: these trends are incomplete.</div>') : ''}
     <p class="note">"Better" or "Worse" only when this period differs from the period before by more than chance (95% interval), with at least ${TR_MIN} games or reports on each side. Partner strength changes week to week: read a change against who you played (Scrim reports). It shows a change in practice numbers, not in tournament chances.</p></div>
   ${team.length ? `<div class="panel"><h2>Team</h2>${team.map((m) => `<div class="trendrow">${head(m)}<div class="trends">${trendChart(m, W)}</div></div>`).join('')}</div>`
     : `<div class="panel"><h2>Team</h2><p class="empty">No scrim reports in this period yet. File reports under Scrim reports and the lines appear here.</p></div>`}
-  ${gameOf(title) ? `<div class="panel"><h2>Players</h2>${players.length ? `<div class="tw"><table><thead><tr><th>Player</th><th>Per game</th>${W.map((w) => `<th class="n">${wk(w)}</th>`).join('')}<th>Change</th></tr></thead><tbody>
+  ${rowKind(title) === 'cs' ? mapPoolPanel(title, W) : ''}
+  ${perPlayer ? `<div class="panel"><h2>Players</h2>${players.length ? `<div class="tw"><table><thead><tr><th>Player</th><th>Per game</th>${W.map((w) => `<th class="n">${wk(w)}</th>`).join('')}<th>Change</th></tr></thead><tbody>
       ${players.flatMap((p) => p.measures.map((m, i) => `<tr>${i ? '<td></td>' : `<td><b>${esc(p.player)}</b><br><span class="note">${p.games} game${p.games === 1 ? '' : 's'}</span></td>`}<td>${esc(m.label)}${m.better === 'down' ? ' <span class="note">(lower is better)</span>' : ''}</td>${m.values.map((v, k) => `<td class="n" title="${m.counts[k]} game(s)">${trFmt(m, v)}</td>`).join('')}<td>${verdictTag(m.verdict)}</td></tr>`)).join('')}</tbody></table></div>
       <p class="note">From coach-confirmed scrim games only (screenshot capture or typed in). ${W.by === 'day' ? 'Daily' : 'Weekly'} averages per game; stand-ins are left out.</p>`
     : `<p class="empty">No confirmed scrim games in this period. Add games to a scrim report (screenshot or by hand) to see each player's line.</p>`}</div>` : ''}
@@ -899,9 +913,9 @@ V['reports-all'] = () => {
 
 // ---------- fast report entry: drafts, quick picks, progress buttons ----------
 // Drafts are a per-device convenience (this browser only). The saved report is what counts.
-const RP_KEYS = ['date', 'time', 'by', 'partner', 'level', 'format', 'roster', 'scrim', 'won', 'lost', 'drawn', 'played', 'points', 'avg', 'chicken', 'focus', 'progress', 'worked', 'failed', 'detail', 'players', 'adjust', 'vod', 'fix', 'dr0', 'dr1', 'dr2', 'dr3'];
+const RP_KEYS = ['rows', 'comp', 'date', 'time', 'by', 'partner', 'level', 'format', 'roster', 'scrim', 'won', 'lost', 'drawn', 'played', 'points', 'avg', 'chicken', 'focus', 'progress', 'worked', 'failed', 'detail', 'players', 'adjust', 'vod', 'fix', 'dr0', 'dr1', 'dr2', 'dr3'];
 const RP_RE = new RegExp(`^rp-(.+)-(${RP_KEYS.join('|')})$`);
-const RP_KEEP_AFTER_SAVE = ['time', 'by', 'level', 'format', 'roster', 'focus'];
+const RP_KEEP_AFTER_SAVE = ['time', 'by', 'level', 'format', 'roster', 'focus', 'comp'];
 const cap = (x) => x.charAt(0).toUpperCase() + x.slice(1);
 const RP_OPTIONAL = ['time', 'level', 'format', 'roster', 'scrim', 'detail', 'players', 'vod', 'avg', 'chicken', 'drawn'];
 const PROG_SHORT = { 1: 'Far off', 2: 'Mostly off', 3: 'Partly', 4: 'Mostly', 5: 'Fully' };
@@ -917,7 +931,7 @@ function storeDraft(fid, d) {
 function draftField(el) {
   const m = el?.id?.match(RP_RE); if (!m) return;
   const d = { ...rpDraft(m[1]), [m[2]]: el.value, at: new Date().toISOString() }; storeDraft(m[1], d);
-  el.removeAttribute('aria-invalid');
+  el.removeAttribute('aria-invalid'); updateLeft(m[1]);
 }
 function fillReport(fid, values) {
   for (const [k, v] of Object.entries(values)) {
@@ -936,9 +950,182 @@ function markInvalid(fid, message) {
   if (key !== 'progress') el.setAttribute('aria-invalid', 'true');
   el.focus();
 }
+// V1.29 frictionless report: a planned session fills the setup; the form says live what is still needed.
+const plannedFocus = (x) => (x.objectives || []).map((id) => S.cycle.find((o) => o.id === id)?.rec?.problem).filter(Boolean).join('; ');
+function scrimValues(x) {
+  const v = { partner: x.partner, scrim: x.id, format: x.format, level: x.partnerLevel, focus: x.focus || plannedFocus(x) };
+  return Object.fromEntries(Object.entries(v).filter(([, y]) => y));
+}
+const RP_NEEDED = [['partner', 'sparring partner'], ['result', 'result'], ['focus', 'focus'], ['story', 'what worked or failed'], ['adjust', 'adjustment'], ['progress', 'plan rating']];
+function rpMissing(fid, pts, { values } = {}) {
+  const g = values ? (k) => String(values[k] ?? '') : (k) => String(val(`rp-${fid}-${k}`));
+  const n = (k) => Number(g(k)) || 0; const has = (k) => g(k).trim() !== '';
+  const ok = { partner: has('partner'), result: (pts ? n('played') > 0 && has('points') : n('won') + n('lost') + n('drawn') > 0) || (S.cap?.[fid]?.ready || []).length > 0,
+    focus: has('focus'), story: has('worked') || has('failed'), adjust: has('adjust'), progress: has('progress') };
+  return RP_NEEDED.filter(([k]) => !ok[k]).map(([, l]) => l);
+}
+const rpLeftText = (m) => (m.length ? `${RP_NEEDED.length - m.length} of ${RP_NEEDED.length} done — still needed: ${m.join(', ')}.` : 'Everything needed is filled in. Ready to save.');
+function updateLeft(fid) {
+  const el = document.getElementById(`rpLeft-${fid}`); if (!el) return;
+  el.textContent = rpLeftText(rpMissing(fid, !!document.getElementById(`rp-${fid}-played`)));
+  if (S.lang === 'id') translateDom(el.parentElement, 'id');
+}
 const chip = (fid, values, label, extra = '') => `<button type="button" class="chip${extra}" data-rp-fill="${esc(JSON.stringify({ fid, v: values }))}">${esc(label)}</button>`;
+// ---------- V1.30 eFootball and CS2: result screenshots read by the AI, checked by the coach (src/core/match_read.js) ----------
+const mrOn = () => S.mode === 'live' && FEAT.ai && FEAT.readAi && FEAT.capture && !!PLATFORM?.ai;
+const mrState = (fid) => (S.mr ||= {})[fid] ||= { pending: null, queue: [], ready: [] };
+const CS_STATS_SHOWN = ['kills', 'deaths', 'assists', 'adr'];
+function readSection(title, fid) {
+  const rg = readGameOf(title); if (!rg || S.mode === 'demo') return '';
+  const st = mrState(fid); const p = st.pending; const foot = rg === 'efootball';
+  const unit = foot ? 'Goals' : 'Rounds';
+  const intro = `<p class="note">Upload the ${foot ? 'match stats screen shown after the match' : 'scoreboard shown at the end of each map'}. The AI reads the score and the numbers, you check them, and they fill the result below. One screenshot per ${foot ? 'match' : 'map'}.</p>`;
+  const ready = st.ready.length ? `<ul class="plain">${st.ready.map((g, i) => `<li><b>${foot ? 'Match' : 'Map'} ${i + 1}:</b> ${esc(g.result)} · <span data-no-tr>${esc(matchLine(g))}</span> <button type="button" class="linkbtn" data-mr-drop="${esc(JSON.stringify({ fid, i }))}">Remove</button></li>`).join('')}</ul>` : '';
+  if (!mrOn()) return `<div class="obj"><b>Results from screenshots</b>${intro}${ready}${banner('warn', '<div>Screenshot reading needs the AI on the website. Type the score below instead.</div>')}</div>`;
+  let check = '';
+  if (p) {
+    const sides = foot ? [['home', `Left: ${p.names.home || 'home'}`], ['away', `Right: ${p.names.away || 'away'}`]] : [['a', `First: ${p.names.a || 'team A'}`], ['b', `Second: ${p.names.b || 'team B'}`]];
+    const o = p.ourSide || ''; const sc = foot ? p.goals : p.rounds; const other = (s) => (foot ? (s === 'home' ? 'away' : 'home') : (s === 'a' ? 'b' : 'a'));
+    const nb = (id, v, label, max) => `<label class="field" for="${id}">${label}<input type="number" inputmode="numeric" min="0" max="${max}" id="${id}" value="${v ?? ''}"></label>`;
+    const statRows = foot ? Object.entries(p.stats).filter(([, v]) => v.home != null || v.away != null) : [];
+    check = `<div class="obj">${p.issues.map((x) => banner(x.level === 'block' ? 'block' : 'warn', `<div>${esc(x.text)}</div>`)).join('')}
+      <div class="form"><label class="field" for="mrSide-${fid}">Which side is ours?<select id="mrSide-${fid}"><option value=""></option>${sides.map(([v, l]) => `<option value="${v}" ${v === o ? 'selected' : ''}>${esc(l)}</option>`).join('')}</select></label>
+        ${nb(`mrO-${fid}`, o ? sc[o] : '', `${unit} (us)`, foot ? 30 : 40)}${nb(`mrT-${fid}`, o ? sc[other(o)] : '', `${unit} (them)`, foot ? 30 : 40)}
+        ${foot ? `${nb(`mrPo-${fid}`, o && p.penalties ? p.penalties[o] : '', 'Penalties (us, if any)', 30)}${nb(`mrPt-${fid}`, o && p.penalties ? p.penalties[other(o)] : '', 'Penalties (them, if any)', 30)}`
+    : `<label class="field" for="mrMap-${fid}">Map<select id="mrMap-${fid}"><option value=""></option>${CS2_MAPS.map((m) => `<option ${m === p.map ? 'selected' : ''}>${m}</option>`).join('')}</select></label>`}</div>
+      ${foot ? (statRows.length ? `<div class="tw"><table><thead><tr><th>Statistic</th><th class="n" data-no-tr>${esc(p.names.home || 'Left')}</th><th class="n" data-no-tr>${esc(p.names.away || 'Right')}</th></tr></thead><tbody>${statRows.map(([k, v]) => `<tr><td>${esc(FOOTBALL_LABEL[k])}</td><td class="n">${v.home ?? '—'}</td><td class="n">${v.away ?? '—'}</td></tr>`).join('')}</tbody></table></div>` : '')
+    : `<div class="tw"><table><thead><tr><th>Team</th><th>Name on screen</th><th>Our player</th>${CS_STATS_SHOWN.map((k) => `<th class="n">${CS_LABEL[k]}</th>`).join('')}</tr></thead><tbody>${p.players.map((x) => `<tr><td data-no-tr>${x.side ? esc((x.side === 'a' ? p.names.a : p.names.b) || x.side.toUpperCase()) : '?'}</td><td data-no-tr>${esc(x.nameSeen)}${x.unsure ? ` ${tag('c-Low', 'check')}` : ''}</td><td data-no-tr>${esc(x.player || '—')}</td>${CS_STATS_SHOWN.map((k) => `<td class="n">${x.stats[k] ?? '—'}</td>`).join('')}</tr>`).join('')}</tbody></table></div>`}
+      <p class="note">Numbers you cannot see on the screenshot stay empty; nothing is guessed.${st.queue.length ? ` ${st.queue.length} more screenshot(s) waiting.` : ''}</p>
+      <div class="toolbar"><button class="btn primary" type="button" data-mr-ok="${esc(title)}">Use this ${foot ? 'match' : 'map'}</button><button class="btn" type="button" data-mr-no="${esc(title)}">Discard</button></div></div>`;
+  }
+  return `<div class="obj" id="mrBox-${fid}"><b>Results from screenshots</b>${intro}${ready}${check}
+    ${p ? '' : `<div class="toolbar"><label class="btn primary filebtn">Upload ${foot ? 'match stats' : 'scoreboard'} screenshot(s)<input type="file" accept="image/*" multiple data-mr-file="${esc(title)}" hidden></label></div>`}
+    <span class="msg" id="mrMsg-${fid}" role="status"></span></div>`;
+}
+async function mrRead(title, files) {
+  const fid = sid(title); const st = mrState(fid);
+  for (const f of files) {
+    setMsg(`mrMsg-${fid}`, 'Reading the screenshot… (5–15 s)');
+    const img = await capUiReal().prepImage(f);
+    const out = await PLATFORM.ai.call({ action: 'match_result', title, image: img, day: localToday() });
+    const p = proposeMatch({ title, raw: out.raw, roster: (S.roster[title] || []).filter(Boolean), aliases: S.aliases?.[title]?.aliases || {} });
+    if (p.issues.some((x) => x.level === 'block')) throw new Error(p.issues.find((x) => x.level === 'block').text);
+    p.captureId = out.captureId || '';
+    if (st.pending) st.queue.push(p); else st.pending = p;
+  }
+  render();
+}
+async function mrClick(t) {
+  const ds = t.dataset;
+  if (ds.mrOk) {
+    const title = ds.mrOk; const fid = sid(title); const st = mrState(fid); const p = st.pending; if (!p) return;
+    try {
+      const g = confirmMatch(p, { ourSide: val(`mrSide-${fid}`), ours: val(`mrO-${fid}`), theirs: val(`mrT-${fid}`), penOurs: val(`mrPo-${fid}`), penTheirs: val(`mrPt-${fid}`), map: document.getElementById(`mrMap-${fid}`) ? val(`mrMap-${fid}`) : undefined },
+        { gameNo: st.ready.length + 1, captureIds: p.captureId ? [p.captureId] : [] });
+      st.ready.push(g); st.pending = st.queue.shift() || null; rrAddFromGame(fid, title, g); render();
+      setMsg(`mrMsg-${fid}`, `Added: ${g.result} ${matchLine(g)}. The result below is filled; keep going or save the report.`, 'ok');
+    } catch (err) { setMsg(`mrMsg-${fid}`, err.message, 'err'); }
+    return;
+  }
+  if (ds.mrNo) { const st = mrState(sid(ds.mrNo)); st.pending = st.queue.shift() || null; render(); return; }
+  if (ds.mrDrop) {
+    try { const { fid, i } = JSON.parse(ds.mrDrop); const st = mrState(fid); st.ready.splice(i, 1); st.ready.forEach((g, k) => { g.gameNo = k + 1; }); render(); } catch { /* malformed */ }
+  }
+}
+// After the report is saved: one scrim_games record per confirmed screenshot, linked to the report.
+async function mrAfterSave(title, fid, r) {
+  const st = mrState(fid); if (!st.ready.length) return 0;
+  const n = st.ready.length;
+  for (const [i, g] of st.ready.entries()) {
+    const rec = { ...g, id: `${r.id}-m${i + 1}`, reportId: r.id, date: r.date, partner: r.partner, by: r.by, gameNo: i + 1, createdAt: new Date().toISOString() };
+    if (S.db) await S.db.collection('scrim_games').doc(rec.id).set(rec);
+    const list = (S.games ||= []); const k = list.findIndex((x) => x.id === rec.id); if (k >= 0) list[k] = rec; else list.push(rec);
+  }
+  S.mr[fid] = { pending: null, queue: [], ready: [] };
+  return n;
+}
+
+// ---------- V1.31 results per map / match / game on competitive settings (src/core/comp_rows.js) ----------
+const RR_LABEL = { cs: 'Map', br: 'Match', foot: 'Match', moba: 'Game' };
+const rrRows = (raw) => { try { const r = JSON.parse(raw || '[]'); return Array.isArray(r) ? r : []; } catch { return []; } };
+function rowsSummary(title, raw) {
+  let rows; try { rows = cleanRows(title, raw); } catch (e) { return { text: e.message, err: true }; }
+  if (!rows.length) return { text: '' };
+  const f = rowsFields(title, rows); const kind = rowKind(title);
+  if (kind === 'br') {
+    const place = rows.reduce((a, r) => a + placementPoints(r.place), 0); const elim = rows.reduce((a, r) => a + r.kills, 0);
+    return { text: `${f.played} match${f.played === '1' ? '' : 'es'}: ${f.points} pts (placement ${place} + eliminations ${elim}) · average place ${f.avg} · ${f.chicken} chicken dinner${f.chicken === '1' ? '' : 's'}`, fields: f };
+  }
+  const unit = { cs: 'map', foot: 'match', moba: 'game' }[kind];
+  const ties = tiesOf(title, rows);
+  return { text: `${rows.length} ${unit}${rows.length === 1 ? '' : unit === 'match' ? 'es' : 's'}: ${f.won} won, ${f.lost} lost${f.drawn ? `, ${f.drawn} drawn` : ''}${ties ? ` · ${tiesText(ties)}` : ''}`, fields: f };
+}
+function rowsSection(title, fid, dv) {
+  const kind = rowKind(title); if (!kind) return '';
+  const rows = rrRows(dv('rows')); const n = Math.max(rows.length, kind === 'moba' ? 0 : 1);
+  const id = (i, k) => `rpr-${fid}-${i}-${k}`;
+  const numIn = (i, k, label, v, max, min = 0) => `<label class="field" for="${id(i, k)}">${label}<input type="number" inputmode="numeric" min="${min}" max="${max}" id="${id(i, k)}" value="${esc(v ?? '')}"></label>`;
+  const selIn = (i, k, label, v, opts) => `<label class="field" for="${id(i, k)}">${label}<select id="${id(i, k)}">${opts.map(([o, l]) => `<option value="${esc(o)}" ${String(v ?? '') === o ? 'selected' : ''}>${esc(l)}</option>`).join('')}</select></label>`;
+  const row = (r, i) => {
+    const x = r || {}; let cells;
+    if (kind === 'cs') cells = `${selIn(i, 'map', 'Map', x.map, [['', ''], ...CS2_MAPS.map((m) => [m, m])])}${numIn(i, 'us', 'Rounds won', x.us, 40)}${numIn(i, 'them', 'Rounds lost', x.them, 40)}${numIn(i, 'ct', 'CT rounds won (optional)', x.ct, 40)}`;
+    else if (kind === 'br') cells = `${selIn(i, 'map', 'Map (optional)', x.map, [['', ''], ...PUBGM_MAPS.map((m) => [m, m])])}${numIn(i, 'place', 'Placement', x.place, 16, 1)}${numIn(i, 'kills', 'Eliminations', x.kills, 80)}`;
+    else if (kind === 'foot') cells = `${numIn(i, 'us', 'Goals for', x.us, 30)}${numIn(i, 'them', 'Goals against', x.them, 30)}${selIn(i, 'extra', 'Extra time / penalties', x.extra, [['', 'No'], ['et', 'Extra time'], ['pk', 'Penalties']])}${numIn(i, 'penUs', 'Penalties scored', x.penUs, 30)}${numIn(i, 'penThem', 'Penalties conceded', x.penThem, 30)}`;
+    else cells = `${selIn(i, 'side', 'Side', x.side, [['', ''], ...MOBA_SIDES[title].map((s) => [s, cap(s)])])}${selIn(i, 'res', 'Result', x.res, [['', ''], ['win', 'Win'], ['loss', 'Loss']])}`;
+    const pts = kind === 'br' && Number(x.place) >= 1 && Number(x.place) <= 16 && x.kills !== '' && x.kills != null ? `= ${placementPoints(Number(x.place)) + Number(x.kills)} pts` : '';
+    return `<div class="rrow"><b class="rrn">${RR_LABEL[kind]} ${i + 1}</b><div class="form">${cells}</div>${kind === 'br' ? `<span class="note" id="${id(i, 'pts')}">${pts}</span>` : ''}${n > 1 || kind === 'moba' ? `<button type="button" class="linkbtn" data-rr-del="${esc(JSON.stringify({ fid, i }))}">Remove</button>` : ''}</div>`;
+  };
+  const head = kind === 'cs' ? 'Per map (Active Duty pool)' : kind === 'br' ? 'Per match: placement and eliminations' : kind === 'foot' ? 'Per match' : 'Per game (optional): side and result';
+  const hint = kind === 'br' ? `<span class="note">WEC scoring: ${PUBGM_POINTS.join('-')} for places 1 to 8, then 0; +1 per elimination.</span>` : '';
+  const sum = rowsSummary(title, rows);
+  return `<div class="rrows"><div class="h3">${head}</div>${hint}
+    <input type="hidden" id="rp-${fid}-rows" data-rr-title="${esc(title)}" value="${esc(JSON.stringify(rows))}">
+    ${Array.from({ length: n }, (_, i) => row(rows[i], i)).join('')}
+    <div class="toolbar"><button class="btn" type="button" data-rr-add="${esc(fid)}">+ Add ${RR_LABEL[kind].toLowerCase()}</button></div>
+    <p class="note${sum.err ? ' err' : ''}" id="rpr-${fid}-sum" aria-live="polite">${esc(sum.text)}</p>
+    ${COMP_QUESTION[title] ? `<div class="form">${`<label class="field wide" for="rp-${fid}-comp">${esc(COMP_QUESTION[title])}<select id="rp-${fid}-comp"><option value="">—</option><option value="yes" ${dv('comp') === 'yes' ? 'selected' : ''}>Yes</option><option value="no" ${dv('comp') === 'no' ? 'selected' : ''}>No</option></select></label>`}</div>` : ''}</div>`;
+}
+const RR_FIELDS = { cs: ['map', 'us', 'them', 'ct'], br: ['map', 'place', 'kills'], foot: ['us', 'them', 'extra', 'penUs', 'penThem'], moba: ['side', 'res'] };
+function rrCollect(fid, title) {
+  const kind = rowKind(title); const out = [];
+  for (let i = 0; i < 12 && document.getElementById(`rpr-${fid}-${i}-${RR_FIELDS[kind][0]}`); i++) out.push(Object.fromEntries(RR_FIELDS[kind].map((k) => [k, val(`rpr-${fid}-${i}-${k}`)])));
+  return out;
+}
+function rrApply(fid, title, raw) {
+  const hidden = document.getElementById(`rp-${fid}-rows`);
+  if (hidden) { hidden.value = JSON.stringify(raw); draftField(hidden); }
+  const sum = rowsSummary(title, raw);
+  const el = document.getElementById(`rpr-${fid}-sum`); if (el) { el.textContent = sum.text; el.classList.toggle('err', !!sum.err); if (S.lang === 'id') translateDom(el.parentElement, 'id'); }
+  if (rowKind(title) === 'br') raw.forEach((x, i) => { const p = document.getElementById(`rpr-${fid}-${i}-pts`); if (p) p.textContent = Number(x.place) >= 1 && Number(x.place) <= 16 && x.kills !== '' ? `= ${placementPoints(Number(x.place)) + Number(x.kills)} pts` : ''; });
+  if (sum.fields) fillReport(fid, sum.fields);
+}
+function rowsInput(el) {
+  const m = el?.id?.match(/^rpr-(.+)-(\d+)-([A-Za-z]+)$/); if (!m) return;
+  const title = document.getElementById(`rp-${m[1]}-rows`)?.dataset.rrTitle; if (!title) return;
+  rrApply(m[1], title, rrCollect(m[1], title));
+}
+function rowsClick(t) {
+  if (t.dataset.rrAdd) {
+    const fid = t.dataset.rrAdd; const title = document.getElementById(`rp-${fid}-rows`)?.dataset.rrTitle; if (!title) return;
+    const raw = rrCollect(fid, title); raw.push({}); storeDraft(fid, { ...rpDraft(fid), rows: JSON.stringify(raw), at: new Date().toISOString() }); render();
+    document.getElementById(`rpr-${fid}-${raw.length - 1}-${RR_FIELDS[rowKind(title)][0]}`)?.focus();
+    return;
+  }
+  try {
+    const { fid, i } = JSON.parse(t.dataset.rrDel); const title = document.getElementById(`rp-${fid}-rows`)?.dataset.rrTitle; if (!title) return;
+    const raw = rrCollect(fid, title); raw.splice(i, 1); rrApply(fid, title, raw); render();
+  } catch { /* malformed */ }
+}
+// A screenshot confirmed for CS2 / eFootball becomes a row (map and rounds, or goals and penalties).
+function rrAddFromGame(fid, title, g) {
+  const raw = rrCollect(fid, title).filter((x) => Object.values(x).some((v) => v !== ''));
+  raw.push(g.game === 'cs2' ? { map: snapMap(g.map), us: String(g.score.ours), them: String(g.score.theirs), ct: '' }
+    : { us: String(g.score.ours), them: String(g.score.theirs), extra: g.penalties ? 'pk' : '', penUs: g.penalties ? String(g.penalties.ours) : '', penThem: g.penalties ? String(g.penalties.theirs) : '' });
+  rrApply(fid, title, raw);
+}
+
 function reportForm(title, { fid, spec, pts, unit, planned, t0 }) {
-  const d = rpDraft(fid); const dv = (k, def = '') => (d[k] != null ? d[k] : def);
+  const d = rpDraft(fid); let auto = {}; const dv = (k, def = '') => (d[k] != null && !(d[k] === '' && auto[k] != null) ? d[k] : auto[k] != null ? auto[k] : def);
   const mine = S.reports.filter((r) => r.title === title).sort((a, b) => b.date.localeCompare(a.date) || b.createdAt.localeCompare(a.createdAt));
   const last = mine[0];
   const uniq = (xs) => [...new Set(xs.filter(Boolean))];
@@ -946,10 +1133,10 @@ function reportForm(title, { fid, spec, pts, unit, planned, t0 }) {
   const partners = uniq(mine.map((r) => r.partner)).filter((p) => !plannedToday.some((x) => x.partner === p)).slice(0, 5);
   const objectives = S.cycle.filter((o) => o.title === title && ['accepted', 'modified'].includes(o.status)).map((o) => o.rec.problem);
   const focuses = uniq([...objectives, ...mine.map((r) => r.focus)]).slice(0, 5);
-  // A planned session's objectives become the report's focus (one tap instead of retyping).
-  const plannedFocus = (x) => (x.objectives || []).map((id) => S.cycle.find((o) => o.id === id)?.rec?.problem).filter(Boolean).join('; ');
   const scores = title === 'eFootball' ? [['1-0', 1, 0, 0], ['0-1', 0, 1, 0], ['Draw', 0, 0, 1], ['2-0', 2, 0, 0], ['1-1', 1, 1, 0], ['0-2', 0, 2, 0]] : [['2-0', 2, 0, 0], ['2-1', 2, 1, 0], ['1-2', 1, 2, 0], ['0-2', 0, 2, 0], ['1-0', 1, 0, 0], ['0-1', 0, 1, 0]];
   const hasDraft = Object.keys(d).some((k) => k !== 'at' && d[k] !== '');
+  // V1.29: one session planned today and nothing typed yet: start from it (partner, format, focus, drills).
+  if (!hasDraft && plannedToday.length === 1) auto = scrimValues(plannedToday[0]);
   const isDefault = (k, v) => (k === 'roster' && v === ROSTER_PLAYED[0]) || (k === 'format' && pts && v === 'Lobby (BR)');
   const optOpen = RP_OPTIONAL.some((k) => d[k] && !isDefault(k, d[k])) ? ' open' : '';
   const num = (k, label, attrs = 'min="0" max="999"') => `<label class="field" for="rp-${fid}-${k}">${label}<input type="number" inputmode="${k === 'avg' ? 'decimal' : 'numeric'}" ${attrs} id="rp-${fid}-${k}" value="${esc(dv(k))}"></label>`;
@@ -958,9 +1145,13 @@ function reportForm(title, { fid, spec, pts, unit, planned, t0 }) {
     : `<label class="field" for="rp-${fid}-${k}">${label}<input type="text" id="rp-${fid}-${k}" placeholder="${esc(ph)}" value="${esc(dv(k))}"></label>`);
   const sel = (k, label, opts, def = '') => `<label class="field" for="rp-${fid}-${k}">${label}<select id="rp-${fid}-${k}">${opts.map(([v, l]) => `<option value="${esc(v)}" ${v === dv(k, def) ? 'selected' : ''}>${esc(l)}</option>`).join('')}</select></label>`;
   const prog = dv('progress');
-  return `<div class="panel rp"><h2>File a scrim report — ${esc(title)}</h2>
-    <p class="note">One report per sparring partner. Tap a chip where you can; "More details" is optional. Saved reports are fixed (add a correction instead). Performance notes only.</p>
+  const step = (n, label, hint) => `<div class="rpstep"><span class="rpn">${n}</span><div><b>${label}</b>${hint ? `<span class="note">${hint}</span>` : ''}</div></div>`;
+  // V1.29: three steps (result → story → check and save), the voice note first in step 2, what is still missing shown live.
+  return `<div class="panel rp" id="rpForm-${fid}"><h2>File a scrim report — ${esc(title)}</h2>
+    <p class="note">About a minute: tap the result, tell the story (speak or type), check and save. One report per sparring partner. Saved reports are fixed (add a correction instead). Performance notes only.</p>
     ${hasDraft ? `<p class="note draftnote">Draft kept on this device${d.at ? ` (last typed ${esc(new Date(d.at).toTimeString().slice(0, 5))})` : ''}. <button type="button" class="linkbtn" data-rp-clear="${esc(fid)}">Clear form</button></p>` : ''}
+    ${auto.partner ? `<p class="note draftnote">Filled from today's plan: vs ${esc(auto.partner)}. Change anything that is different.</p>` : ''}
+    ${step(1, 'Result', 'Who you played and the score.')}
     ${last ? `<div class="toolbar">${chip(fid, { partner: last.partner, level: last.partnerLevel, format: last.format, roster: last.roster, focus: last.focus, by: last.by }, 'Copy setup from last report', ' wide')}<span class="note">vs ${esc(last.partner)}, ${esc(last.date)}</span></div>` : ''}
     <div class="form">
       <label class="field" for="rp-${fid}-date">Date<input type="date" id="rp-${fid}-date" value="${esc(dv('date', t0))}" max="${t0}"></label>
@@ -968,27 +1159,28 @@ function reportForm(title, { fid, spec, pts, unit, planned, t0 }) {
         : `<label class="field" for="rp-${fid}-by">Written by<input type="text" id="rp-${fid}-by" list="staffNames" value="${esc(dv('by', meName()))}"></label>`}
       <label class="field" for="rp-${fid}-partner">Sparring partner<input type="text" id="rp-${fid}-partner" list="pbList-${fid}" placeholder="Team name, or internal" value="${esc(dv('partner'))}"></label>
     </div><datalist id="pbList-${fid}">${S.partners.filter((p) => p.title === title).map((p) => `<option value="${esc(p.name)}">${esc(p.level)}${p.resembles ? ` · like ${esc(p.resembles)}` : ''}</option>`).join('')}</datalist>
-    ${plannedToday.length || partners.length ? `<div class="chips"><span class="note">Quick pick:</span>${plannedToday.map((x) => chip(fid, { partner: x.partner, scrim: x.id, format: x.format, level: x.partnerLevel, ...(x.focus || plannedFocus(x) ? { focus: x.focus || plannedFocus(x) } : {}) }, `Planned today: ${x.partner}`, ' planned')).join('')}${partners.map((p) => chip(fid, { partner: p }, p)).join('')}</div>` : ''}
-    ${capUi().debriefSection(title, fid)}
-    ${capUi().gamesSection(title, fid)}
-    <div class="h3">Result</div>
+    ${plannedToday.length || partners.length ? `<div class="chips"><span class="note">Quick pick:</span>${plannedToday.map((x) => chip(fid, scrimValues(x), `Planned today: ${x.partner}`, ' planned')).join('')}${partners.map((p) => chip(fid, { partner: p }, p)).join('')}</div>` : ''}
+    ${capUi().gamesSection(title, fid)}${readSection(title, fid)}${rowsSection(title, fid, dv)}
     ${gameOf(title) && (S.cap?.[fid]?.ready || []).length ? '<p class="note">Filled from the confirmed games above.</p>' : ''}
-    ${pts || (gameOf(title) && (S.cap?.[fid]?.ready || []).length) ? '' : `<div class="chips"><span class="note">Quick score:</span>${scores.map(([l, w, lo, dr]) => chip(fid, { won: String(w), lost: String(lo), drawn: dr ? String(dr) : '' }, l)).join('')}</div>`}
+    ${pts || ['cs', 'foot'].includes(rowKind(title)) || (gameOf(title) && (S.cap?.[fid]?.ready || []).length) ? '' : `<div class="chips"><span class="note">Quick score:</span>${scores.map(([l, w, lo, dr]) => chip(fid, { won: String(w), lost: String(lo), drawn: dr ? String(dr) : '' }, l)).join('')}</div>`}
     <div class="form">
     ${pts ? `${num('played', 'Matches played')}${num('points', 'Total points')}` : `${num('won', `${esc(cap(unit))} won`)}${num('lost', `${esc(cap(unit))} lost`)}`}
     </div>
-    ${drillsSection(title, fid, dv)}
-    <div class="h3">Progress</div>
+    ${step(2, 'How it went', 'Speak or type once and let the AI fill the boxes, or fill them yourself.')}
+    ${capUi().debriefSection(title, fid)}
     ${last?.adjust ? `<div class="fixcheck"><span class="note">Last time (${esc(last.date)}, vs ${esc(last.partner)}) the adjustment was:</span> <b>${esc(last.adjust)}</b>
       <input type="hidden" id="rp-${fid}-prevadj" value="${esc(last.adjust)}">
       <div class="form">${sel('fix', 'Did we fix it?', [['', '—'], ...FIX_CHECK.map((x) => [x, x])])}</div>
       <div class="chips">${chip(fid, { focus: last.adjust }, "Make it today's focus")}</div></div>` : ''}
     ${txt('focus', 'What was this session meant to practise?', 'e.g. Early rotations; fallback drop; set-piece defending')}
     ${focuses.filter((f) => f !== last?.adjust).length ? `<div class="chips"><span class="note">Recent and active objectives:</span>${focuses.filter((f) => f !== last?.adjust).map((f) => chip(fid, { focus: f }, f.length > 48 ? `${f.slice(0, 46)}…` : f)).join('')}</div>` : ''}
+    <div class="form">${txt('worked', 'What worked', '', true)}${txt('failed', 'What failed', '', true)}</div>
+    ${tagsOf(title).length ? `<div class="chips"><span class="note">Add to what failed:</span>${tagsOf(title).map((w) => `<button type="button" class="chip" data-rp-add="${esc(JSON.stringify({ fid, k: 'failed', w }))}">${esc(w)}</button>`).join('')}</div>` : ''}
+    ${txt('adjust', 'Adjustment for the next session', 'One concrete change to try next time', true)}
+    ${drillsSection(title, fid, dv)}
+    ${step(3, 'Check and save', '')}
     <div class="field"><span id="rp-${fid}-proglabel">How closely did the team follow the plan?</span><input type="hidden" id="rp-${fid}-progress" value="${esc(prog)}">
       <div class="seg" role="group" aria-labelledby="rp-${fid}-proglabel">${PROGRESS.map(([n, l]) => `<button type="button" data-rp-prog="${esc(fid)}" data-v="${n}" aria-pressed="${String(prog) === String(n)}" title="${esc(l)}"><b>${n}</b> ${esc(PROG_SHORT[n])}</button>`).join('')}</div></div>
-    <div class="form">${txt('worked', 'What worked', '', true)}${txt('failed', 'What failed', '', true)}</div>
-    ${txt('adjust', 'Adjustment for the next session', 'One concrete change to try next time', true)}
     <details class="more"${optOpen}><summary>More details (optional)</summary><div class="form">
       <label class="field" for="rp-${fid}-time">Time<input type="text" id="rp-${fid}-time" placeholder="19:00 WIB" value="${esc(dv('time'))}"></label>
       ${sel('level', 'Partner level', [['', ''], ...['Tier 1 international', 'Tier 1 domestic', 'Tier 2', 'Academy / amateur'].map((x) => [x, x])])}
@@ -1000,7 +1192,8 @@ function reportForm(title, { fid, spec, pts, unit, planned, t0 }) {
       ${txt('detail', `${esc(spec.detail)} (optional)`, spec.hint)}
       ${txt('players', 'Player notes (optional, performance only)', 'e.g. Aran: strong first lane, hesitates on second tower')}
       ${txt('vod', 'VOD link or timestamp (optional)')}</details>
-    <div class="toolbar"><button class="btn primary" type="button" data-report-save="${esc(title)}">Save report</button><span class="msg" id="rpMsg-${fid}" role="status"></span></div></div>`;
+    <div class="savebar"><p class="note" id="rpLeft-${fid}" aria-live="polite">${esc(rpLeftText(rpMissing(fid, pts, { values: { ...auto, ...d, progress: prog } })))}</p>
+      <div class="toolbar"><button class="btn primary" type="button" data-report-save="${esc(title)}">Save report</button><span class="msg" id="rpMsg-${fid}" role="status"></span></div></div></div>`;
 }
 
 
@@ -2138,6 +2331,8 @@ function captureForms() {
     : el.tagName === 'INPUT' && el.value !== el.defaultValue);
   for (const el of m.querySelectorAll('input[id],select[id],textarea[id]')) {
     if (el.type === 'file' || (el.form === edit && edit && !dirty)) continue;
+    // V1.29: an untouched report box takes its new value (e.g. filled from today's plan once the plan has loaded).
+    if (/^rp-/.test(el.id) && el.tagName !== 'SELECT' && el.type !== 'hidden' && el.value === el.defaultValue) continue;
     vals[el.id] = el.type === 'checkbox' || el.type === 'radio' ? { c: el.checked } : { v: el.value };
   }
   const a = document.activeElement;
@@ -2768,6 +2963,24 @@ async function onClick(e) {
   }
   if (t.dataset.rpProg) { fillReport(t.dataset.rpProg, { progress: t.dataset.v }); return; }
   if (t.dataset.rpClear) { storeDraft(t.dataset.rpClear, {}); render(); return; }
+  if (t.dataset.mrOk || t.dataset.mrNo || t.dataset.mrDrop) { await mrClick(t); return; }
+  if (t.dataset.rrAdd || t.dataset.rrDel) { rowsClick(t); return; }
+  // V1.29: one-tap weakness word into "What failed"; the coach writes the rest of the line.
+  if (t.dataset.rpAdd) {
+    try { const { fid, k, w } = JSON.parse(t.dataset.rpAdd); const el = document.getElementById(`rp-${fid}-${k}`);
+      if (el) { const cur = el.value.trim(); if (!cur.toLowerCase().includes(w.toLowerCase())) el.value = cur ? `${cur}\n${w}: ` : `${w}: `; draftField(el); el.focus(); } } catch { /* malformed chip */ }
+    return;
+  }
+  // V1.29: "Log the result" on a planned session opens its report already set up (partner, format, focus, drills).
+  if (t.dataset.rpFromScrim) {
+    const x = S.scrims.find((s) => s.id === t.dataset.rpFromScrim); if (!x || !REPORT_TAB[x.title]) return;
+    const fid = sid(x.title); const d = rpDraft(fid);
+    const base = d.scrim === x.id ? d : (d.by ? { by: d.by } : {});
+    storeDraft(fid, { ...base, ...scrimValues(x), date: x.date <= localToday() ? x.date : localToday(), at: new Date().toISOString() });
+    location.hash = REPORT_TAB[x.title];
+    setTimeout(() => document.getElementById(`rpForm-${fid}`)?.scrollIntoView?.({ block: 'start' }), 80);
+    return;
+  }
   if (t.dataset.reportSave) {
     const title = t.dataset.reportSave; const fid = sid(title); const g = (k) => val(`rp-${fid}-${k}`);
     // V1.21: a second tap while the first save is still on its way would file the same report twice.
@@ -2784,7 +2997,7 @@ async function onClick(e) {
       const r = scrimReport({ title, date: g('date'), time: g('time'), by: g('by'), partner: g('partner'), partnerLevel: g('level'), format: g('format'), roster: g('roster'), scrimId: g('scrim') || newSession,
         won: g('won'), lost: g('lost'), drawn: g('drawn'), played: g('played'), points: g('points'), avgPlacement: g('avg'), chicken: g('chicken'),
         focus: g('focus'), progress: g('progress'), worked: g('worked'), failed: g('failed'), detail: g('detail'), playerNotes: g('players'), adjust: g('adjust'), vod: g('vod'), prevAdjust: g('prevadj'), fixCheck: g('fix'), asOf: localToday(),
-        drills: drillResults(blocksOfScrim(g('scrim')), [0, 1, 2, 3].map((i) => g(`dr${i}`))) });
+        drills: drillResults(blocksOfScrim(g('scrim')), [0, 1, 2, 3].map((i) => g(`dr${i}`))), rows: rrRows(g('rows')), comp: g('comp') });
       // Closing a planned session here avoids typing the same result twice.
       const sc = r.scrimId ? S.scrims.find((x) => x.id === r.scrimId && x.status === 'planned') : null;
       const done = sc ? completeScrim(sc, { score: resultText(r.result), notes: r.worked || r.failed, by: r.by, matchIds: [], perObjective: {} }) : null;
@@ -2797,8 +3010,9 @@ async function onClick(e) {
           catch (err) { render(); return setMsg(`rpMsg-${fid}`, `Report saved, but its daily session was not (${err.message}). Log it under Daily sessions if needed.`, 'err'); }
         }
       } else { S.reports.push(r); if (done) Object.assign(sc, done); }
-      const nGames = (S.cap?.[fid]?.ready || []).length;
+      const nGames = (S.cap?.[fid]?.ready || []).length + (readGameOf(title) ? mrState(fid).ready.length : 0);
       if (FEAT.coachAi) coUi().autoTag(r);   // V1.20: weakness labels in the background (one small AI call)
+      try { await mrAfterSave(title, fid, r); } catch (err) { render(); return setMsg(`rpMsg-${fid}`, `Report saved, but its screenshot results were not (${err.message}).`, 'err'); }
       try { await capUi().afterSave(title, fid, r); } catch (err) { render(); return setMsg(`rpMsg-${fid}`, `Report saved, but its games were not (${err.message}). They are kept on this device: use "Retry saving games" under Games.`, 'err'); }
       const keep = Object.fromEntries(RP_KEEP_AFTER_SAVE.map((k) => [k, g(k)]).filter(([, v]) => v));
       storeDraft(fid, { ...keep, at: new Date().toISOString() });
@@ -2923,10 +3137,10 @@ async function onClick(e) {
 // arriving from the shared database, a filter, the language switch — keeps what is being typed.
 document.addEventListener('click', async (e) => {
   const b = e.target.closest('button');
-  KEEP_FORMS = !b || b.id === 'langBtn' || b.id === 'modeBtn' || 'rpFill' in b.dataset || 'rpProg' in b.dataset || 'capMic' in b.dataset;
+  KEEP_FORMS = !b || b.id === 'langBtn' || b.id === 'modeBtn' || 'rpFill' in b.dataset || 'rpProg' in b.dataset || 'rpAdd' in b.dataset || 'capMic' in b.dataset;
   try { await onClick(e); } finally { KEEP_FORMS = true; }
 });
-for (const ev of ['input', 'change']) document.addEventListener(ev, (e) => draftField(e.target));
+for (const ev of ['input', 'change']) document.addEventListener(ev, (e) => { draftField(e.target); rowsInput(e.target); });
 
 document.addEventListener('change', (e) => {
   // V1.27 Brainstorm purpose and opponent.
@@ -2949,6 +3163,7 @@ document.addEventListener('change', (e) => {
   if (e.target.dataset?.drBookopp || e.target.dataset?.drCsvfile) { drUi().onChange(e); return; }
   if (e.target.dataset?.plPickday) { plUi().onChange(e); return; }
   if (e.target.dataset?.coBrFile) { coUi().onChange(e); return; }
+  if (e.target.dataset?.mrFile) { const title = e.target.dataset.mrFile; const files = [...(e.target.files || [])]; if (files.length) mrRead(title, files).catch((err) => { render(); setMsg(`mrMsg-${sid(title)}`, err.message, 'err'); }); return; }
   if (e.target.dataset?.capShot || e.target.dataset?.capDraft || e.target.dataset?.capMore || e.target.dataset?.patPeriod) { capUi().onChange(e); return; }
   const id = e.target.id;
   if (id === 'meSel') { S.me = e.target.value; try { localStorage.setItem('hub-me', S.me); } catch { /* per-viewer convenience only */ } render(); }

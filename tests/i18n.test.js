@@ -70,3 +70,10 @@ test('V1.9 report pages and title hubs are translated; data and option values st
   assert.doesNotMatch(main(), /Catatan: temuan analisis otomatis/, 'no engine-data note on report pages');
   const t = d.getElementById('titles').textContent; for (const x of ['MLBB Women', 'eFootball', 'CS2 Women']) assert.match(t, new RegExp(x));
 });
+
+test('V1.29 scrim report: steps and the live "still needed" line read in Bahasa Indonesia', () => {
+  assert.equal(tr('2 of 6 done — still needed: result, what worked or failed, adjustment, plan rating.'), '2 dari 6 selesai — masih perlu: hasil, yang berhasil atau gagal, penyesuaian, nilai rencana.');
+  assert.equal(tr('Everything needed is filled in. Ready to save.'), 'Semua yang wajib sudah diisi. Siap disimpan.');
+  assert.equal(tr("Filled from today's plan: vs Team Q. Change anything that is different."), 'Diisi dari rencana hari ini: vs Team Q. Ubah yang berbeda.');
+  assert.equal(tr('Log the result (scrim report)'), 'Catat hasil (laporan scrim)');
+});

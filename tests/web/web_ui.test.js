@@ -425,3 +425,33 @@ test("Coach Donny's system inside the hub: staff sign-in, team saved once in the
   const indra = await open(B, 'indra', 'readiness'); await sleep(100);
   assert.match(indra.text(), /Restricted/); assert.equal(indra.d.querySelector('.donny-host'), null);
 });
+
+test('V1.29 frictionless report: "Log the result" on a planned session opens the report set up; the form says live what is still needed', async () => {
+  const B = world(); const today = localDay();
+  const plan = { id: 'SC-fr', title: 'MLBB', date: today, time: '19:00 WIB', kind: 'scrim', partner: 'Team Q', format: 'Bo3', focus: 'Vision before lord', owner: 'Coach Indra', status: 'planned', objectives: [], blocks: [], origin: 'operational' };
+  await B.client(people.indra.id).from('scrim_sessions').insert({ id: plan.id, data: plan });
+  const c = await open(B, 'indra', 'mlbb-scrims');
+  for (let i = 0; i < 40 && !c.d.querySelector('[data-rp-from-scrim="SC-fr"]'); i++) await sleep(50);
+  c.d.querySelector('[data-rp-from-scrim="SC-fr"]').click(); await sleep(150);
+  assert.equal(c.w.location.hash, '#mlbb-reports');
+  const f = (k) => c.d.getElementById(`rp-MLBB-${k}`);
+  assert.equal(f('partner').value, 'Team Q'); assert.equal(f('focus').value, 'Vision before lord'); assert.equal(f('scrim').value, 'SC-fr');
+  const left = () => c.d.getElementById('rpLeft-MLBB').textContent;
+  assert.match(left(), /2 of 6 done — still needed: result, what worked or failed, adjustment, plan rating\./);
+  [...c.d.querySelectorAll('.chip')].find((b) => b.textContent === '2-1').click(); await sleep(30);
+  c.d.querySelector('[data-rp-add*="vision"]').click(); assert.match(f('failed').value, /^vision: $/);
+  c.set('rp-MLBB-failed', 'vision: no wards before lord'); c.set('rp-MLBB-adjust', 'Ward river at 7:30');
+  c.d.querySelector('[data-rp-prog="MLBB"][data-v="4"]').click(); await sleep(30);
+  assert.match(left(), /Everything needed is filled in/);
+  c.d.querySelector('[data-report-save="MLBB"]').click();
+  for (let i = 0; i < 40 && !B.tables.scrim_reports.length; i++) await sleep(50);
+  const r = B.tables.scrim_reports[0].data; assert.equal(r.partner, 'Team Q'); assert.equal(r.scrimId, 'SC-fr'); assert.deepEqual([r.result.won, r.result.lost], [2, 1]);
+  for (let i = 0; i < 40 && B.tables.scrim_sessions.find((x) => x.id === 'SC-fr').data.status === 'planned'; i++) await sleep(50);
+  assert.equal(B.tables.scrim_sessions.find((x) => x.id === 'SC-fr').data.status, 'done', 'the planned session is closed by the report');
+  // Nothing typed yet and exactly one session planned today: the form starts from it by itself.
+  const plan2 = { ...plan, id: 'SC-fr2', partner: 'Team R' };
+  await B.client(people.indra.id).from('scrim_sessions').insert({ id: plan2.id, data: plan2 });
+  const c2 = await open(B, 'indra', 'mlbb-reports');
+  for (let i = 0; i < 40 && !/Filled from today's plan/.test(c2.text()); i++) await sleep(50);
+  assert.match(c2.text(), /Filled from today's plan: vs Team R/); assert.equal(c2.d.getElementById('rp-MLBB-partner').value, 'Team R');
+});

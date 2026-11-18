@@ -7,7 +7,7 @@
 // Rules the prompts enforce: read only what is on the screen, never guess a number, mark what is
 // unclear. The coach confirms every value before it is saved; nothing here writes a record by itself.
 
-export const PROMPT_VERSION = 'scrim-ai-2026-11-28.1';   // V1.26 plan blocks, debrief drills, weekly, meta_extract, meta_fit; V1.27 prematch, scout_day, brainstorm
+export const PROMPT_VERSION = 'scrim-ai-2026-11-28.2';   // V1.30 match_result (eFootball, CS2); V1.26 plan blocks, debrief drills, weekly, meta_extract, meta_fit; V1.27 prematch, scout_day, brainstorm
 export const DEFAULT_MODEL = 'claude-sonnet-5-5';
 
 // Titles with screenshot capture. MLBB Women plays the same game client as MLBB.
@@ -183,6 +183,57 @@ export const brResultSchema = () => obj({
   lobby: { type: 'array', items: obj({ rank: int, team_name: str, kills: int, points: int }) },
   notes: str,
 });
+
+// V1.30: result screens of the other titles (eFootball match stats, CS2 scoreboard). Same rule: -1 = not shown.
+export const READ_GAMES = { eFootball: 'efootball', CS2: 'cs2', 'CS2 Women': 'cs2' };
+export const readGameOf = (title) => READ_GAMES[title] || null;
+export const FOOTBALL_STATS = ['possession', 'shots', 'shots_on_target', 'passes', 'successful_passes', 'tackles', 'interceptions', 'fouls', 'offsides', 'corners', 'free_kicks', 'saves'];
+export const CS_STATS = ['kills', 'deaths', 'assists', 'adr', 'hs_pct', 'mvps', 'score'];
+export function matchResultSchema(game) {
+  if (game === 'efootball') {
+    return obj({
+      screen_kind: { type: 'string', enum: ['match_stats', 'final_score', 'other'] }, readable: { type: 'boolean' },
+      home_name: str, away_name: str, home_goals: int, away_goals: int,
+      penalties: obj({ home: int, away: int }),
+      stats: obj(Object.fromEntries(FOOTBALL_STATS.map((k) => [k, obj({ home: int, away: int })]))),
+      notes: str,
+    });
+  }
+  if (game === 'cs2') {
+    return obj({
+      screen_kind: { type: 'string', enum: ['scoreboard', 'other'] }, readable: { type: 'boolean' },
+      map: str, team_a_name: str, team_b_name: str, rounds_a: int, rounds_b: int,
+      players: { type: 'array', items: obj({ team: { type: 'string', enum: ['a', 'b', 'unknown'] }, name_seen: str,
+        ...Object.fromEntries(CS_STATS.map((k) => [k, k === 'adr' || k === 'hs_pct' ? { type: 'number' } : int])), uncertain: { type: 'boolean' } }) },
+      notes: str,
+    });
+  }
+  throw new Error(`No screenshot reading for ${game}.`);
+}
+export function matchResultPrompt(game) {
+  if (game === 'efootball') {
+    return [
+      'You read one eFootball screenshot taken by a national-team coach after a scrim match and return what it shows as JSON.',
+      'Screens: MATCH STATS (screen_kind "match_stats"): both team names, the score, and a list of statistics with the home value on the left and the away value on the right (possession %, shots, shots on target, passes, successful passes, tackles, interceptions, fouls, offsides, corner kicks, free kicks, saves). FINAL SCORE (screen_kind "final_score"): names and score only.',
+      'Rules:',
+      '- Read only what is visible. Never estimate or complete a number: use -1 for any value that is not shown or not readable. possession is the percentage number without the % sign.',
+      '- home_* is the LEFT team, away_* the RIGHT team, exactly as on screen. penalties: the shoot-out score if shown, else -1 for both.',
+      '- home_name / away_name: as printed (user names or club names), "" if not shown.',
+      '- notes: one short sentence about anything the coach must check (cropped, blurred, a statistic missing). Empty if none.',
+      '- If the screenshot is not a result screen, return screen_kind "other", readable=false and -1 everywhere.',
+    ].join('\n');
+  }
+  return [
+    'You read one Counter-Strike 2 scoreboard screenshot taken by a national-team coach after a scrim map and return what it shows as JSON.',
+    'The scoreboard lists two teams (usually Counter-Terrorists and Terrorists, or team names) with the rounds each team won, and per player: name, kills, deaths, assists, sometimes ADR (average damage per round), HS% (headshot percentage), MVP stars and score.',
+    'Rules:',
+    '- Read only what is visible. Never estimate or complete a number: use -1 for any value not shown or not readable, and set uncertain=true on that player.',
+    '- team_a is the team listed FIRST (top or left), team_b the second. rounds_a / rounds_b: the rounds each won, -1 if not shown. map: the map name if shown (Mirage, Inferno, Nuke, Ancient, Anubis, Dust2, Train...), else "".',
+    '- players: up to 10, in screen order, each with team "a" or "b" by the block it is listed in. name_seen exactly as printed, including team tags.',
+    '- notes: one short sentence about anything the coach must check. Empty if none.',
+    '- If the screenshot is not a scoreboard, return screen_kind "other", readable=false and an empty players list.',
+  ].join('\n');
+}
 
 export const FINDING_KINDS = ['problem', 'strength', 'tendency', 'opponent'];
 export const digestSchema = () => obj({

@@ -51,7 +51,7 @@ test('scouting AI material: ids for brief, live log and counts; day material per
 });
 
 test('brainstorm: plan material with ids; replies checked (sources, unverified numbers, suggestions); session text', () => {
-  const r = scrimReport({ title: 'MLBB', date: '2026-11-20', by: 'Indra', partner: 'Team X', focus: 'f', progress: 3, failed: 'no vision at lord', adjust: 'ward early', won: 1, lost: 2, fixCheck: 'No change', prevAdjust: 'ward early' });
+  const r = { ...scrimReport({ title: 'MLBB', date: '2026-11-20', by: 'Indra', partner: 'Team X', focus: 'f', progress: 3, failed: 'no vision at lord', adjust: 'ward early', won: 1, lost: 2, fixCheck: 'No change', prevAdjust: 'ward early' }), id: 'RP-20261120-abcd' };   // fixed id: a random one could contain the digit under test
   const wt = [1, 2, 3].map((i) => ({ title: 'MLBB', reportId: `R${i}`, date: `2026-11-1${7 + i}`, tags: ['vision'] }));
   const M = planBrainMaterial('MLBB', { reports: [r], wtags: wt, asOf: '2026-11-21' });
   const ids = materialIds(M); assert.ok(ids.has(r.id) && ids.has('WK-vision') && ids.has('TREND'));

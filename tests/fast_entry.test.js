@@ -74,8 +74,9 @@ test('quick picks, progress buttons, highlighted errors, kept setup and drafts',
   // Last report's adjustment is one tap away as the next focus (V1.17 "Did we fix it?" block)
   const cont = [...d.querySelectorAll('.chip')].find((b) => b.textContent === "Make it today's focus"); assert.ok(cont, 'focus chip'); cont.click(); await h.wait();
   assert.equal(d.getElementById('rp-MLBB-focus').value, 'Faster turtle');
-  // "Say it once" comes before the games and the result
-  const html = d.querySelector('.panel.rp').innerHTML; assert.ok(html.indexOf('Say it once') < html.indexOf('>Result<'));
+  // V1.29: step 1 is the result, step 2 starts with "Say it once"; the Save bar says what is still needed
+  const html = d.querySelector('.panel.rp').innerHTML; assert.ok(html.indexOf('>Result<') < html.indexOf('Say it once'));
+  assert.match(d.getElementById('rpLeft-MLBB').textContent, /of 6 done|Ready to save/);
 });
 
 test('a session planned for today is one tap: partner filled and the session closed on save', async () => {

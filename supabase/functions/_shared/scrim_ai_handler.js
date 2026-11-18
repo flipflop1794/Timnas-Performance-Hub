@@ -14,12 +14,12 @@ import {
   scoreboardPrompt, draftPrompt, debriefPrompt, digestPrompt, planPrompt, messagesRequest, imageBlock, parseModelJson, usageOf, capturePath,
   tagsSchema, tagsPrompt, tagsOf, summarySchema, summaryPrompt, prepSchema, prepPrompt, brResultSchema, brResultPrompt,
   weeklySchema, weeklyPrompt, metaExtractSchema, metaExtractPrompt, metaFitSchema, metaFitPrompt,
-  prematchSchema, prematchPrompt, scoutDaySchema, scoutDayPrompt, brainstormSchema, brainstormPrompt,
+  prematchSchema, prematchPrompt, scoutDaySchema, scoutDayPrompt, brainstormSchema, brainstormPrompt, readGameOf, matchResultSchema, matchResultPrompt,
 } from './scrim_spec.js';
 
 // V1.20: summary (weekly, all titles), prep (one WEC match), tags (weakness labels), br_result (PUBG Mobile screenshot).
-const ACTIONS = ['scoreboard', 'draft', 'debrief', 'digest', 'plan', 'summary', 'prep', 'tags', 'br_result', 'weekly', 'meta_extract', 'meta_fit', 'prematch', 'scout_day', 'brainstorm'];
-const IMAGE_ACTIONS = ['scoreboard', 'draft', 'br_result'];
+const ACTIONS = ['scoreboard', 'draft', 'debrief', 'digest', 'plan', 'summary', 'prep', 'tags', 'br_result', 'weekly', 'meta_extract', 'meta_fit', 'prematch', 'scout_day', 'brainstorm', 'match_result'];
+const IMAGE_ACTIONS = ['scoreboard', 'draft', 'br_result', 'match_result'];
 // Calls per day (WIB) for the whole staff, unless the TEAM_DAILY_CALL_CAP secret says otherwise.
 export const TEAM_DAILY_CAP = 600;
 export const RETRIES = 2;
@@ -66,6 +66,7 @@ export async function handle(req, deps) {
   const game = gameOf(title);
   if (['scoreboard', 'draft'].includes(action) && !game) return fail(400, `Screenshot capture is not set up for ${title}.`);
   if (action === 'br_result' && title !== 'PUBG Mobile') return fail(400, 'This screenshot reader is for PUBG Mobile.');
+  if (action === 'match_result' && !readGameOf(title)) return fail(400, `Screenshot reading is not set up for ${title}.`);
   // The weekly summary covers every title: only those who write every title (Head Coach, admin) may ask for it.
   const allTitles = action === 'summary';
   if (!allTitles && (typeof title !== 'string' || !title)) return fail(400, 'Title is required.');
@@ -94,6 +95,10 @@ export async function handle(req, deps) {
       if (action === 'br_result') {
         request = messagesRequest({ model, system: brResultPrompt(), schema: brResultSchema(), maxTokens: 2048,
           content: [imageBlock(body.image.data, mediaType), { type: 'text', text: 'Title: PUBG Mobile. Read this end-of-match screen.' }] });
+      } else if (action === 'match_result') {
+        const rg = readGameOf(title);
+        request = messagesRequest({ model, system: matchResultPrompt(rg), schema: matchResultSchema(rg), maxTokens: 2048,
+          content: [imageBlock(body.image.data, mediaType), { type: 'text', text: `Title: ${title}. Read this end-of-match screen.` }] });
       } else {
         const names = deps.heroes[game] || [];
         request = messagesRequest({

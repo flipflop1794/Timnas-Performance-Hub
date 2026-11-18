@@ -1,5 +1,6 @@
 import { hasContactNumber } from './pii.js';
 import { localDay } from './dates.js';
+import { cleanRows, rowsFields, rowsText, tiesOf } from './comp_rows.js';
 // Daily scrim reports: what a coach writes after a scrim session. One report = one session
 // (one sparring partner). The daily roll-up groups the day's sessions. Reports are never edited
 // or deleted: a mistake is fixed with a dated correction note, so the record stays trustworthy.
@@ -43,6 +44,10 @@ export function scrimReport(x) {
   need(Number(x.progress) >= 1 && Number(x.progress) <= 5, 'Rate how closely the team followed the plan (1 to 5).');
   need((x.worked || '').trim() || (x.failed || '').trim(), 'Write what worked or what failed.');
   need(x.adjust && x.adjust.trim(), 'Write the adjustment for the next session.');
+  // V1.31: rows per map / match / game on competitive settings; when given, they decide the result.
+  const rows = cleanRows(x.title, x.rows);
+  const rf = rowsFields(x.title, rows);
+  if (rf) x = { ...x, ...(rf.played ? { played: rf.played, points: rf.points, avgPlacement: rf.avg, chicken: rf.chicken } : { won: rf.won, lost: rf.lost, drawn: rf.drawn }) };
   let result;
   if (spec.mode === 'points') {
     const played = int(x.played, 'Matches played'); const points = int(x.points, 'Points');
@@ -65,6 +70,7 @@ export function scrimReport(x) {
     detail: plain(x.detail), worked: plain(x.worked), failed: plain(x.failed),
     playerNotes: clean(x.playerNotes, 'Player notes'), adjust: plain(x.adjust),
     prevAdjust: plain(x.prevAdjust).slice(0, 400), fixCheck: FIX_CHECK.includes(x.fixCheck) ? x.fixCheck : '',
+    ...(rows.length ? { rows } : {}), ...(tiesOf(x.title, rows) ? { ties: tiesOf(x.title, rows) } : {}), ...(['yes', 'no'].includes(x.comp) ? { comp: x.comp } : {}),
     vod: (x.vod || '').trim(), scrimId: x.scrimId || '', notes: [], origin: 'operational', createdAt: new Date().toISOString(),
     // V1.26: the coach's call per planned drill: met yes / no / not tried.
     drills: (Array.isArray(x.drills) ? x.drills : []).filter((d) => d && d.name && ['yes', 'no', 'not tried'].includes(d.met)).slice(0, 4)
@@ -140,10 +146,10 @@ const noteDay = (at) => { const d = new Date(at); return Number.isNaN(d.getTime(
 // The byte-order mark tells Excel the file is UTF-8, so names like "Türkiye" and dashes are not garbled.
 export const CSV_BOM = '﻿';
 export function reportsCsv(reports, { bom = false } = {}) {
-  const head = ['id', 'date', 'time', 'title', 'coach', 'partner', 'partner_level', 'format', 'roster', 'won', 'lost', 'drawn', 'matches_played', 'points', 'avg_placement', 'plan_followed_1_5', 'focus', 'detail', 'worked', 'failed', 'player_notes', 'next_adjustment', 'previous_adjustment', 'previous_adjustment_check', 'vod', 'corrections', 'drills'];
+  const head = ['id', 'date', 'time', 'title', 'coach', 'partner', 'partner_level', 'format', 'roster', 'won', 'lost', 'drawn', 'matches_played', 'points', 'avg_placement', 'plan_followed_1_5', 'focus', 'detail', 'worked', 'failed', 'player_notes', 'next_adjustment', 'previous_adjustment', 'previous_adjustment_check', 'vod', 'corrections', 'drills', 'per_map_or_match', 'competitive_settings'];
   const rows = [...reports].sort((a, b) => a.date.localeCompare(b.date) || a.createdAt.localeCompare(b.createdAt)).map((r) => {
     const p = r.result.mode === 'points';
-    return [r.id, r.date, r.time, r.title, r.by, r.partner, r.partnerLevel, r.format, r.roster, p ? '' : r.result.won, p ? '' : r.result.lost, p ? '' : r.result.drawn, p ? r.result.played : '', p ? r.result.points : '', p ? (r.result.avgPlacement ?? '') : '', r.progress, r.focus, r.detail, r.worked, r.failed, r.playerNotes, r.adjust, r.prevAdjust || '', r.fixCheck || '', r.vod, (r.notes || []).map((n) => `${noteDay(n.at)} ${n.by}: ${n.text}`).join(' | '), (r.drills || []).map((d) => `${d.name}: ${d.met}`).join(' | ')];
+    return [r.id, r.date, r.time, r.title, r.by, r.partner, r.partnerLevel, r.format, r.roster, p ? '' : r.result.won, p ? '' : r.result.lost, p ? '' : r.result.drawn, p ? r.result.played : '', p ? r.result.points : '', p ? (r.result.avgPlacement ?? '') : '', r.progress, r.focus, r.detail, r.worked, r.failed, r.playerNotes, r.adjust, r.prevAdjust || '', r.fixCheck || '', r.vod, (r.notes || []).map((n) => `${noteDay(n.at)} ${n.by}: ${n.text}`).join(' | '), (r.drills || []).map((d) => `${d.name}: ${d.met}`).join(' | '), rowsText(r.title, r.rows), r.comp || ''];
   });
   // CRLF line ends: what Excel on Windows expects; other tools read it too.
   return (bom ? CSV_BOM : '') + [head, ...rows].map((row) => row.map(csvCell).join(',')).join('\r\n');

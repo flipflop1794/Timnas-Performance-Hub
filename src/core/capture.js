@@ -24,6 +24,11 @@ export const STAT_DEFS = {
     { key: 'hero_damage', label: 'Hero dmg', higher: true, trail: true }, { key: 'damage_taken', label: 'Dmg taken', higher: null, trail: false },
     { key: 'tower_damage', label: 'Turret dmg', higher: true, trail: false },
   ],
+  // V1.30: CS2 scoreboard (src/core/match_read.js); no screenshot confirm screen of its own, used by Trends.
+  cs2: [
+    { key: 'kills', label: 'K', higher: true, trail: true }, { key: 'deaths', label: 'D', higher: false, trail: true }, { key: 'assists', label: 'A', higher: true, trail: true },
+    { key: 'adr', label: 'ADR', higher: true, trail: true, decimal: true },
+  ],
   dota: [
     { key: 'kills', label: 'K', higher: true, trail: true }, { key: 'deaths', label: 'D', higher: false, trail: true }, { key: 'assists', label: 'A', higher: true, trail: true },
     { key: 'gold', label: 'Net worth', higher: true, trail: true }, { key: 'last_hits', label: 'LH', higher: true, trail: true }, { key: 'denies', label: 'DN', higher: true, trail: false },

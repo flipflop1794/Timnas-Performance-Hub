@@ -54,7 +54,7 @@ test('a coach files a report: saved, shown by day, closes the planned session, c
   await h.go('mlbb-reports');
   const f = (k, v) => { d.getElementById(`rp-MLBB-${k}`).value = v; };
   d.querySelector('[data-report-save="MLBB"]').click(); await h.wait();
-  assert.match(d.getElementById('rpMsg-MLBB').textContent, /Who wrote|sparring partner/);
+  assert.match(d.getElementById('rpMsg-MLBB').textContent, /Who wrote|sparring partner|practise/);   // V1.29: partner comes from today's plan
   assert.equal([...db.store.keys()].filter((k) => k.startsWith('scrim_reports/')).length, 0, 'nothing saved when incomplete');
   f('by', 'Coach Indra'); f('partner', 'Team X'); f('won', '2'); f('lost', '1'); f('focus', 'Early rotations'); f('progress', '4'); f('worked', 'Lane swaps'); f('adjust', 'Faster turtle setup'); f('players', 'Aran: strong first lane'); f('scrim', planned[0][1].id);
   d.querySelector('[data-report-save="MLBB"]').click(); await h.wait();

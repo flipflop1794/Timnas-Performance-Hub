@@ -66,6 +66,26 @@ export function teamTrends(title, ctx, W) {
   const pts = reps.filter((r) => r.result?.mode === 'points' && r.result.played);
   if (pts.length) out.push(series({ key: 'ppm', label: 'Points per match (reports)', type: 'mean', better: 'up' }, pts.map((r) => ({ date: r.date, v: r.result.points / r.result.played })), W));
   if (reps.length) out.push(series({ key: 'plan', label: 'Plan followed (1–5)', type: 'mean', better: 'up' }, reps.map((r) => ({ date: r.date, v: Number(r.progress) })), W));
+  // V1.31 per-match rows in the reports (eFootball goals, PUBG Mobile placement and eliminations); V1.30 screenshot
+  // stats for eFootball possession and shots on target.
+  const rowsOf = (pred) => reps.flatMap((r) => (r.rows || []).filter(pred).map((x) => ({ ...x, date: r.date })));
+  const fr = title === 'eFootball' ? rowsOf((x) => x.us != null) : [];
+  if (fr.length) {
+    out.push(series({ key: 'gf', label: 'Goals scored per match', type: 'mean', better: 'up' }, fr.map((x) => ({ date: x.date, v: x.us })), W));
+    out.push(series({ key: 'ga', label: 'Goals conceded per match', type: 'mean', better: 'down' }, fr.map((x) => ({ date: x.date, v: x.them })), W));
+  }
+  const foot = (ctx.games || []).filter((g) => g.title === title && g.game === 'efootball' && g.stats);
+  if (foot.length) {
+    const st = (k) => foot.map((g) => ({ date: g.date, v: g.stats?.[k]?.ours ?? null }));
+    out.push(series({ key: 'poss', label: 'Possession % (screenshots)', type: 'mean', better: 'up' }, st('possession'), W));
+    out.push(series({ key: 'sot', label: 'Shots on target per match', type: 'mean', better: 'up' }, st('shots_on_target'), W));
+  }
+  const br = title === 'PUBG Mobile' ? rowsOf((x) => x.place != null) : [];
+  if (br.length) {
+    out.push(series({ key: 'brpp', label: 'Placement points per match', type: 'mean', better: 'up' }, br.map((x) => ({ date: x.date, v: x.pts - x.kills })), W));
+    out.push(series({ key: 'brel', label: 'Eliminations per match', type: 'mean', better: 'up' }, br.map((x) => ({ date: x.date, v: x.kills })), W));
+    out.push(series({ key: 'brpl', label: 'Average placement (reports)', type: 'mean', better: 'down' }, br.map((x) => ({ date: x.date, v: x.place })), W));
+  }
   const P = ctx.pubgm;
   if (P && P.rows?.length && P.team) {
     const mine = P.rows.filter((r) => r.team === P.team && r.date);
@@ -82,7 +102,7 @@ export function teamTrends(title, ctx, W) {
 export function playerTrends(games, W) {
   if (!games.length) return [];
   const defs = STAT_DEFS[games[0].game] || [];
-  const pick = ['kills', 'deaths', 'assists'].map((k) => defs.find((d) => d.key === k)).filter(Boolean);
+  const pick = ['kills', 'deaths', 'assists', 'adr'].map((k) => defs.find((d) => d.key === k)).filter(Boolean);
   const players = {};
   for (const g of games) for (const p of g.players || []) if (p.team === 'ours' && p.player && p.player !== 'stand-in') (players[p.player] ||= []).push({ g, p });
   return Object.entries(players).sort((a, b) => a[0].localeCompare(b[0])).map(([player, rows]) => {
