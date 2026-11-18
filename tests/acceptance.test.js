@@ -74,7 +74,7 @@ test('AC1 synthetic data is blocked from every operational path', async () => {
 
 // 2. An unreviewed objective is visibly proposed.
 test('AC2 an engine proposal sent to review shows as proposed everywhere', async () => {
-  const h = await hub('dota-team');
+  const h = await hub('staff-cycle');   // V1.33: Dota proposals are on the Coaching cycle page
   const btn = h.d.querySelector('[data-propose]'); assert.ok(btn, 'a proposal button exists');
   await h.click(btn);
   const saved = [...h.db.store.entries()].filter(([k]) => k.startsWith('cycle/'));
@@ -87,7 +87,7 @@ test('AC2 an engine proposal sent to review shows as proposed everywhere', async
 
 // 3 + 4. Coach can modify/reject with a preserved reason; sessions link to objective and next decision.
 test('AC3/AC4 review reasons are kept and sessions link forward to decisions', async () => {
-  const h = await hub('dota-team');
+  const h = await hub('staff-cycle');   // V1.33: Dota proposals are on the Coaching cycle page
   await h.click(h.d.querySelector('[data-propose]'));
   await h.go('staff-cycle');
   const id = [...h.db.store.keys()].find((k) => k.startsWith('cycle/')).split('/')[1];
@@ -149,7 +149,7 @@ test('AC7 changing a rule profile flags affected views and objectives', async ()
   assert.ok(affected.includes('pubgm-sim'));
   assert.equal(changedSince(snap, rules)[0].to, 'WEC26 v1');
   assert.throws(() => updateRule(DEFAULT_RULES, 'pubgm-scoring', { version: 'x' }, { by: '', reason: 'r' }), /name/);
-  const h = await hub('dota-team');
+  const h = await hub('staff-cycle');   // V1.33: Dota proposals are on the Coaching cycle page
   await h.click(h.d.querySelector('[data-propose]'));
   await h.go('staff-rules');
   h.d.getElementById('ruId').value = 'dota-patch'; h.d.getElementById('ruVer').value = '7.41e'; h.d.getElementById('ruSt').value = 'provisional';

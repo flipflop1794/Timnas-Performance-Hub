@@ -139,8 +139,8 @@ const focusOn = () => !!HUB_USER && !S.showAll;   // the website (coaches); the 
 // V1.32 less noise: Weaknesses and Patterns open from the Analysis tab (sub-links on the page); per-title
 // Competitors notes live under Competitors → Notes per title. Their links keep working.
 const SUB_OF = {};
-for (const team of ['dota', 'pubgm', 'mlbb', 't-mlbbw', 't-efootball', 't-cs2', 't-cs2w']) { SUB_OF[`${team}-weak`] = `${team}-trends`; SUB_OF[`${team}-patterns`] = `${team}-trends`; }
-const BAR_HIDE = new Set(['mlbb-rivals', 't-mlbbw-rivals', 't-efootball-rivals', 't-cs2-rivals', 't-cs2w-rivals', 'pubgm-rivals']);
+for (const team of ['dota', 'pubgm', 'mlbb', 't-mlbbw', 't-efootball', 't-cs2', 't-cs2w']) { SUB_OF[`${team}-weak`] = `${team}-trends`; SUB_OF[`${team}-patterns`] = `${team}-trends`; SUB_OF[`${team}-brain`] = `${team}-trends`; }
+const BAR_HIDE = new Set(['mlbb-rivals', 't-mlbbw-rivals', 't-efootball-rivals', 't-cs2-rivals', 't-cs2w-rivals', 'pubgm-rivals', 'dota-scout']);
 const tabShown = (id, view) => (SUB_OF[id] ? false : BAR_HIDE.has(id) ? id === view : !focusOn() || !FOCUS_HIDE.has(id) || id === view);
 const canSetDates = () => !HUB_USER || HUB_USER.isAdmin || HUB_USER.roles.includes('head_coach');
 const plUi = () => (PL ||= pelatnasUi({ S, esc, tag, banner, setMsg, val, render, meName, sid, localDay, shiftDay, titleVisible: (t) => titleVisible(t), canSetDates }));
@@ -206,7 +206,7 @@ function coachPanel(o) {
     <ul class="plain note">${o.verdict.missing.map((m) => `<li>${esc(m)}</li>`).join('')}</ul>
     <p class="note"><b>${esc(o.verdict.humanReview)}</b></p></div>`;
 }
-const CLUB_BANNER = banner('real', '<div><b>Real data, club context.</b> OpenDota tournament lobbies since patch 7.41 — the players\' club games, not the national five together. Nothing here describes national-team performance.</div>');
+const CLUB_BANNER = '<details class="howto"><summary>Club data (OpenDota, patch 7.41), not national-team performance</summary><p class="note"><b>Real data, club context.</b> OpenDota tournament lobbies since patch 7.41 — the players\' club games, not the national five together. Nothing here describes national-team performance.</p></details>';
 const DEMO_BANNER = banner('synth', '<div><b>DEMO SANDBOX — synthetic data.</b> Shown only to demonstrate the software. It never feeds Today, objectives, the coaching cycle, measurement or exports.</div>');
 function rulesFlag(view) {
   const p = provisional(S.rules, view);
@@ -1335,14 +1335,14 @@ V['pubgm-reports'] = () => reportsPanel('PUBG Mobile');
 V['pubgm-rivals'] = () => competitorsPanel('PUBG Mobile');
 const ANA_TITLE = { dota: 'Dota 2', pubgm: 'PUBG Mobile', mlbb: 'MLBB', 't-mlbbw': 'MLBB Women', 't-efootball': 'eFootball', 't-cs2': 'CS2', 't-cs2w': 'CS2 Women' };
 function anaNav(team, here) {
-  const items = [['trends', 'Trends'], ...(V[`${team}-weak`] && FEAT.coachAi ? [['weak', 'Weaknesses']] : []), ...(V[`${team}-patterns`] && FEAT.capture ? [['patterns', 'Patterns']] : [])];
+  const items = [['trends', 'Trends'], ...(V[`${team}-weak`] && FEAT.coachAi ? [['weak', 'Weaknesses']] : []), ...(V[`${team}-patterns`] && FEAT.capture ? [['patterns', 'Patterns']] : []), ...(V[`${team}-brain`] && FEAT.brainAi ? [['brain', 'Ask the AI (Brainstorm)']] : [])];
   return items.length > 1 ? `<nav class="subnav" aria-label="Analysis">${items.map(([k, l]) => `<a href="#${team}-${k}" ${k === here ? 'aria-current="page"' : ''}>${esc(l)}</a>`).join('')}</nav>` : '';
 }
-for (const team of Object.keys(ANA_TITLE)) for (const k of ['trends', 'weak', 'patterns']) { const f = V[`${team}-${k}`]; if (f) V[`${team}-${k}`] = () => anaNav(team, k) + f(); }
+for (const team of Object.keys(ANA_TITLE)) for (const k of ['trends', 'weak', 'patterns', 'brain']) { const f = V[`${team}-${k}`]; if (f) V[`${team}-${k}`] = () => anaNav(team, k) + f(); }
 V['comp-title'] = () => {
   const ts = WEC_TITLES.map((t) => t.id).filter((t) => titleVisible(t));
   const t = ts.includes(S.compTitle) ? S.compTitle : ts[0];
-  return `<nav class="subnav" aria-label="Title">${ts.map((x) => `<button type="button" data-comp-title="${esc(x)}" aria-pressed="${x === t}">${esc(x)}</button>`).join('')}</nav>${t ? competitorsPanel(t) : ''}`;
+  return `<nav class="subnav" aria-label="Title">${ts.map((x) => `<button type="button" data-comp-title="${esc(x)}" aria-pressed="${x === t}">${esc(x)}</button>`).join('')}</nav>${t === 'Dota 2' ? dotaScout() : ''}${t ? competitorsPanel(t) : ''}<div class="toolbar"><a class="btn" href="#comp-card">Open the opponent card</a></div>`;
 };
 
 V['dota-team'] = () => {
@@ -1352,12 +1352,10 @@ V['dota-team'] = () => {
     ${d.pools.map((p) => `<tr><td><b>${esc(p.player)}</b><br><span class="note">acc ${p.account}</span></td><td>${esc(p.posLabel)}</td><td class="n">${p.games}</td>
       <td><div class="chips">${p.pool.filter((e) => e.tier === 'Established').sort((a, b) => b.games - a.games).slice(0, 7).map((e) => `<span class="chip ${e.stale ? 'stale' : ''}" title="last played ${e.daysSince} days before ${esc(SHIPPED)}">${esc(e.name)} <small>${e.games}</small></span>`).join('')}</div></td>
       <td class="note">${S.freshPools[p.player] ? `refreshed ${esc(S.freshPools[p.player].slice(0, 10))}` : `retrieved ${SHIPPED}`}</td></tr>`).join('')}</tbody></table></div>
-    <p class="note">These counts describe club experience on a hero, not readiness for the national team. Faded chips: last played over 45 days ago. Win rates are left out: at these sample sizes they say little.</p>
+    <details class="howto"><summary>How to read this</summary><p class="note">These counts describe club experience on a hero, not readiness for the national team. Faded chips: last played over 45 days ago. Win rates are left out: at these sample sizes they say little.</p>${evidenceBox(d.evidence)}</details>
     <div class="toolbar"><button class="btn" type="button" id="refreshPools">Refresh from OpenDota (desktop app)</button><span class="msg" id="poolMsg"></span></div>
-    ${evidenceBox(d.evidence)}</div>
-  <div class="cols"><div class="panel"><h2>Findings</h2>${findingList(d.evidence)}</div>
-  <div class="panel"><h2>Proposals for the title coach</h2>${recList(d.recs, 'Dota 2')}</div></div>
-  <div class="panel"><h2>Rule-based review</h2>${coachPanel(d.coach)}</div>`;
+    </div>
+  <p class="note">Proposals from this data are reviewed under <a href="#staff-cycle">Staff → Coaching cycle</a>.</p>`;
 };
 
 function draftState() {
@@ -1448,7 +1446,7 @@ V['dota-post'] = () => {
     ${importReportBox()}</div>${body}`;
 };
 
-V['dota-scout'] = () => {
+function dotaScout() {
   const P = dotaTeam().pools; const agg = S.opp[S.selNation];
   const list = WEC_DOTA.map((n) => { const o = Object.values(S.opp).find((x) => x.nation === n); return `<option value="${o ? o.code : ''}" ${o && o.code === S.selNation ? 'selected' : ''} ${o ? '' : 'disabled'}>${esc(n)}${o ? '' : ' — not scouted'}</option>`; }).join('');
   let body = '';
@@ -1460,14 +1458,15 @@ V['dota-scout'] = () => {
       <div class="tw"><table><thead><tr><th>Player</th><th>Likely role</th><th class="n">Club games</th><th>Most played</th><th class="n">Heroes with 5+ games</th></tr></thead><tbody>
       ${r.players.map((p) => `<tr><td><b>${esc(p.player)}</b></td><td>${esc(p.posLabel)}</td><td class="n">${p.games}</td><td><div class="chips">${[...p.pool].sort((a, b) => b.games - a.games).slice(0, 5).map((e) => `<span class="chip">${esc(e.name)} <small>${e.games}</small></span>`).join('')}</div></td><td class="n">${p.depth}</td></tr>`).join('')}
       ${agg.roster.filter((x) => !x.account).map((x) => `<tr><td><b>${esc(x.ign)}</b></td><td colspan="4">${tag('c-Blocked', 'No data')} ${esc(x.match_status)}</td></tr>`).join('')}</tbody></table></div></div>
-      <div class="cols"><div class="panel"><h2>Countermeasures to consider</h2><div class="h3">Ban candidates (most played)</div><ol class="plain">${r.banPlan.map((b) => `<li><b>${esc(b.name)}</b> — ${esc(b.player)}, ${b.games} games (${pct(b.share)} of his games)</li>`).join('')}</ol>
+      <div><div class="panel"><h2>Countermeasures to consider</h2><div class="h3">Ban candidates (most played)</div><ol class="plain">${r.banPlan.map((b) => `<li><b>${esc(b.name)}</b> — ${esc(b.player)}, ${b.games} games (${pct(b.share)} of his games)</li>`).join('')}</ol>
         <div class="h3">Contested heroes</div>${r.contested.length ? `<ul class="plain">${r.contested.slice(0, 10).map((c) => `<li><b>${esc(c.name)}</b>: ${esc(c.us)} / ${esc(c.them)}</li>`).join('')}</ul>` : '<p class="empty">None.</p>'}
         <div class="h3">Not available</div><ul class="plain">${r.blocked.map((b) => `<li>${esc(b)}</li>`).join('')}</ul></div>
-      <div class="panel"><h2>Findings</h2>${findingList(r.findings.map((f) => ({ ...f, context: 'club' })))}</div></div>
-      <div class="panel"><h2>Rule-based review</h2>${coachPanel(o)}</div>`;
+      </div>
+      <details class="howto"><summary>More detail: findings and rule-based review</summary><div class="h3">Findings</div>${findingList(r.findings.map((f) => ({ ...f, context: 'club' })))}<div class="h3">Rule-based review</div>${coachPanel(o)}</details>`;
   }
-  return `${competitorsPanel('Dota 2')}<div class="panel"><h2>Player-pool scouting</h2><p class="note">Built from each registered player's club tournament games on OpenDota. Loaded: Mongolia.</p><label class="field" for="nSel">Opponent<select id="nSel">${list}</select></label></div>${body}`;
-};
+  return `<div class="panel"><h2>Player-pool scouting</h2><p class="note">Built from each registered player's club tournament games on OpenDota. Loaded: Mongolia.</p><label class="field" for="nSel">Opponent<select id="nSel">${list}</select></label></div>${body}`;
+}
+V['dota-scout'] = () => `${dotaScout()}<details class="howto"><summary>Notes, tiers and VODs</summary>${competitorsPanel('Dota 2')}</details>`;
 
 V['dota-review'] = () => {
   const recs = Object.values(S.matches).map((rec) => { try { return dotaMatchPipeline(rec, accounts(), S.heroes); } catch { return null; } }).filter(Boolean);
@@ -1676,12 +1675,20 @@ V['staff-quality'] = () => {
       <td class="n">${r.sessions} (${r.days})</td>${PQ_PARTS.map(([k]) => `<td class="n">${pc(r.parts[k])}</td>`).join('')}</tr>`).join('')}</tbody></table></div>
     <p class="note">Score: the average of the parts that have records, 0–100. ▲▼: change from the ${win} days before, shown only when both periods have at least ${PQ_MIN} sessions. "Reports filed by next day" counts scrim reports and daily reports entered by the end of the day after the session (WIB). "Plan followed" is the coach's 1–5 rating on scrim reports.</p></div>`;
 };
+// V1.33: proposals the hub draws from the Dota 2 club data (were on the Dota Team page), next to the review queue.
+function dotaSuggestPanel() {
+  if (!titleVisible('Dota 2')) return '';
+  const d = dotaTeam(); LAST.recs['Dota 2'] = d.recs;
+  return `<div class="panel"><h2>Suggestions from the Dota 2 club data</h2>${recList(d.recs, 'Dota 2')}
+    <details class="howto"><summary>More detail: findings and rule-based review</summary><div class="h3">Findings</div>${findingList(d.evidence)}<div class="h3">Rule-based review</div>${coachPanel(d.coach)}</details></div>`;
+}
 V['staff-cycle'] = () => {
   if (S.mode === 'demo') return `<div class="panel">${DEMO_BANNER}<p class="empty">The coaching cycle holds operational records only.</p></div>`;
   const groups = [['proposed', 'Awaiting review'], ['accepted', 'In practice'], ['modified', 'In practice (modified)'], ['evidence-needed', 'Gathering evidence'], ['rejected', 'Rejected'], ['retired', 'Closed']];
   return `<div class="panel"><div class="lead">Coaching <em>cycle</em></div>
     <p>Evidence → proposed objective → review by the focus owner → practice session → result → next decision. Dota 2 and MLBB go to Aufa; PUBG Mobile, eFootball and MLBB Women to Fayad, who oversees every title; wellbeing to Donny. Reviews, sessions and decisions keep their names, times and reasons.</p>
     ${S.dbState === 'live' ? '' : banner('synth', `<div><b>Shared store ${esc(S.dbState)}.</b> Records stay in this tab only.</div>`)}</div>
+    ${dotaSuggestPanel()}
     ${groups.map(([st, label]) => { const list = S.cycle.filter((o) => o.status === st); return list.length ? `<div class="panel"><h2>${esc(label)} (${list.length})</h2>${list.map(cycleCard).join('')}</div>` : ''; }).join('') || '<div class="panel"><p class="empty">No objectives yet. Open Dota 2 → Team and press "Send to coach review" on a proposal.</p></div>'}
     <div class="panel"><h2>Export</h2><p class="note">Operational records only, as JSON for the decision log or a spreadsheet.</p><div class="toolbar"><button class="btn" type="button" id="exportBtn">Show export</button></div><textarea id="exportBox" readonly hidden aria-label="Exported records"></textarea></div>`;
 };

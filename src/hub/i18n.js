@@ -129,6 +129,10 @@ const EXACT = {
   'From coach-confirmed scrim games only (screenshot capture or typed in). Weekly averages per game; stand-ins are left out.': 'Hanya dari game scrim yang dikonfirmasi pelatih (tangkapan layar atau diketik). Rata-rata mingguan per game; pemain pengganti tidak dihitung.',
   Period: 'Periode',
   // V1.32 less noise
+  'More detail: findings and rule-based review': 'Detail lainnya: temuan dan review berbasis aturan', 'Notes, tiers and VODs': 'Catatan, tier dan VOD',
+  'Ask the AI (Brainstorm)': 'Tanya AI (Brainstorm)', 'Club data (OpenDota, patch 7.41), not national-team performance': 'Data klub (OpenDota, patch 7.41), bukan performa timnas',
+  'Proposals from this data are reviewed under': 'Usulan dari data ini direview di', 'Staff → Coaching cycle': 'Staf → Siklus coaching',
+  'Suggestions from the Dota 2 club data': 'Saran dari data klub Dota 2', 'Open the opponent card': 'Buka opponent card',
   Analysis: 'Analisis', Weaknesses: 'Kelemahan', 'Notes per title': 'Catatan per title', 'How to read this': 'Cara membaca', 'Show all tools': 'Tampilkan semua', 'Focus mode': 'Mode fokus',
   'Focus mode hides screens not in use yet': 'Mode fokus menyembunyikan layar yang belum dipakai',
   'Did not take place?': 'Tidak jadi?', 'Why (optional)': 'Alasan (opsional)', 'Mark as cancelled': 'Tandai batal', 'Objectives of this session': 'Objektif sesi ini',

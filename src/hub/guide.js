@@ -162,12 +162,12 @@ export const GUIDE = [
   S('cycle', null, { en: 'All staff', id: 'Semua staf' }, 'staff-cycle',
     { title: 'Proposals, approvals and player plans', steps: [
       'Ideas become proposals (from a finding, an observation or a report). The approver is shown on each one: Head Coach, admin, or the assistant coach for that game.',
-      'Today → My day lists what waits for you.',
+      'Today → My day lists what waits for you. Staff → Coaching cycle also shows the suggestions drawn from the Dota 2 club data. Brainstorm (ask the AI) opens from your game → Analysis.',
       'Performance → Player plans: goals per player (game, physical, mental), with a measure, owner and due date. A goal can follow a scrim stat automatically.',
     ] },
     { title: 'Usulan, persetujuan dan rencana pemain', steps: [
       'Ide menjadi usulan (dari temuan, observasi atau laporan). Penyetuju tertulis di tiap usulan: Head Coach, admin, atau asisten pelatih game itu.',
-      'Today → My day menampilkan yang menunggu Anda.',
+      'Today → My day menampilkan yang menunggu Anda. Staf → Siklus coaching juga menampilkan saran dari data klub Dota 2. Brainstorm (tanya AI) dibuka dari game Anda → Analisis.',
       'Performance → Player plans: target per pemain (game, fisik, mental), dengan ukuran, penanggung jawab dan tenggat. Target bisa mengikuti statistik scrim otomatis.',
     ] }),
   S('admin', null, { en: 'Admins', id: 'Admin' }, 'admin-users',

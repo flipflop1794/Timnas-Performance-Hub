@@ -5,6 +5,9 @@ import { createHash } from 'node:crypto';
 import { build } from 'esbuild';
 
 const rd = (p) => readFileSync(new URL(`../${p}`, import.meta.url), 'utf8');
+// The version shown in the header comes from package.json ("1.32.0" → "V1.32"), so it cannot go stale.
+const VERSION = `V${JSON.parse(rd('package.json')).version.split('.').slice(0, 2).join('.')}`;
+const tpl = () => rd('src/hub/index.html').replace('__HUB_VERSION__', VERSION);
 const data = {
   heroesCsv: rd('data/dota/heroes.csv'),
   inaCsv: rd('data/dota/ina_pro_matches.csv'),
@@ -29,7 +32,7 @@ const DONNY = { jsx: 'automatic', loader: { '.css': 'text' }, define: { 'process
 if (!process.argv.includes('--web-test')) {
   const out = await build({ entryPoints: [fileURLToPath(new URL('../src/hub/app.js', import.meta.url))], bundle: true, format: 'iife', write: false, minify: true, target: 'es2020', ...DONNY });
   const js = out.outputFiles[0].text.replace(/<\/script/gi, '<\\/script');
-  const html = rd('src/hub/index.html').replace('/*__APP__*/', () => js);
+  const html = tpl().replace('/*__APP__*/', () => js);
   mkdirSync(new URL('../dist/', import.meta.url), { recursive: true });
   writeFileSync(new URL('../dist/hub.html', import.meta.url), html);
   console.log(`dist/hub.html ${(html.length / 1024).toFixed(0)} KB`);
@@ -64,7 +67,7 @@ if (mode) {
   });
   const code = web.outputFiles[0].text;
   // The template is a fragment (the artifact host adds the document shell); the website needs a full document.
-  let page = `<!doctype html>\n<html lang="id">\n<head>\n<meta charset="utf-8">\n<meta name="viewport" content="width=device-width, initial-scale=1">\n<meta name="robots" content="noindex, nofollow">\n<meta name="referrer" content="strict-origin-when-cross-origin">\n<meta name="theme-color" content="#080D17">\n<link rel="manifest" href="/manifest.webmanifest">\n<link rel="icon" type="image/png" sizes="192x192" href="/icons/icon-192.png">\n<link rel="apple-touch-icon" href="/icons/apple-touch-icon.png">\n<meta name="apple-mobile-web-app-capable" content="yes">\n<meta name="apple-mobile-web-app-title" content="Timnas Hub">\n<meta name="mobile-web-app-capable" content="yes">\n</head>\n<body>\n${rd('src/hub/index.html')}\n</body>\n</html>\n`;
+  let page = `<!doctype html>\n<html lang="id">\n<head>\n<meta charset="utf-8">\n<meta name="viewport" content="width=device-width, initial-scale=1">\n<meta name="robots" content="noindex, nofollow">\n<meta name="referrer" content="strict-origin-when-cross-origin">\n<meta name="theme-color" content="#080D17">\n<link rel="manifest" href="/manifest.webmanifest">\n<link rel="icon" type="image/png" sizes="192x192" href="/icons/icon-192.png">\n<link rel="apple-touch-icon" href="/icons/apple-touch-icon.png">\n<meta name="apple-mobile-web-app-capable" content="yes">\n<meta name="apple-mobile-web-app-title" content="Timnas Hub">\n<meta name="mobile-web-app-capable" content="yes">\n</head>\n<body>\n${tpl()}\n</body>\n</html>\n`;
   if (test) page = page.replace('/*__APP__*/', () => code.replace(/<\/script/gi, '<\\/script'));
   else {
     const name = `app-${createHash('sha256').update(code).digest('hex').slice(0, 12)}.js`;
