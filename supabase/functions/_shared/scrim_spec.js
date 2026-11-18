@@ -228,7 +228,7 @@ export function matchResultPrompt(game) {
     'The scoreboard lists two teams (usually Counter-Terrorists and Terrorists, or team names) with the rounds each team won, and per player: name, kills, deaths, assists, sometimes ADR (average damage per round), HS% (headshot percentage), MVP stars and score.',
     'Rules:',
     '- Read only what is visible. Never estimate or complete a number: use -1 for any value not shown or not readable, and set uncertain=true on that player.',
-    '- team_a is the team listed FIRST (top or left), team_b the second. rounds_a / rounds_b: the rounds each won, -1 if not shown. map: the map name if shown (Mirage, Inferno, Nuke, Ancient, Anubis, Dust2, Train...), else "".',
+    '- team_a is the team listed FIRST (top or left), team_b the second. rounds_a / rounds_b: the rounds each won, -1 if not shown. map: the map name exactly as shown (the competitive pool is Ancient, Anubis, Cache, Dust II, Inferno, Mirage, Nuke), else "".',
     '- players: up to 10, in screen order, each with team "a" or "b" by the block it is listed in. name_seen exactly as printed, including team tags.',
     '- notes: one short sentence about anything the coach must check. Empty if none.',
     '- If the screenshot is not a scoreboard, return screen_kind "other", readable=false and an empty players list.',
