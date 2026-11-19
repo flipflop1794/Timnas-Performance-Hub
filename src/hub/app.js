@@ -27,9 +27,11 @@ const CAN_APPROVE = !HUB_USER || HUB_USER.roles.some((r) => ['admin', 'head_coac
 // V1.19: an account with only the Leadership role reads everything and saves nothing (the database refuses).
 // V1.32: a title coach (no admin, Head Coach, assistant or readiness role) gets a shorter Today page.
 const TITLE_COACH = !!HUB_USER && HUB_USER.roles.includes('title_coach') && !HUB_USER.roles.some((r) => ['admin', 'head_coach', 'assistant_coach', 'readiness_owner'].includes(r));
+// V1.34: an account with only the support role (team doctor, physio, physical coach, psychologist).
+const SUPPORT_ONLY = !!HUB_USER && HUB_USER.roles.length > 0 && HUB_USER.roles.every((r) => r === 'support');
 const LEADERSHIP_ONLY = !!HUB_USER && HUB_USER.roles.length > 0 && HUB_USER.roles.every((r) => r === 'leadership');
 // V1.15: newer parts switch on only when the live database / server has them (all on in the artifact build).
-const FEAT = { capture: true, draftRoom: true, donny: true, pelatnas: true, ai: true, aiPlan: true, coachAi: true, coachAiFn: true, practiceAi: true, brainAi: true, readAi: true, ...(PLATFORM?.features || {}) };
+const FEAT = { capture: true, draftRoom: true, donny: true, pelatnas: true, ai: true, aiPlan: true, coachAi: true, coachAiFn: true, practiceAi: true, brainAi: true, readAi: true, support: true, supportAi: true, ...(PLATFORM?.features || {}) };
 // V1.27 pre-match brief, day scouting summary and Brainstorm: only when the deployed function has those actions.
 const brainAiOn = () => S.mode !== 'demo' && FEAT.ai && FEAT.brainAi && !!PLATFORM?.ai;
 // V1.27 feedback on an AI output: useful / not useful / wrong (+ one line). It is how the AI gets better over time.
@@ -86,6 +88,8 @@ import { MAPS as PUBGM_MAPS } from '../pubgm/screenshot.js';
 import { gameBreakdown, breakdownText, BASE_MIN, FLAG_PCT, ownVod, addMark, vodThemes, THEME_AT, partnerPlan, STANDIN_DAYS, IDLE_DAYS, daySummary, dayText } from '../core/analyst.js';
 import { tagsOf } from '../core/weakness.js';
 import { coachAiUi } from './coach_ai_ui.js';
+import { supportUi } from './support_ui.js';
+import { JOBS as SUPPORT_JOBS } from '../core/support.js';
 import { standInRecord } from '../core/patterns.js';
 import { weeks as trendWeeks, period as trendPeriod, PERIOD_WEEKS as TR_PERIODS, teamTrends, playerTrends, MIN_VALUES as TR_MIN } from '../core/trends.js';
 import { practiceQuality, PARTS as PQ_PARTS, MIN_SESSIONS as PQ_MIN } from '../core/practice_quality.js';
@@ -128,6 +132,8 @@ const drUi = () => (DR ||= draftRoomUi({ S, esc, tag, banner, setMsg, val, rende
 let PL = null;
 // V1.20 coach AI (src/hub/coach_ai_ui.js): weekly leadership summary, preparation packs, weaknesses, PUBGM screenshots.
 let CO = null;
+let SU = null;
+const supUi = () => (SU ||= supportUi({ S, esc, tag, banner, setMsg, val, render, PLATFORM, HUB_USER, FEAT, today: () => localDay(), meName: () => meName(), titles: () => WEC_TITLES.map((t) => t.id) }));
 const coUi = () => (CO ||= coachAiUi({ S, esc, tag, banner, setMsg, val, render, sid, PLATFORM, HUB_USER, CAN_APPROVE, today: () => today(), EVENT,
   titles: () => PQ_ORDER, titleVisible: (t) => titleVisible(t), cardFor: (t, n) => prepCardFor(t, n), meName: () => meName(), prepImage: (f) => capUiReal().prepImage(f),
   saveScrims: (xs) => saveScrimList(xs), propose: (t, label, w) => proposeWeakness(t, label, w), onSaved: (rows) => savePubgmRows(rows),
@@ -141,7 +147,7 @@ const focusOn = () => !!HUB_USER && !S.showAll;   // the website (coaches); the 
 const SUB_OF = {};
 for (const team of ['dota', 'pubgm', 'mlbb', 't-mlbbw', 't-efootball', 't-cs2', 't-cs2w']) { SUB_OF[`${team}-weak`] = `${team}-trends`; SUB_OF[`${team}-patterns`] = `${team}-trends`; SUB_OF[`${team}-brain`] = `${team}-trends`; }
 const BAR_HIDE = new Set(['mlbb-rivals', 't-mlbbw-rivals', 't-efootball-rivals', 't-cs2-rivals', 't-cs2w-rivals', 'pubgm-rivals', 'dota-scout']);
-const tabShown = (id, view) => (SUB_OF[id] ? false : BAR_HIDE.has(id) ? id === view : !focusOn() || !FOCUS_HIDE.has(id) || id === view);
+const tabShown = (id, view) => (SUPPORT_ONLY && ['readiness', 'players', 'well-day', 'well-log'].includes(id) ? false : SUB_OF[id] ? false : BAR_HIDE.has(id) ? id === view : !focusOn() || !FOCUS_HIDE.has(id) || id === view);
 const canSetDates = () => !HUB_USER || HUB_USER.isAdmin || HUB_USER.roles.includes('head_coach');
 const plUi = () => (PL ||= pelatnasUi({ S, esc, tag, banner, setMsg, val, render, meName, sid, localDay, shiftDay, titleVisible: (t) => titleVisible(t), canSetDates }));
 const heroByName = () => Object.fromEntries(Object.values(S.heroes).map((h) => [h.name.toLowerCase(), h.id]));
@@ -258,6 +264,7 @@ async function initCaps() {
     if (FEAT.draftRoom) try { drUi().subscribe(db); } catch { /* older store without the V1.14 collections */ }
     if (FEAT.pelatnas) try { plUi().subscribe(db); } catch { /* older store without the V1.16 collections */ }
     if (FEAT.coachAi) try { coUi().subscribe(db); } catch { /* older store without the V1.20 collections */ }
+    try { supUi().subscribe(db); } catch { /* support tables not in the database yet */ }
     on(db.collection('wec_matches'), 'WEC matches', (snap) => { S.wecMatches = snap.docs.map((d) => d.data()).filter((x) => x?.origin === 'operational'); render(); });
     on(db.doc('config/runbooks'), 'Runbooks', (d) => { const x = d.data(); if (x?.runbooks) S.runbooks = x.runbooks; render(); });
     on(db.collection('vods'), 'VOD library', (snap) => { S.vods = snap.docs.map((d) => ({ ...d.data(), id: d.id })).filter((x) => x?.origin === 'operational'); render(); });
@@ -323,7 +330,7 @@ const TITLES = [
   { id: 'dota', label: 'Dota 2', tabs: [['dota-team', 'Team'], ['dota-scrims', 'Scrims & practice'], ['dota-reports', 'Scrim reports'], ['dota-trends', 'Analysis'], ...(FEAT.coachAi ? [['dota-weak', 'Weaknesses']] : []), ...(FEAT.capture ? [['dota-patterns', 'Patterns']] : []), ['dota-post', 'Post-match'], ['dota-scout', 'Competitors'], ['dota-meta', 'Meta'], ...(FEAT.brainAi ? [['dota-brain', 'Brainstorm']] : []), ['dota-draft', 'Draft room'], ['dota-review', 'Series review']] },
   { id: 'pubgm', label: 'PUBG Mobile', tabs: [['pubgm-team', 'Team'], ['pubgm-scrims', 'Scrims & practice'], ['pubgm-reports', 'Scrim reports'], ['pubgm-trends', 'Analysis'], ...(FEAT.coachAi ? [['pubgm-weak', 'Weaknesses']] : []), ['pubgm-log', 'Log & import'], ['pubgm-rivals', 'Competitors'], ['pubgm-meta', 'Meta'], ...(FEAT.brainAi ? [['pubgm-brain', 'Brainstorm']] : []), ['pubgm-sim', 'Strategy sim']] },
   ...GAME_HUBS.map((h) => ({ id: h.id, label: h.label, tabs: hubTabs(h) })),
-  { id: 'well', label: 'Performance', tabs: [['readiness', 'Athlete readiness'], ['players', 'Player plans'], ['well-day', 'Wellbeing check'], ['well-log', 'Log check-in & load']] },
+  { id: 'well', label: 'Performance', tabs: [['readiness', 'Athlete readiness'], ['support', 'Support staff'], ['players', 'Player plans'], ['well-day', 'Wellbeing check'], ['well-log', 'Log check-in & load']] },
   { id: 'guide', label: 'Guide', tabs: [['guide', 'How to use the hub']] },
   { id: 'staff', label: 'Staff', tabs: [['staff-cycle', 'Coaching cycle'], ['staff-quality', 'Practice quality'], ['staff-measure', 'Is it working?'], ['staff-rules', 'Rules & decisions'], ['staff-sources', 'Sources & limits'], ...(HUB_USER?.isAdmin ? [['admin-users', 'Users & access']] : [])] },
 ];
@@ -347,6 +354,7 @@ function renderNav(view) {
 const V = {};
 let DAILY;
 V['daily-sessions'] = () => DAILY.page();
+V.support = () => supUi().page();
 const dailyLabel = (text) => esc(dailyText(text, S.lang));
 // V1.32: the scrim report is the daily session report too, so the separate "Log a session" button is gone here.
 const dailyEntry = () => '';
@@ -448,6 +456,7 @@ V.today = () => {
   return `<div class="panel"><div class="lead">What do we <em>train today</em>?</div>
     <p>Accepted objectives first. Anything not yet reviewed is a proposal, not a training decision.</p></div>
     ${attentionPanel(me)}
+    ${supUi().noticesPanel(me.focus || [])}
     ${TITLE_COACH ? '' : dayPanel(me)}
     ${TITLE_COACH ? '' : queueHtml(me.id)}
     ${FEAT.pelatnas && !TITLE_COACH ? (() => { const x = plUi().todayLine(); return `<div class="panel"><h2>Pelatnas</h2><ul class="plain"><li>${esc(x.campText)}</li><li>${x.open ? `<b>${x.open}</b> player${x.open === 1 ? '' : 's'} have not answered about availability. <a href="#pel-avail">Availability</a>` : 'Every player has answered about availability.'}</li><li>${x.sessions ? `Attendance taken for ${x.taken} of ${x.sessions} session${x.sessions === 1 ? '' : 's'} today. <a href="#pel-day">Take attendance</a>` : 'No sessions planned today.'}</li></ul></div>`; })() : ''}
@@ -1212,7 +1221,7 @@ function reportForm(title, { fid, spec, pts, unit, planned, t0 }) {
 
 
 // ---------- website: users & access (admins only; the database enforces it too) ----------
-const ROLES = [['admin', 'Admin'], ['head_coach', 'Head Coach'], ['assistant_coach', 'Assistant coach'], ['readiness_owner', 'Readiness owner'], ['title_coach', 'Title coach'], ['analyst', 'Analyst'], ['leadership', 'Leadership: Ketua BTN, Dewan Pengawas (read only)']];
+const ROLES = [['support', 'Support staff (team doctor, physio, physical coach, psychologist): daily report only'], ['admin', 'Admin'], ['head_coach', 'Head Coach'], ['assistant_coach', 'Assistant coach'], ['readiness_owner', 'Readiness owner'], ['title_coach', 'Title coach'], ['analyst', 'Analyst'], ['leadership', 'Leadership: Ketua BTN, Dewan Pengawas (read only)']];
 async function loadAdminUsers() {
   S.admin = { ...(S.admin || {}), loading: true, error: '' };
   try { S.admin.users = await PLATFORM.admin.listUsers(); } catch (e) { S.admin.error = e.message; }
@@ -1271,6 +1280,7 @@ V['admin-users'] = () => {
   const row = (u) => `<div class="obj"><header><div><span class="note">${esc(u.email)}</span><h3>${esc(u.display_name || u.email)}</h3></div>${u.roles.length ? tag('c-Verified', u.roles.join(', ')) : tag('c-Blocked', 'no access')}</header>
     <div class="form"><label class="field" for="ad-${u.id}-name">Display name<input type="text" id="ad-${u.id}-name" value="${esc(u.display_name)}"></label>
     <label class="field" for="ad-${u.id}-staff">Staff routing<select id="ad-${u.id}-staff"><option value="">— (title coach / analyst)</option>${STAFF.filter((x) => x.id !== 'user').map((x) => `<option value="${x.id}" ${u.staff_key === x.id ? 'selected' : ''}>${esc(x.name)} — ${esc(x.role)}</option>`).join('')}</select></label></div>
+    <div class="form"><label class="field" for="ad-${u.id}-job">Support staff job<select id="ad-${u.id}-job"><option value="">— (not support staff)</option>${Object.entries(SUPPORT_JOBS).map(([k, j]) => `<option value="${k}" ${u.support_job === k ? 'selected' : ''}>${esc(j.label)}</option>`).join('')}</select></label></div>
     <fieldset class="objpick"><legend class="note">Roles</legend>${ROLES.map(([k, l]) => `<label><input type="checkbox" id="ad-${u.id}-role-${k}" ${u.roles.includes(k) ? 'checked' : ''}> ${l}</label>`).join('')}</fieldset>
     <fieldset class="objpick"><legend class="note">Assigned titles</legend>${WEC_TITLES.map((t) => `<label><input type="checkbox" id="ad-${u.id}-title-${sid(t.id)}" ${u.titles.includes(t.id) ? 'checked' : ''}> ${esc(t.id)}</label>`).join('')}</fieldset>
     <div class="toolbar"><button class="btn primary" type="button" data-admin-save="${esc(u.id)}">Save access</button><span class="msg" id="adMsg-${u.id}" role="status"></span></div></div>`;
@@ -1291,7 +1301,7 @@ V['admin-users'] = () => {
 const restricted = () => !!HUB_USER && !HUB_USER.seesAllTitles;
 const titleVisible = (t) => !restricted() || HUB_USER.titles.includes(t);
 function groupTitle(gid) { return gid === 'dota' ? 'Dota 2' : gid === 'pubgm' ? 'PUBG Mobile' : GAME_HUBS.find((h) => h.id === gid)?.title || null; }
-function groupVisible(g) { const t = groupTitle(g.id); return !t || titleVisible(t); }
+function groupVisible(g) { if (SUPPORT_ONLY) return ['well', 'guide'].includes(g.id); const t = groupTitle(g.id); return !t || titleVisible(t); }
 // Which title a view belongs to (for the "not assigned" notice).
 function viewTitle(view) {
   const g = TITLES.find((t) => t.tabs.some(([id]) => id === view)); if (!g) return null;
@@ -2445,6 +2455,7 @@ async function onClick(e) {
   if (t.dataset.go) { location.hash = t.dataset.go; return; }
   // V1.13 capture / patterns buttons only, so every other click stays synchronous until its own first await.
   if (Object.keys(t.dataset).some((k) => /^(cap|pat)[A-Z]/.test(k)) && await capUi().onClick(t)) return;
+  if (Object.keys(t.dataset).some((k) => /^sup[A-Z]/.test(k)) && await supUi().onClick(t)) return;
   if (Object.keys(t.dataset).some((k) => /^dr[A-Z]/.test(k)) && await drUi().onClick(t)) return;
   if (FEAT.coachAi && Object.keys(t.dataset).some((k) => /^co[A-Z]/.test(k)) && await coUi().onClick(t)) return;
   if (Object.keys(t.dataset).some((k) => /^pl[A-Z]/.test(k)) && await plUi().onClick(t)) return;
@@ -2963,8 +2974,10 @@ async function onClick(e) {
   }
   if (t.dataset.adminSave) {
     const uid = t.dataset.adminSave; const u = (S.admin?.users || []).find((x) => x.id === uid); if (!u) return;
-    const want = { display_name: val(`ad-${uid}-name`).trim(), staff_key: val(`ad-${uid}-staff`) || null,
-      roles: ROLES.map(([k]) => k).filter((k) => document.getElementById(`ad-${uid}-role-${k}`)?.checked),
+    const job = val(`ad-${uid}-job`) || null;
+    const want = { display_name: val(`ad-${uid}-name`).trim(), staff_key: val(`ad-${uid}-staff`) || null, support_job: job,
+      // V1.34: picking a support job gives the support role as well.
+      roles: ROLES.map(([k]) => k).filter((k) => document.getElementById(`ad-${uid}-role-${k}`)?.checked || (k === 'support' && job)),
       titles: WEC_TITLES.map((x) => x.id).filter((x) => document.getElementById(`ad-${uid}-title-${sid(x)}`)?.checked) };
     try { await PLATFORM.admin.saveUser(uid, want, u); Object.assign(u, want); setMsg(`adMsg-${uid}`, 'Saved. The person sees the change after reloading the page.', 'ok'); }
     catch (err) { setMsg(`adMsg-${uid}`, err.message, 'err'); }
@@ -3176,7 +3189,7 @@ document.addEventListener('click', async (e) => {
   KEEP_FORMS = !b || b.id === 'langBtn' || b.id === 'modeBtn' || 'rpFill' in b.dataset || 'rpProg' in b.dataset || 'rpAdd' in b.dataset || 'capMic' in b.dataset;
   try { await onClick(e); } finally { KEEP_FORMS = true; }
 });
-for (const ev of ['input', 'change']) document.addEventListener(ev, (e) => { draftField(e.target); rowsInput(e.target); });
+for (const ev of ['input', 'change']) document.addEventListener(ev, (e) => { draftField(e.target); rowsInput(e.target); supUi().onInput(e.target); });
 
 document.addEventListener('change', (e) => {
   // V1.27 Brainstorm purpose and opponent.
@@ -3237,5 +3250,6 @@ if (HUB_USER) {
 if (restricted() && HUB_USER.titles[0] && (!location.hash || location.hash === '#')) history.replaceState(null, '', `#${REPORT_TAB[HUB_USER.titles[0]]}`);
 // V1.19: Leadership (Ketua BTN, Dewan Pengawas) land on the Main dashboard.
 if (LEADERSHIP_ONLY && (!location.hash || location.hash === '#')) history.replaceState(null, '', '#overview');
+if (SUPPORT_ONLY && (!location.hash || location.hash === '#' || location.hash === '#today' || location.hash === '#overview')) history.replaceState(null, '', '#support');
 render();
 initCaps();

@@ -7,10 +7,12 @@ const DOC_TABLES = ['scrim_sessions', 'scrim_reports', 'coaching_objectives', 's
   'scrim_games', 'scrim_captures', 'pattern_findings', 'player_aliases',
   'draft_pools', 'draft_books', 'mock_drafts', 'draft_drills', 'pro_games', 'readiness_store', 'pelatnas_availability', 'pelatnas_attendance',
   'leadership_briefs', 'prep_packs', 'weakness_tags'];
+// V1.34 support staff reports (author + Donny + Head Coach + admins) and notices (title-scoped).
+const SUPPORT = new Set(['support_reports', 'support_notices']);
 
 export function backend() {
   const B = { users: [], tables: {}, channels: new Set(), log: [] };
-  for (const t of [...DOC_TABLES, 'scrim_report_corrections', 'app_config', 'roster_players', 'profiles', 'user_roles', 'user_titles']) B.tables[t] = [];
+  for (const t of [...DOC_TABLES, 'support_reports', 'support_notices', 'scrim_report_corrections', 'app_config', 'roster_players', 'profiles', 'user_roles', 'user_titles']) B.tables[t] = [];
   B.addUser = (u) => { B.users.push(u); B.tables.profiles.push({ id: u.id, email: u.email, display_name: u.name, staff_key: u.staffKey || null, created_at: new Date().toISOString() });
     for (const r of u.roles || []) B.tables.user_roles.push({ user_id: u.id, role: r }); for (const t of u.titles || []) B.tables.user_titles.push({ user_id: u.id, title: t }); };
   const roles = (id) => B.tables.user_roles.filter((r) => r.user_id === id).map((r) => r.role);
@@ -20,9 +22,14 @@ export function backend() {
   const canWrite = (id, t) => has(id, 'admin') || has(id, 'head_coach') || (roles(id).length > 0 && t != null && titles(id).includes(t));
   const canWell = (id) => has(id, 'admin') || has(id, 'readiness_owner');
   const deny = { code: '42501', message: 'new row violates row-level security policy' };
+  const supRead = (id) => has(id, 'admin') || has(id, 'head_coach') || has(id, 'readiness_owner');
+  const supWrite = (id) => has(id, 'support') || supRead(id);
+  B.supRead = supRead; B.supWrite = supWrite;
   B.readable = (uid, table, row) => {
     if (!uid) return false;
     if (WELL.has(table)) return canWell(uid);
+    if (table === 'support_reports') return row.created_by === uid || supRead(uid);
+    if (table === 'support_notices') return canRead(uid, row.title) || supWrite(uid);
     if (DOC_TABLES.includes(table)) return canRead(uid, row.title);
     if (table === 'scrim_report_corrections') { const r = B.tables.scrim_reports.find((x) => x.id === row.report_id); return !!r && canRead(uid, r.title); }
     return roles(uid).length > 0 || (table === 'profiles' && row.id === uid);
@@ -30,6 +37,12 @@ export function backend() {
   B.write = (uid, table, op, row, old) => {
     if (!uid) return deny;
     if (WELL.has(table)) return canWell(uid) ? null : deny;
+    if (SUPPORT.has(table)) {
+      if (row.data?.origin !== 'operational') return { code: '22023', message: 'Only operational records can be stored (origin must be "operational").' };
+      if (table === 'support_notices' && !row.data?.title) return deny;
+      if (old && !(old.created_by === uid || supRead(uid))) return deny;
+      return supWrite(uid) ? null : deny;
+    }
     if (table === 'scrim_games' && op === 'update') return { code: '42501', message: 'Submitted records cannot be changed. Add a correction instead.' };
     if (table === 'scrim_games' && op === 'insert' && !B.tables.scrim_reports.some((r) => r.id === row.data?.reportId && r.title === row.data?.title)) return { code: '23503', message: 'The scrim report for this game was not found. Save the report first.' };
     if (table === 'scrim_reports' && op === 'update') return { code: '42501', message: 'Submitted records cannot be changed. Add a correction instead.' };
@@ -63,7 +76,7 @@ function client(B, sessionUserId) {
   let tick = 0;
   const stamp = (table, row, old) => {
     const now = new Date(Date.now() + (B.skew || 0) + ++tick).toISOString();
-    if (DOC_TABLES.includes(table)) return { ...row, title: FIXED[table] || row.data?.title || null, created_by: old ? old.created_by : uid(), created_at: old ? old.created_at : now, updated_by: uid(), updated_at: now };
+    if (DOC_TABLES.includes(table) || SUPPORT.has(table)) return { ...row, title: FIXED[table] || row.data?.title || null, created_by: old ? old.created_by : uid(), created_at: old ? old.created_at : now, updated_by: uid(), updated_at: now };
     if (table === 'scrim_report_corrections') return { ...row, id: B.tables[table].length + 1, created_by: uid(), created_at: now };
     return { ...row, updated_by: uid(), updated_at: now };
   };
@@ -170,6 +183,14 @@ function client(B, sessionUserId) {
         if (name === 'capture_storage') return { data: [{ files: files.length, bytes: files.reduce((s, f) => s + f.size, 0), oldest: files.map((f) => f.created_at).sort()[0] || null }], error: null };
         const cut = new Date(Date.now() - args.days * 86400000).toISOString();
         return { data: files.filter((f) => f.created_at < cut).map((f) => f.name), error: null };
+      }
+      // V1.34 counts without names (anyone signed in), like public.support_summary().
+      if (name === 'support_summary') {
+        if (!B.roles(uid()).length) return { data: null, error: null };
+        const inP = B.tables.support_reports.map((r) => r.data).filter((d) => d.date >= args.d_from && d.date <= args.d_to);
+        const rows = inP.flatMap((d) => (d.rows || []).map((x) => ({ day: d.date, disc: d.discipline, title: x.title, response: x.response, followUp: !!x.followUp, vasBefore: x.vasBefore ?? null, vasAfter: x.vasAfter ?? null, athlete: x.athlete })));
+        const n = {}; for (const r of rows) if (r.athlete) n[r.athlete] = (n[r.athlete] || 0) + 1;
+        return { data: { reports: inP.map((d) => ({ day: d.date, disc: d.discipline })), rows: rows.map(({ athlete, ...x }) => x), repeat: Object.values(n).filter((k) => k >= 3).length }, error: null };
       }
       if (name !== 'set_roster') return { error: { message: 'unknown rpc' } };
       const err = B.write(uid(), 'roster_players', 'insert', {}); if (err) return { error: err };

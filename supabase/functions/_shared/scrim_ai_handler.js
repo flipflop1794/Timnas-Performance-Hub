@@ -14,11 +14,11 @@ import {
   scoreboardPrompt, draftPrompt, debriefPrompt, digestPrompt, planPrompt, messagesRequest, imageBlock, parseModelJson, usageOf, capturePath,
   tagsSchema, tagsPrompt, tagsOf, summarySchema, summaryPrompt, prepSchema, prepPrompt, brResultSchema, brResultPrompt,
   weeklySchema, weeklyPrompt, metaExtractSchema, metaExtractPrompt, metaFitSchema, metaFitPrompt,
-  prematchSchema, prematchPrompt, scoutDaySchema, scoutDayPrompt, brainstormSchema, brainstormPrompt, readGameOf, matchResultSchema, matchResultPrompt,
+  prematchSchema, prematchPrompt, scoutDaySchema, scoutDayPrompt, brainstormSchema, brainstormPrompt, readGameOf, matchResultSchema, matchResultPrompt, supportParseSchema, supportParsePrompt, SUPPORT_DISCIPLINES,
 } from './scrim_spec.js';
 
 // V1.20: summary (weekly, all titles), prep (one WEC match), tags (weakness labels), br_result (PUBG Mobile screenshot).
-const ACTIONS = ['scoreboard', 'draft', 'debrief', 'digest', 'plan', 'summary', 'prep', 'tags', 'br_result', 'weekly', 'meta_extract', 'meta_fit', 'prematch', 'scout_day', 'brainstorm', 'match_result'];
+const ACTIONS = ['scoreboard', 'draft', 'debrief', 'digest', 'plan', 'summary', 'prep', 'tags', 'br_result', 'weekly', 'meta_extract', 'meta_fit', 'prematch', 'scout_day', 'brainstorm', 'match_result', 'support_parse'];
 const IMAGE_ACTIONS = ['scoreboard', 'draft', 'br_result', 'match_result'];
 // Calls per day (WIB) for the whole staff, unless the TEAM_DAILY_CALL_CAP secret says otherwise.
 export const TEAM_DAILY_CAP = 600;
@@ -68,14 +68,15 @@ export async function handle(req, deps) {
   if (action === 'br_result' && title !== 'PUBG Mobile') return fail(400, 'This screenshot reader is for PUBG Mobile.');
   if (action === 'match_result' && !readGameOf(title)) return fail(400, `Screenshot reading is not set up for ${title}.`);
   // The weekly summary covers every title: only those who write every title (Head Coach, admin) may ask for it.
-  const allTitles = action === 'summary';
+  // support_parse (V1.34): support staff are not assigned to a title; the database decides who may use it.
+  const allTitles = action === 'summary' || action === 'support_parse';
   if (!allTitles && (typeof title !== 'string' || !title)) return fail(400, 'Title is required.');
 
   const db = deps.clientFor(auth);
   const { data: who, error: authErr } = await db.auth.getUser();
   if (authErr || !who?.user) return fail(401, 'Your session has ended. Sign in again.');
-  const { data: canWrite, error: permErr } = await db.rpc('can_write_title', { t: allTitles ? null : title });
-  if (permErr || canWrite !== true) return fail(403, allTitles ? 'The weekly summary is written by the Head Coach or an admin.' : `You are not assigned to ${title}. Ask the admin for access.`);
+  const { data: canWrite, error: permErr } = action === 'support_parse' ? await db.rpc('can_support_write') : await db.rpc('can_write_title', { t: allTitles ? null : title });
+  if (permErr || canWrite !== true) return fail(403, action === 'support_parse' ? 'Only support staff, the readiness owner, the Head Coach and admins file support reports.' : allTitles ? 'The weekly summary is written by the Head Coach or an admin.' : `You are not assigned to ${title}. Ask the admin for access.`);
   const cap = Number(deps.env.DAILY_CALL_CAP || 300);
   const { data: used } = await db.rpc('ai_calls_today');
   if (Number(used) >= cap) return fail(429, `Daily AI limit reached (${cap} calls). Enter the values by hand today, or ask the admin to raise the limit.`);
@@ -138,6 +139,13 @@ export async function handle(req, deps) {
       // The material is the same for every message of a session: cached after the first one.
       request = messagesRequest({ model, system: `${brainstormPrompt(title, body.purpose)}\n\nMATERIAL:\n${material}`, schema: brainstormSchema(), maxTokens: 1500,
         content: [{ type: 'text', text: JSON.stringify({ PREFS: (Array.isArray(body.prefs) ? body.prefs : []).slice(0, 10).map((p) => String(p).slice(0, 200)), HISTORY: history, QUESTION: question }) }] });
+    } else if (action === 'support_parse') {
+      const text = String(body.text || '').trim();
+      if (!text) return fail(400, 'Paste the report first.');
+      if (text.length > 8000) return fail(413, 'Paste at most 8,000 characters at a time.');
+      const roster = Object.fromEntries(Object.entries(body.roster && typeof body.roster === 'object' ? body.roster : {}).slice(0, 7).map(([t, xs]) => [String(t).slice(0, 30), (Array.isArray(xs) ? xs : []).slice(0, 15).map((x) => String(x).slice(0, 40))]));
+      const discipline = SUPPORT_DISCIPLINES.includes(body.discipline) ? body.discipline : '';
+      request = messagesRequest({ model, system: supportParsePrompt(), schema: supportParseSchema(), maxTokens: 3000, content: [{ type: 'text', text: JSON.stringify({ ROSTER: roster, DISCIPLINE: discipline, TEXT: text }) }] });
     } else if (action === 'meta_extract') {
       const text = String(body.text || '').trim();
       if (!text) return fail(400, 'Paste the text first.');

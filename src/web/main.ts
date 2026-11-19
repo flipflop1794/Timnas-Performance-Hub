@@ -8,8 +8,8 @@ import { T, lang, setLang } from './strings';
 declare const __HUB_CONFIG__: { url: string; key: string };
 declare const __TEST_HOOKS__: boolean;
 
-export type Role = 'admin' | 'head_coach' | 'assistant_coach' | 'readiness_owner' | 'title_coach' | 'analyst' | 'leadership';
-export interface HubUser { id: string; email: string; name: string; staffKey: string | null; roles: Role[]; titles: string[]; isAdmin: boolean; canWellbeing: boolean; seesAllTitles: boolean }
+export type Role = 'admin' | 'head_coach' | 'assistant_coach' | 'readiness_owner' | 'title_coach' | 'analyst' | 'leadership' | 'support';
+export interface HubUser { id: string; email: string; name: string; staffKey: string | null; roles: Role[]; titles: string[]; isAdmin: boolean; canWellbeing: boolean; seesAllTitles: boolean; supportJob: string | null; canSupport: boolean }
 
 const W = window as unknown as Record<string, any>;
 const $ = (s: string) => document.querySelector(s) as HTMLElement;
@@ -62,7 +62,7 @@ function showSetPassword(client: SupabaseClient, userId: string) {
 
 export async function loadMe(client: SupabaseClient, id: string): Promise<HubUser> {
   const [p, r, t] = await Promise.all([
-    client.from('profiles').select('id, email, display_name, staff_key').eq('id', id).maybeSingle(),
+    client.from('profiles').select('*').eq('id', id).maybeSingle(),
     client.from('user_roles').select('role').eq('user_id', id),
     client.from('user_titles').select('title').eq('user_id', id),
   ]);
@@ -74,6 +74,8 @@ export async function loadMe(client: SupabaseClient, id: string): Promise<HubUse
     isAdmin: roles.includes('admin'), canWellbeing: roles.includes('admin') || roles.includes('readiness_owner'),
     // V1.19: Leadership (Ketua BTN, Dewan Pengawas) reads every title; the database refuses its writes.
     seesAllTitles: roles.some((x) => ['admin', 'head_coach', 'assistant_coach', 'leadership'].includes(x)),
+    // V1.34 support staff: their job decides the report form; the five, Coach Donny, the Head Coach and admins file and read.
+    supportJob: prof.support_job || null, canSupport: roles.some((x) => ['support', 'admin', 'head_coach', 'readiness_owner'].includes(x)),
   };
 }
 
@@ -89,7 +91,7 @@ function adminApi(client: SupabaseClient) {
   return {
     async listUsers() {
       const [p, r, t] = await Promise.all([
-        client.from('profiles').select('id, email, display_name, staff_key, created_at').order('created_at'),
+        client.from('profiles').select('*').order('created_at'),
         client.from('user_roles').select('user_id, role'), client.from('user_titles').select('user_id, title'),
       ]);
       const err = p.error || r.error || t.error; if (err) throw new Error(err.message);
@@ -97,13 +99,13 @@ function adminApi(client: SupabaseClient) {
         roles: ((r.data || []) as Record<string, string>[]).filter((x) => x.user_id === u.id).map((x) => x.role),
         titles: ((t.data || []) as Record<string, string>[]).filter((x) => x.user_id === u.id).map((x) => x.title) }));
     },
-    async saveUser(id: string, want: { display_name: string; staff_key: string | null; roles: string[]; titles: string[] }, have: { roles: string[]; titles: string[] }) {
+    async saveUser(id: string, want: { display_name: string; staff_key: string | null; support_job?: string | null; roles: string[]; titles: string[] }, have: { roles: string[]; titles: string[] }) {
       const ops: PromiseLike<{ error: { message: string } | null }>[] = [];
       const add = (tb: string, col: string, vals: string[]) => vals.length && ops.push(client.from(tb).insert(vals.map((v) => ({ user_id: id, [col]: v }))));
       const del = (tb: string, col: string, vals: string[]) => vals.forEach((v) => ops.push(client.from(tb).delete().eq('user_id', id).eq(col, v)));
       add('user_roles', 'role', want.roles.filter((x) => !have.roles.includes(x)));
       add('user_titles', 'title', want.titles.filter((x) => !have.titles.includes(x)));
-      ops.push(client.from('profiles').update({ display_name: want.display_name, staff_key: want.staff_key || null }).eq('id', id));
+      ops.push(client.from('profiles').update({ display_name: want.display_name, staff_key: want.staff_key || null, ...(want.support_job !== undefined ? { support_job: want.support_job || null } : {}) }).eq('id', id));
       const first = await Promise.all(ops); ops.length = 0;
       // Removals last, so an admin is never left without a role in between.
       del('user_titles', 'title', have.titles.filter((x) => !want.titles.includes(x)));
@@ -186,7 +188,7 @@ function aiApi(client: SupabaseClient) {
 // coachAi: the V1.20 tables exist; coachAiFn: the deployed scrim-ai function has the V1.20 actions.
 // readAi (V1.30): the deployed scrim-ai function reads eFootball and CS2 screenshots (match_result).
 // practiceAi (V1.26): the deployed scrim-ai function has the weekly / meta_extract / meta_fit actions.
-export type Features = { capture: boolean; draftRoom: boolean; donny: boolean; pelatnas: boolean; ai: boolean; aiPlan: boolean; coachAi: boolean; coachAiFn: boolean; practiceAi: boolean; brainAi: boolean; readAi: boolean };
+export type Features = { capture: boolean; draftRoom: boolean; donny: boolean; pelatnas: boolean; ai: boolean; aiPlan: boolean; coachAi: boolean; coachAiFn: boolean; practiceAi: boolean; brainAi: boolean; readAi: boolean; support: boolean; supportAi: boolean };
 export async function probeFeatures(client: SupabaseClient): Promise<Features> {
   const has = async (table: string) => {
     try {
@@ -195,10 +197,10 @@ export async function probeFeatures(client: SupabaseClient): Promise<Features> {
     } catch { return false; }
   };
   const ai = async () => {
-    try { const { data, error } = await client.functions.invoke('scrim-ai', { body: { action: 'ping' } }); const d = (data || {}) as { ai?: boolean; actions?: string[] }; return { on: !error && !!d.ai, plan: !error && !!d.ai && (d.actions || []).includes('plan'), coach: !error && !!d.ai && (d.actions || []).includes('prep'), practice: !error && !!d.ai && (d.actions || []).includes('meta_fit'), brain: !error && !!d.ai && (d.actions || []).includes('brainstorm'), read: !error && !!d.ai && (d.actions || []).includes('match_result') }; } catch { return { on: false, plan: false, coach: false, practice: false, brain: false, read: false }; }
+    try { const { data, error } = await client.functions.invoke('scrim-ai', { body: { action: 'ping' } }); const d = (data || {}) as { ai?: boolean; actions?: string[] }; return { on: !error && !!d.ai, plan: !error && !!d.ai && (d.actions || []).includes('plan'), coach: !error && !!d.ai && (d.actions || []).includes('prep'), practice: !error && !!d.ai && (d.actions || []).includes('meta_fit'), brain: !error && !!d.ai && (d.actions || []).includes('brainstorm'), read: !error && !!d.ai && (d.actions || []).includes('match_result'), sup: !error && !!d.ai && (d.actions || []).includes('support_parse') }; } catch { return { on: false, plan: false, coach: false, practice: false, brain: false, read: false, sup: false }; }
   };
-  const [capture, draftRoom, donny, pelatnas, coachAi, aiOn] = await Promise.all([has('scrim_games'), has('draft_books'), has('readiness_store'), has('pelatnas_availability'), has('prep_packs'), ai()]);
-  return { capture, draftRoom, donny, pelatnas, ai: aiOn.on, aiPlan: aiOn.plan, coachAi, coachAiFn: aiOn.coach, practiceAi: aiOn.practice, brainAi: aiOn.brain, readAi: aiOn.read };
+  const [capture, draftRoom, donny, pelatnas, coachAi, aiOn, support] = await Promise.all([has('scrim_games'), has('draft_books'), has('readiness_store'), has('pelatnas_availability'), has('prep_packs'), ai(), has('support_reports')]);
+  return { capture, draftRoom, donny, pelatnas, ai: aiOn.on, aiPlan: aiOn.plan, coachAi, coachAiFn: aiOn.coach, practiceAi: aiOn.practice, brainAi: aiOn.brain, readAi: aiOn.read, support, supportAi: aiOn.sup };
 }
 
 async function start(client: SupabaseClient, userId: string) {

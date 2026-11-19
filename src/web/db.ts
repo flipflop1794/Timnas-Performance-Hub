@@ -19,6 +19,8 @@ export const TABLES: Record<string, string> = {
   leadership_briefs: 'leadership_briefs', prep_packs: 'prep_packs', weakness_tags: 'weakness_tags',
   // V1.16 Pelatnas board
   pelatnas_availability: 'pelatnas_availability', pelatnas_attendance: 'pelatnas_attendance',
+  // V1.34 support staff daily reports and the neutral notices for coaches
+  support_reports: 'support_reports', support_notices: 'support_notices',
 };
 const WELLBEING = new Set(['wellbeing_checkins', 'wellbeing_load', 'readiness_store']);
 const CONFIG_KEYS = new Set(['runbooks', 'rules', 'pelatnas']);
@@ -241,9 +243,16 @@ export function createHubDb(client: SupabaseClient, opts: HubDbOptions) {
     if (v.data) versions.set(`${table}:${id}`, String((v.data as Doc).updated_at));
     return data as Doc;
   }
+  // V1.34: counts without names or text (anyone signed in), for the support staff measurements.
+  async function supportSummary(from: string, to: string): Promise<Doc | null> {
+    const { data, error } = await client.rpc('support_summary', { d_from: from, d_to: to });
+    if (error) throw friendlyError(error, 'read');
+    return (data as Doc) || null;
+  }
   return {
     collection,
     approve,
+    supportSummary,
     doc(path: string) { const [c, id] = path.split('/'); if (c !== 'config' || !id) throw new Error(`Unsupported document path: ${path}`); return configDoc(id); },
   };
 }

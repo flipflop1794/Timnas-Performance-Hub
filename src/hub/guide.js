@@ -36,6 +36,19 @@ export const GUIDE = [
       'Catatan pemain hanya soal performa. Tanpa kesehatan, keluarga atau kontak (hub menolak nomor HP dan nomor ID).',
       'Laporan tersimpan tidak bisa diubah: tambahkan koreksi bertanggal di bawahnya.',
     ] }),
+  S('support', 'support', { en: 'Team doctor, physios, physical coach, psychologist', id: 'Dokter tim, fisio, pelatih fisik, psikolog' }, 'support',
+    { title: 'Support staff: the daily report', steps: [
+      'Performance → Support staff. Three questions: what you did, what you found, which athletes you saw.',
+      'Fastest: paste the message you send to the WhatsApp group and press "Fill the form (AI)". Check the rows (athlete, finding, treatment, VAS), then "Save report". The group can keep going: "Copy for WhatsApp" gives the same text back.',
+      'Only you, Coach Donny, the Head Coach and admins read the details. Tick "Tell the coach" on an athlete to send one neutral line (no diagnosis) to that team\'s coaches.',
+      'Coach Donny, the Head Coach and admins see who has reported today, the week\'s numbers and what to watch (athletes seen 3+ times, open follow-ups, worse or still in pain). Everyone else sees counts only.',
+    ] },
+    { title: 'Tim pendukung: laporan harian', steps: [
+      'Performance → Tim pendukung. Tiga pertanyaan: apa yang dilakukan, apa temuannya, atlet siapa saja hari ini.',
+      'Paling cepat: tempel pesan yang Anda kirim ke grup WhatsApp lalu tekan "Isi formulir (AI)". Cek barisnya (atlet, temuan, tindakan, VAS), lalu "Simpan laporan". Grup tetap jalan: "Salin untuk WhatsApp" memberi teks yang sama.',
+      'Detailnya hanya dibaca Anda, Coach Donny, Head Coach dan admin. Centang "Beri tahu pelatih" pada atlet untuk mengirim satu kalimat netral (tanpa diagnosa) ke pelatih timnya.',
+      'Coach Donny, Head Coach dan admin melihat siapa yang sudah melapor hari ini, angka mingguan dan yang perlu dipantau (atlet ditangani 3+ kali, tindak lanjut terbuka, memburuk atau masih nyeri). Yang lain hanya melihat hitungan.',
+    ] }),
   S('pelatnas', 'pelatnas', { en: 'All staff; camp dates: Head Coach, admins', id: 'Semua staf; tanggal pelatnas: Head Coach, admin' }, 'pel-day',
     { title: 'Pelatnas: dates, availability, attendance', steps: [
       'Pelatnas → Availability: the camp dates stay "TBD" until the Head Coach or an admin records them, and "proposed" until PB ESI confirms them.',
@@ -173,12 +186,14 @@ export const GUIDE = [
   S('admin', null, { en: 'Admins', id: 'Admin' }, 'admin-users',
     { title: 'For admins', steps: [
       'Staff → Users & access: give each invited person a role and their games. Changes apply after they reload.',
+      'Support staff (team doctor, physios, physical coach, psychologist): pick their job under "Support staff job"; that also gives the support role. They see only Performance → Support staff and the Guide.',
       '"What is switched on" lists newer parts not yet active on this site and what to run.',
       '"AI use this month": calls, failures and estimated cost. Set the real monthly limit in the Claude Console.',
       'Export: one JSON file of everything you can read. It may contain wellbeing data: store it securely.',
     ] },
     { title: 'Untuk admin', steps: [
       'Staff → Users & access: beri setiap orang yang diundang peran dan game-nya. Berlaku setelah mereka memuat ulang.',
+      'Tim pendukung (dokter, fisio, pelatih fisik, psikolog): pilih jabatannya di "Support staff job"; itu sekaligus memberi peran tim pendukung. Mereka hanya melihat Performance → Tim pendukung dan Guide.',
       '"What is switched on" menampilkan bagian baru yang belum aktif di situs ini dan apa yang perlu dijalankan.',
       '"AI use this month": jumlah panggilan, gagal dan perkiraan biaya. Atur batas bulanan sebenarnya di Claude Console.',
       'Export: satu file JSON berisi semua yang bisa Anda baca. Bisa berisi data wellbeing: simpan dengan aman.',
