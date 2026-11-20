@@ -90,12 +90,16 @@ t('Head Coach and assistant coaches read every title; a coach of another title s
   assert.equal((await rows('indra', 'select id from public.scrim_reports where id = $1', ['RP-3'])).length, 0);
 });
 
-t('a submitted report cannot be changed, even by an admin; corrections are added rows with their own author', async () => {
-  // No update policy exists: an update by any signed-in user changes nothing; a privileged session is stopped by the trigger.
-  const up = await as('aufa', (x) => x(`update public.scrim_reports set data = jsonb_set(data, '{worked}', '"edited"') where id = 'RP-1'`));
-  assert.equal(up.rowCount, 0);
-  assert.equal((await rows('fayad', `select data->>'worked' as w from public.scrim_reports where id = 'RP-1'`))[0].w, 'w');
-  await assert.rejects(db.query(`update public.scrim_reports set data = jsonb_set(data, '{worked}', '"edited"') where id = 'RP-1'`), /cannot be changed/);
+t('V1.36 a report is edited by its author or the Head Coach / admins; every edit is in record_history; corrections are added rows with their own author', async () => {
+  // A coach of another title cannot edit it (nothing changes); the author can; the database keeps the old version.
+  assert.equal((await as('christie', (x) => x(`update public.scrim_reports set data = jsonb_set(data, '{worked}', '"x"') where id = 'RP-1'`))).rowCount, 0);
+  assert.equal((await as('indra', (x) => x(`update public.scrim_reports set data = jsonb_set(data, '{worked}', '"edited"') where id = 'RP-1'`))).rowCount, 1);
+  assert.equal((await as('aufa', (x) => x(`update public.scrim_reports set data = jsonb_set(data, '{worked}', '"edited again"') where id = 'RP-1'`))).rowCount, 1);
+  assert.equal((await rows('fayad', `select data->>'worked' as w from public.scrim_reports where id = 'RP-1'`))[0].w, 'edited again');
+  const h = await rows('fayad', `select editor, before->>'worked' as b, after->>'worked' as a from public.record_history where tbl = 'scrim_reports' and record_id = 'RP-1' order by id`);
+  assert.deepEqual(h.map((x) => [x.editor, x.b, x.a]), [[U.indra, 'w', 'edited'], [U.aufa, 'edited', 'edited again']]);
+  assert.equal((await rows('christie', `select id from public.record_history where record_id = 'RP-1'`)).length, 0, 'history follows the report\'s access');
+  await assert.rejects(as('aufa', (x) => x(`delete from public.record_history`)), /permission denied/, 'nobody deletes history');
   await as('indra', (x) => x('insert into public.scrim_report_corrections (report_id, text, by_name) values ($1, $2, $3)', ['RP-1', 'Score was 2-0', 'Coach Indra']));
   await assert.rejects(as('christie', (x) => x('insert into public.scrim_report_corrections (report_id, text, by_name) values ($1, $2, $3)', ['RP-1', 'x', 'C'])), /row-level security/);
   const c = await rows('fayad', 'select text, created_by from public.scrim_report_corrections where report_id = $1', ['RP-1']);
