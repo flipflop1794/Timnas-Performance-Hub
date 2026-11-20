@@ -5,14 +5,14 @@ const FIXED = { pubgm_logs: 'PUBG Mobile', dota_matches: 'Dota 2', dota_pools: '
 const DOC_TABLES = ['scrim_sessions', 'scrim_reports', 'coaching_objectives', 'scouting_notes', 'rival_tiers', 'rival_rosters', 'rival_vods', 'opponent_cards',
   'sparring_partners', 'wec_matches', 'player_plans', 'pubgm_logs', 'dota_matches', 'dota_pools', 'wellbeing_checkins', 'wellbeing_loads',
   'scrim_games', 'scrim_captures', 'pattern_findings', 'player_aliases',
-  'draft_pools', 'draft_books', 'mock_drafts', 'draft_drills', 'pro_games', 'readiness_store', 'pelatnas_availability', 'pelatnas_attendance',
+  'draft_pools', 'draft_books', 'mock_drafts', 'draft_drills', 'pro_games', 'readiness_store', 'pelatnas_availability', 'pelatnas_attendance', 'camp_plans',
   'leadership_briefs', 'prep_packs', 'weakness_tags'];
 // V1.34 support staff reports (author + Donny + Head Coach + admins) and notices (title-scoped).
 const SUPPORT = new Set(['support_reports', 'support_notices']);
 
 export function backend() {
   const B = { users: [], tables: {}, channels: new Set(), log: [] };
-  for (const t of [...DOC_TABLES, 'support_reports', 'support_notices', 'scrim_report_corrections', 'app_config', 'roster_players', 'profiles', 'user_roles', 'user_titles']) B.tables[t] = [];
+  for (const t of [...DOC_TABLES, 'support_reports', 'support_notices', 'record_history', 'scrim_report_corrections', 'app_config', 'roster_players', 'profiles', 'user_roles', 'user_titles']) B.tables[t] = [];
   B.addUser = (u) => { B.users.push(u); B.tables.profiles.push({ id: u.id, email: u.email, display_name: u.name, staff_key: u.staffKey || null, created_at: new Date().toISOString() });
     for (const r of u.roles || []) B.tables.user_roles.push({ user_id: u.id, role: r }); for (const t of u.titles || []) B.tables.user_titles.push({ user_id: u.id, title: t }); };
   const roles = (id) => B.tables.user_roles.filter((r) => r.user_id === id).map((r) => r.role);
@@ -29,6 +29,7 @@ export function backend() {
     if (!uid) return false;
     if (WELL.has(table)) return canWell(uid);
     if (table === 'support_reports') return row.created_by === uid || supRead(uid);
+    if (table === 'record_history') { const r = B.tables[row.tbl]?.find((x) => x.id === row.record_id); return !!r && B.readable(uid, row.tbl, r); }
     if (table === 'support_notices') return canRead(uid, row.title) || supWrite(uid);
     if (DOC_TABLES.includes(table)) return canRead(uid, row.title);
     if (table === 'scrim_report_corrections') { const r = B.tables.scrim_reports.find((x) => x.id === row.report_id); return !!r && canRead(uid, r.title); }
@@ -45,7 +46,8 @@ export function backend() {
     }
     if (table === 'scrim_games' && op === 'update') return { code: '42501', message: 'Submitted records cannot be changed. Add a correction instead.' };
     if (table === 'scrim_games' && op === 'insert' && !B.tables.scrim_reports.some((r) => r.id === row.data?.reportId && r.title === row.data?.title)) return { code: '23503', message: 'The scrim report for this game was not found. Save the report first.' };
-    if (table === 'scrim_reports' && op === 'update') return { code: '42501', message: 'Submitted records cannot be changed. Add a correction instead.' };
+    if (table === 'scrim_reports' && op === 'update') return canRead(uid, old?.title) && (old?.created_by === uid || has(uid, 'admin') || has(uid, 'head_coach') || has(uid, 'assistant_coach')) ? null : deny;
+    if (table === 'record_history') return deny;
     if (DOC_TABLES.includes(table)) {
       if (row.data?.origin !== 'operational') return { code: '22023', message: 'Only operational records can be stored (origin must be "operational").' };
       // V1.16 guard_approval: "approved" only via approve_record.
@@ -65,6 +67,12 @@ export function backend() {
   B.roles = roles;
   B.canApprove = (id) => has(id, 'admin') || has(id, 'head_coach') || has(id, 'assistant_coach');
   B.notify = (table) => { for (const ch of B.channels) for (const h of ch.handlers) if (h.table === table) setTimeout(h.cb, 0); };
+  B.logEdit = (uid, table, old, now) => {
+    if (!['support_reports', 'scrim_reports'].includes(table) || !old || JSON.stringify(old.before) === JSON.stringify(old.after)) return;
+    const name = B.tables.profiles.find((x) => x.id === uid)?.display_name || '';
+    B.tables.record_history.push({ id: B.tables.record_history.length + 1, tbl: table, record_id: old.id, editor: uid, editor_name: name, at: now, before: old.before, after: old.after });
+    B.notify('record_history');
+  };
   B.client = (sessionUserId) => client(B, sessionUserId);
   return B;
 }
@@ -122,6 +130,7 @@ function client(B, sessionUserId) {
         for (const row of payload) {
           const i = action === 'upsert' ? T.findIndex((r) => r[conflict] === row[conflict]) : -1;
           const s = stamp(table, structuredClone(row), i >= 0 ? T[i] : null);
+          if (i >= 0) B.logEdit(id, table, { id: T[i].id, before: T[i].data, after: s.data }, s.updated_at);
           if (i >= 0) T[i] = s; else T.push(s);
           B.log.push({ table, action, by: id, row: s }); written.push(s);
         }
@@ -130,7 +139,7 @@ function client(B, sessionUserId) {
       if (action === 'update') {
         const rows = T.filter(match);
         for (const r of rows) { const err = B.write(id, table, 'update', { ...r, ...payload }, r); if (err) return { data: null, error: err }; }
-        for (const r of rows) { Object.assign(r, payload); if (DOC_TABLES.includes(table) || table === 'app_config') { r.updated_by = id; r.updated_at = new Date(Date.now() + ++tick).toISOString(); } }
+        for (const r of rows) { const before = structuredClone(r.data); Object.assign(r, payload); if (DOC_TABLES.includes(table) || table === 'app_config') { r.updated_by = id; r.updated_at = new Date(Date.now() + ++tick).toISOString(); } B.logEdit(id, table, { id: r.id, before, after: r.data }, new Date(Date.now() + ++tick).toISOString()); }
         B.notify(table); return { data: returning ? rows.map((x) => structuredClone(x)) : null, error: null };
       }
       if (action === 'delete') {
@@ -186,9 +195,11 @@ function client(B, sessionUserId) {
       }
       // V1.34 counts without names (anyone signed in), like public.support_summary().
       if (name === 'support_summary') {
-        if (!B.roles(uid()).length) return { data: null, error: null };
-        const inP = B.tables.support_reports.map((r) => r.data).filter((d) => d.date >= args.d_from && d.date <= args.d_to);
-        const rows = inP.flatMap((d) => (d.rows || []).map((x) => ({ day: d.date, disc: d.discipline, title: x.title, response: x.response, followUp: !!x.followUp, vasBefore: x.vasBefore ?? null, vasAfter: x.vasAfter ?? null, athlete: x.athlete })));
+        const me = uid(); const all = B.supRead(me) || B.roles(me).includes('leadership'); const own = B.roles(me).includes('support');
+        if (!all && !own) return { data: null, error: null };
+        const inP = B.tables.support_reports.filter((r) => all || r.created_by === me).map((r) => r.data).filter((d) => d.date >= args.d_from && d.date <= args.d_to);
+        const fu = (v) => v != null && v !== false && v !== '' && v !== 'false';
+        const rows = inP.flatMap((d) => (d.rows || []).map((x) => ({ day: d.date, disc: d.discipline, title: x.title, response: x.response, followUp: fu(x.followUp), session: x.session ?? null, vasBefore: x.vasBefore ?? null, vasAfter: x.vasAfter ?? null, athlete: x.athlete })));
         const n = {}; for (const r of rows) if (r.athlete) n[r.athlete] = (n[r.athlete] || 0) + 1;
         return { data: { reports: inP.map((d) => ({ day: d.date, disc: d.discipline })), rows: rows.map(({ athlete, ...x }) => x), repeat: Object.values(n).filter((k) => k >= 3).length }, error: null };
       }

@@ -8,9 +8,13 @@ import { JSDOM } from 'jsdom';
 import { backend } from './fake-supabase.js';
 
 let html;
-before(() => {
+before(async () => {
   execFileSync(process.execPath, ['tools/build.mjs', '--web-test'], { cwd: new URL('../..', import.meta.url) });
-  html = readFileSync(new URL('../../dist-web-test/index.html', import.meta.url), 'utf8');
+  // Another test file may be rewriting the build: wait for a complete file.
+  for (let i = 0; i < 100; i++) {
+    try { html = readFileSync(new URL('../../dist-web-test/index.html', import.meta.url), 'utf8'); if (/<\/html>\s*$/.test(html)) break; } catch { /* being rewritten */ }
+    await new Promise((r) => setTimeout(r, 100));
+  }
 });
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const people = {

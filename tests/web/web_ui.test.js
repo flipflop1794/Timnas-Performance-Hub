@@ -10,9 +10,13 @@ import { backend } from './fake-supabase.js';
 import { localDay, shiftDay } from '../../src/core/dates.js';
 
 let html;
-before(() => {
+before(async () => {
   execFileSync(process.execPath, ['tools/build.mjs', '--web-test'], { cwd: new URL('../..', import.meta.url) });
-  html = readFileSync(new URL('../../dist-web-test/index.html', import.meta.url), 'utf8');
+  // Another test file may be rewriting the build: wait for a complete file.
+  for (let i = 0; i < 100; i++) {
+    try { html = readFileSync(new URL('../../dist-web-test/index.html', import.meta.url), 'utf8'); if (/<\/html>\s*$/.test(html)) break; } catch { /* being rewritten */ }
+    await new Promise((r) => setTimeout(r, 100));
+  }
 });
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const people = {
@@ -204,6 +208,26 @@ test('corrections are added, never overwrite the report, and show who entered th
   assert.equal(B.tables.scrim_report_corrections.length, 1); assert.equal(B.tables.scrim_report_corrections[0].created_by, 'u-indra');
   assert.equal(B.tables.scrim_reports[0].data.result.lost, 1); assert.deepEqual(B.tables.scrim_reports[0].data.notes, []);
   assert.match(indra.text(), /Correction .* Coach Indra: Score was 2-0, not 2-1/);
+});
+
+test('V1.36 a scrim report is edited in place; the database records who changed what, and the Head Coach sees "Edited 1×"', async () => {
+  const B = world(); const indra = await open(B, 'indra', 'mlbb-reports');
+  indra.set('rp-MLBB-partner', 'X'); indra.set('rp-MLBB-won', '2'); indra.set('rp-MLBB-lost', '1'); indra.set('rp-MLBB-focus', 'f'); indra.set('rp-MLBB-progress', '3'); indra.set('rp-MLBB-failed', 'x'); indra.set('rp-MLBB-adjust', 'y');
+  await indra.click('[data-report-save="MLBB"]'); await sleep(400);
+  const id = B.tables.scrim_reports[0].id;
+  await indra.click(`[data-rp-edit="${id}"]`); await sleep(150);
+  assert.match(indra.text(), /Edit scrim report/); assert.equal(indra.d.getElementById('rp-MLBB-partner').value, 'X', 'the form holds the saved report');
+  indra.set('rp-MLBB-lost', '0'); indra.set('rp-MLBB-adjust', 'Vision before turtle');
+  await indra.click('[data-report-save="MLBB"]'); await sleep(400);
+  assert.match(indra.d.getElementById('rpMsg-MLBB').textContent, /Changes saved/);
+  assert.equal(B.tables.scrim_reports.length, 1, 'no second report'); assert.equal(B.tables.scrim_reports[0].data.result.lost, 0);
+  assert.equal(B.tables.scrim_reports[0].created_by, 'u-indra', 'still his report');
+  const h = B.tables.record_history; assert.equal(h.length, 1); assert.equal(h[0].tbl, 'scrim_reports'); assert.equal(h[0].editor_name, 'Coach Indra');
+  assert.equal(h[0].before.adjust, 'y'); assert.equal(h[0].after.adjust, 'Vision before turtle');
+  const fayad = await open(B, 'fayad', 'mlbb-reports'); await sleep(300);
+  assert.match(fayad.text(), /Edited 1× · last by Coach Indra/);
+  await fayad.click('[data-rp-hist]'); await sleep(200);
+  assert.match(fayad.d.querySelector('.overlay').textContent, /Vision before turtle/);
 });
 
 test('wellbeing: the Head Coach is refused by the backend; the readiness owner can record and read', async () => {

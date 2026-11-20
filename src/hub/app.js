@@ -18,6 +18,8 @@ import { simulate, DEFAULT_ASSUMPTIONS } from '../pubgm/simulator.js';
 import { dotaTeamPipeline, dotaMatchPipeline, pubgmPipeline, todayList, PUBGM_MIN_MATCHES } from './pipeline.js';
 import { mmss, round, pct } from '../core/stats.js';
 import { STAFF, TITLES as WEC_TITLES, WELLBEING, owner, ownerNote, reviewersFor, queueFor } from '../core/staff.js';
+import { playersOf, coachesOf, nameLabel } from '../core/people.js';
+import { historyOf } from '../core/history.js';
 // Website build: the signed-in account (src/web/main.ts). Absent in the Claude artifact build.
 const HUB_USER = (typeof window !== 'undefined' && window.__HUB_USER__) || null;
 const PLATFORM = (typeof window !== 'undefined' && window.__HUB_PLATFORM__) || null;
@@ -77,6 +79,7 @@ import { BRAIN_MAX, planBrainMaterial, checkReply, sessionText } from '../core/b
 import { numbersIn, numbersOk, grounded, aiFeedback, aiEdit, feedbackFor, feedbackStats, FEEDBACK_RATINGS } from '../core/ai_feedback.js';
 import { draftRoomUi } from './draftroom_ui.js';
 import { pelatnasUi } from './pelatnas_ui.js';
+import { campPlanUi } from './camp_plan_ui.js';
 import { guidePage } from './guide.js';
 import { dailySessionsUi, dailyLink } from './daily_sessions_ui.js';
 import { dailyText } from './daily_sessions_strings.js';
@@ -130,6 +133,7 @@ const capUi = () => (FEAT.capture ? capUiReal() : CAP_OFF);
 let DR = null;
 const drUi = () => (DR ||= draftRoomUi({ S, esc, tag, banner, setMsg, val, render, meName, sid, focus: () => focusOn(), HUB_USER, CAN_APPROVE }));
 let PL = null;
+let CP = null;
 // V1.20 coach AI (src/hub/coach_ai_ui.js): weekly leadership summary, preparation packs, weaknesses, PUBGM screenshots.
 let CO = null;
 let SU = null;
@@ -150,6 +154,8 @@ const BAR_HIDE = new Set(['mlbb-rivals', 't-mlbbw-rivals', 't-efootball-rivals',
 const tabShown = (id, view) => (SUPPORT_ONLY && ['readiness', 'players', 'well-day', 'well-log'].includes(id) ? false : SUB_OF[id] ? false : BAR_HIDE.has(id) ? id === view : !focusOn() || !FOCUS_HIDE.has(id) || id === view);
 const canSetDates = () => !HUB_USER || HUB_USER.isAdmin || HUB_USER.roles.includes('head_coach');
 const plUi = () => (PL ||= pelatnasUi({ S, esc, tag, banner, setMsg, val, render, meName, sid, localDay, shiftDay, titleVisible: (t) => titleVisible(t), canSetDates }));
+// V1.35 camp plan: each title's staff edit their own plan (the database enforces the same rule).
+const cpUi = () => (CP ||= campPlanUi({ S, esc, tag, banner, setMsg, val, render, meName, sid, localDay, titleVisible: (t) => titleVisible(t), canEdit: (t) => !HUB_USER || canWriteSession(HUB_USER, t), loadsVisible: () => S.wellAccess === 'ok' }));
 const heroByName = () => Object.fromEntries(Object.values(S.heroes).map((h) => [h.name.toLowerCase(), h.id]));
 const accounts = () => Object.values(S.players).map((p) => p.account);
 const WEC_DOTA = ['Greece', 'South Africa', 'Egypt', 'Venezuela', 'Argentina', 'Kazakhstan', 'Mongolia', 'Iran', 'Belarus', 'North Macedonia', 'New Zealand'];
@@ -263,6 +269,7 @@ async function initCaps() {
     if (FEAT.capture) try { capUi().subscribe(db); } catch { /* older store without the V1.13 collections */ }
     if (FEAT.draftRoom) try { drUi().subscribe(db); } catch { /* older store without the V1.14 collections */ }
     if (FEAT.pelatnas) try { plUi().subscribe(db); } catch { /* older store without the V1.16 collections */ }
+    if (FEAT.pelatnas) try { cpUi().subscribe(db); } catch { /* older store without the V1.35 camp plans */ }
     if (FEAT.coachAi) try { coUi().subscribe(db); } catch { /* older store without the V1.20 collections */ }
     try { supUi().subscribe(db); } catch { /* support tables not in the database yet */ }
     on(db.collection('wec_matches'), 'WEC matches', (snap) => { S.wecMatches = snap.docs.map((d) => d.data()).filter((x) => x?.origin === 'operational'); render(); });
@@ -324,7 +331,7 @@ const GAME_HUBS = [
 const hubTabs = (h) => [[h.team, 'Team'], [`${h.team}-scrims`, 'Scrims & practice'], [`${h.team}-reports`, 'Scrim reports'], [`${h.team}-trends`, 'Analysis'], ...(FEAT.coachAi ? [[`${h.team}-weak`, 'Weaknesses']] : []), ...(gameOf(h.title) && FEAT.capture ? [[`${h.team}-patterns`, 'Patterns']] : []), [`${h.team}-rivals`, 'Competitors'], [`${h.team}-meta`, 'Meta'], ...(FEAT.brainAi ? [[`${h.team}-brain`, 'Brainstorm']] : []), ...(h.draftRoom && FEAT.draftRoom ? [[`${h.team}-draft`, 'Draft Room']] : [])];
 const TITLES = [
   { id: 'home', label: 'Today', tabs: [['today', 'My day'], ['overview', 'Main dashboard'], ...(HUB_USER ? [['daily-sessions', 'Daily sessions']] : []), ['board', 'Juara Umum board'], ['reports-all', 'Scrim reports'], ['brief', 'Weekly brief']] },
-  ...(FEAT.pelatnas ? [{ id: 'pelatnas', label: 'Pelatnas', tabs: [['pel-day', 'Schedule & attendance'], ['pel-avail', 'Availability']] }] : []),
+  ...(FEAT.pelatnas ? [{ id: 'pelatnas', label: 'Pelatnas', tabs: [['pel-plan', 'Camp plan'], ['pel-day', 'Schedule & attendance'], ['pel-avail', 'Availability']] }] : []),
   { id: 'comp', label: 'Competitors', tabs: [['comp-overview', 'All nations'], ['comp-nation', 'Nation profile'], ['comp-rosters', 'Rosters & players'], ['comp-card', 'Opponent card'], ['comp-coverage', 'Scouting coverage'], ['comp-title', 'Notes per title']] },
   { id: 'tour', label: 'Tournament', tabs: [['tour-scout', 'Live scouting'], ['tour-runbook', 'Match-day runbook'], ...(FEAT.coachAi ? [['tour-prep', 'Preparation packs']] : []), ['tour-series', 'Between games']] },
   { id: 'dota', label: 'Dota 2', tabs: [['dota-team', 'Team'], ['dota-scrims', 'Scrims & practice'], ['dota-reports', 'Scrim reports'], ['dota-trends', 'Analysis'], ...(FEAT.coachAi ? [['dota-weak', 'Weaknesses']] : []), ...(FEAT.capture ? [['dota-patterns', 'Patterns']] : []), ['dota-post', 'Post-match'], ['dota-scout', 'Competitors'], ['dota-meta', 'Meta'], ...(FEAT.brainAi ? [['dota-brain', 'Brainstorm']] : []), ['dota-draft', 'Draft room'], ['dota-review', 'Series review']] },
@@ -358,6 +365,16 @@ V.support = () => supUi().page();
 const dailyLabel = (text) => esc(dailyText(text, S.lang));
 // V1.32: the scrim report is the daily session report too, so the separate "Log a session" button is gone here.
 const dailyEntry = () => '';
+// V1.36: the squad by full name (BTN TIMNAS WEC 2026 list), nickname beside it; anyone on the hub's roster not on the list stays as written.
+function squadHtml(title, squad) {
+  const P = playersOf(title); const C = coachesOf(title);
+  const extra = squad.filter((x) => !P.some((p) => nameLabel(title, x) === nameLabel(title, p.name)));
+  if (!P.length && !squad.length) return '<p class="empty">Roster not entered in the hub yet (TBD: confirm with the title coach).</p>';
+  const nick = (x) => (x.nick && x.nick !== x.name ? ` <span class="note">(${esc(x.nick)})</span>` : '');
+  return `<ul class="plain">${P.map((x) => `<li><b data-no-tr>${esc(x.name)}</b>${nick(x)}${x.role === 'captain' ? ` ${tag('c-Verified', 'Captain')}` : ''}</li>`).join('')}
+    ${extra.map((x) => `<li data-no-tr>${esc(x)}</li>`).join('')}</ul>
+    ${C.length ? `<p class="note">${C.map((c) => `${esc(c.role === 'coach' ? 'Coach' : 'Assistant coach')}: <span data-no-tr>${esc(c.name)}</span>${c.nick && c.nick !== c.name ? ` (${esc(c.nick)})` : ''}`).join(' · ')}</p>` : ''}`;
+}
 function linkedRecord(title, record, state, card) {
   if (S.mode === 'demo') return `<div class="panel"><p>${dailyLabel('Leave the demo sandbox to log or view daily sessions.')}</p></div>`;
   const message = state === 'ready' || !titleVisible(title) ? 'Session unavailable.'
@@ -399,7 +416,7 @@ function attentionItems(me) {
   // Reports: titles with sessions this week but no report for 2+ days (or none yet).
   const stale = mine.filter((t) => GAME_SPEC[t]).map((t) => ({ t, s: reportSummary(S.reports, t, t0) })).filter((r) => !r.s.last || r.s.daysSince >= 2);
   add('today', 'Titles without a scrim report for 2+ days', stale.length, stale.map((r) => r.t).join(', '), `#${REPORT_TAB[stale[0]?.t] || 'today'}`, 'File a report');
-  if (FEAT.pelatnas) { const x = plUi().todayLine(); add('today', 'Sessions today without attendance', x.sessions - x.taken, '', '#pel-day', 'Take attendance'); add('week', 'Players who have not answered about availability', x.open, '', '#pel-avail', 'Availability'); }
+  if (FEAT.pelatnas) { const x = plUi().todayLine(); add('today', 'Sessions today without attendance', x.sessions - x.taken, '', '#pel-day', 'Take attendance'); add('week', 'Players who have not answered about availability', x.open, '', '#pel-avail', 'Availability'); add('today', 'Camp plan days not marked yet', cpUi().todayLine(), '', '#pel-plan', 'Mark the days'); }
   if ((me.id === 'donny' || me.id === 'fayad') && S.wellAccess !== 'denied') {
     const talk = WEC_TITLES.reduce((a, t) => a + teamDay(S.roster[t.id] || [], t0, S.well.checkins, S.well.loads).toCheck.length, 0);
     add('today', 'Players to talk to (wellbeing flags)', talk, '', '#well-day', 'Daily check');
@@ -439,6 +456,7 @@ function wellTodayPanel() {
     ${rows.map((r) => `<tr><td>${esc(r.t)}</td><td class="n">${r.d.total ? `${r.d.done}/${r.d.total}` : 'roster not entered'}</td><td class="n">${r.d.toCheck.length}</td></tr>`).join('')}</tbody></table></div>
     ${flagged.length ? `<ul class="plain">${flagged.map((f) => `<li><b>${esc(f.player)}</b> (${esc(f.title)}): ${f.flags.filter((x) => x.level === 'check').map((x) => esc(x.text)).join(' ')}</li>`).join('')}</ul>` : '<p class="note">No flags today.</p>'}<div class="toolbar"><a class="btn" href="#well-day">Daily check</a></div></div>`;
 }
+V['pel-plan'] = () => cpUi().page();
 V['pel-day'] = () => plUi().dayPage();
 V['pel-avail'] = () => plUi().availPage();
 V.today = () => {
@@ -584,7 +602,7 @@ function breakdownPanel(title) {
     <p class="note">A first draft per confirmed game for the analyst: the draft, the time, and each player's numbers against their own usual level (median of at least ${BASE_MIN} earlier confirmed games; ${FLAG_PCT}% or more away is a stand-out). Edit it, add your notes, then add it to the scrim report as a follow-up note.</p>
     ${games.map((g) => { const b = gameBreakdown(g, all); const rep = S.reports.find((r) => r.id === g.reportId); const fid = sid(g.id);
       return `<details class="obj"><summary><b>${esc(g.date)} · game ${g.gameNo} vs ${esc(g.partner || '—')}</b> · ${esc(g.result)} · ${esc(b.duration)}${b.flagged ? ` ${tag('c-Medium', `${b.flagged} stand-out${b.flagged > 1 ? 's' : ''}`)}` : ''}</summary>
-        <div class="tw"><table><thead><tr><th>Player</th><th>Hero</th><th>K/D/A</th><th>Against usual level</th></tr></thead><tbody>${b.players.map((p) => `<tr><td>${esc(p.player)}</td><td>${esc(p.hero)}</td><td>${esc(p.kda)}</td><td>${p.flags.length ? p.flags.map((f) => `${tag(f.better ? 'c-Verified' : 'c-Blocked', `${f.stat} ${f.pct > 0 ? '+' : ''}${f.pct}%`)} <span class="note">${f.value} vs ${f.usual}</span>`).join(' ') : `<span class="note">${p.baseN >= BASE_MIN ? 'Nothing stands out' : 'Not enough earlier games'}</span>`}</td></tr>`).join('')}</tbody></table></div>
+        <div class="tw"><table><thead><tr><th>Player</th><th>Hero</th><th>K/D/A</th><th>Against usual level</th></tr></thead><tbody>${b.players.map((p) => `<tr><td data-no-tr>${esc(nameLabel(title, p.player))}</td><td>${esc(p.hero)}</td><td>${esc(p.kda)}</td><td>${p.flags.length ? p.flags.map((f) => `${tag(f.better ? 'c-Verified' : 'c-Blocked', `${f.stat} ${f.pct > 0 ? '+' : ''}${f.pct}%`)} <span class="note">${f.value} vs ${f.usual}</span>`).join(' ') : `<span class="note">${p.baseN >= BASE_MIN ? 'Nothing stands out' : 'Not enough earlier games'}</span>`}</td></tr>`).join('')}</tbody></table></div>
         <label class="field" for="bd-${fid}">Breakdown (edit before adding)<textarea id="bd-${fid}" rows="6">${esc(breakdownText(b, S.lang))}</textarea></label>
         <div class="toolbar">${rep && S.mode !== 'demo' ? `<button class="btn primary" type="button" data-bd-note="${esc(g.id)}">Add to the scrim report</button>` : '<span class="note">No scrim report linked to this game.</span>'}<span class="msg" id="bdMsg-${fid}" role="status"></span></div></details>`; }).join('')}</div>`;
 }
@@ -774,6 +792,38 @@ function observationForm(defTitle) {
 const localToday = localDay;
 const safeUrl = (u) => (/^https?:\/\//i.test(u) ? u : '');
 const trendTag = (t) => (t === 'up' ? tag('c-Verified', 'improving') : t === 'down' ? tag('c-Blocked', 'slipping') : t === 'steady' ? tag('k-observed', 'steady') : '');
+// V1.36: scrim reports can be edited; the database keeps every earlier version (record_history).
+const canEditReport = (r) => S.mode !== 'demo' && (!HUB_USER || HUB_USER.roles.some((x) => ['admin', 'head_coach', 'assistant_coach'].includes(x)) || r.by === (HUB_USER?.name || meName()));
+const fmtWib = (at) => { const d = new Date(at); return Number.isNaN(d.getTime()) ? String(at || '') : `${d.toLocaleString(S.lang === 'id' ? 'id-ID' : 'en-GB', { timeZone: 'Asia/Jakarta', day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit', hour12: false })} WIB`; };
+async function loadRpHist(force = false) {
+  if (!S.db?.history || (!force && Date.now() - (S.rpHistAt || 0) < 60000)) return;
+  S.rpHistAt = Date.now();
+  try { S.rpHist = await S.db.history('scrim_reports'); render(); } catch { /* history not available yet */ }
+}
+function scrimEditBar(r) {
+  const h = historyOf(S.rpHist || [], r.id, 'scrim'); const last = h.at(-1);
+  if (!h.length && !canEditReport(r)) return '';
+  return `<div class="toolbar">${h.length ? `<button type="button" class="linkbtn" data-rp-hist="${esc(r.id)}">${tag('c-Medium', `Edited ${h.length}× · last by ${last.by || '—'}, ${fmtWib(last.at)}`)}</button>` : ''}${canEditReport(r) ? `<button type="button" class="btn" data-rp-edit="${esc(r.id)}">Edit</button>` : ''}</div>`;
+}
+function rpHistOverlay() {
+  if (!S.rpHistFor) return '';
+  const r = S.reports.find((x) => x.id === S.rpHistFor); const h = historyOf(S.rpHist || [], S.rpHistFor, 'scrim');
+  return `<div class="overlay" role="dialog" aria-modal="true" aria-labelledby="rpHistT"><div class="overlay-box">
+    <div class="overlay-head"><b id="rpHistT">Edit history</b><button type="button" class="linkbtn" data-rp-histx="1" aria-label="Close">✕</button></div>
+    ${r ? `<p class="note">${esc(r.date)} · vs <span data-no-tr>${esc(r.partner)}</span> · <span data-no-tr>${esc(r.by)}</span></p>` : ''}
+    ${[...h].reverse().map((e) => `<div class="hist"><p class="note">${esc(fmtWib(e.at))} · <span data-no-tr>${esc(e.by || '—')}</span></p>
+      ${e.changes.map((c) => `<p>${esc(c.field)}: ${c.before ? `<s class="note" data-no-tr>${esc(c.before)}</s> → ` : '<span class="note">(empty)</span> → '}<span data-no-tr>${esc(c.after || '—')}</span></p>`).join('')}</div>`).join('')}
+    ${r ? `<div class="hist"><p class="note">${esc(fmtWib(r.createdAt))} · <span data-no-tr>${esc(r.by)}</span></p><p class="note">Report created</p></div>` : ''}
+    <p class="note">Recorded by the database at every save: it cannot be changed or deleted.</p></div></div>`;
+}
+// The report's values as the form's draft (for editing).
+function reportDraft(r) {
+  const R = r.result || {}; const pts = R.mode === 'points';
+  return { date: r.date, time: r.time || '', by: r.by, partner: r.partner, level: r.partnerLevel || '', format: r.format || '', roster: r.roster || '', scrim: r.scrimId || '',
+    won: pts ? '' : String(R.won ?? ''), lost: pts ? '' : String(R.lost ?? ''), drawn: pts ? '' : (R.drawn ? String(R.drawn) : ''), played: pts ? String(R.played ?? '') : '', points: pts ? String(R.points ?? '') : '',
+    avg: pts && R.avgPlacement != null ? String(R.avgPlacement) : '', chicken: pts && R.wins ? String(R.wins) : '', focus: r.focus, progress: String(r.progress || ''), worked: r.worked || '', failed: r.failed || '',
+    detail: r.detail || '', players: r.playerNotes || '', adjust: r.adjust || '', vod: r.vod || '', fix: r.fixCheck || '', rows: JSON.stringify(r.rows || []), comp: r.comp || '', at: new Date().toISOString() };
+}
 function reportCard(r) {
   const spec = GAME_SPEC[r.title];
   const pl = PROGRESS.find(([n]) => n === r.progress)?.[1] || '';
@@ -783,6 +833,7 @@ function reportCard(r) {
     ${r.detail ? `<p><b>${esc(spec.detail)}:</b> ${esc(r.detail)}</p>` : ''}${r.playerNotes ? `<p><b>Player notes:</b> ${esc(r.playerNotes)}</p>` : ''}
     ${r.prevAdjust ? `<p class="note"><b>Last adjustment</b> (${esc(r.prevAdjust)}): ${esc(r.fixCheck || 'not checked')}</p>` : ''}
     <p><b>Next session:</b> ${esc(r.adjust)}</p>${capUi().reportGames(r)}${safeUrl(r.vod) ? `<p class="note">VOD: <a href="${esc(safeUrl(r.vod))}" target="_blank" rel="noopener">${esc(r.vod)}</a></p>` : r.vod ? `<p class="note">VOD: ${esc(r.vod)}</p>` : ''}
+    ${scrimEditBar(r)}
     ${(r.notes || []).map((n) => `<p class="note">Correction ${esc(Number.isNaN(Date.parse(n.at)) ? String(n.at || '').slice(0, 10) : localDay(new Date(n.at)))} — ${esc(n.by)}: ${esc(n.text)}</p>`).join('')}
     ${S.mode === 'demo' ? '' : `<details><summary class="note">Add a correction</summary><div class="form"><label class="field" for="rpN-${r.id}">Correction or follow-up<input type="text" id="rpN-${r.id}" placeholder="e.g. Score was 2-0, not 2-1"></label></div>
       <div class="toolbar"><button class="btn" type="button" data-report-note="${esc(r.id)}">Add note</button><span class="msg" id="rpNMsg-${r.id}"></span></div></details>`}</div>`;
@@ -872,7 +923,7 @@ function trendsPage(title) {
     : `<div class="panel"><h2>Team</h2><p class="empty">No scrim reports in this period yet. File reports under Scrim reports and the lines appear here.</p></div>`}
   ${rowKind(title) === 'cs' ? mapPoolPanel(title, W) : ''}
   ${perPlayer ? `<div class="panel"><h2>Players</h2>${players.length ? `<div class="tw"><table><thead><tr><th>Player</th><th>Per game</th>${W.map((w) => `<th class="n">${wk(w)}</th>`).join('')}<th>Change</th></tr></thead><tbody>
-      ${players.flatMap((p) => p.measures.map((m, i) => `<tr>${i ? '<td></td>' : `<td><b>${esc(p.player)}</b><br><span class="note">${p.games} game${p.games === 1 ? '' : 's'}</span></td>`}<td>${esc(m.label)}${m.better === 'down' ? ' <span class="note">(lower is better)</span>' : ''}</td>${m.values.map((v, k) => `<td class="n" title="${m.counts[k]} game(s)">${trFmt(m, v)}</td>`).join('')}<td>${verdictTag(m.verdict)}</td></tr>`)).join('')}</tbody></table></div>
+      ${players.flatMap((p) => p.measures.map((m, i) => `<tr>${i ? '<td></td>' : `<td><b data-no-tr>${esc(nameLabel(title, p.player))}</b><br><span class="note">${p.games} game${p.games === 1 ? '' : 's'}</span></td>`}<td>${esc(m.label)}${m.better === 'down' ? ' <span class="note">(lower is better)</span>' : ''}</td>${m.values.map((v, k) => `<td class="n" title="${m.counts[k]} game(s)">${trFmt(m, v)}</td>`).join('')}<td>${verdictTag(m.verdict)}</td></tr>`)).join('')}</tbody></table></div>
       <details class="howto"><summary>How to read this</summary><p class="note">From coach-confirmed scrim games only (screenshot capture or typed in). ${W.by === 'day' ? 'Daily' : 'Weekly'} averages per game; stand-ins are left out.</p></details>`
     : `<p class="empty">No confirmed scrim games in this period. Add games to a scrim report (screenshot or by hand) to see each player's line.</p>`}</div>` : ''}
   <div class="panel"><h2>What the staff changed in this period</h2>${changes.length ? `<ul class="plain">${changes.map((c) => `<li><b>${esc(c.at)}</b> accepted: ${esc(c.what)}${c.drill ? ` <span class="note">— drill: ${esc(c.drill)}</span>` : ''}</li>`).join('')}</ul>` : '<p class="empty">No objective accepted in this period.</p>'}
@@ -882,6 +933,7 @@ for (const [view, title] of [['dota-trends', 'Dota 2'], ['pubgm-trends', 'PUBG M
 for (const [view, title] of [['dota-weak', 'Dota 2'], ['pubgm-weak', 'PUBG Mobile']]) V[view] = () => coUi().weaknessPage(title) + ownVodPanel(title);
 
 function reportsPanel(title) {
+  loadRpHist();
   const record = HUB_USER && viewParams().get('record');
   if (record) return linkedRecord(title, S.reports.find((r) => r.title === title && r.id === record), S.reportLoad, reportCard);
   const spec = GAME_SPEC[title]; const fid = sid(title); const t0 = localToday();
@@ -902,7 +954,7 @@ function reportsPanel(title) {
     ${(() => { const n = gameOf(title) ? capUi().waitingCount(title) : 0; return n ? banner('synth', `<div><b>${n} screenshot${n > 1 ? 's were' : ' was'} read but never confirmed into a game.</b> If ${n > 1 ? 'they were' : 'it was'} a real game, add ${n > 1 ? 'them' : 'it'} again under Games and confirm; a discarded or duplicate screenshot can be ignored.</div>`) : ''; })()}
     ${!mine.length ? '<p class="empty">No report yet.</p>' : ''}
     <details class="howto"><summary>How to read this</summary><p class="note">Progress is the coach's rating of how closely the team followed the plan of the day. It is not computed, and ratings from different coaches are not directly comparable.</p></details></div>
-  ${reportTrends(title)}${ready}${form}
+  ${reportTrends(title)}${ready}${form}${rpHistOverlay()}
   <div class="panel"><h2>Day by day</h2>${days.length ? days.slice(0, 14).map((d) => `<details ${d.date === t0 ? 'open' : ''}><summary><b>${esc(d.date)}</b> · ${d.n} session${d.n > 1 ? 's' : ''} · ${pts ? `${d.points} pts in ${d.played} m` : `${d.won}-${d.lost}${d.drawn ? `-${d.drawn}` : ''}`} · plan ${d.progress}/5 <span class="note">— ${esc(d.focus.join('; '))}</span></summary>${d.sessions.map(reportCard).join('')}</details>`).join('') : '<p class="empty">Nothing filed yet.</p>'}
     ${days.length > 14 ? `<p class="note">${days.length - 14} older day(s) are in the CSV download.</p>` : ''}
     ${mine.length ? `<div class="toolbar"><button class="btn" type="button" data-report-csv="${esc(title)}">Download CSV</button><span class="msg" id="rpCsvMsg-${fid}"></span></div>` : ''}</div>`;
@@ -1169,7 +1221,9 @@ function reportForm(title, { fid, spec, pts, unit, planned, t0 }) {
   const prog = dv('progress');
   const step = (n, label, hint) => `<div class="rpstep"><span class="rpn">${n}</span><div><b>${label}</b>${hint ? `<span class="note">${hint}</span>` : ''}</div></div>`;
   // V1.29: three steps (result → story → check and save), the voice note first in step 2, what is still missing shown live.
-  return `<div class="panel rp" id="rpForm-${fid}"><h2>File a scrim report — ${esc(title)}</h2>
+  const ed = S.rpEdit?.[fid];
+  return `<div class="panel rp" id="rpForm-${fid}"><h2>${ed ? 'Edit scrim report' : 'File a scrim report'} — ${esc(title)}</h2>
+    ${ed ? `<p class="note draftnote">Editing the report of ${esc(ed.date)} vs <span data-no-tr>${esc(ed.partner)}</span>. Saving keeps the old version in the edit history (who, what, date and time). <button type="button" class="linkbtn" data-rp-editx="${esc(fid)}">Cancel editing</button></p>` : ''}
     <p class="note">About a minute: tap the result, tell the story (speak or type), check and save.</p>
     ${hasDraft ? `<p class="note draftnote">Draft kept on this device${d.at ? ` (last typed ${esc(new Date(d.at).toTimeString().slice(0, 5))})` : ''}. <button type="button" class="linkbtn" data-rp-clear="${esc(fid)}">Clear form</button></p>` : ''}
     ${auto.partner ? `<p class="note draftnote">Filled from today's plan: vs ${esc(auto.partner)}. Change anything that is different.</p>` : ''}
@@ -1214,9 +1268,9 @@ function reportForm(title, { fid, spec, pts, unit, planned, t0 }) {
       ${txt('detail', `${esc(spec.detail)} (optional)`, spec.hint)}
       ${txt('players', 'Player notes (optional, performance only)', 'e.g. Aran: strong first lane, hesitates on second tower')}
       ${txt('vod', 'VOD link or timestamp (optional)')}</details>
-    <p class="note">One report per sparring partner · saved reports are fixed (add a correction) · performance notes only.</p>
+    <p class="note">One report per sparring partner · a saved report can be edited (every change is kept in its history) · performance notes only.</p>
     <div class="savebar"><p class="note" id="rpLeft-${fid}" aria-live="polite">${esc(rpLeftText(rpMissing(fid, pts, { values: { ...auto, ...d, progress: prog } })))}</p>
-      <div class="toolbar"><button class="btn primary" type="button" data-report-save="${esc(title)}">Save report</button><span class="msg" id="rpMsg-${fid}" role="status"></span></div></div></div>`;
+      <div class="toolbar"><button class="btn primary" type="button" data-report-save="${esc(title)}">${ed ? 'Save changes' : 'Save report'}</button>${(() => { const m = S.rpDone?.[fid]; return m && Date.now() - m.at < 20000 ? `<span class="msg ok" id="rpMsg-${fid}" role="status">${esc(m.text)}</span>` : `<span class="msg" id="rpMsg-${fid}" role="status"></span>`; })()}</div></div></div>`;
 }
 
 
@@ -1319,7 +1373,7 @@ function teamPage(title) {
   return `<div class="panel"><div class="lead">${esc(title)}</div>
     <p class="note">Focus owner: ${esc(ownerNote(title))} · title coach: ${esc(wt?.coach || 'TBD')}. No analysis engine in the hub. What staff see in VOD or scrims enters the coaching cycle as a staff observation.</p>
 </div>
-  <div class="cols"><div class="panel"><h2>Squad</h2>${squad.length ? `<p>${squad.map(esc).join(' · ')}</p><p class="note">Names as listed on the WEC site or in the decision log. Roles and details are not stored here.</p>` : '<p class="empty">Roster not entered in the hub yet (TBD: confirm with the title coach).</p>'}</div>
+  <div class="cols"><div class="panel"><h2>Squad</h2>${squadHtml(title, squad)}</div>
     <div class="panel"><h2>Scrim reports, last 7 days</h2>${Sm.sessions ? `<p><b>${spec.mode === 'points' ? `${Sm.points} points in ${Sm.matches} matches` : `${Sm.won}-${Sm.lost}${Sm.drawn ? `-${Sm.drawn}` : ''}`}</b> over ${Sm.sessions} session${Sm.sessions > 1 ? 's' : ''} · plan followed ${Sm.progress}/5 ${trendTag(Sm.trend)}</p>` : '<p class="empty">No report in the last 7 days.</p>'}
       ${Sm.carryOver ? `<p class="note">Next session starts from: ${esc(Sm.carryOver.adjust)} (${esc(Sm.carryOver.by)}, ${esc(Sm.carryOver.date)})</p>` : ''}<div class="toolbar"><a class="btn" href="#${hub.team}-reports">${S.mode === 'demo' ? 'Open reports' : 'File or read reports'}</a></div></div></div>
   ${matches.length ? `<div class="panel"><h2>WEC matches coming up</h2><ul class="plain">${matches.map((m) => `<li><b>${esc(m.date)}</b> ${esc(m.time)} · ${esc(m.stage || 'stage TBD')} · vs ${esc(m.opponent)} <a href="#tour-runbook">Runbook</a></li>`).join('')}</ul></div>` : ''}
@@ -1359,7 +1413,7 @@ V['dota-team'] = () => {
   const d = dotaTeam(); LAST.recs['Dota 2'] = d.recs;
   return `<div class="panel"><h2>Dota 2 national five — club evidence</h2>${CLUB_BANNER}${rulesFlag('dota-team')}
     <div class="tw"><table><thead><tr><th>Player</th><th>Club position</th><th class="n">Club games</th><th>Most-played in club tournaments (6+ games, last 120 days)</th><th>Data</th></tr></thead><tbody>
-    ${d.pools.map((p) => `<tr><td><b>${esc(p.player)}</b><br><span class="note">acc ${p.account}</span></td><td>${esc(p.posLabel)}</td><td class="n">${p.games}</td>
+    ${d.pools.map((p) => `<tr><td><b data-no-tr>${esc(nameLabel('Dota 2', p.player))}</b><br><span class="note">acc ${p.account}</span></td><td>${esc(p.posLabel)}</td><td class="n">${p.games}</td>
       <td><div class="chips">${p.pool.filter((e) => e.tier === 'Established').sort((a, b) => b.games - a.games).slice(0, 7).map((e) => `<span class="chip ${e.stale ? 'stale' : ''}" title="last played ${e.daysSince} days before ${esc(SHIPPED)}">${esc(e.name)} <small>${e.games}</small></span>`).join('')}</div></td>
       <td class="note">${S.freshPools[p.player] ? `refreshed ${esc(S.freshPools[p.player].slice(0, 10))}` : `retrieved ${SHIPPED}`}</td></tr>`).join('')}</tbody></table></div>
     <details class="howto"><summary>How to read this</summary><p class="note">These counts describe club experience on a hero, not readiness for the national team. Faded chips: last played over 45 days ago. Win rates are left out: at these sample sizes they say little.</p>${evidenceBox(d.evidence)}</details>
@@ -1665,7 +1719,7 @@ V.overview = () => {
     ${titles.map(row).join('')}</tbody></table></div>
     <p class="note">Practice quality: how rigorously the title practises (sessions held, objectives, reports, follow-ups), 0–100, ▲▼ against the week before. Last 7 days: scrim record (or points) and number of sessions. Results trend: last 2 weeks against the 2 before; "Better" or "Worse" only when the change is beyond chance. Tap a title or a number for the detail.</p></div>
   <div class="panel"><h2>WEC matches coming up</h2>${upcoming.length ? `<ul class="plain">${upcoming.slice(0, 8).map((m) => `<li><b>${esc(m.date)}</b>${m.time ? ` ${esc(m.time)}` : ''} · ${esc(m.title)} · ${esc(m.stage || 'stage TBD')} · vs ${esc(m.opponent)}</li>`).join('')}</ul>` : '<p class="empty">No WEC match entered yet (Tournament → Match-day runbook).</p>'}
-    <div class="toolbar"><a class="btn" href="#brief">Weekly brief</a><a class="btn" href="#staff-quality">Practice quality</a></div></div>`;
+    <div class="toolbar"><a class="btn" href="#brief">Weekly brief</a><a class="btn" href="#staff-quality">Practice quality</a></div></div>${FEAT.support ? supUi().overviewLine() : ''}`;
 };
 
 // V1.16: practice quality across titles (src/core/practice_quality.js). Priority titles first (decided 12 Nov 2026).
@@ -2459,6 +2513,7 @@ async function onClick(e) {
   if (Object.keys(t.dataset).some((k) => /^dr[A-Z]/.test(k)) && await drUi().onClick(t)) return;
   if (FEAT.coachAi && Object.keys(t.dataset).some((k) => /^co[A-Z]/.test(k)) && await coUi().onClick(t)) return;
   if (Object.keys(t.dataset).some((k) => /^pl[A-Z]/.test(k)) && await plUi().onClick(t)) return;
+  if (Object.keys(t.dataset).some((k) => /^cp[A-Z]/.test(k)) && await cpUi().onClick(t)) return;
   if (t.dataset.guideJump) { document.getElementById(`guide-${t.dataset.guideJump}`)?.scrollIntoView?.({ behavior: 'smooth', block: 'start' }); return; }
   if (t.dataset.rdMode) { S.rd.mode = t.dataset.rdMode; S.rd.key = null; render(); return; }
   const id = t.id;
@@ -3008,6 +3063,15 @@ async function onClick(e) {
   }
   if (t.dataset.rpProg) { fillReport(t.dataset.rpProg, { progress: t.dataset.v }); return; }
   if (t.dataset.rpClear) { storeDraft(t.dataset.rpClear, {}); render(); return; }
+  if (t.dataset.rpEdit) {
+    const r = S.reports.find((x) => x.id === t.dataset.rpEdit); if (!r) return;
+    const fid = sid(r.title); (S.rpEdit ||= {})[fid] = r; storeDraft(fid, reportDraft(r));
+    if (location.hash !== `#${REPORT_TAB[r.title]}`) location.hash = REPORT_TAB[r.title]; else render();
+    setTimeout(() => document.getElementById(`rpForm-${fid}`)?.scrollIntoView?.({ block: 'start' }), 80); return;
+  }
+  if (t.dataset.rpEditx) { delete S.rpEdit?.[t.dataset.rpEditx]; storeDraft(t.dataset.rpEditx, {}); render(); return; }
+  if (t.dataset.rpHist) { S.rpHistFor = t.dataset.rpHist; await loadRpHist(true); render(); return; }
+  if (t.dataset.rpHistx) { S.rpHistFor = ''; render(); return; }
   if (t.dataset.compTitle) { S.compTitle = t.dataset.compTitle; render(); return; }
   if (t.dataset.mrOk || t.dataset.mrNo || t.dataset.mrDrop) { await mrClick(t); return; }
   if (t.dataset.rrAdd || t.dataset.rrDel) { rowsClick(t); return; }
@@ -3034,6 +3098,21 @@ async function onClick(e) {
     S.rpSaving[fid] = true; t.disabled = true; setMsg(`rpMsg-${fid}`, 'Saving…');
     try {
     try {
+      const ed = S.rpEdit?.[fid];
+      if (ed) {
+        const made = scrimReport({ title, date: g('date'), time: g('time'), by: ed.by, partner: g('partner'), partnerLevel: g('level'), format: g('format'), roster: g('roster'), scrimId: ed.scrimId,
+          won: g('won'), lost: g('lost'), drawn: g('drawn'), played: g('played'), points: g('points'), avgPlacement: g('avg'), chicken: g('chicken'),
+          focus: g('focus'), progress: g('progress'), worked: g('worked'), failed: g('failed'), detail: g('detail'), playerNotes: g('players'), adjust: g('adjust'), vod: g('vod'), prevAdjust: ed.prevAdjust, fixCheck: g('fix'), asOf: localToday(),
+          drills: ed.drills || [], rows: rrRows(g('rows')), comp: g('comp') });
+        const r = { ...made, id: ed.id, createdAt: ed.createdAt, notes: ed.notes || [], editedAt: new Date().toISOString() };
+        if (S.db) await S.db.collection('scrim_reports').doc(r.id).set({ ...r, _edit: true });
+        else { (S.rpHist ||= []).push({ record_id: r.id, at: r.editedAt, editor_name: HUB_USER?.name || meName(), before: ed, after: r }); }
+        const i = S.reports.findIndex((x) => x.id === r.id); if (i >= 0) S.reports[i] = r;
+        delete S.rpEdit[fid]; storeDraft(fid, {}); await loadRpHist(true);
+        (S.rpDone ||= {})[fid] = { text: 'Changes saved. The old version is in the edit history.', at: Date.now() };
+        render(); setMsg(`rpMsg-${fid}`, S.rpDone[fid].text, 'ok');
+        return;
+      }
       const fromGames = capUi().beforeSave(title, fid);
       if (fromGames) fillReport(fid, { won: String(fromGames.won), lost: String(fromGames.lost) });
       // V1.16 one form: on the website the report is also the session's daily report. Without a planned

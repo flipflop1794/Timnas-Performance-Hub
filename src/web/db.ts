@@ -19,6 +19,8 @@ export const TABLES: Record<string, string> = {
   leadership_briefs: 'leadership_briefs', prep_packs: 'prep_packs', weakness_tags: 'weakness_tags',
   // V1.16 Pelatnas board
   pelatnas_availability: 'pelatnas_availability', pelatnas_attendance: 'pelatnas_attendance',
+  // V1.35 camp plan (periodisation), one per title
+  camp_plans: 'camp_plans',
   // V1.34 support staff daily reports and the neutral notices for coaches
   support_reports: 'support_reports', support_notices: 'support_notices',
 };
@@ -130,6 +132,14 @@ export function createHubDb(client: SupabaseClient, opts: HubDbOptions) {
 
   async function writeReport(id: string, data: Doc) {
     const notes = Array.isArray(data.notes) ? (data.notes as Doc[]) : [];
+    if (reportNotes.has(id) && data._edit) {
+      // V1.36: an edited report is updated in place; the database records who changed what, and when.
+      const clean = { ...data, notes: [] as unknown[] }; delete (clean as Doc)._entered; delete (clean as Doc)._edit;
+      const { data: rows, error } = await client.from('scrim_reports').update({ data: clean }).eq('id', id).select('id');
+      if (error) throw friendlyError(error);
+      if (!rows?.length) throw friendlyError({ code: '42501', message: 'You can edit only your own reports (or ask the Head Coach).' });
+      return;
+    }
     if (reportNotes.has(id)) {
       // Existing report: only new correction notes are written; the report itself never changes.
       const have = reportNotes.get(id)!;
@@ -243,6 +253,12 @@ export function createHubDb(client: SupabaseClient, opts: HubDbOptions) {
     if (v.data) versions.set(`${table}:${id}`, String((v.data as Doc).updated_at));
     return data as Doc;
   }
+  // V1.36: the edit history the database keeps for support reports and scrim reports (read like the records).
+  async function history(tbl: string): Promise<Doc[]> {
+    const { data, error } = await client.from('record_history').select('id, tbl, record_id, editor_name, at, before, after').eq('tbl', tbl).order('at', { ascending: true });
+    if (error) { if (/PGRST205|42P01|does not exist|Could not find the table/i.test(`${error.code || ''} ${error.message || ''}`)) return []; throw friendlyError(error, 'read'); }
+    return (data || []) as Doc[];
+  }
   // V1.34: counts without names or text (anyone signed in), for the support staff measurements.
   async function supportSummary(from: string, to: string): Promise<Doc | null> {
     const { data, error } = await client.rpc('support_summary', { d_from: from, d_to: to });
@@ -253,6 +269,7 @@ export function createHubDb(client: SupabaseClient, opts: HubDbOptions) {
     collection,
     approve,
     supportSummary,
+    history,
     doc(path: string) { const [c, id] = path.split('/'); if (c !== 'config' || !id) throw new Error(`Unsupported document path: ${path}`); return configDoc(id); },
   };
 }

@@ -7,7 +7,7 @@
 // Rules the prompts enforce: read only what is on the screen, never guess a number, mark what is
 // unclear. The coach confirms every value before it is saved; nothing here writes a record by itself.
 
-export const PROMPT_VERSION = 'scrim-ai-2026-11-30.1';   // V1.34 support_parse; V1.30 match_result (eFootball, CS2); V1.26 plan blocks, debrief drills, weekly, meta_extract, meta_fit; V1.27 prematch, scout_day, brainstorm
+export const PROMPT_VERSION = 'scrim-ai-2026-12-02.1';   // V1.36 support rows (follow-up text, session, prognosis); V1.34 support_parse; V1.30 match_result (eFootball, CS2); V1.26 plan blocks, debrief drills, weekly, meta_extract, meta_fit; V1.27 prematch, scout_day, brainstorm
 export const DEFAULT_MODEL = 'claude-sonnet-5-5';
 
 // Titles with screenshot capture. MLBB Women plays the same game client as MLBB.
@@ -242,7 +242,8 @@ export const supportParseSchema = () => obj({
   discipline: { type: 'string', enum: [...SUPPORT_DISCIPLINES, 'unknown'] },
   date: str,
   rows: { type: 'array', items: obj({ athlete_seen: str, athlete: str, title_seen: str, did: str, found: str, region: str,
-    response: { type: 'string', enum: ['better', 'same', 'worse', ''] }, vas_before: int, vas_after: int, follow_up: { type: 'boolean' } }) },
+    response: { type: 'string', enum: ['better', 'same', 'worse', ''] }, vas_before: int, vas_after: int, follow_up: str,
+    session: { type: 'string', enum: ['formal', 'informal', 'observation', ''] }, prognosis: str }) },
   general: obj({ did: str, found: str, teams: { type: 'array', items: str } }),
   notes: str,
 });
@@ -254,7 +255,7 @@ export function supportParsePrompt() {
     '- date: the report date as YYYY-MM-DD when the text names it (e.g. "Selasa 17 november 2026" → 2026-11-17), else "".',
     '- rows: one per athlete named in the text, in order. athlete_seen: the name exactly as written. athlete: the ROSTER spelling when it is clearly the same person (nicknames such as "Kak Vivi", "Bang Jonathan" match the roster name), else "". title_seen: the team as written ("MLBB M", "mlbb women", "efootball", "CS"), else "".',
     '- did: what the staff member did for the athlete (therapy, medicine with dose, treatment, massage, exercise, session), in their own words. found: what they found (complaint, examination, diagnosis, assessment, observation), in their own words; for S/O/A/P put S, O and A in found and P in did. region: body region if written, else "".',
-    '- response: "better", "same" or "worse" only when the text says how the athlete responded (e.g. "better", "berkurang", "membaik"), else "". vas_before / vas_after: the VAS numbers exactly as written (0-10), -1 if not written. follow_up: true only when the text says to continue, re-check, change therapy if no improvement, or "perlu pendalaman".',
+    '- response: "better", "same" or "worse" only when the text says how the athlete responded (e.g. "better", "berkurang", "membaik"), else "". vas_before / vas_after: the VAS numbers exactly as written (0-10), -1 if not written. follow_up: what should happen next, in their own words (continue therapy, re-check, change therapy if no improvement, "perlu pendalaman", next session), else "". session (psychologists only): "formal" for a formal counselling session, "informal" for an informal talk or counselling, "observation" for observing a team or a player, else "". prognosis (psychologists only): the prognosis in their own words, else "".',
     '- general: what the staff member did and found for a whole team or the session (not one athlete), in their own words; teams: the teams named for it.',
     '- Copy the staff member\'s words; never add advice, interpretation, diagnoses, medicines or numbers that are not in the text. Do not translate.',
     '- notes: one short sentence about anything unclear (a name that matches no roster athlete, a cut-off message). Empty if none.',

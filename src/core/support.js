@@ -4,6 +4,7 @@
 // everyone else sees counts only (summarize() on the names-free rows from support_summary()).
 import { hasContactNumber } from './pii.js';
 import { localDay, shiftDay } from './dates.js';
+import { person } from './people.js';
 
 export const JOBS = {
   medic: { label: 'Team doctor', disc: 'medic' }, physio_men: { label: 'Physio (men)', disc: 'physio' }, physio_women: { label: 'Physio (women)', disc: 'physio' },
@@ -11,13 +12,19 @@ export const JOBS = {
 };
 export const DISCS = ['medic', 'physio', 'physical', 'psych'];
 export const DISC_LABEL = { medic: 'Team doctor', physio: 'Physio / massage', physical: 'Physical conditioning', psych: 'Psychologist' };
-// The two questions per discipline, in the words the staff already use in their WhatsApp reports.
+// V1.36 the three columns of an athlete row, the same in the form and in the saved report (staff feedback, 20 Nov):
+// what was done, findings, follow-up. "What was done" names the role.
 export const ASK = {
-  medic: { did: 'Therapy (P)', found: 'Complaint, examination, diagnosis (S / O / A)' },
-  physio: { did: 'Treatment', found: 'Complaint / assessment' },
-  physical: { did: 'What you did (session, measurement)', found: 'What you found (fatigue, load)' },
-  psych: { did: 'What you did (observation, session)', found: 'What you found' },
+  medic: { did: 'What was done (doctor)', found: 'Findings', follow: 'Follow-up' },
+  physio: { did: 'What was done (physio)', found: 'Findings', follow: 'Follow-up' },
+  physical: { did: 'What was done (physical coach)', found: 'Findings', follow: 'Follow-up' },
+  psych: { did: 'What was done (psychologist)', found: 'Findings', follow: 'Follow-up' },
 };
+// Psychologists: the kind of session, and a prognosis in their own words.
+export const SESSIONS = ['formal', 'informal', 'observation'];
+export const SESSION_LABEL = { formal: 'Formal counselling', informal: 'Informal counselling', observation: 'Observation' };
+// Follow-up used to be a tick (V1.34): true reads as "Yes", false as nothing.
+export const followText = (v) => (v === true ? 'Yes' : v === false || v == null ? '' : String(v).trim());
 export const RESPONSES = ['better', 'same', 'worse'];
 export const REPEAT_AT = 3;          // seen 3+ times in the period: flagged as a possible problem coming up
 export const HIGH_VAS = 7;           // pain score at or above this after treatment: flagged
@@ -38,10 +45,11 @@ export function supportReport(x) {
     const did = noNumbers(txt(r.did), `Athlete ${n}`); const found = noNumbers(txt(r.found), `Athlete ${n}`);
     if (!athlete && !athleteSeen && !did && !found) return null;
     need(athlete || athleteSeen, `Athlete ${n}: pick the athlete.`);
-    need(did || found, `Athlete ${n}: write what you did or what you found.`);
+    need(did || found, `Athlete ${n}: write what was done or the findings.`);
     const vasBefore = vas(r.vasBefore, `Athlete ${n}: VAS before`); const vasAfter = vas(r.vasAfter, `Athlete ${n}: VAS after`);
     return { athlete: athlete || athleteSeen, ...(athleteSeen && athleteSeen !== athlete ? { athleteSeen } : {}), title: txt(r.title, 30), did, found, region: txt(r.region, 120),
-      response: RESPONSES.includes(r.response) ? r.response : '', vasBefore, vasAfter, followUp: !!r.followUp,
+      response: RESPONSES.includes(r.response) ? r.response : '', vasBefore, vasAfter, followUp: noNumbers(txt(followText(r.followUp), 400), `Athlete ${n}`),
+      ...(x.discipline === 'psych' ? { session: SESSIONS.includes(r.session) ? r.session : '', prognosis: noNumbers(txt(r.prognosis, 600), `Athlete ${n}`) } : {}),
       notify: !!r.notify && !!txt(r.notifyText), notifyText: noNumbers(txt(r.notifyText, 200), `Athlete ${n}`) };
   }).filter(Boolean);
   const general = { did: noNumbers(txt(x.general?.did, 1500), 'Team activity'), found: noNumbers(txt(x.general?.found, 1500), 'Team finding'),
@@ -62,6 +70,22 @@ export function usersOfDay(rep) {
   return { n, titles, teams: rep.general?.teams || [], text: `${n} athlete${n === 1 ? '' : 's'}${titles.length ? `: ${titles.join(', ')}` : ''}${rep.general?.teams?.length ? ` · teams: ${rep.general.teams.join(', ')}` : ''}` };
 }
 
+// V1.35 one session, many athletes: the athletes ticked (title|name) plus names typed by hand ("Jonathan (CS2)", comma-separated)
+// share one "what you did / what you found"; each becomes its own row, so visits, repeats and follow-ups stay per athlete.
+export function groupRows(g) {
+  const did = txt(g?.did); const found = txt(g?.found);
+  need(did || found, 'Group session: write what you did or what you found.');
+  const seen = new Set(); const out = [];
+  const add = (title, athlete, athleteSeen = '') => { const k = `${title}|${norm(athlete || athleteSeen)}`; if (!norm(athlete || athleteSeen) || seen.has(k)) return; seen.add(k);
+    out.push({ athlete, athleteSeen, title, did, found, region: txt(g.region, 120), response: '', vasBefore: '', vasAfter: '', followUp: txt(followText(g.followUp), 400), notify: false, notifyText: '' }); };
+  for (const p of Array.isArray(g?.picks) ? g.picks : []) { const i = String(p).indexOf('|'); if (i > 0) add(String(p).slice(0, i), txt(String(p).slice(i + 1), 60)); }
+  for (const name of String(g?.others || '').split(/[,;\n]/).map((s) => txt(s, 60)).filter(Boolean)) add(titleOf(name), '', name);
+  need(out.length, 'Group session: tick the athletes (or a whole team) first.');
+  need(out.length <= 40, 'Group session: 40 athletes at most per report.');
+  return out;
+}
+export const isBlankRow = (r) => !r.athlete && !r.athleteSeen && !r.did && !r.found && !r.region && !r.notifyText;
+
 // The AI's reading of a pasted WhatsApp report → rows for the form. roster: { title: [names] }.
 const norm = (s) => String(s || '').toLowerCase().replace(/^(kak|bang|mba|mbak|mas|dek|coach)\s+/, '').replace(/[^a-z0-9]/g, '');
 const TITLE_HINT = [[/mlbb.*(w|women|wanita|putri)|mlbbw/i, 'MLBB Women'], [/mlbb/i, 'MLBB'], [/dota/i, 'Dota 2'], [/pubg/i, 'PUBG Mobile'], [/e-?football/i, 'eFootball'],
@@ -77,23 +101,31 @@ export function findAthlete(name, roster, hintTitle = '') {
 export function fromParse(raw, roster) {
   const r = raw && typeof raw === 'object' ? raw : {};
   const rows = (Array.isArray(r.rows) ? r.rows : []).slice(0, 40).map((x) => {
-    const hint = titleOf(x.title_seen); const m = findAthlete(x.athlete || x.athlete_seen, roster, hint);
+    // V1.36: the national-team list (full names) first, then the hub's rosters.
+    const hint = titleOf(x.title_seen); const pp = person(hint || null, x.athlete || x.athlete_seen) || person(hint || null, x.athlete_seen);
+    const m = pp ? { ign: pp.name, title: pp.title } : findAthlete(x.athlete || x.athlete_seen, roster, hint);
     const v = (n) => (Number.isInteger(n) && n >= 0 && n <= 10 ? String(n) : '');
     return { athlete: m?.ign || '', athleteSeen: txt(x.athlete_seen, 60), title: m?.title || hint, did: txt(x.did), found: txt(x.found), region: txt(x.region, 120),
-      response: RESPONSES.includes(x.response) ? x.response : '', vasBefore: v(x.vas_before), vasAfter: v(x.vas_after), followUp: !!x.follow_up, notify: false, notifyText: '' };
+      response: RESPONSES.includes(x.response) ? x.response : '', vasBefore: v(x.vas_before), vasAfter: v(x.vas_after), followUp: txt(typeof x.follow_up === 'string' ? x.follow_up : followText(x.follow_up), 400),
+      session: SESSIONS.includes(x.session) ? x.session : '', prognosis: txt(x.prognosis, 600), notify: false, notifyText: '' };
   });
   return { discipline: DISCS.includes(r.discipline) ? r.discipline : '', date: /^\d{4}-\d{2}-\d{2}$/.test(r.date || '') ? r.date : '', rows,
     general: { did: txt(r.general?.did, 1500), found: txt(r.general?.found, 1500), teams: (r.general?.teams || []).map((t) => txt(t, 30)).filter(Boolean) },
     unmatched: rows.filter((x) => !x.athlete).map((x) => x.athleteSeen).filter(Boolean), notes: txt(r.notes, 200) };
 }
 
+// Bahasa Indonesia labels for the WhatsApp copy (the hub's own translation table is not loaded in core).
+const WA_ID = { 'What was done (doctor)': 'Yang dilakukan (Dokter)', 'What was done (physio)': 'Yang dilakukan (Fisio)', 'What was done (physical coach)': 'Yang dilakukan (Pelatih fisik)',
+  'What was done (psychologist)': 'Yang dilakukan (Psikolog)', Findings: 'Temuan', 'Follow-up': 'Tindak lanjut', Session: 'Jenis sesi', Prognosis: 'Prognosis', 'Body region': 'Area tubuh',
+  Response: 'Respon', 'Formal counselling': 'Konseling formal', 'Informal counselling': 'Konseling informal', Observation: 'Observasi', better: 'membaik', same: 'sama', worse: 'memburuk' };
 // The report as a WhatsApp message (the group keeps going).
 export function whatsappText(rep, lang = 'id') {
   const id = lang === 'id'; const A = ASK[rep.discipline];
   const head = `${id ? 'Laporan harian' : 'Daily report'} — ${DISC_LABEL[rep.discipline]} · ${rep.by}\n${rep.date}`;
-  const rows = rep.rows.map((r, i) => [`${i + 1}. ${r.athlete}${r.title ? ` (${r.title})` : ''}`, r.found && `   ${A.found}: ${r.found}`, r.region && `   ${id ? 'Area' : 'Region'}: ${r.region}`,
-    r.did && `   ${A.did}: ${r.did}`, r.vasBefore != null && `   VAS ${r.vasBefore}/10 → ${r.vasAfter ?? '?'}/10`, r.response && `   ${id ? 'Respon' : 'Response'}: ${r.response}`,
-    r.followUp && `   ${id ? 'Perlu tindak lanjut' : 'Follow-up needed'}`].filter(Boolean).join('\n'));
+  const L = id ? WA_ID : null; const lab = (k) => (L ? L[k] : k);
+  const rows = rep.rows.map((r, i) => [`${i + 1}. ${r.athlete}${r.title ? ` (${r.title})` : ''}`, r.did && `   ${lab(A.did)}: ${r.did}`, r.found && `   ${lab(A.found)}: ${r.found}`,
+    followText(r.followUp) && `   ${lab(A.follow)}: ${followText(r.followUp) === 'Yes' && id ? 'Ya' : followText(r.followUp)}`, r.session && `   ${lab('Session')}: ${lab(SESSION_LABEL[r.session])}`, r.prognosis && `   ${lab('Prognosis')}: ${r.prognosis}`,
+    r.region && `   ${lab('Body region')}: ${r.region}`, r.vasBefore != null && `   VAS ${r.vasBefore}/10 → ${r.vasAfter ?? '?'}/10`, r.response && `   ${lab('Response')}: ${lab(r.response)}`].filter(Boolean).join('\n'));
   const g = rep.general.did || rep.general.found ? `\n${id ? 'Tim' : 'Team'}${rep.general.teams.length ? ` (${rep.general.teams.join(', ')})` : ''}:\n${[rep.general.did && `- ${rep.general.did}`, rep.general.found && `- ${rep.general.found}`].filter(Boolean).join('\n')}` : '';
   return [head, '', ...rows, g, '', `${id ? 'User hari ini' : 'Seen today'}: ${usersOfDay(rep).text}`].join('\n').replace(/\n{3,}/g, '\n\n').trim();
 }
@@ -103,7 +135,7 @@ export function whatsappText(rep, lang = 'id') {
 // title, response, followUp, vasBefore, vasAfter}], repeat }. Built here from full reports for those who may read them.
 export function anonymise(reports, from, to) {
   const inP = reports.filter((r) => r.date >= from && r.date <= to);
-  const rows = inP.flatMap((r) => r.rows.map((x) => ({ day: r.date, disc: r.discipline, title: x.title, response: x.response, followUp: x.followUp, vasBefore: x.vasBefore, vasAfter: x.vasAfter })));
+  const rows = inP.flatMap((r) => r.rows.map((x) => ({ day: r.date, disc: r.discipline, title: x.title, response: x.response, followUp: !!followText(x.followUp), session: x.session || '', vasBefore: x.vasBefore, vasAfter: x.vasAfter })));
   return { reports: inP.map((r) => ({ day: r.date, disc: r.discipline })), rows, repeat: repeatAthletes(reports, from, to).length };
 }
 const avg = (xs) => (xs.length ? Math.round((xs.reduce((a, b) => a + b, 0) / xs.length) * 10) / 10 : null);
@@ -116,7 +148,8 @@ export function summarize(S) {
   const responded = rows.filter((r) => RESPONSES.includes(r.response));
   return { reports: reps.length, days: new Set(reps.map((r) => r.day)).size, seen: rows.length, byDisc, byTitle,
     followUps: rows.filter((r) => r.followUp).length, better: responded.filter((r) => r.response === 'better').length, worse: responded.filter((r) => r.response === 'worse').length, responded: responded.length,
-    vasDrop: avg(vasPairs.map((r) => r.vasBefore - r.vasAfter)), vasN: vasPairs.length, highVas: rows.filter((r) => Number.isInteger(r.vasAfter) && r.vasAfter >= HIGH_VAS).length, repeat: S.repeat || 0 };
+    vasDrop: avg(vasPairs.map((r) => r.vasBefore - r.vasAfter)), vasN: vasPairs.length, highVas: rows.filter((r) => Number.isInteger(r.vasAfter) && r.vasAfter >= HIGH_VAS).length, repeat: S.repeat || 0,
+    formal: rows.filter((r) => r.session === 'formal').length, informal: rows.filter((r) => r.session === 'informal').length };
 }
 // Day by day for a chart / table (from the names-free shape).
 export function perDay(S, from, to) {
@@ -148,7 +181,8 @@ export function watchList(reports, from, to) {
   const seenAfter = (athlete, date) => inP.some((r) => r.date > date && r.rows.some((x) => x.athlete === athlete));
   const out = [];
   for (const r of inP) for (const x of r.rows) {
-    if (x.followUp && !seenAfter(x.athlete, r.date)) out.push({ kind: 'follow-up', athlete: x.athlete, title: x.title, date: r.date, disc: r.discipline, by: r.by, text: x.found || x.did });
+    const fu = followText(x.followUp);
+    if (fu && !seenAfter(x.athlete, r.date)) out.push({ kind: 'follow-up', athlete: x.athlete, title: x.title, date: r.date, disc: r.discipline, by: r.by, text: fu !== 'Yes' ? fu : (x.found || x.did) });
     else if (x.response === 'worse' || (Number.isInteger(x.vasAfter) && x.vasAfter >= HIGH_VAS)) out.push({ kind: x.response === 'worse' ? 'worse' : 'pain', athlete: x.athlete, title: x.title, date: r.date, disc: r.discipline, by: r.by, text: x.found || x.did });
   }
   return out;

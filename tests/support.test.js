@@ -1,6 +1,8 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { JOBS, supportReport, usersOfDay, fromParse, findAthlete, titleOf, whatsappText, anonymise, summarize, perDay, weekSignals, repeatAthletes, watchList, dayBoard, weekRange, noticeRecord } from '../src/core/support.js';
+import { readFileSync } from 'node:fs';
+import { JSDOM } from 'jsdom';
+import { JOBS, supportReport, usersOfDay, fromParse, findAthlete, titleOf, whatsappText, anonymise, summarize, perDay, weekSignals, repeatAthletes, watchList, dayBoard, weekRange, noticeRecord, groupRows, isBlankRow } from '../src/core/support.js';
 import { handle } from '../supabase/functions/_shared/scrim_ai_handler.js';
 import { HEROES } from '../supabase/functions/_shared/catalog.gen.js';
 
@@ -10,11 +12,11 @@ const rep = (date, discipline, rows, extra = {}) => supportReport({ date, discip
 test('a report: rows per athlete, team part, who was seen; empty rows dropped; phone numbers refused', () => {
   const r = rep('2026-11-17', 'medic', [{ athlete: 'Usep', title: 'MLBB', found: 'batuk kering 2 hari; obs batuk', did: 'Siladex syrup 3x5ml', followUp: true },
     { athlete: 'Cindy', title: 'MLBB Women', found: 'luka lecet lutut kiri', did: 'Betason n cream k/p' }, {}]);
-  assert.equal(r.rows.length, 2); assert.equal(r.rows[0].followUp, true); assert.equal(r.origin, 'operational');
+  assert.equal(r.rows.length, 2); assert.equal(r.rows[0].followUp, 'Yes', 'an old follow-up tick reads as "Yes" (V1.36: follow-up is a text)'); assert.equal(r.origin, 'operational');
   assert.equal(usersOfDay(r).text, '2 athletes: MLBB 1, MLBB Women 1');
   // Six jobs: two physios and two psychologists (men / women) share their role's form.
   assert.deepEqual(Object.keys(JOBS), ['medic', 'physio_men', 'physio_women', 'physical', 'psych_men', 'psych_women']); assert.equal(JOBS.psych_men.disc, 'psych');
-  assert.throws(() => rep('2026-11-17', 'medic', [{ athlete: 'Usep', found: '' , did: '' }]), /write what you did or what you found/);
+  assert.throws(() => rep('2026-11-17', 'medic', [{ athlete: 'Usep', found: '' , did: '' }]), /write what was done or the findings/);
   assert.throws(() => rep('2026-11-17', 'physio', [{ athlete: 'Vivi', did: 'US', vasBefore: '11' }]), /VAS before must be a whole number from 0 to 10/);
   assert.throws(() => rep('2026-11-20', 'medic', [{ athlete: 'Usep', did: 'x' }]), /future/);
   assert.throws(() => rep('2026-11-17', 'nurse', [{ athlete: 'Usep', did: 'x' }]), /Pick your role/);
@@ -30,10 +32,10 @@ test('WhatsApp reading: nicknames match the roster, team written as in the chat,
     { athlete_seen: 'Kak Vivi indrawaty', athlete: '', title_seen: 'MLBB women', did: 'Ultrasound', found: 'tightness quadriceps', region: 'quadriceps', response: 'better', vas_before: 4, vas_after: 3, follow_up: false },
     { athlete_seen: 'Bang Jonathan', athlete: '', title_seen: '', did: 'massage arm & back', found: 'muscle strain arm & back', region: '', response: '', vas_before: 7, vas_after: 6, follow_up: false }],
     general: { did: '', found: '', teams: [] }, notes: '' }, roster);
-  assert.equal(p.rows[0].athlete, 'Vivi'); assert.equal(p.rows[0].title, 'MLBB Women'); assert.equal(p.rows[0].vasBefore, '4');
+  assert.equal(p.rows[0].athlete, 'Vivy Indrawaty', 'V1.36: the full name from the national-team list'); assert.equal(p.rows[0].title, 'MLBB Women'); assert.equal(p.rows[0].vasBefore, '4');
   assert.equal(p.rows[1].athlete, ''); assert.deepEqual(p.unmatched, ['Bang Jonathan']);
   const r = rep('2026-11-19', 'physio', p.rows); assert.equal(r.rows[1].athlete, 'Bang Jonathan', 'an unknown name is kept as written');
-  assert.match(whatsappText(r, 'id'), /1\. Vivi \(MLBB Women\)[\s\S]*VAS 4\/10 → 3\/10[\s\S]*User hari ini: 2 athletes/);
+  assert.match(whatsappText(r, 'id'), /1\. Vivy Indrawaty \(MLBB Women\)[\s\S]*Yang dilakukan \(Fisio\): Ultrasound[\s\S]*Temuan: tightness quadriceps[\s\S]*VAS 4\/10 → 3\/10[\s\S]*User hari ini: 2 athletes/);
 });
 
 test('measurements: week totals, per day, signals; with names: repeat athletes, open follow-ups, pain; day board', () => {
@@ -72,4 +74,42 @@ test('scrim-ai: support_parse needs the support permission, not a title; logged 
   const user = JSON.parse(calls.at(-1).messages[0].content[0].text); assert.equal(user.DISCIPLINE, 'physio'); assert.deepEqual(user.ROSTER.MLBB, ['Usep', 'Aran', 'Leoni']);
   assert.ok(calls.at(-1).output_config.format.schema.properties.rows); assert.equal(inserts.at(-1).action, 'support_parse'); assert.equal(inserts.at(-1).title, null);
   allowed = false; assert.equal((await call({ action: 'support_parse', text: 'x' })).status, 403);
+});
+
+// ---------------------------------------------------------------- V1.35 one session, many athletes
+test('group session: one entry becomes one row per athlete; typed names get their team; checks', () => {
+  const rows = groupRows({ picks: ['MLBB|Aran', 'MLBB|Usep', 'MLBB|Aran'], others: 'Jonathan (CS2), Rina (MLBB W)', did: 'Stretching 30 menit', found: '', followUp: true });
+  assert.deepEqual(rows.map((r) => [r.title, r.athlete || r.athleteSeen]), [['MLBB', 'Aran'], ['MLBB', 'Usep'], ['CS2', 'Jonathan (CS2)'], ['MLBB Women', 'Rina (MLBB W)']]);
+  assert.ok(rows.every((r) => r.did === 'Stretching 30 menit' && r.followUp));
+  const r = rep('2026-11-19', 'physical', rows); assert.equal(usersOfDay(r).text, '4 athletes: MLBB 2, CS2 1, MLBB Women 1');
+  assert.throws(() => groupRows({ picks: ['MLBB|Aran'], did: '', found: '' }), /write what you did or what you found/);
+  assert.throws(() => groupRows({ picks: [], others: '', did: 'x' }), /tick the athletes/);
+  assert.ok(isBlankRow({ athlete: '', athleteSeen: '', did: '', found: '', region: '', notifyText: '' }));
+});
+
+const html = readFileSync(new URL('../dist/hub.html', import.meta.url), 'utf8');
+test('support screen: tick a whole team, write once, add, save one report with a row per athlete', async () => {
+  const store = new Map();
+  const db = { doc: () => ({ set: async () => {}, onSnapshot: () => () => {} }),
+    collection: (col) => ({ doc: (id) => ({ set: async (d) => { store.set(`${col}/${id}`, d); }, onSnapshot: () => () => {} }), add: async () => {}, onSnapshot: () => () => {} }) };
+  const dom = new JSDOM(`<!doctype html><html><body>${html}</body></html>`, { runScripts: 'dangerously', url: 'https://example.test/#support', beforeParse(w) { w.localStorage.setItem('hub-lang', 'en'); w.claude = { use: async (nm) => (nm === 'db' ? db : null) }; } });
+  const wait = () => new Promise((res) => setTimeout(res, 30)); await wait();
+  const d = dom.window.document; const text = () => d.getElementById('main').textContent;
+  const fire = async (id, v) => { const el = d.getElementById(id); assert.ok(el, `no #${id}`); el.value = v; el.dispatchEvent(new dom.window.Event('change', { bubbles: true })); await wait(); };
+  await fire('supDisc', 'physical');
+  assert.match(text(), /One session, many athletes/);
+  d.querySelector('[data-sup-gall="MLBB"]').click(); await wait();
+  assert.equal(d.querySelectorAll('input[data-sup-gp]:checked').length, 5);
+  assert.equal(d.getElementById('supGpN').textContent, '5');
+  d.querySelector('[data-sup-gadd]').click(); await wait();
+  assert.match(d.getElementById('supGpMsg').textContent, /write what you did or what you found/);
+  await fire('supGpDid', 'Stretching & mobility 30 menit');
+  await fire('supGpOther', 'Jonathan (CS2)');
+  d.querySelector('[data-sup-gadd]').click(); await wait();
+  assert.equal(d.querySelectorAll('[id^="sR-"][id$="-did"]').length, 6, 'one row per athlete');
+  assert.match(d.getElementById('supMsg').textContent, /6 athlete\(s\) added from the group session/);
+  d.querySelector('[data-sup-save]').click(); await wait();
+  const saved = [...store.entries()].filter(([k]) => k.startsWith('support_reports/')).map(([, v]) => v);
+  assert.equal(saved.length, 1); assert.equal(saved[0].rows.length, 6);
+  assert.ok(saved[0].rows.every((r) => r.did === 'Stretching & mobility 30 menit'));
 });

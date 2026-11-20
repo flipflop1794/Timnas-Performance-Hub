@@ -52,7 +52,7 @@ const t = (name, fn) => test(name, async (ctx) => { if (!available) return ctx.s
 const ins = (who, table, id, data) => as(who, (x) => x(`insert into public.${table} (id, data, created_by) values ($1, $2, $3)`, [id, data, U[who]]));
 
 t('pelatnas: title staff record availability and attendance for their title only; others see nothing', async () => {
-  for (const tb of ['pelatnas_availability', 'pelatnas_attendance']) {
+  for (const tb of ['pelatnas_availability', 'pelatnas_attendance', 'camp_plans']) {
     await ins('indra', tb, `${tb}-1`, { title: 'MLBB', origin: 'operational' });
     const [r] = await rows('aufa', `select title, created_by from public.${tb} where id = $1`, [`${tb}-1`]);
     assert.deepEqual([r.title, r.created_by], ['MLBB', U.indra], tb);
@@ -65,7 +65,7 @@ t('pelatnas: title staff record availability and attendance for their title only
     assert.equal((await as('indra', (x) => x(`delete from public.${tb}`))).rowCount, 0, `${tb}: coach cannot delete`);
     await assert.rejects(ins('aufa', tb, `${tb}-demo`, { title: 'MLBB', origin: 'demo' }), /Only operational records/);
   }
-  const [audit] = await rows('aufa', `select count(*)::int as n from public.audit_log where table_name like 'pelatnas_%'`);
+  const [audit] = await rows('aufa', `select count(*)::int as n from public.audit_log where table_name like 'pelatnas_%' or table_name = 'camp_plans'`);
   assert.ok(audit.n >= 4, 'changes are audited');
 });
 

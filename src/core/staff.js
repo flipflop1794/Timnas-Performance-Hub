@@ -8,15 +8,15 @@ export const STAFF = [
   { id: 'donny', name: 'Donny Ardy Kusuma', role: 'Assistant Coach 1 — sport scientist', focus: ['Wellbeing'], oversight: 'physical and mental preparation, all titles' },
 ];
 
-// WEC finals entries. Title coaches as published on wec.iesf.org (29 Oct–3 Nov); TBD where none listed.
+// WEC finals entries. Title coaches: full names from the BTN TIMNAS WEC 2026 dashboard (20 Nov 2026).
 export const TITLES = [
   { id: 'Dota 2', coach: 'Gregorius Arvindra Prasetyo', engine: 'dota' },
-  { id: 'MLBB', coach: 'Coach Indra', engine: null },
-  { id: 'MLBB Women', coach: 'Coach Ilyas', engine: null },
-  { id: 'PUBG Mobile', coach: 'Christie Onibala', engine: 'pubgm' },
-  { id: 'eFootball', coach: 'TBD (not named)', engine: null },
-  { id: 'CS2', coach: 'see WEC roster', engine: null },
-  { id: 'CS2 Women', coach: 'see WEC roster', engine: null },
+  { id: 'MLBB', coach: 'Indra Wijaya', engine: null },
+  { id: 'MLBB Women', coach: 'Ilyas Rahmanda', engine: null },
+  { id: 'PUBG Mobile', coach: 'Christie Albertos Berie Onibala', engine: 'pubgm' },
+  { id: 'eFootball', coach: 'Rizky Faydan', engine: null },
+  { id: 'CS2', coach: 'Baskoro Dwi Putra', engine: null },
+  { id: 'CS2 Women', coach: 'Iqbal Mauldhan Yusup', engine: null },
 ];
 export const WELLBEING = 'Wellbeing';
 
