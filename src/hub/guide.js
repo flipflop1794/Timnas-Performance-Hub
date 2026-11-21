@@ -28,6 +28,7 @@ export const GUIDE = [
       'One report per sparring partner, the same day; "Copy setup from last report" saves typing for the next one. Saving also closes the planned session and records the objective results.',
       'Player notes are about performance only. No health, family or contact details (the hub refuses phone and ID numbers).',
       'Made a mistake? Press "Edit" on the saved report (the author, the Head Coach, assistant coaches and admins). The database keeps the old version: "Edited 1×" shows who changed what, and when.',
+      'MLBB and MLBB Women: step 1 is the Scrim Log. Pick the time slot, then "+ Add game" for every game: side FP / SP, map, our bans and picks (rows in pick order, P1 at the top, with the player), their bans and picks, result, duration (digits only: 2040 = 20:40), VOD link and a note. The report\'s result is counted from the games; "Download games (Scrim Log format)" gives the same columns as the Scrim Log export.',
     ] },
     { title: 'Isi laporan scrim harian', steps: [
       'Paling cepat: di Today atau game Anda → Scrim & latihan, tekan "Catat hasil" pada sesi yang direncanakan. Laporan terbuka dengan lawan, fokus dan drill sudah terisi. Atau buka game Anda → Laporan scrim.',
@@ -35,6 +36,7 @@ export const GUIDE = [
       'Satu laporan per lawan sparring, di hari yang sama; "Copy setup from last report" menghemat ketikan untuk laporan berikutnya. Menyimpannya juga menutup sesi yang direncanakan dan mencatat hasil objektif.',
       'Catatan pemain hanya soal performa. Tanpa kesehatan, keluarga atau kontak (hub menolak nomor HP dan nomor ID).',
       'Ada yang salah? Tekan "Ubah" pada laporan tersimpan (penulis, Head Coach, asisten pelatih dan admin). Database menyimpan versi lama: "Diubah 1×" menunjukkan siapa mengubah apa, dan kapan.',
+      'MLBB dan MLBB Women: langkah 1 adalah Scrim Log. Pilih slot waktu, lalu "+ Tambah game" untuk setiap game: side FP / SP, map, ban dan pick kita (baris sesuai urutan pick, P1 paling atas, dengan pemainnya), ban dan pick lawan, hasil, durasi (angka saja: 2040 = 20:40), link VOD dan catatan. Hasil laporan dihitung dari game; "Unduh game (format Scrim Log)" memberi kolom yang sama dengan ekspor Scrim Log.',
     ] }),
   S('support', 'support', { en: 'Team doctor, physios, physical coach, psychologist', id: 'Dokter tim, fisio, pelatih fisik, psikolog' }, 'support',
     { title: 'Support staff: the daily report', steps: [

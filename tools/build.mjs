@@ -19,6 +19,8 @@ const data = {
   pubgmMatchesCsv: rd('data/pubgm/demo_matches.csv'),
   pubgmFightsCsv: rd('data/pubgm/demo_fights.csv'),
   mlbbHeroes: JSON.parse(rd('data/mlbb/heroes.json')).heroes,
+  // V1.39: official hero icon references for reading avatars (src/core/hero_icons.js), 96 bytes per hero.
+  mlbbHeroIcons: { icons: JSON.parse(rd('data/mlbb/hero_icons.json')).icons },
   builtAt: new Date().toISOString(),
 };
 writeFileSync(new URL('../src/hub/data.gen.js', import.meta.url), `export const DATA = ${JSON.stringify(data)};\n`);

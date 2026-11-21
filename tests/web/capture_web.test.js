@@ -57,10 +57,10 @@ test('website: a coach captures a game from a screenshot, saves the report; the 
   await upload(P);
   assert.deepEqual(seen[0], { action: 'scoreboard', title: 'MLBB', uid: 'u-indra' });
   assert.equal(P.d.getElementById('cg-MLBB-our').value, 'right', 'our team found from the roster names'); assert.equal(P.d.getElementById('cg-MLBB-result').value, 'loss', 'VICTORY on the partner\'s screen = our loss');
-  await P.click('[data-cap-confirm="MLBB"]');
+  P.set('cg-MLBB-po', 'FP'); await P.click('[data-cap-confirm="MLBB"]');
   P.set('rp-MLBB-partner', 'ONIC'); P.set('rp-MLBB-focus', 'Lord setups'); P.set('rp-MLBB-worked', 'early game'); P.set('rp-MLBB-adjust', 'vision before lord'); P.set('rp-MLBB-progress', '3');
   await P.click('[data-report-save="MLBB"]'); await sleep(100);
-  assert.match(P.d.getElementById('rpMsg-MLBB').textContent, /0-1 vs ONIC, 1 game with stats/);
+  assert.match(P.d.getElementById('rpMsg-MLBB').textContent, /0-1 vs ONIC, 1 game\)/);
   assert.equal(B.tables.scrim_games.length, 1);
   const g = B.tables.scrim_games[0]; const rep = B.tables.scrim_reports[0];
   assert.equal(g.data.reportId, rep.id); assert.equal(g.title, 'MLBB'); assert.equal(g.data.players.filter((x) => x.team === 'ours').map((x) => x.player).join(','), 'Aran,Kevin,Drichel,Lyoni,Jull.');
@@ -98,14 +98,14 @@ test('website: after the first load, a new game fetches only new rows, not every
   const P = await open(B, 'indra', 'mlbb-reports');
   for (let r = 0; r < 3; r++) {
     B.skew = r * 3600_000;   // sessions an hour apart
-    await upload(P); await P.click('[data-cap-confirm="MLBB"]');
+    await upload(P); P.set('cg-MLBB-po', 'FP'); await P.click('[data-cap-confirm="MLBB"]');
     P.set('rp-MLBB-partner', `P${r}`); P.set('rp-MLBB-focus', 'f'); P.set('rp-MLBB-worked', 'w'); P.set('rp-MLBB-adjust', 'a'); P.set('rp-MLBB-progress', '3');
     await P.click('[data-report-save="MLBB"]'); await sleep(400);
   }
   assert.equal(B.tables.scrim_games.length, 3);
   B.skew = 3 * 3600_000;
   const before = B.selected.scrim_games || 0;
-  await upload(P); await P.click('[data-cap-confirm="MLBB"]');
+  await upload(P); P.set('cg-MLBB-po', 'FP'); await P.click('[data-cap-confirm="MLBB"]');
   P.set('rp-MLBB-partner', 'P9'); P.set('rp-MLBB-focus', 'f'); P.set('rp-MLBB-worked', 'w'); P.set('rp-MLBB-adjust', 'a'); P.set('rp-MLBB-progress', '3');
   await P.click('[data-report-save="MLBB"]'); await sleep(600);
   const fetched = (B.selected.scrim_games || 0) - before;

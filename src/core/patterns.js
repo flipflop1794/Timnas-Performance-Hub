@@ -40,6 +40,9 @@ export function facts(games, ctx = {}) {
   wl('all', 'All scrim games', 'overall', games);
   // Map side: Dota from the screen; MLBB only where the coach set it (the result screen does not show it).
   for (const s of [...new Set(games.map((g) => g.mapSide).filter(Boolean))]) wl(`side:${s}`, `Played on ${s} side`, 'side', games.filter((g) => g.mapSide === s));
+  // V1.38 Scrim Log: FP / SP and the jungle map variant, as the coach entered them per game.
+  for (const o of ['FP', 'SP']) wl(`pick:${o}`, o === 'FP' ? 'We picked first (FP)' : 'We picked second (SP)', 'side', games.filter((g) => g.pickOrder === o));
+  for (const m of [...new Set(games.map((g) => g.mapVariant).filter(Boolean))].sort()) wl(`map:${m}`, `Map: ${m}`, 'side', games.filter((g) => g.mapVariant === m));
   for (const [lo, hi, label] of LENGTH_BUCKETS[game]) wl(`length:${label}`, `Games ${label}`, 'length', games.filter((g) => g.durationS != null && g.durationS >= lo && g.durationS < hi));
   // Our heroes (played 2+ times).
   const ourHero = {};
@@ -53,7 +56,7 @@ export function facts(games, ctx = {}) {
     for (const [h, gs] of Object.entries(bans).sort((a, b) => b[1].length - a[1].length).slice(0, 8)) {
       out.push({ id: `banned:${h}`, group: 'bans', label: `${h} banned against us`, n: drafted.length, count: gs.length, share: pct(gs.length, drafted.length), lowSample: drafted.length < MIN_SAMPLE, games: ids(gs) });
     }
-    const fp = drafted.filter((g) => g.firstPick);
+    const fp = drafted.filter((g) => g.firstPick && !g.pickOrder);   // Scrim Log games are in the FP / SP lines
     wl('firstpick:us', 'We had first pick', 'draft', fp.filter((g) => g.firstPick === g.ourSide));
     wl('firstpick:them', 'Partner had first pick', 'draft', fp.filter((g) => g.firstPick !== g.ourSide));
   }

@@ -3,16 +3,40 @@
 // through the website's platform hook (PLATFORM.ai), so the Claude-artifact build and the tests run
 // without it: every AI step has a by-hand path.
 import { DATA } from './data.gen.js';
-import { heroIndex, gameOf, proposeGame, proposeDraft, confirmGame, blankGame, gameToProposal, mergeGames, heroesFromDraft, heroChoices, heroMemory, playerHeroes, findDuplicate, STAT_DEFS, SIDE_LABEL, MAP_SIDES, durationText, parseDuration, latestGames, gamesResult, extractionAccuracy, learnAliases } from '../core/capture.js';
+import { heroIndex, gameOf, proposeGame, proposeDraft, confirmGame, blankGame, gameToProposal, mergeGames, heroesFromDraft, heroChoices, heroMemory, playerHeroes, findDuplicate, STAT_DEFS, SIDE_LABEL, MAP_SIDES, durationText, parseDuration, formatDurationInput, latestGames, gamesResult, extractionAccuracy, learnAliases } from '../core/capture.js';
 import { checkDebriefInput, checkDebriefSplit } from '../core/debrief.js';
 import { facts, checkFindings, findingRecord, markFinding, statTrail, digestPayload, MIN_SAMPLE, standInRecord, statGoalProgress } from '../core/patterns.js';
 import { GAME_SIDES, LIMITS } from '../../supabase/functions/_shared/scrim_spec.js';
+import { isScrimLog, PICK_ORDER, PICK_ORDER_LABEL, MLBB_MAPS, MAX_BANS, NOTES_MAX } from '../core/scrim_log.js';
 
 const HEROES = {
   mlbb: heroIndex(DATA.mlbbHeroes),
   dota: heroIndex(DATA.heroesCsv.trim().split(/\r?\n/).slice(1).map((l) => ({ name: l.split(',')[1] }))),
 };
 export const heroesFor = (title) => HEROES[gameOf(title)] || null;
+// V1.39: on the Scrim Log game screen, a hero used twice (bans and picks of both teams) or a player on two
+// rows is marked at once; confirming still refuses it.
+export function capDupInput(el) {
+  const box = el?.closest?.('.capedit'); if (!box || !/^c[gb]-/.test(el.id || '')) return;
+  const mark = (inputs, skip) => {
+    const seen = new Map(); let n = 0;
+    for (const i of inputs) { const k = i.value.trim().toLowerCase(); if (k && !skip(k)) seen.set(k, (seen.get(k) || 0) + 1); }
+    for (const i of inputs) {
+      const k = i.value.trim().toLowerCase(); const dup = !!k && !skip(k) && seen.get(k) > 1;
+      i.classList.toggle('dup', dup); if (dup) { i.setAttribute('aria-invalid', 'true'); n++; } else if (!i.classList.contains('flag')) i.removeAttribute('aria-invalid');
+    }
+    return n;
+  };
+  const heroes = mark([...box.querySelectorAll('input[list^="capHeroes-"]')], () => false);
+  const players = mark([...box.querySelectorAll('input[list^="capPlayers-"]')], (k) => k === 'stand-in');
+  const msg = box.querySelector('[data-cap-dup]');
+  if (msg) msg.textContent = [heroes ? 'The same hero is entered twice (bans and picks of both teams).' : '', players ? 'The same player is on two rows.' : ''].filter(Boolean).join(' ');
+}
+// V1.39: duration boxes take digits only and put the colon in themselves ("2040" → "20:40").
+export function mmssInput(el) {
+  if (!el?.matches?.('input[data-mmss]')) return;
+  const v = formatDurationInput(el.value); if (v !== el.value) el.value = v;
+}
 
 export function captureUi(ctx) {
   const { S, esc, tag, banner, setMsg, val, render, meName, sid, fillReport, localToday, PLATFORM } = ctx;
@@ -59,9 +83,16 @@ export function captureUi(ctx) {
   function gamesSection(title, fid) {
     if (!gameOf(title)) return '';
     const s = st(fid); const on = !!ai();
-    const list = s.ready.map((g, i) => `<li><b>Game ${i + 1}</b> · ${g.result === 'win' ? tag('c-Verified', 'win') : tag('c-Blocked', 'loss')} · ${esc(durationText(g.durationS))}${g.mapSide ? ` · ${esc(SIDE_LABEL[g.mapSide])} side` : ''} · <span class="note">${g.players.filter((p) => p.team === 'ours').map((p) => esc(`${p.player === 'stand-in' ? 'stand-in' : p.player} (${p.hero})`)).join(', ')}${g.draft.length ? ` · draft ${g.draft.length} actions` : ''}${g.source === 'screenshot' ? ` · from screenshot${g.corrections.length ? `, ${g.corrections.length} value${g.corrections.length > 1 ? 's' : ''} corrected` : ''}` : ' · typed'}</span>
+    const list = s.ready.map((g, i) => `<li><b>Game ${i + 1}</b> · ${g.result === 'win' ? tag('c-Verified', 'win') : tag('c-Blocked', 'loss')}${g.pickOrder ? ` · <b>${esc(g.pickOrder)}</b>` : ''}${g.mapVariant ? ` · ${esc(g.mapVariant)}` : ''} · ${esc(durationText(g.durationS))}${g.mapSide ? ` · ${esc(SIDE_LABEL[g.mapSide])} side` : ''} · <span class="note">${g.players.filter((p) => p.team === 'ours').map((p) => esc(`${p.player === 'stand-in' ? 'stand-in' : p.player} (${p.hero})`)).join(', ')}${g.draft.length ? ` · draft ${g.draft.length} actions` : ''}${g.source === 'screenshot' ? ` · from screenshot${g.corrections.length ? `, ${g.corrections.length} value${g.corrections.length > 1 ? 's' : ''} corrected` : ''}` : ' · typed'}</span>
       <button type="button" class="linkbtn" data-cap-remove="${esc(`${fid}|${i}`)}">Remove</button></li>`).join('');
     if (s.savedFor) return `<div class="h3">Games</div>${banner('block', `<div><b>${s.ready.length} game(s) of the report vs ${esc(s.savedFor.partner)} (${esc(s.savedFor.date)}) are not saved yet.</b> The report itself is saved.</div>`)}<div class="toolbar"><button class="btn primary" type="button" data-cap-retry="${esc(title)}">Retry saving games</button><span class="msg" id="capMsg-${fid}" role="status"></span></div>`;
+    // V1.38: MLBB and MLBB Women are entered the Scrim Log way: one entry per game, the result counted from them.
+    if (isScrimLog(title)) {
+      return `<div class="h3">Games (Scrim Log)</div>
+      <p class="note">One entry per game, in the order played: side FP / SP, map, bans and picks (P1–P5 with the player), the other team's bans and picks, result, duration, VOD link and a note. The report's result is counted from these games.${on ? ' A screenshot of the result or the draft can fill the heroes and stats for you; you check every value.' : ''}</p>
+      ${S.rpEdit?.[fid] ? '<p class="note">Editing the report: its games stay as saved. To change a game, use Fix in the saved report\'s game table.</p>' : list ? `<ul class="plain capgames">${list}</ul>` : '<p class="empty">No game added yet. A report needs at least one.</p>'}
+      ${S.rpEdit?.[fid] ? '' : s.pending ? editorHtml(title, fid, s.pending) : `<div class="toolbar"><button class="btn primary" type="button" data-cap-manual="${esc(title)}">+ Add game ${s.ready.length + 1}</button>${on ? `<label class="btn filebtn">From a screenshot<input type="file" accept="image/*" multiple data-cap-shot="${esc(title)}" hidden></label>` : ''}<span class="msg" id="capMsg-${fid}" role="status"></span></div>`}`;
+    }
     return `<div class="h3">Games</div>
       <p class="note">${on ? 'Upload the screenshots of one game: pick the end-of-game screen first, and you can select the second screen (Data or Scoreboard tab) and the draft or loading screen together with it. The AI sorts them, and a draft fills the heroes. You check every value before it counts.' : 'AI screenshot reading works on the website. Here you can type each game by hand.'} Confirmed games fill the result above and feed the Patterns tab and player trails.</p>
       ${list ? `<ul class="plain capgames">${list}</ul>` : ''}
@@ -82,25 +113,37 @@ export function captureUi(ctx) {
   };
   // Pools for filling an unsure hero: the Draft Room pool, else (Dota, no Draft Room) heroes used 2+ times in scrims.
   const fillPools = (title) => { const p = poolsOf(title); if (Object.keys(p).length) return p; return playerHeroes(gamesOf(title)); };
+  // V1.38 Scrim Log bans: B1–B5 for each team, in ban order. A draft screenshot pre-fills them.
+  function banRows(fid, g, dr) {
+    const fromDraft = (team) => (dr?.actions || []).filter((a) => a.action === 'ban' && a.hero && (team === 'ours' ? a.side === g.ourSide : a.side && a.side !== g.ourSide)).map((a) => a.hero);
+    const typed = (team) => (g.bans?.[team] || []).filter(Boolean);
+    const bans = { ours: typed('ours').length ? typed('ours') : fromDraft('ours'), partner: typed('partner').length ? typed('partner') : fromDraft('partner') };
+    const row = (team, label) => `<div class="form banrow"><span class="note"><b>${label}</b></span>${Array.from({ length: MAX_BANS }, (_, k) => `<label class="field" for="cb-${fid}-${team}-${k}">B${k + 1}<input type="text" id="cb-${fid}-${team}-${k}" list="capHeroes-${fid}" size="8" value="${esc(bans[team][k] || '')}"></label>`).join('')}</div>`;
+    return `<div class="h3">Bans</div>${row('ours', 'Our bans')}${row('partner', 'Their bans')}${dr ? '<p class="note">Bans pre-filled from the draft screenshot: check them.</p>' : ''}`;
+  }
   function editorHtml(title, fid, pend) {
     const g = pend.base; const game = gameOf(title); const sides = GAME_SIDES[game]; const defs = STAT_DEFS[game]; const roster = rosterOf(title);
     const block = g.issues.some((i) => i.level === 'block');
     const iss = g.issues.length ? banner(block ? 'block' : 'synth', `<div><b>${block ? 'Cannot use this screenshot.' : 'Check before confirming:'}</b><ul class="plain">${g.issues.map((i) => `<li>${esc(i.text)}</li>`).join('')}</ul></div>`) : (pend.fromScreenshot && !g.players.some((p) => p.flags.length) ? banner('real', '<div>Read cleanly. Still check each value against the screenshot.</div>') : '');
-    const dl = `<datalist id="capHeroes-${fid}">${heroesFor(title).names.map((n) => `<option value="${esc(n)}">`).join('')}</datalist>`;
+    const dl = `<datalist id="capHeroes-${fid}">${heroesFor(title).names.map((n) => `<option value="${esc(n)}">`).join('')}</datalist>`
+      + (isScrimLog(title) ? `<datalist id="capPlayers-${fid}">${[...roster, 'stand-in'].map((n) => `<option value="${esc(n)}">`).join('')}</datalist>` : '');
     // Short words in the boxes (phone width); full words in messages.
     const SHORT = { left: 'Left', right: 'Right', blue: 'Blue', red: 'Red', radiant: 'Radiant', dire: 'Dire' };
     const sideSel = (id, cur, extra = '', list = sides, words = SIDE_LABEL) => `<select id="${id}"${extra}><option value=""></option>${list.map((x) => `<option value="${x}" ${x === cur ? 'selected' : ''}>${words[x]}</option>`).join('')}</select>`;
     const help = heroHelp(title);
     const chips = (p, i) => { const c = heroChoices(p, help); return c.length ? `<div class="herochips">${c.map((h) => `<button type="button" class="hchip" data-cap-hero="${esc(`${fid}|${i}|${h}`)}">${esc(h)}</button>`).join('')}</div>` : ''; };
     const heroBlank = g.players.filter((p) => !p.hero).length;
+    const log = isScrimLog(title);
+    // V1.39: the pick number is the row's place in its team (top row = P1); it is shown, not chosen.
+    const pickSel = (p, i) => { const k = p.side ? g.players.slice(0, i + 1).filter((x) => x.side === p.side).length : 0; return `<td class="n">${k ? `P${k}` : '—'}</td>`; };
     // Phone first: hero, player and K/D/A come before the wider columns.
-    const rows = g.players.map((p, i) => `<tr><td>${sideSel(`cg-${fid}-${i}-side`, p.side, cell(p, 'side'), sides, SHORT)}</td>
+    const rows = g.players.map((p, i) => `<tr>${log ? pickSel(p, i) : ''}<td>${sideSel(`cg-${fid}-${i}-side`, p.side, cell(p, 'side'), sides, SHORT)}</td>
       <td><input type="text" id="cg-${fid}-${i}-hero" list="capHeroes-${fid}" value="${esc(p.hero)}"${cell(p, 'hero')} size="10" placeholder="${p.hero ? '' : 'pick'}">${p.hero ? '' : chips(p, i)}</td>
-      <td><select id="cg-${fid}-${i}-player"><option value="">${p.side && p.side !== g.ourSide ? '(partner)' : ''}</option>${roster.map((r) => `<option ${r === p.player ? 'selected' : ''}>${esc(r)}</option>`).join('')}<option value="stand-in" ${p.player === 'stand-in' ? 'selected' : ''}>stand-in</option></select></td>
+      <td>${log ? `<input type="text" id="cg-${fid}-${i}-player" list="capPlayers-${fid}" value="${esc(p.player || '')}" size="9" autocomplete="off" placeholder="${p.side && p.side !== g.ourSide ? '(partner)' : 'player'}">` : `<select id="cg-${fid}-${i}-player"><option value="">${p.side && p.side !== g.ourSide ? '(partner)' : ''}</option>${roster.map((r) => `<option ${r === p.player ? 'selected' : ''}>${esc(r)}</option>`).join('')}<option value="stand-in" ${p.player === 'stand-in' ? 'selected' : ''}>stand-in</option></select>`}</td>
       ${defs.map((d) => `<td><input type="number" inputmode="${d.decimal ? 'decimal' : 'numeric'}" step="${d.decimal ? '0.1' : '1'}" min="0" id="cg-${fid}-${i}-${d.key}" value="${p.stats[d.key] ?? ''}"${cell(p, d.key)}></td>`).join('')}
       <td><input type="text" id="cg-${fid}-${i}-name" value="${esc(p.nameSeen)}"${cell(p, 'name')} size="10"></td></tr>`).join('');
     const dr = pend.draft;
-    const draftHtml = dr ? `<div class="h3">Draft</div>${dr.issues.length ? banner('synth', `<div><ul class="plain">${dr.issues.map((i) => `<li>${esc(i.text)}</li>`).join('')}</ul></div>`) : ''}
+    const draftHtml = log ? banRows(fid, g, dr) : dr ? `<div class="h3">Draft</div>${dr.issues.length ? banner('synth', `<div><ul class="plain">${dr.issues.map((i) => `<li>${esc(i.text)}</li>`).join('')}</ul></div>`) : ''}
       <label class="field" for="cd-${fid}-first">First pick${sideSel(`cd-${fid}-first`, dr.firstPick)}</label>
       <div class="tw"><table class="capdraft"><thead><tr><th class="n">#</th><th>Team</th><th>Action</th><th>Hero</th></tr></thead><tbody>${dr.actions.map((a, i) => `<tr><td class="n">${a.order}</td><td>${sideSel(`cd-${fid}-${i}-side`, a.side, '', sides, SHORT)}</td><td><select id="cd-${fid}-${i}-action"><option ${a.action === 'pick' ? 'selected' : ''}>pick</option><option ${a.action === 'ban' ? 'selected' : ''}>ban</option></select></td><td><input type="text" id="cd-${fid}-${i}-hero" list="capHeroes-${fid}" value="${esc(a.hero)}" placeholder="${a.hero ? '' : esc(a.candidates.slice(0, 2).join(' / ') || 'pick')}"${a.flags.length ? ` class="flag" title="${esc(a.flags.map((f) => f.reason).join('; '))}" aria-invalid="true"` : ''}></td></tr>`).join('')}</tbody></table></div>
       <p class="note">Clear a hero to drop a row you cannot read.</p>` : '';
@@ -112,15 +155,21 @@ export function captureUi(ctx) {
       <div class="form">
         <label class="field" for="cg-${fid}-our">Our team${sideSel(`cg-${fid}-our`, g.ourSide)}</label>
         <label class="field" for="cg-${fid}-result">Result<select id="cg-${fid}-result"><option value=""></option><option value="win" ${g.result === 'win' ? 'selected' : ''}>Win</option><option value="loss" ${g.result === 'loss' ? 'selected' : ''}>Loss</option></select></label>
-        <label class="field" for="cg-${fid}-dur">Duration (mm:ss)<input type="text" inputmode="numeric" id="cg-${fid}-dur" value="${g.durationS == null ? '' : esc(durationText(g.durationS))}" placeholder="18:42"></label>
-        ${game === 'mlbb' ? `<label class="field" for="cg-${fid}-map">Our map side (optional)${sideSel(`cg-${fid}-map`, g.mapSide, '', MAP_SIDES.mlbb)}</label>` : ''}
+        <label class="field" for="cg-${fid}-dur">Duration (mm:ss)<input type="text" inputmode="numeric" id="cg-${fid}-dur" data-mmss maxlength="5" value="${g.durationS == null ? '' : esc(durationText(g.durationS))}" placeholder="1842"></label>
+        ${log ? `<label class="field" for="cg-${fid}-po">Side<select id="cg-${fid}-po"><option value=""></option>${PICK_ORDER.map((o) => `<option value="${o}" ${g.pickOrder === o ? 'selected' : ''}>${esc(PICK_ORDER_LABEL[o])}</option>`).join('')}</select></label>
+        <label class="field" for="cg-${fid}-jmap">Map<select id="cg-${fid}-jmap"><option value=""></option>${[...MLBB_MAPS, ...(g.mapVariant && !MLBB_MAPS.includes(g.mapVariant) ? [g.mapVariant] : [])].map((m) => `<option ${g.mapVariant === m ? 'selected' : ''}>${esc(m)}</option>`).join('')}</select></label>`
+    : game === 'mlbb' ? `<label class="field" for="cg-${fid}-map">Our map side (optional)${sideSel(`cg-${fid}-map`, g.mapSide, '', MAP_SIDES.mlbb)}</label>` : ''}
         ${game === 'dota' ? `<label class="field" for="cg-${fid}-mid">Match ID (optional)<input type="text" inputmode="numeric" id="cg-${fid}-mid" value="${esc(pend.matchId || '')}"></label>` : ''}
       </div>
-      ${game === 'mlbb' ? '<p class="note">The MLBB result screen does not show which base (blue or red) a team played; set it from the draft or your notes, or leave it empty. Blue/red splits on the Patterns tab use only games where it is set.</p>' : ''}
+      ${log ? '<p class="note">Rows go in pick order: the top row of each team is P1, the next P2, down to P5. Our rows: hero and player. K/D/A and the other stats are optional. Duration: type the digits only (2040 = 20:40).</p>'
+    : game === 'mlbb' ? '<p class="note">The MLBB result screen does not show which base (blue or red) a team played; set it from the draft or your notes, or leave it empty. Blue/red splits on the Patterns tab use only games where it is set.</p>' : ''}
       ${heroBlank ? `<p class="note"><b>${heroBlank} hero${heroBlank > 1 ? 'es' : ''} to pick.</b> Hero portraits are often skins, so the AI fills only heroes it is sure of. Tap a suggestion under the box (the AI's guesses, earlier corrections and the player's usual heroes) or type the name.${ai() && !dr ? ' A draft screenshot fills them too.' : ''}</p>` : ''}
-      <div class="tw"><table class="capgrid"><thead><tr><th>Team</th><th>Hero</th><th>Our player</th>${defs.map((d) => `<th class="n">${esc(d.label)}</th>`).join('')}<th>Name on screen</th></tr></thead><tbody>${rows}</tbody></table></div>
+      <div class="tw"><table class="capgrid"><thead><tr>${log ? '<th>Pick</th>' : ''}<th>Team</th><th>Hero</th><th>Our player</th>${defs.map((d) => `<th class="n">${esc(d.label)}</th>`).join('')}<th>Name on screen</th></tr></thead><tbody>${rows}</tbody></table></div>
+      ${log ? '<p class="warn-line" role="status" data-cap-dup></p>' : ''}
       <p class="note">Highlighted cells are ones the AI was unsure of or that failed a check: hover or tap for the reason. Empty = not shown on the screen. On a phone, swipe the table sideways for the numbers.</p>
       ${draftHtml}
+      ${log ? `<div class="form"><label class="field wide" for="cg-${fid}-gnotes">Game notes (optional)<textarea rows="2" id="cg-${fid}-gnotes" maxlength="${NOTES_MAX}" placeholder="e.g. Lord fight telat, vision kurang di sisi kiri">${esc(g.notes || '')}</textarea></label>
+        <label class="field wide" for="cg-${fid}-vod">VOD link (optional)<input type="url" id="cg-${fid}-vod" value="${esc(g.vod || '')}" placeholder="https://"></label></div>` : ''}
       <div class="toolbar">${block ? '' : `<button class="btn primary" type="button" data-cap-confirm="${esc(title)}">${pend.fix ? 'Save the fix' : 'Confirm game'}</button>`}
         ${ai() && !block && !pend.fix ? `<label class="btn filebtn">Add another screenshot of this game<input type="file" accept="image/*" multiple data-cap-more="${esc(title)}" hidden></label>` : ''}
         ${ai() && !dr && !block ? `<label class="btn filebtn">Add draft screenshot<input type="file" accept="image/*" data-cap-draft="${esc(title)}" hidden></label>` : ''}
@@ -134,6 +183,14 @@ export function captureUi(ctx) {
     edited.mapSide = game === 'mlbb' ? val(`cg-${fid}-map`) : edited.ourSide;
     edited.players = edited.players.map((p, i) => ({ ...p, side: val(`cg-${fid}-${i}-side`), nameSeen: val(`cg-${fid}-${i}-name`).trim(), player: val(`cg-${fid}-${i}-player`), hero: val(`cg-${fid}-${i}-hero`).trim(),
       stats: Object.fromEntries(defs.map((d) => [d.key, val(`cg-${fid}-${i}-${d.key}`)])) }));
+    if (isScrimLog(title)) {
+      // V1.39: a typed player name is matched to the roster's spelling ("aran" → "Aran", "Stand-in" → "stand-in").
+      const names = [...rosterOf(title), 'stand-in'];
+      edited.players = edited.players.map((p) => { const t = String(p.player || '').trim(); return { ...p, player: names.find((n) => n.toLowerCase() === t.toLowerCase()) || t }; });
+      edited.pickOrder = val(`cg-${fid}-po`); edited.mapVariant = val(`cg-${fid}-jmap`); edited.notes = val(`cg-${fid}-gnotes`); edited.vod = val(`cg-${fid}-vod`).trim();
+      edited.bans = Object.fromEntries(['ours', 'partner'].map((team) => [team, Array.from({ length: MAX_BANS }, (_, k) => val(`cb-${fid}-${team}-${k}`).trim())]));
+      return { edited, draft: null, matchId: '' };   // the draft is built from the bans and picks (core/scrim_log.js)
+    }
     let draft = null;
     if (pend.draft) draft = { firstPick: val(`cd-${fid}-first`), actions: pend.draft.actions.map((a, i) => ({ order: a.order, side: val(`cd-${fid}-${i}-side`), action: val(`cd-${fid}-${i}-action`), hero: val(`cd-${fid}-${i}-hero`).trim() })).filter((a) => a.hero) };
     return { edited, draft, matchId: game === 'dota' ? val(`cg-${fid}-mid`) : '' };
@@ -154,6 +211,11 @@ export function captureUi(ctx) {
     if (a.result !== b.result) out.push(`result ${a.result} → ${b.result}`);
     if (a.durationS !== b.durationS) out.push(`duration ${durationText(a.durationS)} → ${durationText(b.durationS)}`);
     if ((a.mapSide || '') !== (b.mapSide || '')) out.push(`map side ${a.mapSide || '—'} → ${b.mapSide || '—'}`);
+    if ((a.pickOrder || '') !== (b.pickOrder || '')) out.push(`side ${a.pickOrder || '—'} → ${b.pickOrder || '—'}`);
+    if ((a.mapVariant || '') !== (b.mapVariant || '')) out.push(`map ${a.mapVariant || '—'} → ${b.mapVariant || '—'}`);
+    const bansTxt = (g) => (g.draft || []).filter((x) => x.action === 'ban').map((x) => x.hero).join(',');
+    if (bansTxt(a) !== bansTxt(b)) out.push('bans changed');
+    if ((a.notes || '') !== (b.notes || '')) out.push('game notes changed');
     b.players.forEach((p, i) => { const q = a.players[i]; if (!q) return; const who = p.player || p.nameSeen || `row ${i + 1}`;
       if (q.hero !== p.hero) out.push(`${who} hero ${q.hero || '—'} → ${p.hero || '—'}`);
       if (q.player !== p.player) out.push(`row ${i + 1} player ${q.player || '—'} → ${p.player || '—'}`);
@@ -166,7 +228,13 @@ export function captureUi(ctx) {
     const gs = gamesOf(r.title).filter((g) => g.reportId === r.id).sort((a, b) => a.gameNo - b.gameNo);
     if (!gs.length) return '';
     const fixed = S.games.filter((g) => g.reportId === r.id && g.supersedes).length;
-    return `<div class="tw"><table class="repgames"><thead><tr><th>Game</th><th>Result</th><th>Time</th><th>Our heroes (K/D/A)</th>${S.mode === 'demo' ? '' : '<th></th>'}</tr></thead><tbody>${gs.map((g) => `<tr><td>${g.gameNo}${g.mapSide ? ` <span class="note">${esc(g.mapSide)}</span>` : ''}</td><td>${g.result === 'win' ? 'W' : 'L'}</td><td>${esc(durationText(g.durationS))}</td><td>${g.players.filter((p) => p.team === 'ours').map((p) => `${esc(p.hero)} <span class="note">${p.stats.kills}/${p.stats.deaths}/${p.stats.assists}</span>`).join(', ')}</td>${S.mode === 'demo' ? '' : `<td><button type="button" class="linkbtn" data-cap-fix="${esc(`${g.title}|${g.id}`)}">Fix</button></td>`}</tr>`).join('')}</tbody></table></div>${fixed ? `<p class="note">${fixed} game version(s) corrected; earlier versions are kept in the history.</p>` : ''}`;
+    const kda = (p) => (p.stats?.kills == null ? '' : ` <span class="note">${p.stats.kills}/${p.stats.deaths ?? '—'}/${p.stats.assists ?? '—'}</span>`);
+    const ourPicks = (g) => { const d = (g.draft || []).filter((a) => a.team === 'ours' && a.action === 'pick'); const rows = g.players.filter((p) => p.team === 'ours'); return d.length ? d.map((a) => rows.find((p) => p.hero === a.hero)).filter(Boolean) : rows; };
+    const bans = (g, team) => (g.draft || []).filter((a) => a.team === team && a.action === 'ban').map((a) => esc(a.hero)).join(', ');
+    if (isScrimLog(r.title)) {
+      return `<div class="tw"><table class="repgames"><thead><tr><th>Game</th><th>Side</th><th>Map</th><th>Result</th><th>Time</th><th>Our picks (P1–P5)</th><th>Bans: ours / theirs</th><th>Notes</th>${S.mode === 'demo' ? '' : '<th></th>'}</tr></thead><tbody>${gs.map((g) => `<tr><td>${g.gameNo}</td><td>${esc(g.pickOrder || '—')}</td><td>${esc(g.mapVariant || '—')}</td><td>${g.result === 'win' ? 'W' : 'L'}</td><td>${esc(durationText(g.durationS))}</td><td>${ourPicks(g).map((p) => `${esc(p.hero)} <span class="note" data-no-tr>(${esc(p.player || '—')})</span>${kda(p)}`).join(', ')}</td><td class="note">${bans(g, 'ours') || '—'} / ${bans(g, 'partner') || '—'}</td><td class="note">${esc(g.notes || '')}${g.vod ? ` <a href="${esc(g.vod)}" target="_blank" rel="noopener noreferrer">VOD</a>` : ''}</td>${S.mode === 'demo' ? '' : `<td><button type="button" class="linkbtn" data-cap-fix="${esc(`${g.title}|${g.id}`)}">Fix</button></td>`}</tr>`).join('')}</tbody></table></div>${fixed ? `<p class="note">${fixed} game version(s) corrected; earlier versions are kept in the history.</p>` : ''}`;
+    }
+    return `<div class="tw"><table class="repgames"><thead><tr><th>Game</th><th>Result</th><th>Time</th><th>Our heroes (K/D/A)</th>${S.mode === 'demo' ? '' : '<th></th>'}</tr></thead><tbody>${gs.map((g) => `<tr><td>${g.gameNo}${g.mapSide ? ` <span class="note">${esc(g.mapSide)}</span>` : ''}</td><td>${g.result === 'win' ? 'W' : 'L'}</td><td>${esc(durationText(g.durationS))}</td><td>${g.players.filter((p) => p.team === 'ours').map((p) => `${esc(p.hero)}${kda(p)}`).join(', ')}</td>${S.mode === 'demo' ? '' : `<td><button type="button" class="linkbtn" data-cap-fix="${esc(`${g.title}|${g.id}`)}">Fix</button></td>`}</tr>`).join('')}</tbody></table></div>${fixed ? `<p class="note">${fixed} game version(s) corrected; earlier versions are kept in the history.</p>` : ''}`;
   }
 
   // ---------------------------------------------------------------- debrief dump
@@ -402,7 +470,7 @@ export function captureUi(ctx) {
         const { edited, draft, matchId } = readEditor(title, fid, s.pending);
         const fx = s.pending.fix;
         const rec = confirmGame(edited, { date: fx ? fx.date : (val(`rp-${fid}-date`) || localToday()), partner: fx ? fx.partner : val(`rp-${fid}-partner`), gameNo: fx ? fx.gameNo : s.ready.length + 1, by: fx ? fx.by : (val(`rp-${fid}-by`) || meName()),
-          base: s.pending.fromScreenshot ? (s.pending.ai || s.pending.base) : null, captureIds: s.pending.captureIds || [], heroes: heroesFor(title), draft, externalMatchId: matchId });
+          base: s.pending.fromScreenshot ? (s.pending.ai || s.pending.base) : null, captureIds: s.pending.captureIds || [], heroes: heroesFor(title), draft, externalMatchId: matchId, roster: rosterOf(title) });
         if (fx) {
           const old = gamesOf(title).find((x) => x.id === fx.gameId);
           rec.reportId = fx.reportId; rec.supersedes = fx.gameId; rec.fixedBy = meName() || S.me; rec.source = old?.source || rec.source; rec.captureIds = old?.captureIds || []; rec.corrections = old?.corrections || [];
@@ -417,7 +485,7 @@ export function captureUi(ctx) {
         }
         s.ready.push(rec); s.pending = null; keep(fid);
         const r = gamesResult(s.ready); render(); fillReport(fid, { won: String(r.won), lost: String(r.lost) });
-        setMsg(`capMsg-${fid}`, `Game ${s.ready.length} confirmed (${rec.result}). Result above updated to ${r.won}-${r.lost}.`, 'ok');
+        setMsg(`capMsg-${fid}`, isScrimLog(title) ? `Game ${s.ready.length} confirmed (${rec.result}). Session so far: ${r.won}-${r.lost}.` : `Game ${s.ready.length} confirmed (${rec.result}). Result above updated to ${r.won}-${r.lost}.`, 'ok');
       } catch (err) { setMsg(`capMsg-${fid}`, err.message, 'err'); }
       return true;
     }

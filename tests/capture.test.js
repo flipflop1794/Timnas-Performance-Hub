@@ -3,7 +3,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { heroIndex, matchPlayer, proposeGame, proposeDraft, mergeGames, heroesFromDraft, heroChoices, heroMemory, playerHeroes, findDuplicate, confirmGame, blankGame, gameToProposal, gamesResult, latestGames, extractionAccuracy, learnAliases, parseDuration } from '../src/core/capture.js';
+import { heroIndex, matchPlayer, proposeGame, proposeDraft, mergeGames, heroesFromDraft, heroChoices, heroMemory, playerHeroes, findDuplicate, confirmGame, blankGame, gameToProposal, gamesResult, latestGames, extractionAccuracy, learnAliases, parseDuration, formatDurationInput } from '../src/core/capture.js';
 import { checkDebriefInput, checkDebriefSplit } from '../src/core/debrief.js';
 import { facts, checkFindings, findingRecord, markFinding, statTrail, statGoal, statGoalProgress, standInRecord, digestPayload } from '../src/core/patterns.js';
 import { scoreboardSchema, draftSchema, digestSchema, debriefSchema, scoreboardPrompt, draftPrompt, messagesRequest, imageBlock, parseModelJson, capturePath, SLUG_TITLE } from '../supabase/functions/_shared/scrim_spec.js';
@@ -145,6 +145,8 @@ test('hero help: AI candidates, what coaches corrected the same reading to, the 
 
 test('confirmed game: required fields, map side, draft must match the heroes, corrections recorded, fixes supersede', () => {
   const base = proposeGame({ title: 'MLBB', raw: sureAll(REAL[1].raw), roster: MLBB, heroes: mlbbHeroes });
+  assert.equal(base.pickOrder, '', 'FP / SP is not on the result screen: the coach sets it');
+  base.pickOrder = 'FP';   // V1.38 Scrim Log: every MLBB game needs FP or SP
   const edited = clone(base); edited.mapSide = 'red'; edited.players[1].stats.kills = 4;
   const g = confirmGame(edited, ctxFor(base));
   assert.equal(g.source, 'screenshot'); assert.equal(g.mapSide, 'red'); assert.equal(g.result, 'win');
@@ -158,10 +160,13 @@ test('confirmed game: required fields, map side, draft must match the heroes, co
   assert.throws(() => confirmGame(dup, ctxFor(base)), /same roster player/);
   const noRes = clone(base); noRes.result = '';
   assert.throws(() => confirmGame(noRes, ctxFor(base)), /Pick the result/);
-  const draft = { firstPick: 'left', actions: [{ order: 1, side: 'left', action: 'pick', hero: 'Fanny' }] };
-  assert.throws(() => confirmGame(edited, ctxFor(base, { draft })), /the draft says Left team picked Fanny/i);
+  // V1.38: MLBB drafts come from the Scrim Log bans and picks; a hero cannot be banned and picked.
+  assert.throws(() => confirmGame({ ...clone(edited), bans: { ours: [edited.players[0].hero], partner: [] } }, ctxFor(base)), /both banned and picked/);
+  assert.throws(() => confirmGame({ ...clone(edited), pickOrder: '' }, ctxFor(base)), /Pick FP or SP/);
+  const dDraft = proposeGame({ title: 'MLBB', raw: sureAll(REAL[1].raw), roster: MLBB, heroes: mlbbHeroes });
+  assert.equal(confirmGame({ ...clone(dDraft), pickOrder: 'SP' }, ctxFor(dDraft)).firstPick, 'right', 'SP: the other team picked first');
   // Unsure hero the coach picked: counted as a correction only when the AI's best guess differed.
-  const unsure = proposeGame({ title: 'MLBB', raw: REAL[1].raw, roster: MLBB, heroes: mlbbHeroes });
+  const unsure = proposeGame({ title: 'MLBB', raw: REAL[1].raw, roster: MLBB, heroes: mlbbHeroes }); unsure.pickOrder = 'FP';
   const e2 = clone(unsure); e2.players.forEach((p, i) => { p.hero = REAL[1].truthHeroes[p.side][p.slot - 1]; });
   const g2 = confirmGame(e2, ctxFor(unsure));
   const heroFixes = g2.corrections.filter((c) => /hero/.test(c.field)).length;
@@ -174,13 +179,14 @@ test('confirmed game: required fields, map side, draft must match the heroes, co
   assert.deepEqual(gamesResult(latestGames([g, fixed])), { won: 0, lost: 1 });
   assert.equal(gameToProposal(g).players[0].hero, g.players[0].hero);
   assert.equal(parseDuration('18:42'), 1122); assert.equal(parseDuration('35'), 2100); assert.equal(parseDuration('18.42'), 1122);
+  assert.deepEqual(['2040', '905', '1405'].map(parseDuration), [1240, 545, 845], 'V1.39: digits only = mm:ss'); assert.deepEqual(['2', '20', '204', '2040', '20405', 'a2b040'].map(formatDurationInput), ['2', '20', '2:04', '20:40', '20:40', '20:40']);
   assert.throws(() => parseDuration('18m'), /minutes:seconds/); assert.throws(() => parseDuration('18:75'), /0 to 59/);
   assert.deepEqual(learnAliases({}, g).Aran, ['TLID Aran']);
 });
 
 test('duplicates: the same result added twice is spotted (same kill score and duration)', () => {
   const p1 = proposeGame({ title: 'MLBB', raw: REAL[2].raw, roster: MLBB, heroes: mlbbHeroes });
-  const saved = confirmGame(proposeGame({ title: 'MLBB', raw: sureAll(REAL[2].raw), roster: MLBB, heroes: mlbbHeroes }), ctxFor(p1));
+  const saved = confirmGame({ ...proposeGame({ title: 'MLBB', raw: sureAll(REAL[2].raw), roster: MLBB, heroes: mlbbHeroes }), pickOrder: 'FP' }, ctxFor(p1));
   assert.match(findDuplicate(p1, [saved]), /vs ONIC, 2026-11-16, game 1/);
   assert.equal(findDuplicate(proposeGame({ title: 'MLBB', raw: REAL[3].raw, roster: MLBB, heroes: mlbbHeroes }), [saved]), '');
 });
@@ -202,6 +208,7 @@ function season() {
     const f = REAL[i % REAL.length]; const base = proposeGame({ title: 'MLBB', raw: sureAll(f.raw), roster: MLBB, heroes: mlbbHeroes });
     const e = clone(base); const long = i % 3 === 0;
     e.durationS = long ? 1500 : 840; e.result = long ? 'loss' : 'win'; e.players[0].stats.deaths = long ? 5 : 1; e.mapSide = i % 2 ? 'blue' : '';
+    e.pickOrder = i % 2 ? 'FP' : 'SP'; e.mapVariant = i < 4 ? 'Dangerous Grass' : '';
     const g = confirmGame(e, { reportId: `RP-${i}`, date: `2026-11-${String(10 + Math.floor(i / 2)).padStart(2, '0')}`, partner: i < 6 ? 'ONIC' : 'RRQ', gameNo: (i % 2) + 1, heroes: mlbbHeroes, base });
     g.draft = [{ order: 1, side: 'right', team: 'partner', action: 'ban', hero: i % 2 ? 'Fanny' : 'Ling' }]; g.firstPick = i % 2 ? 'left' : 'right'; g.createdAt = `2026-11-${10 + i}T10:00:00Z`;
     gs.push(g);
@@ -221,6 +228,7 @@ test('facts: map side only where set, length, heroes, bans, partner level, stand
   assert.equal(f('length:under 15 min').won, 8); assert.equal(f('banned:Fanny').count, 6); assert.equal(f('banned:Fanny').share, 50);
   assert.equal(f('standin:Myanmar').n, 6); assert.equal(f('standin:Malaysia').n, 6); assert.equal(f('level:Tier 2').n, 6);
   assert.deepEqual([f('player:Aran').deathsInWins, f('player:Aran').deathsInLosses], [1, 5]);
+  assert.deepEqual([f('pick:FP').n, f('pick:SP').n], [6, 6], 'V1.38: FP / SP split'); assert.equal(f('map:Dangerous Grass').n, 4); assert.equal(f('firstpick:us'), undefined, 'Scrim Log games use the FP / SP lines');
   const pay = digestPayload(F, reports); assert.ok(!('games' in pay.facts[0]), 'game ids are not sent'); assert.ok(pay.excerpts.length <= 60);
   const rec = standInRecord(gs, 'Myanmar', { reports, scrims }); assert.deepEqual([rec.n, rec.won], [6, 4]); assert.ok(rec.bansAgainst.length);
 });
