@@ -763,7 +763,7 @@ const RULES = [
   [/^(Goals|Rounds|Penalties) \((us|them)\) must be a whole number from 0 to (\d+)\.$/, (m, a, b, n) => `${({ Goals: 'Gol', Rounds: 'Ronde', Penalties: 'Penalti' })[a]} (${b === 'us' ? 'kita' : 'lawan'}) harus bilangan bulat dari 0 sampai ${n}.`],
   [/^Added: (win|loss|draw) (.+)\. The result below is filled; keep going or save the report\.$/, (m, r, x) => `Ditambahkan: ${({ win: 'menang', loss: 'kalah', draw: 'seri' })[r]} ${x}. Hasil di bawah sudah terisi; lanjutkan atau simpan laporan.`],
   // V1.29 scrim report
-  [/^(\d) of (\d) done — still needed: (.+)\.$/, (m, a, b, l) => `${a} dari ${b} selesai — masih perlu: ${l.split(', ').map((x) => ({ 'sparring partner': 'sparring partner', result: 'hasil', focus: 'fokus', 'what worked or failed': 'yang berhasil atau gagal', adjustment: 'penyesuaian', 'plan rating': 'nilai rencana' })[x] || x).join(', ')}.`],
+  [/^(\d) of (\d) done — still needed: (.+)\.$/, (m, a, b, l) => `${a} dari ${b} selesai — masih perlu: ${l.split(', ').map((x) => ({ 'sparring partner': 'sparring partner', result: 'hasil', 'at least one game': 'minimal satu game', focus: 'fokus', 'what worked or failed': 'yang berhasil atau gagal', adjustment: 'penyesuaian', 'plan rating': 'nilai rencana' })[x] || x).join(', ')}.`],
   [/^Filled from today's plan: vs (.+)\. Change anything that is different\.$/, 'Diisi dari rencana hari ini: vs $1. Ubah yang berbeda.'],
   // V1.28 Trends period
   [/^this period (.+) \((\d+)\) vs (.+) \((\d+)\) the (?:week|(\d) weeks) before$/, (m, a, na, b, nb, w) => `periode ini ${a} (${na}) vs ${b} (${nb}) pada ${w || 1} minggu sebelumnya`],
@@ -837,6 +837,32 @@ const RULES = [
   [/^Field: (\d+) nations \((.+)\)\. (\d+) with notes\..*$/, 'Peserta: $1 negara. $3 dengan catatan. Tier ancaman adalah penilaian staf dengan alasan, tidak pernah dihitung.'],
   [/^([A-Z][^:·]{1,60}):$/, (m, f) => (tr(f) == null ? m : `${tr(f)}:`)],
 ];
+
+// V1.38 Scrim Log input for MLBB and MLBB Women.
+Object.assign(EXACT, {
+  'Games (Scrim Log)': 'Game (Scrim Log)', 'No game added yet. A report needs at least one.': 'Belum ada game. Laporan butuh minimal satu.',
+  'From a screenshot': 'Dari screenshot', 'Session and games': 'Sesi dan game', 'Partner and time slot, then each game the Scrim Log way.': 'Partner dan slot waktu, lalu tiap game ala Scrim Log.',
+  'Time slot': 'Slot waktu', Bans: 'Ban', 'Our bans': 'Ban kita', 'Their bans': 'Ban lawan', 'Bans pre-filled from the draft screenshot: check them.': 'Ban diisi dari screenshot draft: cek lagi.',
+  'Game notes (optional)': 'Catatan game (opsional)', 'VOD link (optional)': 'Link VOD (opsional)', 'Pick number': 'Nomor pick',
+  'Rows go in pick order: the top row of each team is P1, the next P2, down to P5. Our rows: hero and player. K/D/A and the other stats are optional. Duration: type the digits only (2040 = 20:40).':
+    'Baris sesuai urutan pick: baris teratas tiap tim P1, berikutnya P2, sampai P5. Baris tim kita: hero dan pemain. K/D/A dan statistik lain opsional. Durasi: ketik angkanya saja (2040 = 20:40).',
+  'Add at least one game under Games (Scrim Log) before saving.': 'Tambahkan minimal satu game di bagian Game (Scrim Log) sebelum menyimpan.',
+  'Download games (Scrim Log format)': 'Unduh game (format Scrim Log)', 'Pick FP or SP (did we pick first?).': 'Pilih FP atau SP (apakah kita pick duluan?).',
+  "Editing the report: its games stay as saved. To change a game, use Fix in the saved report's game table.": 'Mengedit laporan: game-nya tetap seperti tersimpan. Untuk mengubah satu game, pakai Fix di tabel game laporan tersimpan.',
+  'Our picks (P1–P5)': 'Pick kita (P1–P5)', 'Bans: ours / theirs': 'Ban: kita / lawan', 'We picked first (FP)': 'Kita pick duluan (FP)', 'We picked second (SP)': 'Kita pick kedua (SP)',
+  'No confirmed games yet.': 'Belum ada game terkonfirmasi.',
+  'VOD link must start with http:// or https://.': 'Link VOD harus diawali http:// atau https://.',
+  'The same hero is entered twice (bans and picks of both teams).': 'Ada hero yang diisi dua kali (ban dan pick kedua tim).', 'The same player is on two rows.': 'Ada pemain yang diisi di dua baris.',
+});
+RULES.push(
+  [/^One entry per game, in the order played: .*counted from these games\.( A screenshot .*)?$/, (m, shot) => `Satu entri per game, urut sesuai main: side FP / SP, map, ban dan pick (P1–P5 dengan pemainnya), ban dan pick lawan, hasil, durasi, link VOD dan catatan. Hasil laporan dihitung dari game ini.${shot ? ' Screenshot hasil atau draft bisa mengisi hero dan statistik; Anda cek setiap nilainya.' : ''}`],
+  [/^\+ Add game (\d+)$/, '+ Tambah game $1'],
+  [/^Game (\d+) confirmed \((win|loss)\)\. Session so far: (\d+)-(\d+)\.$/, (m, n, r, w, l) => `Game ${n} dikonfirmasi (${r === 'win' ? 'menang' : 'kalah'}). Sesi sejauh ini: ${w}-${l}.`],
+  [/^"(.+)" is not on the (.+) roster\. Pick a name from the list, or "stand-in"\.$/, (m, n, t) => `"${n}" tidak ada di roster ${t}. Pilih nama dari daftar, atau "stand-in".`],
+  [/^(Our|Their) picks: give every hero its pick number \(P1–P5\)\.$/, (m, w) => `${w === 'Our' ? 'Pick kita' : 'Pick lawan'}: isi nomor pick tiap hero (P1–P5).`],
+  [/^(Our|Their) picks: two heroes have the same pick number\.$/, (m, w) => `${w === 'Our' ? 'Pick kita' : 'Pick lawan'}: dua hero punya nomor pick yang sama.`],
+  [/^(.+) is both banned and picked, or entered twice\.$/, '$1 di-ban sekaligus di-pick, atau diisi dua kali.'],
+);
 
 // Page headlines ("Word <em>word</em>") are translated as a whole.
 const LEADS = {

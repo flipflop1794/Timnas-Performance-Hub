@@ -1,6 +1,7 @@
 import { localDay, shiftDay } from './dates.js';
 import { GAME_SPEC } from './reports.js';
 import { completeScrim, planScrim } from './scrims.js';
+import { slotOrder } from './scrim_log.js';
 
 export const ACTION_STATUSES = ['Open', 'In progress', 'Done'];
 export const NOTE_LIMIT = 500;
@@ -87,7 +88,10 @@ export const isOverdue = (action, today) => action.status !== 'Done' && action.d
 
 function scheduledTime(session) {
   const time = /^(\d{1,2}):([0-5]\d)(?:\s*WIB)?$/i.exec(session.time?.trim() || '');
-  return time && +time[1] < 24 ? +time[1] * 60 + +time[2] : Infinity;
+  if (time && +time[1] < 24) return +time[1] * 60 + +time[2];
+  // V1.38: Scrim Log time slots (Warmup, Jam 1, Jam 2 …) sort after clock times, in slot order.
+  const slot = slotOrder(session.time);
+  return slot == null ? Infinity : 24 * 60 + slot;
 }
 
 export function sessionOverview(titles, sessions, scrimReports, today) {

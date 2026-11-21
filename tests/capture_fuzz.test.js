@@ -49,7 +49,7 @@ test('2000 random draft answers: no crash, only list heroes, never fills an unsu
 test('random findings and debrief answers: no crash, nothing kept without a real fact', () => {
   const base = proposeGame({ title: 'MLBB', raw: REAL[1].raw, roster: ROSTER, heroes });
   const e = JSON.parse(JSON.stringify(base)); e.players.forEach((p) => { p.hero = REAL[1].truthHeroes[p.side][p.slot - 1]; });
-  const games = Array.from({ length: 8 }, (_, i) => confirmGame({ ...e, result: i % 2 ? 'win' : 'loss' }, { date: '2026-11-16', partner: 'X', gameNo: 1, heroes }));
+  const games = Array.from({ length: 8 }, (_, i) => confirmGame({ ...e, pickOrder: 'FP', result: i % 2 ? 'win' : 'loss' }, { date: '2026-11-16', partner: 'X', gameNo: 1, heroes }));
   const F = facts(games, {}); const ids = new Set(F.map((f) => f.id));
   for (let i = 0; i < 2000; i++) {
     const raw = mutate({ findings: [{ fact_ids: [pick([...ids]), 'nope'], kind: 'problem', claim: `Lost ${Math.floor(rnd() * 10)} of 8 games.`, why_it_matters: 'x' }] }, 0.3);

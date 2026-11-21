@@ -1,6 +1,7 @@
 {
  "source": "https://mlbbhub.com/heroes",
  "retrieved": "2026-11-06",
+ "checked": "2026-11-21: same 133 names as the official list on mobilelegends.com/rank (Original Server). Dori (Advance Server since Aug 2026) is not released yet.",
  "count": 133,
  "heroes": [
   {

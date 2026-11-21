@@ -1,9 +1,11 @@
 import { hasContactNumber } from './pii.js';
 import { localDay } from './dates.js';
 import { cleanRows, rowsFields, rowsText, tiesOf } from './comp_rows.js';
+import { SCRIM_LOG_HEAD, scrimLogRows, isScrimLog } from './scrim_log.js';
 // Daily scrim reports: what a coach writes after a scrim session. One report = one session
-// (one sparring partner). The daily roll-up groups the day's sessions. Reports are never edited
-// or deleted: a mistake is fixed with a dated correction note, so the record stays trustworthy.
+// (one sparring partner). The daily roll-up groups the day's sessions. Reports are not deleted; since
+// V1.36 the author (or the Head Coach, an assistant coach, an admin) can edit one, and the database keeps
+// every earlier version. Correction notes stay available for later follow-ups.
 // Operational data only. Player notes are performance notes: no health, personal or contact details.
 
 export const REPORT_TITLES = ['Dota 2', 'MLBB', 'MLBB Women', 'PUBG Mobile', 'eFootball', 'CS2', 'CS2 Women'];
@@ -136,7 +138,7 @@ export function reportSummary(reports, title, asOf, windowDays = 7) {
 // is run as a formula by spreadsheets, so it gets a leading apostrophe. Plain numbers (scores, points,
 // placements) are left as they are so they still add up.
 const FORMULA = /^[=+\-@\t\r]/;
-const csvCell = (v) => {
+export const csvCell = (v) => {
   let s = String(v ?? '');
   if (typeof v !== 'number' && FORMULA.test(s) && !/^-?\d+(\.\d+)?$/.test(s)) s = `'${s}`;
   return /[",\n\r]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
@@ -154,3 +156,10 @@ export function reportsCsv(reports, { bom = false } = {}) {
   // CRLF line ends: what Excel on Windows expects; other tools read it too.
   return (bom ? CSV_BOM : '') + [head, ...rows].map((row) => row.map(csvCell).join(',')).join('\r\n');
 }
+
+// V1.38: MLBB / MLBB Women games in the Scrim Log export layout (one row per game).
+export function scrimLogCsv(games, reports, { bom = false } = {}) {
+  const rows = scrimLogRows(games, reports);
+  return (bom ? CSV_BOM : '') + [SCRIM_LOG_HEAD, ...rows].map((row) => row.map(csvCell).join(',')).join('\r\n');
+}
+export { isScrimLog };

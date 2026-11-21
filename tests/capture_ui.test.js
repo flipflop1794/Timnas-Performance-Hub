@@ -42,19 +42,45 @@ async function hub(aiImpl) {
   return { dom, d, go, click, set, upload, calls, pickAllHeroes, fillReport, text: () => d.getElementById('main').textContent };
 }
 
-test('without the website AI, games are typed by hand and still feed the report result', async () => {
+test('without the website AI, games are typed the Scrim Log way and still feed the report result', async () => {
   const h = await hub(null);
-  assert.match(h.text(), /AI screenshot reading works on the website/); assert.equal(h.d.querySelector('[data-cap-shot]'), null);
+  assert.match(h.text(), /Games \(Scrim Log\)/); assert.equal(h.d.querySelector('[data-cap-shot]'), null);
+  assert.equal(h.d.querySelector('.chips button')?.textContent === '2-1', false, 'no typed quick score for MLBB');
+  assert.equal(h.d.getElementById('rp-MLBB-won').type, 'hidden', 'the result is counted from the games');
   await h.click('[data-cap-manual="MLBB"]');
-  assert.equal(h.d.getElementById('cg-MLBB-0-player').value, 'Aran', 'roster pre-filled on our side');
-  assert.equal(h.d.getElementById('cg-MLBB-our').value, 'left');
-  h.set('cg-MLBB-result', 'win'); h.set('cg-MLBB-dur', '14:05'); h.set('cg-MLBB-map', 'blue');
+  // V1.39: player boxes start empty; the division's roster is offered as suggestions; names typed in any case.
+  assert.equal(h.d.getElementById('cg-MLBB-0-player').value, '', 'player boxes start empty');
+  assert.deepEqual([...h.d.getElementById('capPlayers-MLBB').options].map((o) => o.value), ['Aran', 'Kevin', 'Drichel', 'Lyoni', 'Jull.', 'stand-in']);
+  ['aran', 'Kevin', 'Drichel', 'Lyoni', 'Jull.'].forEach((n, i) => h.set(`cg-MLBB-${i}-player`, n));
+  // A hero or a player entered twice is marked at once.
+  h.set('cg-MLBB-1-player', 'Aran');
+  assert.ok(h.d.getElementById('cg-MLBB-1-player').classList.contains('dup')); assert.match(h.d.querySelector('[data-cap-dup]').textContent, /same player is on two rows/);
+  h.set('cg-MLBB-1-player', 'Kevin'); assert.equal(h.d.querySelector('.capedit .dup'), null); assert.equal(h.d.querySelector('[data-cap-dup]').textContent, '');
+  h.set('cb-MLBB-ours-0', 'Fanny'); h.set('cg-MLBB-7-hero', 'fanny');
+  assert.ok(h.d.getElementById('cb-MLBB-ours-0').classList.contains('dup')); assert.match(h.d.querySelector('[data-cap-dup]').textContent, /same hero is entered twice/);
+  h.set('cg-MLBB-7-hero', '');
+  // V1.39: the pick number is the row's place in its team, shown and not chosen; FP / SP without words; four maps.
+  assert.equal(h.d.getElementById('cg-MLBB-0-pick'), null, 'no pick-number box');
+  assert.deepEqual([...h.d.querySelectorAll('.capgrid tbody tr')].map((r) => r.cells[0].textContent), ['P1', 'P2', 'P3', 'P4', 'P5', 'P1', 'P2', 'P3', 'P4', 'P5']);
+  assert.deepEqual([...h.d.getElementById('cg-MLBB-po').options].map((o) => o.textContent).filter(Boolean), ['FP', 'SP']);
+  assert.deepEqual([...h.d.getElementById('cg-MLBB-jmap').options].map((o) => o.value).filter(Boolean), ['Flying Clouds', 'Golden Turret', 'Healing Turtle', 'Revealing Wisps']);
+  h.set('cg-MLBB-result', 'win'); h.set('cg-MLBB-dur', '1405'); h.set('cg-MLBB-jmap', 'Golden Turret');
+  assert.equal(h.d.getElementById('cg-MLBB-dur').value, '14:05', 'digits only: the colon is put in');
+  h.set('cb-MLBB-ours-0', 'Fanny'); h.set('cb-MLBB-partner-0', 'Ling'); h.set('cg-MLBB-gnotes', 'Lord fight telat'); h.set('cg-MLBB-vod', 'https://youtu.be/abc');
   h.pickAllHeroes(0);
-  for (let i = 0; i < 5; i++) for (const k of ['kills', 'deaths', 'assists']) h.set(`cg-MLBB-${i}-${k}`, '1');
   await h.click('[data-cap-confirm="MLBB"]');
-  assert.match(h.d.getElementById('capMsg-MLBB').textContent, /Game 1 confirmed \(win\)/);
+  assert.match(h.d.getElementById('capMsg-MLBB').textContent, /Pick FP or SP/, 'side is required');
+  h.set('cg-MLBB-po', 'FP');
+  await h.click('[data-cap-confirm="MLBB"]');
+  assert.match(h.d.getElementById('capMsg-MLBB').textContent, /Game 1 confirmed \(win\)/, 'K/D/A not needed');
   assert.equal(h.d.getElementById('rp-MLBB-won').value, '1'); assert.equal(h.d.getElementById('rp-MLBB-lost').value, '0');
-  assert.match(h.text(), /Blue side/); assert.match(h.text(), /typed/);
+  assert.match(h.text(), /FP · Golden Turret/); assert.match(h.text(), /14:05/); assert.match(h.text(), /typed/);
+  // A report without games is refused; with the game it saves 1-0 and lists the game the Scrim Log way.
+  h.fillReport('ONIC'); await h.click('[data-report-save="MLBB"]');
+  assert.match(h.d.getElementById('rpMsg-MLBB').textContent, /Report saved \(1-0 vs ONIC, 1 game/);
+  assert.match(h.text(), /Fanny \/ Ling/, 'bans: ours / theirs'); assert.match(h.text(), /Lord fight telat/);
+  h.fillReport('RRQ'); await h.click('[data-report-save="MLBB"]');
+  assert.match(h.d.getElementById('rpMsg-MLBB').textContent, /Add at least one game/);
 });
 
 test('real screen → only sure heroes filled → coach taps suggestions → Data tab merged → draft → duplicate warned → report saved with games', async () => {
@@ -82,10 +108,11 @@ test('real screen → only sure heroes filled → coach taps suggestions → Dat
   assert.match(h.d.getElementById('capMsg-MLBB').textContent, /1 more screen merged/);
   assert.equal(h.d.getElementById('cg-MLBB-0-hero_damage').value, '50001'); assert.equal(h.d.getElementById('cg-MLBB-0-kills').value, '7', 'typed value kept');
   assert.equal(h.d.getElementById('cg-MLBB-4-hero').value, 'Wanwan', 'picked hero kept');
-  await h.upload('[data-cap-draft="MLBB"]'); assert.equal(h.d.getElementById('cd-MLBB-0-hero').value, 'Fanny');
-  h.set('cg-MLBB-2-hero', 'Alucard'); h.pickAllHeroes(1); h.set('cg-MLBB-map', 'red');
+  await h.upload('[data-cap-draft="MLBB"]');
+  assert.equal(h.d.getElementById('cb-MLBB-partner-0').value, 'Fanny', 'their ban from the draft screenshot'); assert.equal(h.d.getElementById('cb-MLBB-ours-0').value, 'Ling');
+  h.set('cg-MLBB-2-hero', 'Alucard'); h.pickAllHeroes(1); h.set('cg-MLBB-po', 'SP');
   await h.click('[data-cap-confirm="MLBB"]');
-  assert.match(h.text(), /Game 1/); assert.match(h.text(), /Red side/); assert.match(h.text(), /draft 2 actions/);
+  assert.match(h.text(), /Game 1/); assert.match(h.text(), /SP/); assert.match(h.text(), /draft 12 actions/, '2 bans and 10 picks');
   // The same screenshot again: warned as a duplicate.
   await h.upload('[data-cap-shot="MLBB"]'); assert.match(h.text(), /looks like a game already added \(.*game 1\)/);
   await h.click('[data-cap-discard="MLBB"]');
@@ -95,7 +122,7 @@ test('real screen → only sure heroes filled → coach taps suggestions → Dat
   assert.equal(h.d.getElementById('rp-MLBB-focus').value, 'rotasi early ke turtle'); assert.equal(h.d.getElementById('rp-MLBB-players').value, 'Kevin: rotasi cepat');
   h.set('rp-MLBB-partner', 'ONIC'); h.set('rp-MLBB-progress', '4');
   await h.click('[data-report-save="MLBB"]');
-  assert.match(h.d.getElementById('rpMsg-MLBB').textContent, /Report saved \(1-0 vs ONIC, 1 game with stats\)/);
+  assert.match(h.d.getElementById('rpMsg-MLBB').textContent, /Report saved \(1-0 vs ONIC, 1 game\)/);
   // The saved report lists its game with a Fix button; fixing writes a new version and a correction note.
   assert.match(h.text(), /Alucard/);
   await h.click('[data-cap-fix]');
@@ -107,7 +134,7 @@ test('real screen → only sure heroes filled → coach taps suggestions → Dat
   assert.match(h.text(), /1 game version\(s\) corrected/);
   // Patterns: one game (the fix replaced the old version), map side from the coach.
   await h.go('mlbb-patterns');
-  assert.match(h.text(), /Confirmed games1/); assert.match(h.text(), /Played on red side/); assert.match(h.text(), /Fanny/);
+  assert.match(h.text(), /Confirmed games1/); assert.match(h.text(), /We picked second \(SP\)/); assert.match(h.text(), /Fanny/);
   await h.click('[data-pat-player="MLBB|Kevin"]');
   assert.match(h.text(), /Scrim trail — Kevin/); assert.match(h.text(), /Fewer than 5 games/);
 });
@@ -126,7 +153,7 @@ test('findings: checked against the facts, marked by the coach, promoted into a 
   let digestAnswer; let k = 0;
   const h = await hub(async (b) => (b.action === 'digest' ? { raw: digestAnswer, model: 'claude-sonnet-5-5' } : { captureId: `c${k}`, raw: screen(k++ % REAL.length, { allSure: true }), model: 'm' }));
   for (let r = 0; r < 3; r++) {
-    for (let g = 0; g < 2; g++) { await h.upload('[data-cap-shot="MLBB"]'); h.set('cg-MLBB-result', r === 2 ? 'loss' : 'win'); await h.click('[data-cap-confirm="MLBB"]'); }
+    for (let g = 0; g < 2; g++) { await h.upload('[data-cap-shot="MLBB"]'); h.set('cg-MLBB-result', r === 2 ? 'loss' : 'win'); h.set('cg-MLBB-po', g ? 'SP' : 'FP'); await h.click('[data-cap-confirm="MLBB"]'); }
     h.fillReport(`Team ${r}`); await h.click('[data-report-save="MLBB"]');
   }
   await h.go('mlbb-patterns');
