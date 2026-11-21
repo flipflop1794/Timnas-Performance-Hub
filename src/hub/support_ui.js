@@ -7,11 +7,12 @@ import { JOBS, DISCS, DISC_LABEL, ASK, RESPONSES, SESSIONS, SESSION_LABEL, follo
   weekSignals, repeatAthletes, watchList, dayBoard, weekRange, noticeRecord, groupRows, isBlankRow, REPEAT_AT, HIGH_VAS } from '../core/support.js';
 import { playersOf, coachesOf, fullName } from '../core/people.js';
 import { historyOf } from '../core/history.js';
+import { POINTS, bodySvg, pointLabel, painText, painCounts } from '../core/painmap.js';
 
 const DRAFT_KEY = 'hub-support-draft';
 const blankGroup = () => ({ picks: [], others: '', did: '', found: '', region: '', followUp: '', open: false });
 const groupCount = (g) => (g?.picks || []).length + String(g?.others || '').split(/[,;\n]/).filter((x) => x.trim()).length;
-const blankRow = () => ({ athlete: '', athleteSeen: '', title: '', did: '', found: '', followUp: '', session: '', prognosis: '', region: '', response: '', vasBefore: '', vasAfter: '', notify: false, notifyText: '' });
+const blankRow = () => ({ athlete: '', athleteSeen: '', title: '', did: '', found: '', followUp: '', session: '', prognosis: '', region: '', response: '', vasBefore: '', vasAfter: '', pain: [], notify: false, notifyText: '' });
 
 export function supportUi(ctx) {
   const { S, esc, tag, banner, setMsg, val, render, PLATFORM, HUB_USER, FEAT, today, meName, titles } = ctx;
@@ -48,7 +49,8 @@ export function supportUi(ctx) {
       const g = (k) => val(`sR-${i}-${k}`); const c = (k) => !!document.getElementById(`sR-${i}-${k}`)?.checked;
       const pick = g('athlete'); const [t, a] = pick.includes('|') ? pick.split('|') : ['', ''];
       return { ...r, athlete: a, title: a ? t : (r.title || ''), athleteSeen: g('seen'), did: g('did'), found: g('found'), followUp: g('fu'), session: g('session'), prognosis: g('prog'),
-        region: g('region'), response: g('response'), vasBefore: g('vb'), vasAfter: g('va'), notify: c('nt'), notifyText: g('ntx') };
+        region: g('region'), response: g('response'), vasBefore: g('vb'), vasAfter: g('va'), notify: c('nt'), notifyText: g('ntx'),
+        pain: (r.pain || []).map((x) => { const el = document.getElementById(`sR-${i}-pv-${x.p}`); return el ? { p: x.p, v: el.value } : x; }) };
     });
     if (document.getElementById('supGp')) {
       d.group = { ...d.group, picks: [...f.querySelectorAll('input[data-sup-gp]')].filter((x) => x.checked).map((x) => x.value), others: val('supGpOther'),
@@ -74,12 +76,16 @@ export function supportUi(ctx) {
           <label class="field wide" for="sR-${i}-prog">Prognosis<textarea rows="2" id="sR-${i}-prog">${esc(r.prognosis || '')}</textarea></label>` : ''}
         ${disc === 'physio' ? `<label class="field" for="sR-${i}-region">Body region<input type="text" id="sR-${i}-region" value="${esc(r.region)}"></label>
           <label class="field" for="sR-${i}-vb">VAS before (0–10)<input type="number" min="0" max="10" inputmode="numeric" id="sR-${i}-vb" value="${esc(r.vasBefore ?? '')}"></label>
-          <label class="field" for="sR-${i}-va">VAS after (0–10)<input type="number" min="0" max="10" inputmode="numeric" id="sR-${i}-va" value="${esc(r.vasAfter ?? '')}"></label>` : ''}
+          <label class="field" for="sR-${i}-va">VAS after (0–10)<input type="number" min="0" max="10" inputmode="numeric" id="sR-${i}-va" value="${esc(r.vasAfter ?? '')}"></label>${painPick(r, i)}` : ''}
         ${disc === 'physio' || disc === 'medic' ? `<label class="field" for="sR-${i}-response">Athlete response<select id="sR-${i}-response"><option value=""></option>${RESPONSES.map((x) => `<option value="${x}" ${r.response === x ? 'selected' : ''}>${x}</option>`).join('')}</select></label>` : ''}
         <label class="field"><span><input type="checkbox" id="sR-${i}-nt" ${r.notify ? 'checked' : ''}> Tell the coach (no diagnosis)</span></label>
         <label class="field wide" for="sR-${i}-ntx">Line for the coach, if ticked<input type="text" id="sR-${i}-ntx" maxlength="200" value="${esc(r.notifyText)}" placeholder="e.g. Check with the physio before scrim"></label>
       </div></div>`;
     const G = d.group || blankGroup(); const RA = athletes();
+    const painPick = (r, i) => { const on = new Set((r.pain || []).map((x) => x.p)); return `<div class="pm-field"><b>Pain map</b> <span class="note">Tap the painful spots on the front or back, then give each a pain score (0–10).</span>
+      <div class="pm-pick">${bodySvg({ pain: r.pain, row: i, esc, lang: S.lang })}
+      <div><label class="field" for="sR-${i}-padd">Or pick a spot<select id="sR-${i}-padd"><option value=""></option>${POINTS.filter((p) => !on.has(p.id)).map((p) => `<option value="${p.id}" data-no-tr>${esc(pointLabel(p.id, S.lang))}</option>`).join('')}</select></label>
+      ${(r.pain || []).length ? `<ul class="plain pm-list">${r.pain.map((x) => `<li><span data-no-tr>${esc(pointLabel(x.p, S.lang))}</span><label class="field pm-v" for="sR-${i}-pv-${x.p}">Pain (0–10)<input type="number" min="0" max="10" inputmode="numeric" id="sR-${i}-pv-${x.p}" value="${esc(x.v ?? '')}"></label><button type="button" class="linkbtn" data-sup-pain="${i}" data-pt="${x.p}">Remove</button></li>`).join('')}</ul>` : '<p class="note">No spot picked yet.</p>'}</div></div></div>`; };
     const group = `<details class="capdump" id="supGp" ${G.open ? 'open' : ''}><summary>One session, many athletes</summary>
       <p class="note">For a group session (stretching, recovery, a team talk): tick the athletes or a whole team, write it once, then add. Each athlete gets their own row below, which you can still change (pain score, follow-up) before saving.</p>
       <div class="sup-gp">${Object.entries(RA).filter(([, xs]) => xs.length).map(([t, xs]) => `<fieldset class="objpick"><legend class="note">${esc(t)} <button type="button" class="linkbtn" data-sup-gall="${esc(t)}">${xs.every((x) => G.picks.includes(`${t}|${x}`)) ? 'Untick team' : 'Whole team'}</button></legend>
@@ -117,14 +123,14 @@ export function supportUi(ctx) {
   }
   function card(r) {
     const A = ASK[r.discipline] || ASK.physical;
-    const extra = (x) => [x.session && SESSION_LABEL[x.session], x.prognosis && `Prognosis: ${x.prognosis}`, x.region && `Body region: ${x.region}`,
+    const extra = (x) => [x.session && SESSION_LABEL[x.session], x.prognosis && `Prognosis: ${x.prognosis}`, x.region && `Body region: ${x.region}`, (x.pain || []).length && `Pain spots: ${painText(x.pain, S.lang)}`,
       x.vasBefore != null && `VAS ${x.vasBefore} → ${x.vasAfter ?? '?'}`, x.response && `Response: ${x.response}`, x.notify && `To the coach: ${x.notifyText}`].filter(Boolean);
     return `<div class="obj"><header><div><span class="note">${esc(r.date)} · ${esc(DISC_LABEL[r.discipline])} · <span data-no-tr>${esc(r.by)}</span>${r.source === 'whatsapp' ? ' · from WhatsApp' : ''}</span><h3>${esc(usersOfDay(r).text)}</h3></div>
       <div class="toolbar">${editBadge(r)}${canEdit(r) && S.mode !== 'demo' ? `<button type="button" class="btn" data-sup-edit="${esc(r.id)}">Edit</button>` : ''}</div></header>
       ${r.rows.length ? `<div class="srow srow-h"><div>Athlete</div><div>${esc(A.did)}</div><div>${esc(A.found)}</div><div>${esc(A.follow)}</div></div>
       ${r.rows.map((x) => `<div class="srow srow-v"><div><b data-no-tr>${esc(x.athlete)}</b>${x.title ? `<br><span class="note">${esc(x.title)}</span>` : ''}</div>
         <div data-no-tr>${esc(x.did || '—')}</div><div data-no-tr>${esc(x.found || '—')}</div><div data-no-tr>${esc(followText(x.followUp) === 'Yes' ? (S.lang === 'id' ? 'Ya' : 'Yes') : (followText(x.followUp) || '—'))}</div></div>
-        ${extra(x).length ? `<p class="note srow-xv">${extra(x).map((e) => `<span>${esc(e)}</span>`).join(' · ')}</p>` : ''}`).join('')}` : ''}
+        ${extra(x).length ? `<p class="note srow-xv">${extra(x).map((e) => `<span>${esc(e)}</span>`).join(' · ')}</p>` : ''}${(x.pain || []).length ? `<div class="pm-mini">${bodySvg({ pain: x.pain, esc, lang: S.lang, small: true })}</div>` : ''}`).join('')}` : ''}
       ${r.general.did || r.general.found ? `<p><b>Team${r.general.teams.length ? ` (${esc(r.general.teams.join(', '))})` : ''}</b><br><span data-no-tr>${esc([r.general.did, r.general.found].filter(Boolean).join(' — '))}</span></p>` : ''}</div>`;
   }
   function historyOverlay() {
@@ -157,6 +163,7 @@ export function supportUi(ctx) {
       ${strip(mine, w)}
       <div class="stats">${statCard('Days reported', `${cur.days}/7`)}${statCard('Athletes handled', cur.seen, `${prev.seen} the week before`)}${statCard('Open follow-ups', open.filter((x) => x.kind === 'follow-up').length)}${special}</div>
       ${Object.keys(cur.byTitle).length ? `<p class="note">Per team: ${Object.entries(cur.byTitle).map(([t, n]) => `${esc(t)} ${n}`).join(' · ')}</p>` : ''}
+      ${disc === 'physio' ? painPanel(mine, w) : ''}
       ${rep.length || open.length ? `<div class="h3">To watch</div><ul class="plain">${rep.map((x) => `<li><b data-no-tr>${esc(x.athlete)}</b> — ${x.n} visits this week</li>`).join('')}${open.slice(0, 10).map((x) => `<li>${tag(x.kind === 'follow-up' ? 'c-Medium' : 'c-Blocked', x.kind === 'follow-up' ? 'follow-up' : x.kind === 'worse' ? 'worse' : `pain ≥${HIGH_VAS}`)} <b data-no-tr>${esc(x.athlete)}</b> <span class="note">${esc(x.date)}</span> — <span data-no-tr>${esc(x.text)}</span></li>`).join('')}</ul>` : ''}</div>`;
   }
 
@@ -183,8 +190,16 @@ export function supportUi(ctx) {
       <div class="cols"><div><div class="h3">Visits per team</div>${Object.keys(cur.byTitle).length ? `<ul class="plain">${Object.entries(cur.byTitle).sort((a, b) => b[1] - a[1]).map(([t, n]) => `<li>${esc(t)}: <b>${n}</b> <span class="note">(${prev.byTitle[t] || 0} the week before)</span></li>`).join('')}</ul>` : '<p class="empty">No visits.</p>'}</div>
         <div><div class="h3">To watch</div>${rep.length || watch.length ? `<ul class="plain">${rep.map((x) => `<li><b data-no-tr>${esc(x.athlete)}</b> ${x.title ? `<span class="note">${esc(x.title)}</span>` : ''} — seen ${x.n}× · ${esc(x.discs.map((d) => DISC_LABEL[d]).join(', '))}</li>`).join('')}
           ${watch.slice(0, 15).map((x) => `<li>${tag(...label[x.kind])} <b data-no-tr>${esc(x.athlete)}</b> <span class="note">${esc(x.date)} · <span data-no-tr>${esc(x.by)}</span></span> — <span data-no-tr>${esc(x.text)}</span></li>`).join('')}</ul>` : '<p class="note">Nothing open.</p>'}</div></div>
+      ${painPanel(U.reports, w)}
       <div class="h3">Edited after saving (7 days)</div>${edits.length ? `<ul class="plain">${edits.slice(0, 15).map(({ h, r }) => `<li><button type="button" class="linkbtn" data-sup-hist="${esc(r.id)}">${esc(fmtAt(h.at))}</button> · <span data-no-tr>${esc(h.editor_name || '—')}</span> edited the report of ${esc(r.date)} (<span data-no-tr>${esc(r.by)}</span>)</li>`).join('')}</ul>` : '<p class="note">No report was edited this week.</p>'}
       <p class="note">Measured over ${esc(w.from)} to ${esc(w.to)}; ${inW.length} report(s). A visit is one athlete in one report.</p></div>`;
+  }
+  // Pain spots reported in the week (physio): a map with bigger dots where more athletes hurt, and the top spots per team.
+  function painPanel(reports, w) {
+    const c = painCounts(reports, w.from, w.to); if (!c.total) return '';
+    return `<div class="h3">Pain spots (7 days)</div><div class="pm-pick">${bodySvg({ counts: Object.fromEntries(c.top), esc, lang: S.lang, small: true })}
+      <ul class="plain">${c.top.slice(0, 6).map(([p, n]) => `<li><span data-no-tr>${esc(pointLabel(p, S.lang))}</span> <b>${n}×</b></li>`).join('')}
+      ${Object.entries(c.byTitle).map(([t, xs]) => `<li class="note">${esc(t)}: <span data-no-tr>${esc(xs.slice(0, 3).map(([p, n]) => `${pointLabel(p, S.lang)} ${n}×`).join(', '))}</span></li>`).join('')}</ul></div>`;
   }
   function reportList(list, filter) {
     const f = U.filter; const p = U.person; const people = [...new Set(list.map((r) => r.by))];
@@ -239,6 +254,11 @@ export function supportUi(ctx) {
   async function onClick(t) {
     const ds = t.dataset;
     if (ds.supAdd) { const d = collect(); d.rows.push(blankRow()); keep(); render(); return true; }
+    if ('supPain' in ds && ds.pt) {
+      const d = collect(); const r = d.rows[Number(ds.supPain)]; if (!r) return true;
+      r.pain = (r.pain || []).some((x) => x.p === ds.pt) ? r.pain.filter((x) => x.p !== ds.pt) : [...(r.pain || []), { p: ds.pt, v: '' }];
+      keep(); render(); return true;
+    }
     if ('supDel' in ds) { const d = collect(); d.rows.splice(Number(ds.supDel), 1); if (!d.rows.length) d.rows.push(blankRow()); keep(); render(); return true; }
     if ('supGall' in ds) {
       const d = collect(); const tt = ds.supGall; const keys = (athletes()[tt] || []).map((x) => `${tt}|${x}`);
@@ -309,6 +329,8 @@ export function supportUi(ctx) {
   function onInput(el) {
     if (!el?.closest?.('#supForm')) return false;
     if (el.id === 'supDisc') { collect(); render(); return true; }
+    const pa = /^sR-(\d+)-padd$/.exec(el.id || '');
+    if (pa && el.value) { const d = collect(); const r = d.rows[Number(pa[1])]; if (r && !(r.pain || []).some((x) => x.p === el.value)) r.pain = [...(r.pain || []), { p: el.value, v: '' }]; keep(); render(); return true; }
     const d = collect(); const span = document.getElementById('supUsers');
     const gn = document.getElementById('supGpN'); if (gn) gn.textContent = String(groupCount(d.group));
     if (span) { try { span.textContent = usersOfDay(supportReport({ ...d, by: 'x', asOf: today() })).text; } catch { span.textContent = ''; } }

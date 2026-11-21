@@ -160,6 +160,9 @@ const EXACT = {
   'Did we fix it?': 'Sudah teratasi?', Fixed: 'Teratasi', 'Better, not fixed yet': 'Membaik, belum teratasi', 'No change': 'Tidak ada perubahan', 'Not practised today': 'Tidak dilatih hari ini',
   "Make it today's focus": 'Jadikan fokus hari ini', Focus: 'Fokus', Detail: 'Detail', 'Player notes': 'Catatan pemain', 'Per map / match / game': 'Per map / pertandingan / game',
   'e.g. Score was 2-0, not 2-1': 'mis. Skornya 2-0, bukan 2-1', 'Athlete readiness': 'Kesiapan atlet',
+  // V1.37 physio pain map
+  'Pain map': 'Peta nyeri', 'Tap the painful spots on the front or back, then give each a pain score (0–10).': 'Ketuk titik yang nyeri di tubuh depan atau belakang, lalu beri skor nyeri (0–10) untuk masing-masing.',
+  'Or pick a spot': 'Atau pilih titik', 'Pain (0–10)': 'Nyeri (0–10)', 'No spot picked yet.': 'Belum ada titik yang dipilih.', 'Pain spots (7 days)': 'Titik nyeri (7 hari)', 'Pain spots': 'Titik nyeri',
   // V1.34 support staff
   'Support staff': 'Tim pendukung', 'Team doctor': 'Dokter tim', 'Physio (men)': 'Fisio putra', 'Physio (women)': 'Fisio putri', 'Physical coach': 'Pelatih fisik', Psychologist: 'Psikolog', 'Psychologist (men)': 'Psikolog putra', 'Psychologist (women)': 'Psikolog putri',
   'Physio / massage': 'Fisio / masase', 'Physical conditioning': 'Kondisi fisik', 'Therapy (P)': 'Terapi (P)', 'Complaint, examination, diagnosis (S / O / A)': 'Keluhan, pemeriksaan, diagnosa (S / O / A)',
@@ -723,7 +726,7 @@ const RULES = [
   [/^Measured over (\S+) to (\S+); (\d+) report\(s\)\. A visit is one athlete in one report\.$/, 'Diukur dari $1 sampai $2; $3 laporan. Satu kunjungan = satu atlet dalam satu laporan.'],
   [/^(\d+) report\(s\) · (\d+) athlete visit\(s\) · (\d+) follow-up\(s\) · (\d+) athlete\(s\) seen (\d+)\+ times$/, '$1 laporan · $2 kunjungan atlet · $3 tindak lanjut · $4 atlet ditangani $5+ kali'],
   [/^(\S+) · (Team doctor|Physio \/ massage|Physical conditioning|Psychologist) ·$/, (m, d, k) => `${d} · ${tr(k)} ·`],
-  [/^(Prognosis|Body region|Response|To the coach): (.+)$/, (m, k, v) => `${{ Prognosis: 'Prognosis', 'Body region': 'Area tubuh', Response: 'Respon', 'To the coach': 'Untuk pelatih' }[k]}: ${tr(v) ?? v}`],
+  [/^(Prognosis|Body region|Response|To the coach|Pain spots): (.+)$/, (m, k, v) => `${{ Prognosis: 'Prognosis', 'Body region': 'Area tubuh', Response: 'Respon', 'To the coach': 'Untuk pelatih', 'Pain spots': 'Titik nyeri' }[k]}: ${tr(v) ?? v}`],
   [/^Athlete (added|removed): (.+):$/, (m, k, w) => `Atlet ${k === 'added' ? 'ditambahkan' : 'dihapus'}: ${w}:`],
   [/^(.+) · ([A-Z][^·]*):$/, (m, w, f) => `${w} · ${tr(f) ?? f}:`],
   [/^Last time \((\S+), vs (.+)\) the adjustment was:$/, 'Terakhir kali ($1, vs $2) penyesuaiannya:'],

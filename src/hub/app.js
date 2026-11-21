@@ -2505,7 +2505,7 @@ async function cycleAct(act, id) {
   } catch (e) { setMsg(`msg-${id}`, e.message, 'err'); }
 }
 async function onClick(e) {
-  const t = e.target.closest('button, [data-go]'); if (!t) return;
+  const t = e.target.closest('button, [data-go], [data-sup-pain]'); if (!t) return;
   if (t.dataset.go) { location.hash = t.dataset.go; return; }
   // V1.13 capture / patterns buttons only, so every other click stays synchronous until its own first await.
   if (Object.keys(t.dataset).some((k) => /^(cap|pat)[A-Z]/.test(k)) && await capUi().onClick(t)) return;

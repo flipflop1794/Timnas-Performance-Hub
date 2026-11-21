@@ -5,6 +5,7 @@
 import { hasContactNumber } from './pii.js';
 import { localDay, shiftDay } from './dates.js';
 import { person } from './people.js';
+import { cleanPain, painText } from './painmap.js';
 
 export const JOBS = {
   medic: { label: 'Team doctor', disc: 'medic' }, physio_men: { label: 'Physio (men)', disc: 'physio' }, physio_women: { label: 'Physio (women)', disc: 'physio' },
@@ -49,6 +50,7 @@ export function supportReport(x) {
     const vasBefore = vas(r.vasBefore, `Athlete ${n}: VAS before`); const vasAfter = vas(r.vasAfter, `Athlete ${n}: VAS after`);
     return { athlete: athlete || athleteSeen, ...(athleteSeen && athleteSeen !== athlete ? { athleteSeen } : {}), title: txt(r.title, 30), did, found, region: txt(r.region, 120),
       response: RESPONSES.includes(r.response) ? r.response : '', vasBefore, vasAfter, followUp: noNumbers(txt(followText(r.followUp), 400), `Athlete ${n}`),
+      ...(x.discipline === 'physio' ? { pain: cleanPain(r.pain, `Athlete ${n}`) } : {}),
       ...(x.discipline === 'psych' ? { session: SESSIONS.includes(r.session) ? r.session : '', prognosis: noNumbers(txt(r.prognosis, 600), `Athlete ${n}`) } : {}),
       notify: !!r.notify && !!txt(r.notifyText), notifyText: noNumbers(txt(r.notifyText, 200), `Athlete ${n}`) };
   }).filter(Boolean);
@@ -84,7 +86,7 @@ export function groupRows(g) {
   need(out.length <= 40, 'Group session: 40 athletes at most per report.');
   return out;
 }
-export const isBlankRow = (r) => !r.athlete && !r.athleteSeen && !r.did && !r.found && !r.region && !r.notifyText;
+export const isBlankRow = (r) => !r.athlete && !r.athleteSeen && !r.did && !r.found && !r.region && !r.notifyText && !(r.pain || []).length;
 
 // The AI's reading of a pasted WhatsApp report → rows for the form. roster: { title: [names] }.
 const norm = (s) => String(s || '').toLowerCase().replace(/^(kak|bang|mba|mbak|mas|dek|coach)\s+/, '').replace(/[^a-z0-9]/g, '');
@@ -125,7 +127,7 @@ export function whatsappText(rep, lang = 'id') {
   const L = id ? WA_ID : null; const lab = (k) => (L ? L[k] : k);
   const rows = rep.rows.map((r, i) => [`${i + 1}. ${r.athlete}${r.title ? ` (${r.title})` : ''}`, r.did && `   ${lab(A.did)}: ${r.did}`, r.found && `   ${lab(A.found)}: ${r.found}`,
     followText(r.followUp) && `   ${lab(A.follow)}: ${followText(r.followUp) === 'Yes' && id ? 'Ya' : followText(r.followUp)}`, r.session && `   ${lab('Session')}: ${lab(SESSION_LABEL[r.session])}`, r.prognosis && `   ${lab('Prognosis')}: ${r.prognosis}`,
-    r.region && `   ${lab('Body region')}: ${r.region}`, r.vasBefore != null && `   VAS ${r.vasBefore}/10 → ${r.vasAfter ?? '?'}/10`, r.response && `   ${lab('Response')}: ${lab(r.response)}`].filter(Boolean).join('\n'));
+    r.region && `   ${lab('Body region')}: ${r.region}`, (r.pain || []).length && `   ${id ? 'Titik nyeri' : 'Pain spots'}: ${painText(r.pain, lang)}`, r.vasBefore != null && `   VAS ${r.vasBefore}/10 → ${r.vasAfter ?? '?'}/10`, r.response && `   ${lab('Response')}: ${lab(r.response)}`].filter(Boolean).join('\n'));
   const g = rep.general.did || rep.general.found ? `\n${id ? 'Tim' : 'Team'}${rep.general.teams.length ? ` (${rep.general.teams.join(', ')})` : ''}:\n${[rep.general.did && `- ${rep.general.did}`, rep.general.found && `- ${rep.general.found}`].filter(Boolean).join('\n')}` : '';
   return [head, '', ...rows, g, '', `${id ? 'User hari ini' : 'Seen today'}: ${usersOfDay(rep).text}`].join('\n').replace(/\n{3,}/g, '\n\n').trim();
 }

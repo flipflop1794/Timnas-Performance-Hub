@@ -173,6 +173,12 @@ details.more,details.capdump{margin:12px 0 4px;border-top:1px solid var(--line-2
 .overlay{position:fixed;inset:0;z-index:50;background:rgba(0,0,0,.45);display:flex;align-items:center;justify-content:center;padding:16px}
 .overlay-box{background:var(--surface);border:1px solid var(--line-2);border-radius:12px;padding:16px 18px;max-width:560px;width:100%;max-height:85vh;overflow:auto}
 .overlay-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;font-size:16px}.hist{border-left:2px solid var(--line-2);padding-left:10px;margin:10px 0}.hist p{margin:2px 0}
+.pm-field{flex:1 1 100%;margin-top:8px;border-top:1px dashed var(--line-2);padding-top:8px}.pm-pick{display:flex;flex-wrap:wrap;gap:8px 18px;align-items:flex-start}
+.painmap{width:100%;max-width:400px;height:auto}.painmap.pm-small{max-width:230px}.pm-skin{stroke:#5A1F13;stroke-width:1.2}.pm-lines{fill:none;stroke:#5A1D11;stroke-opacity:.7;stroke-width:1.4;stroke-linecap:round}.pm-lines-hi{fill:none;stroke:#FFD9C8;stroke-opacity:.35;stroke-width:1.2;stroke-linecap:round}
+.pm-shine{fill:#FFFFFF;fill-opacity:.75;pointer-events:none}
+.pm-dot{fill:#1F2FD0;stroke:#FFFFFF;stroke-width:2.5;cursor:pointer;filter:drop-shadow(1px 2px 1.5px rgba(0,0,0,.35))}.pm-dot:hover,.pm-dot:focus{stroke:#FFC940;outline:none}
+.pm-on{stroke:#FFFFFF;stroke-width:3}.pm-set{fill:var(--info)}.pm-low{fill:var(--good)}.pm-mid{fill:var(--warn)}.pm-high{fill:var(--bad)}.pm-count{fill:var(--bad);fill-opacity:.7;stroke:none;cursor:default}
+.pm-list li{display:flex;gap:8px;align-items:flex-end;flex-wrap:wrap;margin:4px 0}.pm-v input{width:70px}.pm-mini{margin:2px 0 8px}
 .daystrip{display:flex;gap:4px;margin:6px 0 10px}.daystrip span{width:30px;text-align:center;padding:4px 0;border-radius:6px;font-size:12px;border:1px solid var(--line-2)}
 .daystrip .on{background:var(--gold);color:var(--surface);border-color:var(--gold)}.daystrip .today{border-style:dashed}.warnrow td:first-child{border-left:3px solid var(--warn)}
 .subnav{display:flex;flex-wrap:wrap;gap:6px;margin:0 0 12px}.subnav a,.subnav button{padding:6px 14px;border-radius:999px;border:1px solid var(--line-2);background:var(--surface);color:var(--ink-2);font:inherit;font-size:13.5px;text-decoration:none;cursor:pointer}

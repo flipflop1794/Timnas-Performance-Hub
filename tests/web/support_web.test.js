@@ -56,12 +56,20 @@ test('support staff: paste from WhatsApp → AI fills the form → save; Donny r
   await dewi.wait(() => dewi.d.getElementById('sR-1-athlete'));
   assert.equal(B.calls[0].action, 'support_parse'); assert.equal(B.calls[0].discipline, 'physio'); assert.ok(B.calls[0].roster['MLBB Women'].includes('Viorelle Valencia Chen'), 'full names from the BTN list');
   assert.equal(dewi.d.getElementById('sR-0-athlete').value, 'MLBB Women|Vivy Indrawaty'); assert.equal(dewi.d.getElementById('sR-0-vb').value, '4');
+  // V1.37 pain map: tap a spot on the figure and score it; pick another spot from the list.
+  dewi.d.querySelector('[data-sup-pain="0"][data-pt="knee_L"]').dispatchEvent(new dewi.w.MouseEvent('click', { bubbles: true }));
+  await dewi.wait(() => dewi.d.getElementById('sR-0-pv-knee_L'));
+  dewi.set('sR-0-pv-knee_L', '6');
+  const pick = dewi.d.getElementById('sR-1-padd'); pick.value = 'wrist_R'; pick.dispatchEvent(new dewi.w.Event('change', { bubbles: true }));
+  await dewi.wait(() => dewi.d.getElementById('sR-1-pv-wrist_R'));
+  assert.equal(dewi.d.getElementById('sR-0-pv-knee_L').value, '6', 'the score survives the redraw');
   dewi.d.getElementById('sR-1-nt').checked = true; dewi.set('sR-1-ntx', 'Viorelle: check with the physio before scrim');
   dewi.d.querySelector('[data-sup-save]').click();
   await dewi.wait(() => B.tables.support_reports.length && B.tables.support_notices.length);
   const r = B.tables.support_reports[0].data; assert.equal(r.discipline, 'physio'); assert.equal(r.job, 'physio_women'); assert.equal(r.source, 'whatsapp'); assert.equal(r.rows.length, 2);
   assert.equal(B.tables.support_notices[0].title, 'MLBB Women');
   assert.equal(r.rows[1].followUp, 'Yes', 'follow-up is a text now');
+  assert.deepEqual(r.rows[0].pain, [{ p: 'knee_L', v: 6 }]); assert.deepEqual(r.rows[1].pain, [{ p: 'wrist_R', v: null }]);
   // V1.36: her own summary, then an edit that the database records (who, what, when).
   await dewi.wait(() => /My summary \(7 days\)/.test(dewi.text()));
   assert.match(dewi.text(), /Only your own reports/);
@@ -83,6 +91,7 @@ test('support staff: paste from WhatsApp → AI fills the form → save; Donny r
   await donny.wait(() => /To watch/.test(donny.text()));
   assert.match(donny.text(), /Support team progress \(7 days\)/); assert.match(donny.text(), /Edited after saving/); assert.match(donny.text(), /Viorelle/); assert.match(donny.text(), /follow-up/);
   assert.match(donny.text(), /VAS −1\.5/);
+  assert.match(donny.text(), /Pain spots \(7 days\)/); assert.match(donny.text(), /Knee \(left\) 1×/);
 
   const indra = await open(B, 'indra', 'today');
   await indra.wait(() => /From the support staff/.test(indra.text()));

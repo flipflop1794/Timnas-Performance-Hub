@@ -2,6 +2,7 @@
 // this turns two versions into the lines people read: "Follow-up: before → after".
 import { resultText } from './reports.js';
 import { rowsText } from './comp_rows.js';
+import { painText } from './painmap.js';
 
 const s = (v) => (v == null ? '' : typeof v === 'boolean' ? (v ? 'Yes' : '') : String(v).trim());
 const push = (out, field, a, b) => { const x = s(a); const y = s(b); if (x !== y) out.push({ field, before: x, after: y }); };
@@ -16,6 +17,7 @@ export function supportDiff(a = {}, b = {}) {
     if (!x) { out.push({ field: `Athlete added: ${who}`, before: '', after: [y.did, y.found].filter(Boolean).join(' — ') }); continue; }
     if (!y) { out.push({ field: `Athlete removed: ${who}`, before: [x.did, x.found].filter(Boolean).join(' — '), after: '' }); continue; }
     for (const [k, l] of SUPPORT_ROW) push(out, `${who} · ${l}`, x[k], y[k]);
+    push(out, `${who} · Pain spots`, painText(x.pain), painText(y.pain));
   }
   push(out, 'Team: what was done', a.general?.did, b.general?.did); push(out, 'Team: findings', a.general?.found, b.general?.found);
   push(out, 'Teams', (a.general?.teams || []).join(', '), (b.general?.teams || []).join(', '));
