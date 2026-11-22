@@ -1,4 +1,4 @@
-// V1.39 on the website: focus mode folds screens with no entries yet behind "More · n" at the end of the tab bar.
+// V1.41 on the website: focus mode folds screens with no entries yet behind "More · n" at the end of the tab bar.
 // One tap shows every tool again; a folded screen opened by link still works and shows its own tab.
 import { test, before } from 'node:test';
 import assert from 'node:assert/strict';

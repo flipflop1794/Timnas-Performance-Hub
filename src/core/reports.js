@@ -1,9 +1,11 @@
 import { hasContactNumber } from './pii.js';
 import { localDay } from './dates.js';
 import { cleanRows, rowsFields, rowsText, tiesOf } from './comp_rows.js';
+import { SCRIM_LOG_HEAD, scrimLogRows, isScrimLog } from './scrim_log.js';
 // Daily scrim reports: what a coach writes after a scrim session. One report = one session
-// (one sparring partner). The daily roll-up groups the day's sessions. Reports are never edited
-// or deleted: a mistake is fixed with a dated correction note, so the record stays trustworthy.
+// (one sparring partner). The daily roll-up groups the day's sessions. Reports are not deleted; since
+// V1.36 the author (or the Head Coach, an assistant coach, an admin) can edit one, and the database keeps
+// every earlier version. Correction notes stay available for later follow-ups.
 // Operational data only. Player notes are performance notes: no health, personal or contact details.
 
 export const REPORT_TITLES = ['Dota 2', 'MLBB', 'MLBB Women', 'PUBG Mobile', 'eFootball', 'CS2', 'CS2 Women'];
@@ -40,7 +42,7 @@ export function scrimReport(x) {
   need(!x.asOf || x.date <= x.asOf, 'A report cannot be dated in the future.');
   need(x.by && x.by.trim(), 'Who wrote the report is required.');
   need(x.partner && x.partner.trim(), 'Name the sparring partner (or "internal").');
-  // V1.39 two-minute report: partner, result and the one change for next time are needed; focus, what worked or
+  // V1.42 two-minute report: partner, result and the one change for next time are needed; focus, what worked or
   // failed and the plan rating are asked for but optional (a short report every day beats a full one now and then).
   const progress = x.progress === '' || x.progress == null ? null : Number(x.progress);
   need(progress == null || (Number.isInteger(progress) && progress >= 1 && progress <= 5), 'Rate how closely the team followed the plan (1 to 5), or leave it empty.');
@@ -91,7 +93,7 @@ export const resultText = (r) => (r.mode === 'points'
   : `${r.won}-${r.lost}${r.drawn ? `-${r.drawn}` : ''}`);
 
 const dayDiff = (a, b) => Math.round((Date.parse(b) - Date.parse(a)) / 86400000);
-// Reports without a plan rating (allowed since V1.39) are left out of the average, not counted as 0.
+// Reports without a plan rating (allowed since V1.42) are left out of the average, not counted as 0.
 const avg = (xs0) => { const xs = xs0.filter((x) => x != null && !Number.isNaN(x)); return xs.length ? Math.round((xs.reduce((a, b) => a + b, 0) / xs.length) * 10) / 10 : null; };
 export const withRating = (reps) => reps.filter((r) => r.progress != null && Number(r.progress) >= 1);
 
@@ -139,7 +141,7 @@ export function reportSummary(reports, title, asOf, windowDays = 7) {
 // is run as a formula by spreadsheets, so it gets a leading apostrophe. Plain numbers (scores, points,
 // placements) are left as they are so they still add up.
 const FORMULA = /^[=+\-@\t\r]/;
-const csvCell = (v) => {
+export const csvCell = (v) => {
   let s = String(v ?? '');
   if (typeof v !== 'number' && FORMULA.test(s) && !/^-?\d+(\.\d+)?$/.test(s)) s = `'${s}`;
   return /[",\n\r]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
@@ -158,7 +160,14 @@ export function reportsCsv(reports, { bom = false } = {}) {
   return (bom ? CSV_BOM : '') + [head, ...rows].map((row) => row.map(csvCell).join(',')).join('\r\n');
 }
 
-// V1.39: the saved report as a message for the team's WhatsApp group (the same habit as the support staff report).
+// V1.38: MLBB / MLBB Women games in the Scrim Log export layout (one row per game).
+export function scrimLogCsv(games, reports, { bom = false } = {}) {
+  const rows = scrimLogRows(games, reports);
+  return (bom ? CSV_BOM : '') + [SCRIM_LOG_HEAD, ...rows].map((row) => row.map(csvCell).join(',')).join('\r\n');
+}
+export { isScrimLog };
+
+// V1.42: the saved report as a message for the team's WhatsApp group (the same habit as the support staff report).
 const WA = {
   en: { head: 'Scrim report', vs: 'vs', result: 'Result', focus: 'Focus', worked: 'Worked', failed: 'Failed', next: 'Next session', plan: 'Plan followed', fix: 'Last change' },
   id: { head: 'Laporan scrim', vs: 'vs', result: 'Hasil', focus: 'Fokus', worked: 'Berhasil', failed: 'Gagal', next: 'Sesi berikutnya', plan: 'Rencana dijalankan', fix: 'Perubahan terakhir' },

@@ -11,6 +11,7 @@
 //   from the AI's candidates, earlier corrections and the player's own recent heroes.
 // - Dota (and MLBB's Data tab) spread a game over two screens: a second screenshot merges into the first.
 import { CAPTURE_GAMES, GAME_SIDES, MAP_SIDES, PLAYER_FIELDS, gameOf } from '../../supabase/functions/_shared/scrim_spec.js';
+import { isScrimLog, scrimLogFields, scrimLogDraft, bansOf } from './scrim_log.js';
 
 export { CAPTURE_GAMES, gameOf, MAP_SIDES };
 export const SIDE_LABEL = { left: 'Left team', right: 'Right team', blue: 'Blue', red: 'Red', radiant: 'Radiant', dire: 'Dire' };
@@ -43,8 +44,15 @@ const RANGE = {
 };
 const DURATION = [180, 7200];
 export const durationText = (s) => (s == null ? '—' : `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`);
+// Typing help for a duration box: keep the digits, put the colon before the last two ("2040" → "20:40").
+export function formatDurationInput(text) {
+  const d = String(text ?? '').replace(/\D/g, '').slice(0, 4);
+  return d.length >= 3 ? `${d.slice(0, -2)}:${d.slice(-2)}` : d;
+}
+// V1.39: digits only, three or four of them, are minutes and seconds: "2040" → 20:40, "905" → 9:05.
 export function parseDuration(text) {
-  const t = String(text ?? '').trim(); if (!t) return null;
+  let t = String(text ?? '').trim(); if (!t) return null;
+  if (/^\d{3,4}$/.test(t)) t = `${t.slice(0, -2)}:${t.slice(-2)}`;
   const m = t.match(/^(\d{1,3})(?:[:.](\d{1,2}))?$/); if (!m) throw new Error('Duration must look like 18:42 (minutes:seconds).');
   if (m[2] && Number(m[2]) > 59) throw new Error('Duration seconds must be 0 to 59.');
   return Number(m[1]) * 60 + Number(m[2] || 0);
@@ -129,7 +137,8 @@ export function proposeGame({ title, raw, roster = [], aliases = {}, heroes, poo
     const side = sides.includes(p.side) ? p.side : '';
     if (!side) flags.push({ field: 'side', reason: 'team not shown' });
     if (!p.name_seen || uncertain.has('name')) flags.push({ field: 'name', reason: 'name unclear' });
-    return { side, slot: Number.isInteger(p.slot) && p.slot > 0 && p.slot <= 5 ? p.slot : (i % 5) + 1, nameSeen: String(p.name_seen || '').slice(0, 60), player, hero, aiHero: guess || '', candidates, mvp: p.mvp === true, stats, flags };
+    const slot = Number.isInteger(p.slot) && p.slot > 0 && p.slot <= 5 ? p.slot : (i % 5) + 1;
+    return { side, slot, pick: slot, nameSeen: String(p.name_seen || '').slice(0, 60), player, hero, aiHero: guess || '', candidates, mvp: p.mvp === true, stats, flags };
   });
   // Duplicate hero readings: only sure ones count (an unsure guess is not filled in anyway).
   const seen = new Map();
@@ -167,6 +176,7 @@ export function proposeGame({ title, raw, roster = [], aliases = {}, heroes, poo
   return {
     title, game, sides, kind, ourSide, winner, result: ourSide && winner ? (winner === ourSide ? 'win' : 'loss') : '',
     mapSide: game === 'dota' ? ourSide : '', durationS, score, teamNames,
+    ...(isScrimLog(title) ? { pickOrder: '', mapVariant: '', notes: '', vod: '', bans: { ours: [], partner: [] } } : {}),
     players: [...players].sort((a, b) => sides.indexOf(a.side) - sides.indexOf(b.side) || a.slot - b.slot), issues,
   };
 }
@@ -284,7 +294,7 @@ export function heroesFromDraft(game, draft, heroes) {
 const need = (c, m) => { if (!c) throw new Error(m); };
 // edited: the values on the confirm screen (proposal shape). base: the untouched proposal from the
 // screenshot (or null for a game typed by hand). Throws a plain sentence on the first problem.
-export function confirmGame(edited, { reportId = '', date, partner, gameNo, by, base = null, captureIds = [], heroes, draft = null, externalMatchId = '' }) {
+export function confirmGame(edited, { reportId = '', date, partner, gameNo, by, base = null, captureIds = [], heroes, draft = null, externalMatchId = '', roster = null }) {
   const game = gameOf(edited.title); need(game, `Screenshot capture is not set up for ${edited.title}.`);
   const sides = GAME_SIDES[game]; const defs = STAT_DEFS[game];
   need(/^\d{4}-\d{2}-\d{2}$/.test(date || ''), 'Date is required.');
@@ -292,10 +302,14 @@ export function confirmGame(edited, { reportId = '', date, partner, gameNo, by, 
   need(['win', 'loss'].includes(edited.result), 'Pick the result: win or loss.');
   need(Number.isInteger(gameNo) && gameNo >= 1 && gameNo <= 9, 'Game number must be 1 to 9.');
   const mapSide = game === 'dota' ? edited.ourSide : (MAP_SIDES.mlbb.includes(edited.mapSide) ? edited.mapSide : '');
+  const log = isScrimLog(edited.title) ? scrimLogFields(edited) : null;   // V1.38: FP/SP, map, notes, VOD
   const durationS = edited.durationS == null || edited.durationS === '' ? null : Number(edited.durationS);
   need(durationS == null || (Number.isInteger(durationS) && durationS >= 60 && durationS <= 10800), 'Duration must be between 1:00 and 180:00.');
+  // V1.39 Scrim Log: the pick number is the row's place in its team (top row = P1), never typed.
+  const seat = {};
   const players = edited.players.map((p) => {
     need(sides.includes(p.side), 'Every row needs a team.');
+    seat[p.side] = (seat[p.side] || 0) + 1;
     const hero = heroes.find(p.hero);
     need(!String(p.hero || '').trim() || hero, `"${String(p.hero).trim()}" is not a hero name. Pick one from the list.`);
     const ours = p.side === edited.ourSide;
@@ -306,25 +320,32 @@ export function confirmGame(edited, { reportId = '', date, partner, gameNo, by, 
       need(v == null || (Number.isFinite(v) && v >= 0), `${d.label} for ${p.player || p.nameSeen || hero} must be a number.`);
       stats[d.key] = v == null ? null : d.decimal ? Math.round(v * 10) / 10 : Math.round(v);
     }
-    if (ours) for (const k of ['kills', 'deaths', 'assists']) need(stats[k] != null, `K/D/A is required for our players (${p.player || p.nameSeen || hero}).`);
-    return { team: ours ? 'ours' : 'partner', side: p.side, slot: Number(p.slot) || 0, nameSeen: String(p.nameSeen || '').slice(0, 60), player: ours ? String(p.player || '') : '', hero: hero || '', aiHero: p.aiHero || '', mvp: !!p.mvp, stats };
+    // Scrim Log games may have no stats (draft and result only); screenshot and Dota games need K/D/A.
+    if (ours && !log) for (const k of ['kills', 'deaths', 'assists']) need(stats[k] != null, `K/D/A is required for our players (${p.player || p.nameSeen || hero}).`);
+    const pick = log && hero ? seat[p.side] : null;
+    return { team: ours ? 'ours' : 'partner', side: p.side, slot: Number(p.slot) || 0, ...(log ? { pick } : {}), nameSeen: String(p.nameSeen || '').slice(0, 60), player: ours ? String(p.player || '') : '', hero: hero || '', aiHero: p.aiHero || '', mvp: !!p.mvp, stats };
   });
   const ours = players.filter((p) => p.team === 'ours');
   need(ours.length === 5, `Our team needs exactly 5 players (now ${ours.length}).`);
   need(ours.every((p) => p.player), 'Match each of our players to the roster (or pick "stand-in").');
+  // V1.39: typed names must be on the division's roster (the game screen offers them as suggestions).
+  if (log && roster) for (const p of ours) need(p.player === 'stand-in' || roster.includes(p.player), `"${p.player}" is not on the ${edited.title} roster. Pick a name from the list, or "stand-in".`);
   const named = ours.filter((p) => p.player !== 'stand-in').map((p) => p.player);
   need(new Set(named).size === named.length, 'The same roster player is on two rows.');
   const heroesUsed = players.map((p) => p.hero).filter(Boolean);
   need(new Set(heroesUsed).size === heroesUsed.length, 'The same hero is on two rows.');
   const score = Object.fromEntries(sides.map((s) => [s, players.filter((p) => p.side === s).reduce((a, p) => a + (p.stats.kills ?? 0), 0)]));
-  const confirmedDraft = draft ? confirmDraft(draft, { heroes, ourSide: edited.ourSide, sides }) : [];
+  const other = sides.find((x) => x !== edited.ourSide);
+  const confirmedDraft = log ? scrimLogDraft({ players, bans: edited.bans, ourSide: edited.ourSide, otherSide: other, heroes })
+    : draft ? confirmDraft(draft, { heroes, ourSide: edited.ourSide, sides }) : [];
   // Draft picks must match the heroes of the game.
   for (const a of confirmedDraft) if (a.action === 'pick') need(players.some((p) => p.side === a.side && p.hero === a.hero), `The draft says ${SIDE_LABEL[a.side]} picked ${a.hero}, but no row of that team has ${a.hero}.`);
   return {
     id: `GM-${date.replace(/-/g, '')}-${Math.random().toString(36).slice(2, 8)}`,
     title: edited.title, game, reportId, date, partner: String(partner || '').trim(), gameNo, by: String(by || '').trim(),
     ourSide: edited.ourSide, mapSide, result: edited.result, durationS, score, players,
-    draft: confirmedDraft, firstPick: draft?.firstPick || '',
+    draft: confirmedDraft, firstPick: log ? (log.pickOrder === 'FP' ? edited.ourSide : other) : draft?.firstPick || '',
+    ...(log ? { ...log, draftSource: 'scrim-log' } : {}),
     source: base ? 'screenshot' : 'manual', captureIds, externalMatchId: String(externalMatchId || '').replace(/\D/g, '').slice(0, 20),
     corrections: base ? corrections(base, edited, defs) : [],
     origin: 'operational', createdAt: new Date().toISOString(),
@@ -355,18 +376,22 @@ export function corrections(base, edited, defs) {
 }
 
 // A game typed by hand: an empty confirm screen with our roster on our side.
+// V1.39: MLBB / MLBB Women (Scrim Log) start with the player boxes empty; the coach types each one.
 export function blankGame(title, roster, ourSide) {
   const game = gameOf(title); const sides = GAME_SIDES[game]; const side = ourSide || sides[0];
   const other = sides.find((s) => s !== side);
-  const row = (s, slot, player) => ({ side: s, slot, nameSeen: '', player, hero: '', aiHero: '', candidates: [], mvp: false, stats: Object.fromEntries(STAT_DEFS[game].map((d) => [d.key, null])), flags: [] });
+  const row = (s, slot, player) => ({ side: s, slot, pick: slot, nameSeen: '', player, hero: '', aiHero: '', candidates: [], mvp: false, stats: Object.fromEntries(STAT_DEFS[game].map((d) => [d.key, null])), flags: [] });
   return { title, game, sides, kind: 'manual', ourSide: side, winner: '', result: '', mapSide: game === 'dota' ? side : '', durationS: null, score: {}, teamNames: {},
-    players: [...[0, 1, 2, 3, 4].map((i) => row(side, i + 1, roster[i] || '')), ...[0, 1, 2, 3, 4].map((i) => row(other, i + 1, ''))], issues: [] };
+    ...(isScrimLog(title) ? { pickOrder: '', mapVariant: '', notes: '', vod: '', bans: { ours: [], partner: [] } } : {}),
+    players: [...[0, 1, 2, 3, 4].map((i) => row(side, i + 1, isScrimLog(title) ? '' : roster[i] || '')), ...[0, 1, 2, 3, 4].map((i) => row(other, i + 1, ''))], issues: [] };
 }
 // A saved game back on the check screen (to fix it): same shape as a proposal.
 export function gameToProposal(g) {
   const sides = GAME_SIDES[g.game];
+  const log = isScrimLog(g.title);
   return { title: g.title, game: g.game, sides, kind: 'saved', ourSide: g.ourSide, winner: '', result: g.result, mapSide: g.mapSide || '', durationS: g.durationS, score: g.score || {}, teamNames: {},
-    players: g.players.map((p) => ({ side: p.side, slot: p.slot, nameSeen: p.nameSeen, player: p.player, hero: p.hero, aiHero: p.aiHero || '', candidates: [], mvp: p.mvp, stats: { ...p.stats }, flags: [] })), issues: [] };
+    ...(log ? { pickOrder: g.pickOrder || '', mapVariant: g.mapVariant || '', notes: g.notes || '', vod: g.vod || '', bans: bansOf(g) } : {}),
+    players: g.players.map((p) => ({ side: p.side, slot: p.slot, pick: p.pick ?? p.slot, nameSeen: p.nameSeen, player: p.player, hero: p.hero, aiHero: p.aiHero || '', candidates: [], mvp: p.mvp, stats: { ...p.stats }, flags: [] })), issues: [] };
 }
 
 // Result of a scrim session from its confirmed games (latest version of each game).

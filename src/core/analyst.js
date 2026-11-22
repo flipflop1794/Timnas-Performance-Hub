@@ -42,7 +42,7 @@ export function gameBreakdown(game, games) {
   return {
     id: game.id, title: game.title, date: game.date, partner: game.partner, gameNo: game.gameNo, reportId: game.reportId, result: game.result,
     duration: durationText(game.durationS), usualDuration: durs.length >= BASE_MIN ? durationText(Math.round(median(durs))) : null,
-    side: game.mapSide || game.ourSide, draft: game.draft?.length ? { ourPicks: pick('ours', 'pick'), ourBans: pick('ours', 'ban'), theirPicks: pick('partner', 'pick'), theirBans: pick('partner', 'ban'), firstPick: game.firstPick } : null,
+    side: [game.pickOrder, game.mapVariant, game.mapSide].filter(Boolean).join(', ') || game.ourSide, draft: game.draft?.length ? { ourPicks: pick('ours', 'pick'), ourBans: pick('ours', 'ban'), theirPicks: pick('partner', 'pick'), theirBans: pick('partner', 'ban'), firstPick: game.firstPick } : null,
     players, flagged: players.reduce((a, p) => a + p.flags.length, 0),
   };
 }

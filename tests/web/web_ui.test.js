@@ -36,7 +36,19 @@ async function open(B, who, hash = 'today') {
   return { dom, d, w: dom.window, text: () => d.getElementById('main').textContent, nav: () => d.getElementById('titles').textContent,
     go: async (h) => { dom.window.location.hash = h; dom.window.dispatchEvent(new dom.window.HashChangeEvent('hashchange')); await sleep(40); },
     set: (id, v) => { const e = d.getElementById(id); e.value = v; e.dispatchEvent(new dom.window.Event('input', { bubbles: true })); },
-    click: async (sel) => { d.querySelector(sel).click(); await sleep(60); } };
+    click: async (sel) => { d.querySelector(sel).click(); await sleep(60); },
+    // V1.38: MLBB games the Scrim Log way, typed by hand (FP, ten heroes, stand-ins where no roster is loaded).
+    addGames: async (title, results) => {
+      const fid = title.replace(/[^A-Za-z0-9_\-.]/g, '_'); const H = ['Fanny', 'Ling', 'Lancelot', 'Hayabusa', 'Gusion', 'Tigreal', 'Franco', 'Atlas', 'Khufra', 'Chou'];
+      const put = (id, v) => { const e = d.getElementById(id); e.value = v; e.dispatchEvent(new dom.window.Event('input', { bubbles: true })); };
+      for (const r of results) {
+        d.querySelector(`[data-cap-manual="${title}"]`).click(); await sleep(60);
+        put(`cg-${fid}-po`, 'FP'); put(`cg-${fid}-result`, r);
+        H.forEach((h, i) => { put(`cg-${fid}-${i}-hero`, h); if (i < 5 && !d.getElementById(`cg-${fid}-${i}-player`).value) put(`cg-${fid}-${i}-player`, 'stand-in'); });
+        d.querySelector(`[data-cap-confirm="${title}"]`).click(); await sleep(60);
+        assert.match(d.getElementById(`capMsg-${fid}`).textContent, /confirmed/);
+      }
+    } };
 }
 
 test('no session: the sign-in screen, not the hub; wrong password refused; right password opens the hub', async () => {
@@ -64,11 +76,11 @@ test('a title coach files a report from his phone; it survives a reload and the 
   const indra = await open(B, 'indra', 'mlbb-reports');
   assert.equal(indra.d.getElementById('rp-MLBB-by').value, 'Coach Indra', 'written by defaults to the signed-in coach');
   indra.set('rp-MLBB-partner', 'RRQ Academy');
-  [...indra.d.querySelectorAll('.chip')].find((b) => b.textContent === '2-1').click(); await sleep(20);
+  await indra.addGames('MLBB', ['win', 'win', 'loss']);
   indra.set('rp-MLBB-focus', 'Early rotations'); await indra.click('[data-rp-prog="MLBB"][data-v="4"]');
   indra.set('rp-MLBB-worked', 'Lane swaps on time'); indra.set('rp-MLBB-adjust', 'Vision 20s before turtle');
   await indra.click('[data-report-save="MLBB"]'); await sleep(100);
-  assert.match(indra.d.getElementById('rpMsg-MLBB').textContent, /Report saved \(2-1 vs RRQ Academy\)/);
+  assert.match(indra.d.getElementById('rpMsg-MLBB').textContent, /Report saved \(2-1 vs RRQ Academy, 3 games/);
   const row = B.tables.scrim_reports[0];
   assert.equal(row.created_by, 'u-indra'); assert.equal(row.title, 'MLBB'); assert.equal(row.data.result.won, 2);
   await sleep(400);
@@ -83,12 +95,12 @@ test('a coach of another title cannot see or file MLBB records; the page says wh
   const B = world(); B.addUser({ id: 'u-chr', email: 'c@example.test', password: 'pw-c-1234567', name: 'Christie', roles: ['title_coach'], titles: ['PUBG Mobile'] });
   people.christie = B.users.at(-1);
   const indra = await open(B, 'indra', 'mlbb-reports');
-  indra.set('rp-MLBB-partner', 'X'); indra.set('rp-MLBB-won', '1'); indra.set('rp-MLBB-lost', '0'); indra.set('rp-MLBB-focus', 'f'); indra.set('rp-MLBB-progress', '3'); indra.set('rp-MLBB-failed', 'x'); indra.set('rp-MLBB-adjust', 'y');
+  await indra.addGames('MLBB', ['win']); indra.set('rp-MLBB-partner', 'X'); indra.set('rp-MLBB-focus', 'f'); indra.set('rp-MLBB-progress', '3'); indra.set('rp-MLBB-failed', 'x'); indra.set('rp-MLBB-adjust', 'y');
   await indra.click('[data-report-save="MLBB"]'); await sleep(100);
   assert.equal(B.tables.scrim_reports.length, 1);
   const c = await open(B, 'christie', 'mlbb-reports'); await sleep(100);
   assert.match(c.text(), /You are not assigned to MLBB/); assert.doesNotMatch(c.text(), /vs X/);
-  c.set('rp-MLBB-partner', 'Y'); c.set('rp-MLBB-won', '1'); c.set('rp-MLBB-lost', '0'); c.set('rp-MLBB-focus', 'f'); c.set('rp-MLBB-progress', '3'); c.set('rp-MLBB-failed', 'x'); c.set('rp-MLBB-adjust', 'y');
+  await c.addGames('MLBB', ['win']); c.set('rp-MLBB-partner', 'Y'); c.set('rp-MLBB-focus', 'f'); c.set('rp-MLBB-progress', '3'); c.set('rp-MLBB-failed', 'x'); c.set('rp-MLBB-adjust', 'y');
   await c.click('[data-report-save="MLBB"]'); await sleep(100);
   assert.match(c.d.getElementById('rpMsg-MLBB').textContent, /don't have permission/);
   assert.equal(B.tables.scrim_reports.length, 1, 'nothing written');
@@ -200,7 +212,7 @@ test('a completed session accepts one daily report and keeps its original result
 
 test('corrections are added, never overwrite the report, and show who entered them', async () => {
   const B = world(); const indra = await open(B, 'indra', 'mlbb-reports');
-  indra.set('rp-MLBB-partner', 'X'); indra.set('rp-MLBB-won', '2'); indra.set('rp-MLBB-lost', '1'); indra.set('rp-MLBB-focus', 'f'); indra.set('rp-MLBB-progress', '3'); indra.set('rp-MLBB-failed', 'x'); indra.set('rp-MLBB-adjust', 'y');
+  await indra.addGames('MLBB', ['win', 'win', 'loss']); indra.set('rp-MLBB-partner', 'X'); indra.set('rp-MLBB-focus', 'f'); indra.set('rp-MLBB-progress', '3'); indra.set('rp-MLBB-failed', 'x'); indra.set('rp-MLBB-adjust', 'y');
   await indra.click('[data-report-save="MLBB"]'); await sleep(400);
   const id = B.tables.scrim_reports[0].id;
   indra.d.getElementById(`rpN-${id}`).value = 'Score was 2-0, not 2-1';
@@ -212,15 +224,16 @@ test('corrections are added, never overwrite the report, and show who entered th
 
 test('V1.36 a scrim report is edited in place; the database records who changed what, and the Head Coach sees "Edited 1×"', async () => {
   const B = world(); const indra = await open(B, 'indra', 'mlbb-reports');
-  indra.set('rp-MLBB-partner', 'X'); indra.set('rp-MLBB-won', '2'); indra.set('rp-MLBB-lost', '1'); indra.set('rp-MLBB-focus', 'f'); indra.set('rp-MLBB-progress', '3'); indra.set('rp-MLBB-failed', 'x'); indra.set('rp-MLBB-adjust', 'y');
+  await indra.addGames('MLBB', ['win', 'win', 'loss']); indra.set('rp-MLBB-partner', 'X'); indra.set('rp-MLBB-focus', 'f'); indra.set('rp-MLBB-progress', '3'); indra.set('rp-MLBB-failed', 'x'); indra.set('rp-MLBB-adjust', 'y');
   await indra.click('[data-report-save="MLBB"]'); await sleep(400);
   const id = B.tables.scrim_reports[0].id;
   await indra.click(`[data-rp-edit="${id}"]`); await sleep(150);
   assert.match(indra.text(), /Edit scrim report/); assert.equal(indra.d.getElementById('rp-MLBB-partner').value, 'X', 'the form holds the saved report');
-  indra.set('rp-MLBB-lost', '0'); indra.set('rp-MLBB-adjust', 'Vision before turtle');
+  assert.match(indra.text(), /its games stay as saved/, 'Scrim Log: the result comes from the games, not the edit form');
+  indra.set('rp-MLBB-adjust', 'Vision before turtle');
   await indra.click('[data-report-save="MLBB"]'); await sleep(400);
   assert.match(indra.d.getElementById('rpMsg-MLBB').textContent, /Changes saved/);
-  assert.equal(B.tables.scrim_reports.length, 1, 'no second report'); assert.equal(B.tables.scrim_reports[0].data.result.lost, 0);
+  assert.equal(B.tables.scrim_reports.length, 1, 'no second report'); assert.equal(B.tables.scrim_reports[0].data.result.lost, 1, 'result kept from the games');
   assert.equal(B.tables.scrim_reports[0].created_by, 'u-indra', 'still his report');
   const h = B.tables.record_history; assert.equal(h.length, 1); assert.equal(h[0].tbl, 'scrim_reports'); assert.equal(h[0].editor_name, 'Coach Indra');
   assert.equal(h[0].before.adjust, 'y'); assert.equal(h[0].after.adjust, 'Vision before turtle');
@@ -257,7 +270,7 @@ test('typing is kept while a colleague saves; the database refuses demo data; si
   const B = world();
   const indra = await open(B, 'indra', 'mlbb-reports'); const aufa = await open(B, 'aufa', 'mlbb-reports');
   indra.d.getElementById('rp-MLBB-worked').focus(); indra.set('rp-MLBB-worked', 'half-typed');
-  aufa.set('rp-MLBB-partner', 'Z'); aufa.set('rp-MLBB-won', '1'); aufa.set('rp-MLBB-lost', '0'); aufa.set('rp-MLBB-focus', 'f'); aufa.set('rp-MLBB-progress', '3'); aufa.set('rp-MLBB-failed', 'x'); aufa.set('rp-MLBB-adjust', 'y');
+  await aufa.addGames('MLBB', ['win']); aufa.set('rp-MLBB-partner', 'Z'); aufa.set('rp-MLBB-focus', 'f'); aufa.set('rp-MLBB-progress', '3'); aufa.set('rp-MLBB-failed', 'x'); aufa.set('rp-MLBB-adjust', 'y');
   await aufa.click('[data-report-save="MLBB"]'); await sleep(450);
   assert.match(indra.text(), /vs Z/); assert.equal(indra.d.getElementById('rp-MLBB-worked').value, 'half-typed');
   const r = await B.client('u-aufa').from('scrim_reports').insert({ id: 'D1', data: { title: 'MLBB', origin: 'demo' } });
@@ -347,7 +360,8 @@ test('V1.16 scrim report: the author is the signed-in coach and cannot be change
 test('V1.16 one form: a scrim report filed by the title coach is also the daily report, with his follow-up', async () => {
   const B = world();
   const indra = await open(B, 'indra', 'mlbb-reports');
-  for (const [k, v] of Object.entries({ partner: 'Team Q', won: '2', lost: '1', focus: 'Turtle setup', progress: '4', worked: 'Clean turtle', failed: 'Late vision', adjust: 'Ward before lord' })) indra.set(`rp-MLBB-${k}`, v);
+  await indra.addGames('MLBB', ['win', 'win', 'loss']);
+  for (const [k, v] of Object.entries({ partner: 'Team Q', focus: 'Turtle setup', progress: '4', worked: 'Clean turtle', failed: 'Late vision', adjust: 'Ward before lord' })) indra.set(`rp-MLBB-${k}`, v);
   await indra.click('[data-report-save="MLBB"]'); await sleep(150);
   assert.match(indra.d.getElementById('rpMsg-MLBB').textContent, /also the daily report/);
   const [rep] = B.tables.scrim_reports; const sess = B.tables.scrim_sessions.find((s) => s.id === rep.data.scrimId);
@@ -461,8 +475,8 @@ test('V1.29 frictionless report: "Log the result" on a planned session opens the
   const f = (k) => c.d.getElementById(`rp-MLBB-${k}`);
   assert.equal(f('partner').value, 'Team Q'); assert.equal(f('focus').value, 'Vision before lord'); assert.equal(f('scrim').value, 'SC-fr');
   const left = () => c.d.getElementById('rpLeft-MLBB').textContent;
-  assert.match(left(), /1 of 3 done — still needed: result, change for next time\./);
-  [...c.d.querySelectorAll('.chip')].find((b) => b.textContent === '2-1').click(); await sleep(30);
+  assert.match(left(), /1 of 3 done — still needed: at least one game, change for next time\./);
+  await c.addGames('MLBB', ['win', 'win', 'loss']);
   c.d.querySelector('[data-rp-add*="vision"]').click(); assert.match(f('failed').value, /^vision: $/);
   c.set('rp-MLBB-failed', 'vision: no wards before lord'); c.set('rp-MLBB-adjust', 'Ward river at 7:30');
   c.d.querySelector('[data-rp-prog="MLBB"][data-v="4"]').click(); await sleep(30);

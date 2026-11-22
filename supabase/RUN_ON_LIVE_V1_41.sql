@@ -1,5 +1,5 @@
--- V1.39 — Close five database functions to visitors who are not signed in. Run this whole file once in Supabase → SQL Editor.
--- Same content as supabase/migrations/20261203120000_function_access.sql. Safe to run twice.
+-- V1.41 — Close five database functions to visitors who are not signed in. Run this whole file once in Supabase → SQL Editor.
+-- Same content as supabase/migrations/20261204120000_function_access.sql. Safe to run twice.
 begin;
 -- V1.39 — close database functions to visitors who are not signed in.
 --

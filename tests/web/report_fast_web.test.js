@@ -1,4 +1,4 @@
-// V1.39 two-minute scrim report on the website: a Dota coach files partner, score and the one change for next time,
+// V1.42 two-minute scrim report on the website: a Dota coach files partner, score and the one change for next time,
 // saves, copies the report for the team's WhatsApp group, and My day shows it at the top as filed today.
 import { test, before } from 'node:test';
 import assert from 'node:assert/strict';

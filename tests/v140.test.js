@@ -1,4 +1,4 @@
-// V1.38: 21 Nov site re-read, eFootball rosters, rule profiles from the desk research, rules in AI material,
+// V1.40: 21 Nov site re-read, eFootball rosters, rule profiles from the desk research, rules in AI material,
 // the press-reported Dota schedule.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -48,7 +48,7 @@ test('rule profiles: new defaults reach a saved live copy; staff edits are never
     { id: 'pubgm-scoring', title: 'PUBG Mobile', label: 'Scoring table', version: 'WEC26 v1', status: 'confirmed', source: 'PB ESI', affects: [], history: [{ by: 'Fayad' }] }];
   const m = mergeRules(old, DEFAULT_RULES, { at });
   const dp = m.find((r) => r.id === 'dota-patch');
-  assert.match(dp.version, /^7\.42/); assert.equal(dp.history[0].from, '7.41 (OpenDota patch 60)'); assert.match(dp.history[0].by, /V1\.38/);
+  assert.match(dp.version, /^7\.42/); assert.equal(dp.history[0].from, '7.41 (OpenDota patch 60)'); assert.match(dp.history[0].by, /V1.40/);
   assert.equal(m.find((r) => r.id === 'pubgm-scoring').version, 'WEC26 v1', 'staff-set rule kept');
   for (const id of ['dota-format', 'cs2-format', 'cs2-map-pool', 'mlbb-format', 'mlbbw-format', 'pubgm-format', 'efootball-format']) assert.ok(m.some((r) => r.id === id), id);
   // A staff-edited patch rule stays as set.

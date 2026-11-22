@@ -45,32 +45,33 @@ test('every title has its own section with Team, Scrims, Scrim reports and Compe
   await h.go('t-cs2w-rivals'); assert.match(h.text(), /Field: 11 nations/);
 });
 
+// V1.38: MLBB files games the Scrim Log way (tests/capture_ui.test.js); the typed-score report flow is tested on Dota 2.
 test('a coach files a report: saved, shown by day, closes the planned session, corrections appended, CSV offered', async () => {
-  const db = mock(); const h = await page('mlbb-scrims', db); const d = h.d; const t0 = localDay();
-  d.getElementById('spP-MLBB').value = 'Team X'; d.getElementById('spO-MLBB').value = 'Coach Indra'; d.getElementById('spD-MLBB').value = t0;
-  d.querySelector('[data-scrim-plan="MLBB"]').click(); await h.wait();
+  const db = mock(); const h = await page('dota-scrims', db); const d = h.d; const t0 = localDay();
+  d.getElementById('spP-Dota_2').value = 'Team X'; d.getElementById('spO-Dota_2').value = 'Coach Indra'; d.getElementById('spD-Dota_2').value = t0;
+  d.querySelector('[data-scrim-plan="Dota 2"]').click(); await h.wait();
   const planned = [...db.store.entries()].filter(([k]) => k.startsWith('scrims/'));
   assert.equal(planned.length, 1);
-  await h.go('mlbb-reports');
-  const f = (k, v) => { d.getElementById(`rp-MLBB-${k}`).value = v; };
-  d.querySelector('[data-report-save="MLBB"]').click(); await h.wait();
-  assert.match(d.getElementById('rpMsg-MLBB').textContent, /Who wrote|sparring partner|one change for the next session/);   // V1.29: partner comes from today's plan
+  await h.go('dota-reports');
+  const f = (k, v) => { d.getElementById(`rp-Dota_2-${k}`).value = v; };
+  d.querySelector('[data-report-save="Dota 2"]').click(); await h.wait();
+  assert.match(d.getElementById('rpMsg-Dota_2').textContent, /Who wrote|sparring partner|one change for the next session/);   // V1.29: partner comes from today's plan
   assert.equal([...db.store.keys()].filter((k) => k.startsWith('scrim_reports/')).length, 0, 'nothing saved when incomplete');
   f('by', 'Coach Indra'); f('partner', 'Team X'); f('won', '2'); f('lost', '1'); f('focus', 'Early rotations'); f('progress', '4'); f('worked', 'Lane swaps'); f('adjust', 'Faster turtle setup'); f('players', 'Aran: strong first lane'); f('scrim', planned[0][1].id);
-  d.querySelector('[data-report-save="MLBB"]').click(); await h.wait();
+  d.querySelector('[data-report-save="Dota 2"]').click(); await h.wait();
   const saved = [...db.store.entries()].filter(([k]) => k.startsWith('scrim_reports/'));
   assert.equal(saved.length, 1); assert.equal(saved[0][1].result.won, 2); assert.equal(saved[0][1].origin, 'operational');
   assert.equal([...db.store.entries()].find(([k]) => k.startsWith('scrims/'))[1].status, 'done', 'planned session closed by the report');
   assert.match(h.text(), new RegExp(t0)); assert.match(h.text(), /2-1/);
   assert.match(h.text(), /Last 14 days/); assert.match(h.text(), /Win rate by day \(games won\)/); assert.equal(d.querySelectorAll('.trend .tb').length, 1); assert.match(d.querySelector('.trend .tm title').textContent, /2-1 \(67%\), 1 session/); assert.match(h.text(), /Faster turtle setup/); assert.match(h.text(), /Start the next session from here/);
-  assert.ok(d.querySelector('[data-report-csv="MLBB"]'));
+  assert.ok(d.querySelector('[data-report-csv="Dota 2"]'));
   // correction
   const id = saved[0][1].id; d.getElementById(`rpN-${id}`).value = 'Score was 2-0, not 2-1';
   d.querySelector(`[data-report-note="${id}"]`).click(); await h.wait();
   const after = db.store.get(`scrim_reports/${id}`);
   assert.equal(after.notes.length, 1); assert.equal(after.result.lost, 1, 'original untouched'); assert.match(h.text(), /Score was 2-0, not 2-1/);
   // overview and Today
-  await h.go('reports-all'); assert.match(h.text(), /MLBB/); assert.match(h.text(), /Next session starts from/); assert.match(h.text(), /Faster turtle setup/);
+  await h.go('reports-all'); assert.match(h.text(), /Dota 2/); assert.match(h.text(), /Next session starts from/); assert.match(h.text(), /Faster turtle setup/);
   await h.go('today'); await h.as('aufa'); assert.match(h.text(), /Scrim reports today: 1 of [0-9]+ filed/);
   await h.go('t-mlbbw-reports'); assert.match(h.text(), /No report yet/);
 });

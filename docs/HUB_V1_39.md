@@ -1,59 +1,63 @@
-# Hub V1.39 — safer and simpler (21 Nov 2026)
+# Hub V1.39 — MLBB hero list checked, hero avatars readable (21 Nov 2026)
 
-Improvement 1 of 5 in the pre-WEC plan. No new features: it tightens the database and trims the menu. It ships
-together with V1.38, which is not live yet (`docs/HUB_V1_38.md`).
+Groundwork for reading MLBB scrim screenshots the Scrim Log way (two screenshots per game, read on the
+device). Branch `feature/mlbb-scrim-log`. Nothing changes on screen yet: the avatar reader is wired in
+when the screenshot reading (crop positions of the result screen and the Data tab) moves over from the
+Scrim Log.
 
-## Put it live (V1.38 and V1.39 together)
-1. **Database:** run `supabase/RUN_ON_LIVE_V1_39.sql` once in Supabase → SQL Editor. It is safe to run twice.
-2. **Leaked passwords (owner, one switch):** Supabase → Authentication → Sign In / Providers → Email → turn on
-   "Prevent use of leaked passwords". This is a security setting, so the owner changes it, not the Hub.
-3. **AI function:** redeploy `scrim-ai` (V1.38 prompt version `scrim-ai-2026-12-03.1`) via GitHub → Actions →
-   Go-live, step 2.
-4. **Website:** merge to `main`.
-5. **Check:** Supabase → Advisors → Security should no longer list "Public can execute SECURITY DEFINER function" or
-   "Function search path mutable".
+## Hero list
+- `data/mlbb/heroes.json`: checked on 21 Nov 2026 against the official list on mobilelegends.com/rank
+  (Original Server): the same 133 heroes, same spelling. Dori is on the Advance Server only (since Aug 2026)
+  and is not in the list yet; add her when she is released.
 
-## Database: closed to visitors who are not signed in
-- **The finding:** the Supabase security advisor (21 Nov) found 5 functions that anyone with the public site key
-  could call without signing in:
-  - `can_support_read`
-  - `can_support_write`
-  - `log_edit`
-  - `support_summary`
-  - `title_from_slug`
-- **Risk:** none of them returned data to a visitor, because each one checks who is signed in. The support summary,
-  for example, returns nothing without a staff account. Still, none of them should be callable.
-- **Cause:** Supabase gives visitors rights on every new function and table by default. Earlier versions closed each
-  new table by hand, but these 5 functions (V1.30–V1.36) were missed.
-- **Fix:**
-  - Visitor access is revoked on the 5 functions. Signed-in users keep it, because the access rules use these
-    functions.
-  - The default is changed: new functions, tables and sequences now start closed to visitors.
-  - `block_update` and `jsonb_prefix` get a fixed search_path (a second advisor warning).
-- **Not changed:** the advisor also lists 31 functions that signed-in users can call. That is intended. The access
-  rules call the role checks, and each role check looks at the signed-in user. The others are database triggers,
-  which refuse to run when called directly.
+## Hero avatars
+- `data/mlbb/hero_icons.json`: one 96-byte reference per hero, read from the official 128 px icons on
+  mobilelegends.com/rank, plus the icon file name. The icons themselves are not stored in the repo.
+- `src/core/hero_icons.js`:
+  - `readHero(crop, refs)` takes a crop of one portrait (canvas ImageData) and returns the hero when it is
+    sure, else the three closest heroes as suggestions. `allow` limits the heroes (e.g. not banned).
+  - `learnFrom(crop, hero)` keeps a confirmed crop as an extra reference, so a skin is read next time.
+  - `referenceSet(iconData, learned)` builds the references (official + learned).
+- The bundle ships the references as `DATA.mlbbHeroIcons` (about 17 KB).
 
-## Menu: screens with no entries yet fold behind "More"
-- On the live site after the camp's first week, these screens had no entries at all, so focus mode now hides them:
-  - Draft rooms (Dota 2, MLBB, MLBB Women)
-  - Player plans
-  - Camp schedule & attendance
-  - Camp availability
-- This adds to the screens focus mode already hid (Juara Umum board, Is it working?, Between games, Dota
-  post-match and series review, PUBGM strategy sim).
-- **A tab bar with hidden screens now ends in "More · n"** ("Lainnya · n" in Bahasa). One tap shows every tool, the
-  same as the existing "Show all tools" button.
-- Nothing is deleted. A hidden screen opened by link still works and shows its own tab.
-- Focus mode applies to the website only. The offline file shows everything, as before.
-- Coaches already see only their assigned games (since V1.12).
+### How it was checked
+On the 133 official icons, in the browser, after: scaling to 44–60 px; a 3–4 px gold frame; a darker,
+higher-contrast screenshot; loose crops with the portrait off-centre by 2–4 px. The right hero came first
+in every case (133 of 133 each). With the thresholds used (closest ≤ 8 and runner-up ≥ 1.4 × farther),
+none of the 133 flipped-and-recoloured or shifted portraits was filled in as sure. Tests:
+`tests/hero_icons.test.js` (same code as the browser, checked value for value).
 
-## Version
-`package.json` is now 1.39.0, so the header shows V1.39. V1.38 had not bumped it.
+### Not covered yet
+- Skins: a skin portrait differs from the official icon, so it comes back as suggestions until a coach
+  confirms it once (then it is learned). Where learned crops are stored (table and RLS) is decided with
+  the screenshot reading.
+- Real screenshots have not been tried yet: the crop positions on the result screen and the Data tab
+  come with the Scrim Log reading.
 
-## Tests
-- `tests/v139.test.js`: the migration and the one-paste file match.
-- `tests/web/focus_web.test.js`: a Dota coach's menu, "More", the Bahasa label, and opening a folded screen by link.
-- 323 tests: 288 pass, 0 fail, 35 skipped (database tests that need a local Postgres, as before). Typecheck is clean.
-- The SQL was not run against a test Postgres here. It uses only standard statements; the advisor check after step 1
-  confirms it on the live site.
+## Game screen changes (MLBB and MLBB Women)
+- **Pick order is fixed by the rows:** the top row of each team is P1, then P2 … P5 (the result screen lists
+  players in pick order). The pick-number boxes are gone; the column shows P1–P5. A number sent with a row
+  is ignored, so two heroes can no longer share a pick number.
+- **Side** shows just **FP** and **SP**.
+- **Map** offers the four maps in use: Flying Clouds, Golden Turret, Healing Turtle, Revealing Wisps. A saved
+  game with an older map (Default Map, Broken Walls, Dangerous Grass, Expanding River) keeps it, also when
+  it is fixed.
+- **Duration:** type the digits only; the box puts the colon in (`2040` → `20:40`, `905` → `9:05`). Three or
+  four digits are always read as minutes and seconds (all titles); one or two digits are still minutes.
+- **Players per division:** MLBB Women now has its roster (Cinnyyy, Chel, Fumi Eko, Vival, Vivian) in the
+  hub's defaults and in a new migration (`20261203120000_mlbb_women_roster.sql`, insert only, rows already
+  entered stay), so the "Our player" choices are filled for both MLBB divisions.
+- **Hero suggestions** on the game screen (bans and picks, ours and theirs) list all 133 heroes of the
+  checked official list.
+
+## Put it live
+- Merge to `main` and run the new migration on Supabase (`supabase db push`, or paste the file into the
+  SQL editor). Nothing else changes in the database.
+
+## Players typed, no doubles (MLBB and MLBB Women)
+- A new game starts with the **player boxes empty**. The coach types each player; the division's roster
+  (and "stand-in") is offered as suggestions, and a name in any case is matched to the roster's spelling.
+  A name that is not on the roster is refused. (Screenshot-read games still fill the players they read.)
+- **No doubles:** a hero entered twice anywhere in the game (our bans, their bans, our picks, their picks)
+  or a player on two rows is marked red at once, with a line saying what is doubled; confirming refuses it.
+  "stand-in" may be used on more than one row.

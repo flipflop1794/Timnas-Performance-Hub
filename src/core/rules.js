@@ -53,7 +53,7 @@ export function mergeRules(saved, defaults, { at = new Date().toISOString() } = 
     const d = defaults.find((x) => x.id === r.id);
     if (!d || r.history?.length || !(d.replaces || []).includes(r.version)) return r;
     return { ...r, version: d.version, status: d.status, source: d.source, affects: d.affects,
-      history: [{ from: r.version, to: d.version, status: d.status, by: 'Hub V1.38 (default update)', at, reason: 'New default from the 21 Nov 2026 desk research; the old default had not been changed by the staff.' }] };
+      history: [{ from: r.version, to: d.version, status: d.status, by: 'Hub V1.40 (default update)', at, reason: 'New default from the 21 Nov 2026 desk research; the old default had not been changed by the staff.' }] };
   });
   for (const d of defaults) if (!out.some((r) => r.id === d.id)) out.push(d);
   return out;

@@ -1,78 +1,49 @@
-# Hub V1.38 — current WEC facts: rosters, formats, patch, schedule (21 Nov 2026)
+# Hub V1.38 — MLBB and MLBB Women scrim reports the Scrim Log way (21 Nov 2026)
 
-From the desk research of 21 Nov (`research_notes/WEC26_deep_research_2026-11-21.md`) and a full re-read of the
-official team pages on wec.iesf.org. IESF has still published no rulebook ("Official documents will be available
-soon"), so every rule below is **provisional**: the Head Coach confirms each one in Staff → Rules & decisions when
-IESF publishes it.
+From the EVOS Scrim Log (one row per game: side FP / SP, map, B1–B5, P1–P5 with the player, opponent bans and
+picks, result, duration, link, time slot, game and session notes). Branch `feature/mlbb-scrim-log`.
 
 ## Put it live
-1. **Database:** nothing to run.
-2. **AI function:** redeploy `scrim-ai` (prompt version `scrim-ai-2026-12-03.1`), via GitHub → Actions → Go-live,
-   step 2 only. Until then the AI still works. It just gets the RULES block without the instruction on how to use it.
-3. **Website:** merge to `main`.
+- **Website only:** merge to `main`. No database change: games are stored in `scrim_games.data` (JSON), and the
+  new fields sit there. The `scrim-ai` function is unchanged (screenshots still fill heroes and stats; the coach
+  sets FP / SP and the map).
 
-## Rival rosters (Competitors → Rosters & players)
-- **Every rival team was re-read on 21 Nov** (all 99 nation pages, structured read). The re-read ships as a dated
-  check on each team, as the 13 Nov one did. Nothing is overwritten, and "last checked" now shows 21 Nov everywhere.
-- **Changes found since the last check:**
-  - **CS2 Mongolia:** Aapestt and AccuracyTG in, hoolig4n and RATE out.
-  - **CS2 Australia:** sliimey in, dexter out.
-  - **CS2 Women Kyrgyzstan:** rumethis in, amy out.
-  - **PUBG Mobile Morocco:** lazyboy now a player, md now the coach; MARSHALL is captain.
-  - These show under "Rival rosters changed in the last 14 days" on Today.
-- **Corrections that are not changes:**
-  - France CS2 Women "Si" was a 3 Nov misread of **SiA** (fixed, flagged on the player).
-  - Iraq CS2's coach (TAHA AL DULAIMI) was not caught on 3 Nov and is now filled in.
-- **eFootball is in the roster screen**: the 96 rival players, one per nation, first read on 21 Nov (for example
-  Thailand Jeans, Brazil HenrykinhO, Japan Oshushi, Malaysia HARIZ, Iran Yousef, Spain Javilota).
-- The MLBB changes of Türkiye, Myanmar and Cambodia were already caught on 13 Nov; 21 Nov confirms the same rosters.
-- Teams a staff member edited keep their saved record (as before). The 21 Nov check shows on the seeded record only,
-  so record a weekly check on an edited team to bring it up to date.
-- Tool: `tools/site_check_2026-11-21.mjs` with the raw read in `tools/raw_rosters_2026-11-21.txt`.
+## Scrim reports → MLBB and MLBB Women
+- **Step 1 is "Session and games":** sparring partner, **time slot** (Warmup, Jam 1 … Jam 10, Tournament), then
+  **+ Add game** for every game, in the order played.
+- **One game:** side **FP / SP** (required), **map** (Default Map, Broken Walls, Dangerous Grass, Expanding River,
+  Flying Clouds, Golden Turret, Healing Turtle, Revealing Wisps), result, duration, **our bans B1–B5**, **their
+  bans B1–B5**, ten heroes with a **pick number P1–P5** per team and our player per hero, **game notes** and a
+  **VOD link**. K/D/A, gold and damage are optional (screenshots still fill them).
+- **The report's result is counted from the games.** The typed won/lost boxes, the quick-score chips and the
+  per-game side/result rows are gone for these two titles; a report without a game is refused.
+- The reflection stays required, as before: focus, what worked or failed, adjustment, plan rating (they feed
+  Trends, the AI features and the daily report).
+- **Saved report:** a game table with Side, Map, Result, Time, our picks P1–P5 (player, K/D/A when entered),
+  bans ours / theirs, notes and the VOD link. **Fix** reopens a game with all of this.
+- **Download games (Scrim Log format):** one CSV row per game with the Scrim Log export's column names
+  (DATE, COACH, TEAM, Game, Side, B 1…, P 1, Name P1…, Result, VS, Team, Opp B 1…, Opp P 1…, Durasi, LINK, Map,
+  SESSION KEY, TIME SLOT, MVP, GAME NOTES, SESSION NOTES, CREATED AT, KILLS P1 … DAMAGE TAKEN P5). The result has
+  its own "Result" header (the Scrim Log export leaves it blank). Session notes = worked / failed / next.
 
-## Rule profiles (Staff → Rules & decisions)
-| Rule | Version shipped | Status |
-|---|---|---|
-| Dota 2 · Game patch | **7.42 (live 18 Nov 2026)** | provisional |
-| Dota 2 · Event format | 2 groups of 6, Bo1 round robin (top 4) · playoffs Bo3 · 16–20 Dec | provisional |
-| CS2 · Event format (Open and Women) | 2 groups of 6, Bo1 round robin (top 4) · playoffs Bo3 | provisional |
-| CS2 · Map pool | Active Duty: Ancient, Anubis, Cache, Dust II, Inferno, Mirage, Nuke | provisional |
-| MLBB · Event format | GSL groups of 4, Bo3 · playoffs Bo3 · final Bo5 · 5 bans per team | provisional |
-| MLBB Women · Event format | 4 teams, double elimination | provisional |
-| PUBG Mobile · Event format | 18 matches over 3 days · Erangel, Miramar, Rondo · tie-break chicken dinners | provisional |
-| eFootball · Event format | 1v1 · 16 groups (home and away) · knockout Bo3 · final Bo5 | **unverified** (platform not confirmed) |
+## Analysis
+- **Patterns:** "We picked first (FP)" / "We picked second (SP)" and one line per map.
+- **Draft statistics** (bans against us, our first picks) now cover every MLBB game, not only games with a
+  draft screenshot. Order is kept within each team; the order between the teams is not recorded (as in the
+  Scrim Log), so it is not reconstructed.
+- **Daily sessions:** time slots sort after clock times, in slot order.
 
-- **How they reach the live site:** the live hub keeps its rules in the database, so new defaults would never
-  appear. Now, on load:
-  - A missing profile is added.
-  - A profile the staff never changed that still has the old default (Dota "7.41") moves to the new one, with a history
-    line "Hub V1.38 (default update)".
-  - A profile the staff changed is never touched.
-- **Effect of the Dota patch change:** objectives proposed under 7.41 are flagged "rules changed, re-check", as with
-  any rule change. That is intended: 7.42 changes a lot.
+## Code
+- New `src/core/scrim_log.js` (titles, FP / SP, maps, time slots, checks, draft from bans and picks, export rows).
+- `src/core/capture.js` (game record), `src/hub/capture_ui.js` (game screen, game table),
+  `src/hub/app.js` (report form, save, export button), `src/core/reports.js` (CSV), `src/core/patterns.js`,
+  `src/core/analyst.js`, `src/core/daily_sessions.js`, `src/hub/i18n.js`, `src/hub/guide.js`.
+- Tests: new `tests/scrim_log.test.js`; MLBB flows in `tests/capture*.test.js` and `tests/web/*` file games;
+  the typed-score form tests moved to Dota 2 (`tests/fast_entry.test.js`, `tests/hubs_reports.test.js`).
 
-## The AI works from these facts
-- Preparation packs, pre-match briefs and Brainstorm now receive a **RULES** block for the title (format, patch, map
-  pool), each with an id the AI can cite.
-- The AI is told that "provisional" means not confirmed by IESF. It should use the rules as context (a Bo1 group stage,
-  a new patch) and never as facts about the opponent.
-- Numbers in the rules (Bo1, 7.42, 18 matches) can now appear in AI lines without being removed by the number check.
-
-## Reported Dota schedule (Tournament → Match-day runbook, Dota 2)
-- New panel **"Reported schedule — not official"**: Indonesia's five Group A Bo1s as reported by cybersport.ru
-  (single source):
-  - **16 Dec: Mongolia, then Kazakhstan**
-  - 17 Dec: North Macedonia, Venezuela
-  - Egypt: probably 18 Dec
-- The source line says what is uncertain (no time zone; another site lists a different Day-1 match).
-- **"Add to match tracker"** turns a row into a normal match card (stage marked "reported, confirm"). Nothing is added
-  without a staff tap.
-
-## Not changed
-- The Dota hero pools are still club games since 7.41 (OpenDota, read 3 Nov), and the page still says so. A 7.42
-  refresh needs new pro games first; there are only a few days of them.
-- No threat score was added. Tiers stay the staff's evidence-based judgement (decision pending with the owner).
-
-## Tests
-`tests/v138.test.js` (new). `tests/rosters_oppcard.test.js` and `tests/competitor_form.test.js` were updated for the
-third roster check. 318 tests: 283 pass, 35 skipped (database tests without a local Postgres, as before), 0 fail.
+## Not covered yet
+- Editing a report does not change its games (use **Fix** per game). Changing the date or partner of a report
+  does not update its games.
+- Game capture must be switched on (it is, on the live site since V1.13). Where it is off, MLBB falls back to
+  the typed score.
+- IR (individual rating) per player from the Scrim Log is not a field; MLBB's "Rating" stat is the nearest.
