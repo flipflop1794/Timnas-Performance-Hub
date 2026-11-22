@@ -24,7 +24,8 @@ async function page(hash, db) {
     as: async (who) => { const el = d.getElementById('meSel'); el.value = who; el.dispatchEvent(new dom.window.Event('change', { bubbles: true })); await wait(); } };
 }
 
-const localDay = () => { const d = new Date(); d.setMinutes(d.getMinutes() - d.getTimezoneOffset()); return d.toISOString().slice(0, 10); };
+// The hub's day is Jakarta time (WIB), whatever the machine's time zone (CI runs in UTC).
+import { localDay } from '../src/core/dates.js';
 
 test('every title has its own section with Team, Scrims, Scrim reports and Competitors; no outside draft tool links', async () => {
   const h = await page('today', mock());
