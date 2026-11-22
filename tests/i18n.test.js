@@ -60,7 +60,7 @@ test('V1.9 report pages and title hubs are translated; data and option values st
   const main = () => d.getElementById('main').textContent;
   assert.equal(d.documentElement.lang, 'id', 'Bahasa Indonesia is the default');
   assert.match(main(), /Laporan scrim/); assert.match(main(), /Sesi 7 h/);
-  await go('dota-reports'); assert.match(main(), /Isi laporan scrim — Dota 2/); assert.match(main(), /Simpan laporan/); assert.match(main(), /Game menang/); assert.match(main(), /Satu perubahan konkret|Penyesuaian untuk sesi berikutnya/);
+  await go('dota-reports'); assert.match(main(), /Isi laporan scrim — Dota 2/); assert.match(main(), /Simpan laporan/); assert.match(main(), /Game menang/); assert.match(main(), /Satu perubahan konkret|Satu perubahan untuk sesi berikutnya/);
   assert.equal(d.getElementById('rp-Dota_2-roster').options[0].value, 'Full national roster', 'option values stay English');
   assert.match(d.querySelector('[data-rp-prog="Dota_2"][data-v="1"]').textContent, /1 Jauh/); assert.equal(d.querySelector('[data-rp-prog="Dota_2"][data-v="1"]').title, 'Jauh dari rencana');
   assert.match(main(), /Detail lainnya \(opsional\)/); assert.match(main(), /Skor cepat/);

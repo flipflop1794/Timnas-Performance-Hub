@@ -72,12 +72,13 @@ test('page: Today opens with a ranked "needs attention" list, each item linking 
   // Panel comes before the personal queue.
   const panels = [...d.querySelectorAll('#main > .panel, #main .panel')];
   assert.ok(panels.indexOf(panel) < panels.findIndex((p) => /To review/.test(p.textContent)));
-  // The Head Coach follows every title. CS2 rosters were last read on 3 Nov (MLBB, Dota 2 and PUBG Mobile were
-  // re-read on 13 Nov), so their weekly checks are due, grouped per title.
+  // The Head Coach follows every title. V1.38: every rival roster was re-read on 21 Nov, so no weekly check is due
+  // before 28 Nov; the changes found then (Mongolia CS2, among others) show as "changed", grouped per title.
   const sel = d.getElementById('meSel'); sel.value = 'fayad'; sel.dispatchEvent(new dom.window.Event('change', { bubbles: true })); await wait();
   const p2 = d.querySelector('#main .attention').textContent;
-  assert.match(p2, /Rival roster checks due \(weekly\): \d+/); assert.match(p2, /CS2: \d+/);
-  if (localDay() < '2026-11-20') assert.doesNotMatch(p2, /MLBB: \d+ ·|Dota: \d+/, 're-read on 13 Nov: not due before 20 Nov');
+  if (localDay() < '2026-11-28') assert.doesNotMatch(p2, /Rival roster checks due/, 're-read on 21 Nov: not due before 28 Nov');
+  else { assert.match(p2, /Rival roster checks due \(weekly\): \d+/); assert.match(p2, /CS2: \d+/); }
+  if (localDay() <= '2026-12-05') { assert.match(p2, /Rival rosters changed in the last 14 days/); assert.match(p2, /Mongolia \(CS2\)/); }
 });
 
 test('V1.23 staff keep public results current: add, correct (same event and date replaces), retire; never counted as notes', async () => {

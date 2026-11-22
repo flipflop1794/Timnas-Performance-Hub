@@ -10,7 +10,7 @@ import { runCoaches } from '../core/coaches.js';
 import { KPIS, compareWindows } from '../core/measure.js';
 import { SOURCES } from '../core/registry.js';
 import { CONTEXT_LABEL, tagOrigin, assertOperational } from '../core/records.js';
-import { DEFAULT_RULES, snapshot, changedSince, updateRule, provisional } from '../core/rules.js';
+import { DEFAULT_RULES, snapshot, changedSince, updateRule, provisional, mergeRules, rulesMaterial } from '../core/rules.js';
 import { propose, review, logSession, decide, nextStep, trail, REVIEW, DECISIONS, EXECUTION, RESULT } from '../core/cycle.js';
 import { parseCSV, scorer, validateMatches, MATCH_COLUMNS, FIGHT_COLUMNS } from '../pubgm/scoring.js';
 import { standings, teamSummary } from '../pubgm/analytics.js';
@@ -54,11 +54,11 @@ if (HUB_USER && !HUB_USER.staffKey) {
 import { staffObservation, recommendationRecord } from '../core/records.js';
 import { FIELDS, FIELD_SOURCE, TIERS, board as rivalBoard, rivalNote, crossTitle, nationProfile, coverage, formOf, fieldForm, FORM_READ, formKey, rivalResult, retireResult } from '../core/competitors.js';
 import { planScrim, completeScrim, summary as scrimSummary, FORMATS, KINDS as SCRIM_KINDS } from '../core/scrims.js';
-import { EVENT, defaultRunbook, tLabel, wecMatch, tick, setResult, gameNote, markApplied } from '../core/matchday.js';
+import { EVENT, defaultRunbook, tLabel, wecMatch, tick, setResult, gameNote, markApplied, REPORTED_SCHEDULE, onTracker } from '../core/matchday.js';
 import { VOD_TAGS, vod, reviewVod, LEVELS, partner as partnerRec, partnerStats, AREAS, GOAL_STATUS, goal as goalRec, updateGoal, plan as newPlan } from '../core/library.js';
 import { weeklyBrief } from '../core/brief.js';
 import { localDay, shiftDay } from '../core/dates.js';
-import { scrimReport, addNote as reportNote, byDay as reportDays, reportSummary, reportsCsv, scrimLogCsv, resultText, GAME_SPEC, PROGRESS, ROSTER_PLAYED, FIX_CHECK } from '../core/reports.js';
+import { scrimReport, addNote as reportNote, byDay as reportDays, reportSummary, reportsCsv, scrimLogCsv, resultText, reportWhatsApp, GAME_SPEC, PROGRESS, ROSTER_PLAYED, FIX_CHECK } from '../core/reports.js';
 import { isScrimLog, TIME_SLOTS } from '../core/scrim_log.js';
 import { seedRosters, effective, editPlayers, recordCheck, checkStatus, dotaPool, ACCOUNT_KIND, ROLE_HINT, rosterKey, CHECK_EVERY_DAYS } from '../core/rosters.js';
 import { loadReadiness, READINESS_SLOT } from '../readiness/contract.js';
@@ -101,6 +101,8 @@ import { statGoal } from '../core/patterns.js';
 
 // ---------- state ----------
 const SHIPPED = '2026-11-03';
+// The default rule profiles as the hub uses them (the PUBG Mobile scoring rule carries its table).
+const DEFAULT_RULES_HUB = DEFAULT_RULES.map((r) => (r.id === 'pubgm-scoring' ? { ...r, table: DATA.profiles.standard_10_6.placement, perElim: 1 } : r));
 const S = {
   mode: 'live', // 'live' = operational data only; 'demo' = demo sandbox
   heroes: parseHeroes(DATA.heroesCsv),
@@ -108,7 +110,7 @@ const S = {
   matches: Object.fromEntries(DATA.matches.map((m) => [m.id, { m, origin: 'operational', retrieved: SHIPPED, source: 'Shipped with V1 (OpenDota)' }])),
   opp: DATA.opp,
   asOf: Math.floor(Date.now() / 1000),
-  rules: JSON.parse(JSON.stringify(DEFAULT_RULES)).map((r) => (r.id === 'pubgm-scoring' ? { ...r, table: DATA.profiles.standard_10_6.placement, perElim: 1 } : r)),
+  rules: JSON.parse(JSON.stringify(DEFAULT_RULES_HUB)),
   pubgm: { team: null, logged: { matches: [], fights: [] }, sim: null },
   draft: { firstUs: true, steps: [], opp: 'MGL', saved: {} },
   cycle: [], db: null, dbState: 'connecting', mcp: undefined,
@@ -148,14 +150,18 @@ const coUi = () => (CO ||= coachAiUi({ S, esc, tag, banner, setMsg, val, render,
   aiOn: () => FEAT.ai && FEAT.coachAi && FEAT.coachAiFn && !!PLATFORM?.ai }));
 // Focus mode (website only, per device): hide screens that are not used yet, so coaches see what matters before WEC.
 // Nothing is deleted; "Show all tools" brings everything back.
-const FOCUS_HIDE = new Set(['board', 'staff-measure', 'tour-series', 'dota-post', 'dota-draft', 'dota-review', 'pubgm-sim', ...(FEAT.donny ? ['well-day', 'well-log'] : [])]);
+// V1.41: also the screens with no entries on the live site after the camp's first week (draft rooms, player plans,
+// camp attendance and availability). A tab bar with hidden screens ends in "More · n", which shows them all.
+const FOCUS_HIDE = new Set(['board', 'staff-measure', 'tour-series', 'dota-post', 'dota-draft', 'dota-review', 'pubgm-sim', 'mlbb-draft', 't-mlbbw-draft',
+  'players', 'pel-day', 'pel-avail', ...(FEAT.donny ? ['well-day', 'well-log'] : [])]);
+const focusHidden = (id, view) => focusOn() && FOCUS_HIDE.has(id) && id !== view;
 const focusOn = () => !!HUB_USER && !S.showAll;   // the website (coaches); the offline file shows everything
 // V1.32 less noise: Weaknesses and Patterns open from the Analysis tab (sub-links on the page); per-title
 // Competitors notes live under Competitors → Notes per title. Their links keep working.
 const SUB_OF = {};
 for (const team of ['dota', 'pubgm', 'mlbb', 't-mlbbw', 't-efootball', 't-cs2', 't-cs2w']) { SUB_OF[`${team}-weak`] = `${team}-trends`; SUB_OF[`${team}-patterns`] = `${team}-trends`; SUB_OF[`${team}-brain`] = `${team}-trends`; }
 const BAR_HIDE = new Set(['mlbb-rivals', 't-mlbbw-rivals', 't-efootball-rivals', 't-cs2-rivals', 't-cs2w-rivals', 'pubgm-rivals', 'dota-scout']);
-const tabShown = (id, view) => (SUPPORT_ONLY && ['readiness', 'players', 'well-day', 'well-log'].includes(id) ? false : SUB_OF[id] ? false : BAR_HIDE.has(id) ? id === view : !focusOn() || !FOCUS_HIDE.has(id) || id === view);
+const tabShown = (id, view) => (SUPPORT_ONLY && ['readiness', 'players', 'well-day', 'well-log'].includes(id) ? false : SUB_OF[id] ? false : BAR_HIDE.has(id) ? id === view : !focusHidden(id, view));
 const canSetDates = () => !HUB_USER || HUB_USER.isAdmin || HUB_USER.roles.includes('head_coach');
 const plUi = () => (PL ||= pelatnasUi({ S, esc, tag, banner, setMsg, val, render, meName, sid, localDay, shiftDay, titleVisible: (t) => titleVisible(t), canSetDates }));
 // V1.35 camp plan: each title's staff edit their own plan (the database enforces the same rule).
@@ -287,7 +293,7 @@ async function initCaps() {
     // Wellbeing collections are readable and writable by editors only (declared in the page's db rules).
     db.collection('wellbeing_checkins').onSnapshot((snap) => { S.well.checkins = snap.docs.map((d) => d.data()).filter((x) => x?.origin === 'operational'); S.wellAccess = 'ok'; render(); }, () => { S.wellAccess = 'denied'; render(); });
     on(db.collection('wellbeing_load'), 'Training load', (snap) => { S.well.loads = snap.docs.map((d) => d.data()).filter((x) => x?.origin === 'operational'); render(); });
-    on(db.doc('config/rules'), 'Rules', (d) => { const x = d.data(); if (x?.rules) S.rules = x.rules; render(); });
+    on(db.doc('config/rules'), 'Rules', (d) => { const x = d.data(); if (x?.rules) S.rules = mergeRules(x.rules, DEFAULT_RULES_HUB); render(); });
     on(db.collection('dota_pools'), 'Dota hero pools', (snap) => {
       for (const d of snap.docs) { const x = d.data(); if (x?.games && S.players[d.id]) { S.players[d.id].games = x.games; S.freshPools[d.id] = x.at; } }
       render();
@@ -358,7 +364,9 @@ function renderNav(view) {
     + `<button type="button" id="langBtn" class="lang" aria-label="${S.lang === 'id' ? 'Switch to English' : 'Ganti ke Bahasa Indonesia'}"><b${S.lang === 'en' ? ' class="on"' : ''}>EN</b><b${S.lang === 'id' ? ' class="on"' : ''}>ID</b></button>`
     + `<button type="button" id="modeBtn" class="mode ${S.mode}" aria-pressed="${S.mode === 'demo'}">${S.mode === 'demo' ? 'Leave demo sandbox' : 'Demo sandbox'}</button>`
     + (HUB_USER ? `<button type="button" id="focusBtn" class="mode" aria-pressed="${!S.showAll}" title="Focus mode hides screens not in use yet">${S.showAll ? 'Focus mode' : 'Show all tools'}</button>` : '');
-  $('#tabs').innerHTML = title.tabs.filter(([id]) => tabShown(id, view)).map(([id, label]) => `<a href="#${id}" ${id === view || SUB_OF[view] === id ? 'aria-current="page"' : ''}>${id === 'daily-sessions' ? dailyLabel(label) : esc(label)}</a>`).join('');
+  const folded = title.tabs.filter(([id]) => !SUB_OF[id] && !BAR_HIDE.has(id) && !(SUPPORT_ONLY && !tabShown(id, view)) && focusHidden(id, view)).length;
+  $('#tabs').innerHTML = title.tabs.filter(([id]) => tabShown(id, view)).map(([id, label]) => `<a href="#${id}" ${id === view || SUB_OF[view] === id ? 'aria-current="page"' : ''}>${id === 'daily-sessions' ? dailyLabel(label) : esc(label)}</a>`).join('')
+    + (folded ? `<button type="button" id="focusMore" class="more" title="Screens not in use yet. Show all tools">More · ${folded}</button>` : '');
 }
 
 // ---------- views ----------
@@ -478,6 +486,7 @@ V.today = () => {
   return `<div class="panel"><div class="lead">What do we <em>train today</em>?</div>
     <p>Accepted objectives first. Anything not yet reviewed is a proposal, not a training decision.</p></div>
     ${attentionPanel(me)}
+    ${reportsTodayPanel(me)}
     ${supUi().noticesPanel(me.focus || [])}
     ${TITLE_COACH ? '' : dayPanel(me)}
     ${TITLE_COACH ? '' : queueHtml(me.id)}
@@ -485,12 +494,27 @@ V.today = () => {
     ${me.id === 'donny' || me.id === 'fayad' ? wellTodayPanel() : ''}
     ${(() => { const mine = me.id === 'aufa' || me.id === 'user' ? me.focus : WEC_TITLES.map((t) => t.id); const up = S.scrims.filter((x) => mine.includes(x.title) && x.status === 'planned').sort((a, b) => a.date.localeCompare(b.date)).slice(0, 6);
       return up.length ? `<div class="panel"><h2>Scrims and practice coming up</h2><ul class="plain">${up.map((x) => `<li><b>${esc(x.date)}</b> ${esc(x.time)} · ${esc(x.title)} · ${esc(x.kind)}${x.partner ? ` vs ${esc(x.partner)}` : ''}${x.mirrors ? ` (stand-in for ${esc(x.mirrors)})` : ''}${x.date < today() ? ' — <b>result not logged</b>' : ''}${x.date <= localToday() && GAME_SPEC[x.title] && S.mode !== 'demo' ? ` <button type="button" class="linkbtn" data-rp-from-scrim="${esc(x.id)}">Log the result</button>` : ''}</li>`).join('')}</ul></div>` : ''; })()}
-    ${(() => { const mine = me.id === 'aufa' || me.id === 'user' ? me.focus : WEC_TITLES.map((t) => t.id); const t0 = localToday();
-      const rows = mine.filter((t) => GAME_SPEC[t]).map((t) => ({ t, s: reportSummary(S.reports, t, t0) }));
-      return rows.length ? `<div class="panel"><h2>Scrim reports</h2><ul class="plain">${rows.map((r) => `<li><b>${esc(r.t)}</b> — ${r.s.last ? (r.s.daysSince === 0 ? 'report filed today' : `last report ${r.s.daysSince} day(s) ago`) : 'no report yet'} <a href="#${REPORT_TAB[r.t]}">${r.s.daysSince === 0 ? 'Open' : 'File one'}</a></li>`).join('')}</ul></div>` : ''; })()}
     ${TITLE_COACH ? '' : rivalChangesToday(me)}
     <div class="cols">${titles.map(titlePanel).join('')}</div>`;
 };
+
+// V1.42: scrim reports today, near the top of My day. Titles without a report today come first, the longest
+// gap first (never reported before any gap), so the teams that need a nudge are at the top.
+function reportsGap(rows) {
+  const gap = (s) => (s.last ? s.daysSince : Infinity);
+  return [...rows].sort((a, b) => (a.s.daysSince === 0) - (b.s.daysSince === 0) || gap(b.s) - gap(a.s));
+}
+function reportsTodayPanel(me) {
+  const mine = me.id === 'aufa' || me.id === 'user' ? me.focus : WEC_TITLES.map((t) => t.id); const t0 = localToday();
+  const rows = reportsGap(mine.filter((t) => GAME_SPEC[t]).map((t) => ({ t, s: reportSummary(S.reports, t, t0) })));
+  if (!rows.length) return '';
+  const done = rows.filter((r) => r.s.daysSince === 0).length;
+  const line = (r) => (r.s.daysSince === 0 ? `${tag('c-Verified', 'filed today')} <b>${esc(r.t)}</b> <a href="#${REPORT_TAB[r.t]}">Open</a>`
+    : `${tag(r.s.last ? 'c-Low' : 'c-Blocked', r.s.last ? `${r.s.daysSince} day(s) ago` : 'never')} <b>${esc(r.t)}</b> <a href="#${REPORT_TAB[r.t]}">File one</a>`);
+  return `<div class="panel"><h2>Scrim reports today: ${done} of ${rows.length} filed</h2>
+    <p class="note">A report takes two minutes: the result, the one change for next time, save, then "Copy for WhatsApp".</p>
+    <ul class="plain">${rows.map((r) => `<li>${line(r)}</li>`).join('')}</ul></div>`;
+}
 
 // V1.21 iteration 4: rival rosters that changed in the last 14 days, for the titles this person follows.
 // A changed five means the old scouting (VODs, hero pools, opponent card) may no longer fit.
@@ -966,7 +990,7 @@ function reportsPanel(title) {
 V['reports-all'] = () => {
   const t0 = localToday(); const dayList = Array.from({ length: 7 }, (_, i) => shiftDay(t0, i - 6));
   const rows = WEC_TITLES.filter((t) => titleVisible(t.id)).map((t) => ({ t, s: reportSummary(S.reports, t.id, t0), pts: GAME_SPEC[t.id].mode === 'points', per: dayList.map((d) => S.reports.filter((r) => r.title === t.id && r.date === d).length) }));
-  const missing = rows.filter((r) => !r.per.at(-1));
+  const missing = reportsGap(rows.filter((r) => !r.per.at(-1)));
   return `<div class="panel"><div class="lead">Scrim <em>reports</em></div>
     <p>What every coach filed in the last seven days, all titles. Open a title's <b>Scrim reports</b> tab to file or read the details.</p>
     ${S.reports.length ? '' : '<p class="empty">No reports filed yet. Coaches file them from each title\'s Scrim reports tab.</p>'}
@@ -1010,7 +1034,7 @@ function fillReport(fid, values) {
     if (RP_OPTIONAL.includes(k) && v && !(k === 'roster' && v === ROSTER_PLAYED[0])) { const det = el.closest('details'); if (det) det.open = true; }
   }
 }
-const ERR_FIELD = [[/future|Date/, 'date'], [/Who wrote/, 'by'], [/sparring partner/, 'partner'], [/Matches played/, 'played'], [/Total points|points is required/i, 'points'], [/^Wins \(/, 'chicken'], [/placement/, 'avg'], [/Won|Lost|Drawn|at least one|whole number/, 'won'], [/practise/, 'focus'], [/1 to 5/, 'progress'], [/worked or what failed/, 'worked'], [/adjustment/, 'adjust'], [/Player notes/, 'players']];
+const ERR_FIELD = [[/future|Date/, 'date'], [/Who wrote/, 'by'], [/sparring partner/, 'partner'], [/Matches played/, 'played'], [/Total points|points is required/i, 'points'], [/^Wins \(/, 'chicken'], [/placement/, 'avg'], [/Won|Lost|Drawn|at least one|whole number/, 'won'], [/practise/, 'focus'], [/1 to 5/, 'progress'], [/worked or what failed/, 'worked'], [/adjustment|change for the next/, 'adjust'], [/Player notes/, 'players']];
 function markInvalid(fid, message) {
   const key = ERR_FIELD.find(([re]) => re.test(message))?.[1]; if (!key) return;
   const el = key === 'progress' ? document.querySelector(`[data-rp-prog="${fid}"]`) : document.getElementById(`rp-${fid}-${key}`); if (!el) return;
@@ -1024,7 +1048,8 @@ function scrimValues(x) {
   const v = { partner: x.partner, scrim: x.id, format: x.format, level: x.partnerLevel, focus: x.focus || plannedFocus(x) };
   return Object.fromEntries(Object.entries(v).filter(([, y]) => y));
 }
-const RP_NEEDED = [['partner', 'sparring partner'], ['result', 'result'], ['focus', 'focus'], ['story', 'what worked or failed'], ['adjust', 'adjustment'], ['progress', 'plan rating']];
+// V1.42 two-minute report: three things are needed; focus, what worked or failed and the plan rating are optional.
+const RP_NEEDED = [['partner', 'sparring partner'], ['result', 'result'], ['adjust', 'change for next time']];
 function rpMissing(fid, pts, { values } = {}) {
   const g = values ? (k) => String(values[k] ?? '') : (k) => String(val(`rp-${fid}-${k}`));
   const n = (k) => Number(g(k)) || 0; const has = (k) => g(k).trim() !== '';
@@ -1236,7 +1261,7 @@ function reportForm(title, { fid, spec, pts, unit, planned, t0 }) {
     return `<label class="field" for="rp-${fid}-time">Time slot<select id="rp-${fid}-time"><option value=""></option>${opts.map((x) => `<option ${x === cur ? 'selected' : ''}>${esc(x)}</option>`).join('')}</select></label>`; };
   return `<div class="panel rp" id="rpForm-${fid}"><h2>${ed ? 'Edit scrim report' : 'File a scrim report'} — ${esc(title)}</h2>
     ${ed ? `<p class="note draftnote">Editing the report of ${esc(ed.date)} vs <span data-no-tr>${esc(ed.partner)}</span>. Saving keeps the old version in the edit history (who, what, date and time). <button type="button" class="linkbtn" data-rp-editx="${esc(fid)}">Cancel editing</button></p>` : ''}
-    <p class="note">About a minute: tap the result, tell the story (speak or type), check and save.</p>
+    <p class="note">Two minutes: the result, the one change for next time, save. Everything else is optional. Screenshots or a voice note fill the boxes for you.</p>
     ${hasDraft ? `<p class="note draftnote">Draft kept on this device${d.at ? ` (last typed ${esc(new Date(d.at).toTimeString().slice(0, 5))})` : ''}. <button type="button" class="linkbtn" data-rp-clear="${esc(fid)}">Clear form</button></p>` : ''}
     ${auto.partner ? `<p class="note draftnote">Filled from today's plan: vs ${esc(auto.partner)}. Change anything that is different.</p>` : ''}
     ${log ? step(1, 'Session and games', 'Partner and time slot, then each game the Scrim Log way.') : step(1, 'Result', 'Who you played and the score.')}
@@ -1255,20 +1280,20 @@ function reportForm(title, { fid, spec, pts, unit, planned, t0 }) {
     ${log ? `<input type="hidden" id="rp-${fid}-won" value="${esc(dv('won'))}"><input type="hidden" id="rp-${fid}-lost" value="${esc(dv('lost'))}">` : `<div class="form">
     ${pts ? `${num('played', 'Matches played')}${num('points', 'Total points')}` : `${num('won', `${esc(cap(unit))} won`)}${num('lost', `${esc(cap(unit))} lost`)}`}
     </div>`}
-    ${step(2, 'How it went', 'Speak or type once and let the AI fill the boxes, or fill them yourself.')}
+    ${step(2, 'The change for next time', 'Needed: one concrete change. The rest helps the analysis but is optional.')}
     ${capUi().debriefSection(title, fid)}
+    ${txt('adjust', 'The one change for the next session (needed)', 'One concrete change to try next time', true)}
     ${last?.adjust ? `<div class="fixcheck"><span class="note">Last time (${esc(last.date)}, vs ${esc(last.partner)}) the adjustment was:</span> <b>${esc(last.adjust)}</b>
       <input type="hidden" id="rp-${fid}-prevadj" value="${esc(last.adjust)}">
       <div class="form">${sel('fix', 'Did we fix it?', [['', '—'], ...FIX_CHECK.map((x) => [x, x])])}</div>
       <div class="chips">${chip(fid, { focus: last.adjust }, "Make it today's focus")}</div></div>` : ''}
-    ${txt('focus', 'What was this session meant to practise?', 'e.g. Early rotations; fallback drop; set-piece defending')}
+    ${txt('focus', 'What was this session meant to practise? (optional)', 'e.g. Early rotations; fallback drop; set-piece defending')}
     ${focuses.filter((f) => f !== last?.adjust).length ? `<div class="chips"><span class="note">Recent and active objectives:</span>${focuses.filter((f) => f !== last?.adjust).map((f) => chip(fid, { focus: f }, f.length > 48 ? `${f.slice(0, 46)}…` : f)).join('')}</div>` : ''}
-    <div class="form">${txt('worked', 'What worked', '', true)}${txt('failed', 'What failed', '', true)}</div>
+    <div class="form">${txt('worked', 'What worked (optional)', '', true)}${txt('failed', 'What failed (optional)', '', true)}</div>
     ${tagsOf(title).length ? `<div class="chips"><span class="note">Add to what failed:</span>${tagsOf(title).map((w) => `<button type="button" class="chip" data-rp-add="${esc(JSON.stringify({ fid, k: 'failed', w }))}">${esc(w)}</button>`).join('')}</div>` : ''}
-    ${txt('adjust', 'Adjustment for the next session', 'One concrete change to try next time', true)}
     ${drillsSection(title, fid, dv)}${objectivesSection(fid, dv)}
     ${step(3, 'Check and save', '')}
-    <div class="field"><span id="rp-${fid}-proglabel">How closely did the team follow the plan?</span><input type="hidden" id="rp-${fid}-progress" value="${esc(prog)}">
+    <div class="field"><span id="rp-${fid}-proglabel">How closely did the team follow the plan? (optional)</span><input type="hidden" id="rp-${fid}-progress" value="${esc(prog)}">
       <div class="seg" role="group" aria-labelledby="rp-${fid}-proglabel">${PROGRESS.map(([n, l]) => `<button type="button" data-rp-prog="${esc(fid)}" data-v="${n}" aria-pressed="${String(prog) === String(n)}" title="${esc(l)}"><b>${n}</b> ${esc(PROG_SHORT[n])}</button>`).join('')}</div></div>
     <details class="more"${optOpen}><summary>More details (optional)</summary><div class="form">
       ${log ? '' : `<label class="field" for="rp-${fid}-time">Time<input type="text" id="rp-${fid}-time" placeholder="19:00 WIB" value="${esc(dv('time'))}"></label>`}
@@ -1283,7 +1308,7 @@ function reportForm(title, { fid, spec, pts, unit, planned, t0 }) {
       ${txt('vod', 'VOD link or timestamp (optional)')}</details>
     <p class="note">One report per sparring partner · a saved report can be edited (every change is kept in its history) · performance notes only.</p>
     <div class="savebar"><p class="note" id="rpLeft-${fid}" aria-live="polite">${esc(rpLeftText(rpMissing(fid, pts, { values: { ...auto, ...d, progress: prog } })))}</p>
-      <div class="toolbar"><button class="btn primary" type="button" data-report-save="${esc(title)}">${ed ? 'Save changes' : 'Save report'}</button>${(() => { const m = S.rpDone?.[fid]; return m && Date.now() - m.at < 20000 ? `<span class="msg ok" id="rpMsg-${fid}" role="status">${esc(m.text)}</span>` : `<span class="msg" id="rpMsg-${fid}" role="status"></span>`; })()}</div></div></div>`;
+      <div class="toolbar"><button class="btn primary" type="button" data-report-save="${esc(title)}">${ed ? 'Save changes' : 'Save report'}</button>${!ed && S.rpLast?.[fid] ? `<button class="btn" type="button" data-rp-wa="${esc(fid)}" title="The report you just saved, ready to paste in the team's WhatsApp group">Copy for WhatsApp</button>` : ''}${(() => { const m = S.rpDone?.[fid]; return m && Date.now() - m.at < 20000 ? `<span class="msg ok" id="rpMsg-${fid}" role="status">${esc(m.text)}</span>` : `<span class="msg" id="rpMsg-${fid}" role="status"></span>`; })()}</div></div></div>`;
 }
 
 
@@ -2031,9 +2056,9 @@ function brainState(title) {
 function brainMaterial(title, b) {
   if (b.purpose === 'opponent') {
     const { standIn, book } = prepCardFor(title, b.nation);
-    return { PURPOSE: `prepare for ${b.nation}`, TITLE: title, ...prematchMaterial({ brief: opponentBriefFor(title, b.nation), live: liveOf(allLive(), title, b.nation), standIn, book }) };
+    return { PURPOSE: `prepare for ${b.nation}`, TITLE: title, ...prematchMaterial({ brief: opponentBriefFor(title, b.nation), live: liveOf(allLive(), title, b.nation), standIn, book, rules: rulesMaterial(S.rules, title) }) };
   }
-  return planBrainMaterial(title, { reports: S.reports, wtags: S.wtags || [], vods: S.vods, partners: S.partners, tiers: S.tiers, scrims: S.scrims, asOf: today() });
+  return { ...planBrainMaterial(title, { reports: S.reports, wtags: S.wtags || [], vods: S.vods, partners: S.partners, tiers: S.tiers, scrims: S.scrims, asOf: today() }), RULES: rulesMaterial(S.rules, title) };
 }
 function brainPage(title) {
   if (S.mode === 'demo') return `<div class="panel">${DEMO_BANNER}<p class="empty">Brainstorm uses operational records only.</p></div>`;
@@ -2085,8 +2110,16 @@ V['tour-runbook'] = () => {
     <label class="field" for="wmO">Opponent<select id="wmO"><option>TBD</option>${(FIELDS[t] || []).map((n) => `<option>${esc(n)}</option>`).join('')}</select></label>
     <label class="field" for="wmF">Format<select id="wmF"><option value=""></option>${FORMATS.map((k) => `<option>${k}</option>`).join('')}</select></label></div>
     <div class="toolbar"><button class="btn primary" type="button" id="wmAdd">Add match</button><span class="msg" id="wmAddMsg"></span></div></div></div>
+  ${reportedPanel(t)}
   <div class="panel"><h2>WEC matches — ${esc(t)}</h2>${ms.map(card).join('') || '<p class="empty">No WEC match entered for this title yet.</p>'}</div>`;
 };
+// V1.38: a press-reported schedule, shown apart from the match cards until a staff member adds each match.
+function reportedPanel(t) {
+  const rs = REPORTED_SCHEDULE[t]; if (!rs) return '';
+  return `<div class="panel"><h2>Reported schedule — not official</h2><p class="note">${esc(rs.source)}</p>
+    <div class="tw"><table><thead><tr><th>Date</th><th>Stage</th><th>Opponent</th><th>Format</th><th></th></tr></thead><tbody>${rs.matches.map((r, i) => `<tr><td class="mono">${esc(r.date)}</td><td>${esc(r.stage)}<div class="note">${esc(r.when)}</div></td><td><b>${esc(r.opponent)}</b></td><td>${esc(r.format)}</td><td>${onTracker(S.wecMatches, t, r) ? '<span class="note">on the tracker</span>' : `<button class="btn small" type="button" data-wm-reported="${i}">Add to match tracker</button>`}</td></tr>`).join('')}</tbody></table></div>
+    <span class="msg" id="wmRepMsg"></span></div>`;
+}
 
 V['tour-series'] = () => {
   if (S.mode === 'demo') return `<div class="panel">${DEMO_BANNER}<p class="empty">Operational records only.</p></div>`;
@@ -2382,8 +2415,8 @@ V['comp-rosters'] = () => {
         <div class="toolbar"><button class="btn primary" type="button" data-roster-check="${esc(key)}">Save check</button><span class="msg" id="rcMsg-${fk}"></span></div></details></div>`;
   };
   return `${compHead('Every rival player, from the official WEC team pages, with role, club and game account added by the staff. Re-check each roster weekly; changes are flagged here and on the nation profile.')}
-  <div class="panel"><div class="form"><label class="field" for="crT">Title${titleOpts('crT', t)}</label><label class="field" for="crN">Nation<select id="crN"><option>All</option>${field.map((n) => `<option ${n === S.crNation ? 'selected' : ''}>${esc(n)}</option>`).join('')}</select></label></div>
-    <p class="note">Source: ${esc(DATA.rivalRosters.source)}, read ${esc(DATA.rivalRosters.read)} (${esc(DATA.rivalRosters.method)}) Names marked ⚠ need checking on the site.${t === 'Dota 2' ? ` Dota accounts and pools: ${esc(DATA.rivalPools._source)}` : ''}</p>
+  <div class="panel"><div class="form"><label class="field" for="crT">Title${titleOpts('crT', t, WEC_TITLES.map((x) => x.id))}</label><label class="field" for="crN">Nation<select id="crN"><option>All</option>${field.map((n) => `<option ${n === S.crNation ? 'selected' : ''}>${esc(n)}</option>`).join('')}</select></label></div>
+    <p class="note">Source: ${esc(DATA.rivalRosters.source)}, read ${esc((DATA.rivalRosters.reads || [DATA.rivalRosters.read]).join(', '))} (${esc(DATA.rivalRosters.method)}) Names marked ⚠ need checking on the site.${t === 'Dota 2' ? ` Dota accounts and pools: ${esc(DATA.rivalPools._source)}` : ''}</p>
     <div class="stats"><div class="stat"><span class="k">Teams</span><span class="v">${teams.length}</span></div><div class="stat"><span class="k">Checks due (${CHECK_EVERY_DAYS}+ days)</span><span class="v">${due}</span></div><div class="stat"><span class="k">Rosters changed</span><span class="v">${changed.length}</span></div>${t === 'Dota 2' ? `<div class="stat"><span class="k">Players with an account</span><span class="v">${teams.reduce((a, x) => a + x.players.filter((p) => p.account).length, 0)}/${teams.reduce((a, x) => a + x.players.length, 0)}</span></div>` : ''}</div></div>
   <div class="panel">${nations.map(card).join('')}</div>`;
 };
@@ -2530,7 +2563,7 @@ async function onClick(e) {
   if (t.dataset.guideJump) { document.getElementById(`guide-${t.dataset.guideJump}`)?.scrollIntoView?.({ behavior: 'smooth', block: 'start' }); return; }
   if (t.dataset.rdMode) { S.rd.mode = t.dataset.rdMode; S.rd.key = null; render(); return; }
   const id = t.id;
-  if (id === 'focusBtn') { S.showAll = !S.showAll; try { localStorage.setItem('hub-showall', S.showAll ? '1' : ''); } catch { /* per-device convenience */ } render(); return; }
+  if (id === 'focusBtn' || id === 'focusMore') { S.showAll = !S.showAll; try { localStorage.setItem('hub-showall', S.showAll ? '1' : ''); } catch { /* per-device convenience */ } render(); return; }
   if (id === 'langBtn') { S.lang = S.lang === 'id' ? 'en' : 'id'; try { localStorage.setItem('hub-lang', S.lang); } catch { /* per-viewer convenience only */ } render(); return; }
   if (id === 'modeBtn' || id === 'modeBtn2') { S.mode = S.mode === 'demo' ? 'live' : 'demo'; S.pubgm.team = null; S.pubgm.sim = null; render(); return; }
   if (t.dataset.hero && viewOf() === 'dota-draft') { S.draft.steps.push(+t.dataset.hero); render(); return; }
@@ -2592,6 +2625,12 @@ async function onClick(e) {
       }
       S.runbooks = { ...S.runbooks, [ti]: rb }; await saveRunbooks(); render();
     } catch (err) { setMsg('rbMsg', err.message, 'err'); }
+    return;
+  }
+  if (t.dataset.wmReported !== undefined) {
+    const r = REPORTED_SCHEDULE[S.tourTitle]?.matches[Number(t.dataset.wmReported)]; if (!r) return;
+    try { await saveMatch(wecMatch({ title: S.tourTitle, date: r.date, time: '', stage: `${r.stage} (reported, confirm)`, opponent: r.opponent, format: r.format })); render(); }
+    catch (err) { setMsg('wmRepMsg', err.message, 'err'); }
     return;
   }
   if (id === 'wmAdd') {
@@ -2788,7 +2827,7 @@ async function onClick(e) {
     try {
       const { title, nation } = S.sc; const match = (S.wecMatches || []).find((m) => m.id === S.sc.matchId) || null;
       const { standIn, book } = prepCardFor(title, nation);
-      const material = prematchMaterial({ brief: opponentBriefFor(title, nation), live: liveOf(allLive(), title, nation), standIn, book });
+      const material = prematchMaterial({ brief: opponentBriefFor(title, nation), live: liveOf(allLive(), title, nation), standIn, book, rules: rulesMaterial(S.rules, title) });
       setMsg('scAIMsg', 'Drafting… (10–20 s)');
       const out = await PLATFORM.ai.call({ action: 'prematch', title, material });
       const g = { allowed: numbersIn(material), ids: materialIds(material) }; const raw = out.raw || {}; let dropped = 0;
@@ -3158,9 +3197,16 @@ async function onClick(e) {
       try { await capUi().afterSave(title, fid, r); } catch (err) { render(); return setMsg(`rpMsg-${fid}`, `Report saved, but its games were not (${err.message}). They are kept on this device: use "Retry saving games" under Games.`, 'err'); }
       const keep = Object.fromEntries(RP_KEEP_AFTER_SAVE.map((k) => [k, g(k)]).filter(([, v]) => v));
       storeDraft(fid, { ...keep, at: new Date().toISOString() });
+      (S.rpLast ||= {})[fid] = r;   // V1.42: "Copy for WhatsApp" sends this one
       render(); setMsg(`rpMsg-${fid}`, `Report saved (${resultText(r.result)} vs ${r.partner}${nGames ? `, ${nGames} game${nGames > 1 ? 's' : ''}${logMode(title) ? '' : ' with stats'}` : ''})${daily ? '; it is also the daily report, with your next action due tomorrow' : ''}. Next partner? The setup is kept.`, 'ok');
     } catch (err) { setMsg(`rpMsg-${fid}`, err.message, 'err'); markInvalid(fid, err.message); }
     } finally { S.rpSaving[fid] = false; t.disabled = false; }
+    return;
+  }
+  if (t.dataset.rpWa) {
+    const fid = t.dataset.rpWa; const r = S.rpLast?.[fid]; if (!r) return;
+    try { await navigator.clipboard.writeText(reportWhatsApp(r, S.lang)); setMsg(`rpMsg-${fid}`, "Copied: paste it in the team's WhatsApp group.", 'ok'); }
+    catch { setMsg(`rpMsg-${fid}`, 'Copy did not work on this device.', 'err'); }
     return;
   }
   if (t.dataset.reportNote) {

@@ -10,6 +10,7 @@ import { shiftDay } from './dates.js';
 import { compareWindows } from './measure.js';
 import { mean } from './stats.js';
 import { STAT_DEFS } from './capture.js';
+import { withRating } from './reports.js';
 
 export const VERDICT_WEEKS = 2;        // last N weeks vs the N before
 export const MIN_VALUES = 6;           // values needed on each side before a verdict
@@ -65,7 +66,7 @@ export function teamTrends(title, ctx, W) {
   }
   const pts = reps.filter((r) => r.result?.mode === 'points' && r.result.played);
   if (pts.length) out.push(series({ key: 'ppm', label: 'Points per match (reports)', type: 'mean', better: 'up' }, pts.map((r) => ({ date: r.date, v: r.result.points / r.result.played })), W));
-  if (reps.length) out.push(series({ key: 'plan', label: 'Plan followed (1–5)', type: 'mean', better: 'up' }, reps.map((r) => ({ date: r.date, v: Number(r.progress) })), W));
+  if (withRating(reps).length) out.push(series({ key: 'plan', label: 'Plan followed (1–5)', type: 'mean', better: 'up' }, withRating(reps).map((r) => ({ date: r.date, v: Number(r.progress) })), W));
   // V1.31 per-match rows in the reports (eFootball goals, PUBG Mobile placement and eliminations); V1.30 screenshot
   // stats for eFootball possession and shots on target.
   const rowsOf = (pred) => reps.flatMap((r) => (r.rows || []).filter(pred).map((x) => ({ ...x, date: r.date })));

@@ -12,7 +12,8 @@ export function seedRosters(data) {
   for (const t of data.teams) {
     let team = { title: t.title, nation: t.nation, code: t.code, coach: t.coach, note: t.note || '',
       players: t.players.map((p) => ({ ign: p.ign, captain: !!p.captain, role: '', club: p.club || '', account: p.account || '', accountNote: p.accountNote || '', note: '', flags: [...(p.flags || [])] })),
-      checks: [{ date: data.read, by: 'Hub (read from the IESF site)', result: 'seeded', added: [], removed: [] }], origin: 'operational' };
+      // V1.38: a team first read later than the 3 Nov read (the eFootball players, 21 Nov) carries its own date.
+      checks: [{ date: t.read || data.read, by: 'Hub (read from the IESF site)', result: 'seeded', added: [], removed: [] }], origin: 'operational' };
     // V1.21: later re-reads of the site ship as dated checks, so a change shows as "roster changed" with who
     // joined and who left, instead of silently replacing the first read. "*" marks the captain.
     for (const c of t.checks || []) {

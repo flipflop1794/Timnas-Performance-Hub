@@ -1,7 +1,7 @@
 {
  "source": "wec.iesf.org/editions/wec-2026/teams/{code}",
  "read": "2026-11-03",
- "method": "Each team page read with an automated page reader; eFootball not included.",
+ "method": "Team pages read 3 Nov with an automated page reader (eFootball not included then); re-read 13 Nov and 21 Nov (structured read of every page, eFootball added).",
  "teams": [
   {
    "title": "CS2",
@@ -35,7 +35,19 @@
      "flags": []
     }
    ],
-   "checks": [],
+   "checks": [
+    {
+     "date": "2026-11-21",
+     "by": "Hub (re-read from the IESF site)",
+     "names": [
+      "*b1NGO",
+      "Alone",
+      "b2k",
+      "Hellsing",
+      "wESO"
+     ]
+    }
+   ],
    "note": "The page reader joined the word \"Player\"/\"Coach\" to each name; removed. Check spellings on the site."
   },
   {
@@ -73,6 +85,17 @@
    "checks": [
     {
      "date": "2026-11-13",
+     "by": "Hub (re-read from the IESF site)",
+     "names": [
+      "*Famousar3a",
+      "forever",
+      "Kemps",
+      "MeetYourBob",
+      "strive"
+     ]
+    },
+    {
+     "date": "2026-11-21",
      "by": "Hub (re-read from the IESF site)",
      "names": [
       "*Famousar3a",
@@ -128,6 +151,17 @@
       "ABO AMMAR",
       "Aody"
      ]
+    },
+    {
+     "date": "2026-11-21",
+     "by": "Hub (re-read from the IESF site)",
+     "names": [
+      "*shen",
+      "#MiO#",
+      "7oda",
+      "ABO AMMAR",
+      "Aody"
+     ]
     }
    ],
    "note": "The page reader joined the word \"Player\"/\"Coach\" to each name; removed. Check spellings on the site."
@@ -167,6 +201,17 @@
    "checks": [
     {
      "date": "2026-11-13",
+     "by": "Hub (re-read from the IESF site)",
+     "names": [
+      "Names",
+      "Nana",
+      "Nucci",
+      "Rio",
+      "Syrinx"
+     ]
+    },
+    {
+     "date": "2026-11-21",
      "by": "Hub (re-read from the IESF site)",
      "names": [
       "Names",
@@ -216,6 +261,16 @@
       "NASSER74",
       "ZUXXY隋"
      ]
+    },
+    {
+     "date": "2026-11-21",
+     "by": "Hub (re-read from the IESF site)",
+     "names": [
+      "AGA1N",
+      "APKRINO",
+      "NASSER74",
+      "ZUXXY隋"
+     ]
     }
    ],
    "note": "The page reader joined the word \"Player\"/\"Coach\" to each name; removed. Check spellings on the site."
@@ -252,7 +307,19 @@
      "flags": []
     }
    ],
-   "checks": []
+   "checks": [
+    {
+     "date": "2026-11-21",
+     "by": "Hub (re-read from the IESF site)",
+     "names": [
+      "BK1",
+      "Fakzwall",
+      "nacho",
+      "reversive",
+      "righi"
+     ]
+    }
+   ]
   },
   {
    "title": "Dota 2",
@@ -300,6 +367,17 @@
       "Shifu",
       "Un Gato"
      ]
+    },
+    {
+     "date": "2026-11-21",
+     "by": "Hub (re-read from the IESF site)",
+     "names": [
+      "*Hermit",
+      "Balenci",
+      "Runaway",
+      "Shifu",
+      "Un Gato"
+     ]
     }
    ]
   },
@@ -338,6 +416,17 @@
    "checks": [
     {
      "date": "2026-11-13",
+     "by": "Hub (re-read from the IESF site)",
+     "names": [
+      "*Mizz",
+      "HawksHawks",
+      "Miyuki",
+      "Myzhlet",
+      "RIZAA"
+     ]
+    },
+    {
+     "date": "2026-11-21",
      "by": "Hub (re-read from the IESF site)",
      "names": [
       "*Mizz",
@@ -393,6 +482,17 @@
       "Zeichnen"
      ],
      "coach": "Jeff"
+    },
+    {
+     "date": "2026-11-21",
+     "by": "Hub (re-read from the IESF site)",
+     "names": [
+      "*Sunshine",
+      "Harikasın Samet",
+      "intangible",
+      "Saviom",
+      "Zeichnen"
+     ]
     }
    ]
   },
@@ -431,6 +531,17 @@
    "checks": [
     {
      "date": "2026-11-13",
+     "by": "Hub (re-read from the IESF site)",
+     "names": [
+      "KUJOU",
+      "MIEKO",
+      "Nora",
+      "UNOHANA",
+      "ZENDAYA"
+     ]
+    },
+    {
+     "date": "2026-11-21",
      "by": "Hub (re-read from the IESF site)",
      "names": [
       "KUJOU",
@@ -479,6 +590,16 @@
       "Lost",
       "S2GKam1kaze"
      ]
+    },
+    {
+     "date": "2026-11-21",
+     "by": "Hub (re-read from the IESF site)",
+     "names": [
+      "*Solkay",
+      "HamsiG",
+      "Lost",
+      "S2GKam1kaze"
+     ]
     }
    ]
   },
@@ -514,7 +635,19 @@
      "flags": []
     }
    ],
-   "checks": []
+   "checks": [
+    {
+     "date": "2026-11-21",
+     "by": "Hub (re-read from the IESF site)",
+     "names": [
+      "*march",
+      "Doru",
+      "FROZ3N",
+      "Triton",
+      "wilj"
+     ]
+    }
+   ]
   },
   {
    "title": "CS2 Women",
@@ -548,7 +681,19 @@
      "flags": []
     }
    ],
-   "checks": []
+   "checks": [
+    {
+     "date": "2026-11-21",
+     "by": "Hub (re-read from the IESF site)",
+     "names": [
+      "*Pixar",
+      "huntress.",
+      "KayC",
+      "nAAtz",
+      "scorpz"
+     ]
+    }
+   ]
   },
   {
    "title": "Dota 2",
@@ -585,6 +730,17 @@
    "checks": [
     {
      "date": "2026-11-13",
+     "by": "Hub (re-read from the IESF site)",
+     "names": [
+      "*bee",
+      "Berend",
+      "remedy",
+      "Skep",
+      "soup"
+     ]
+    },
+    {
+     "date": "2026-11-21",
      "by": "Hub (re-read from the IESF site)",
      "names": [
       "*bee",
@@ -640,6 +796,17 @@
       "Shyco"
      ],
      "coach": "Thet Lynn Htut"
+    },
+    {
+     "date": "2026-11-21",
+     "by": "Hub (re-read from the IESF site)",
+     "names": [
+      "*J3X",
+      "Coin",
+      "Dear",
+      "Niko",
+      "Shyco"
+     ]
     }
    ]
   },
@@ -673,6 +840,16 @@
    "checks": [
     {
      "date": "2026-11-13",
+     "by": "Hub (re-read from the IESF site)",
+     "names": [
+      "*Mernatt",
+      "Rexx",
+      "Romeo",
+      "YGSaycloudq44"
+     ]
+    },
+    {
+     "date": "2026-11-21",
      "by": "Hub (re-read from the IESF site)",
      "names": [
       "*Mernatt",
@@ -726,6 +903,17 @@
       "Rokji",
       "Sepat"
      ]
+    },
+    {
+     "date": "2026-11-21",
+     "by": "Hub (re-read from the IESF site)",
+     "names": [
+      "*Unii",
+      "Kyym",
+      "NovaXcobar",
+      "Rokji",
+      "Sepat"
+     ]
     }
    ]
   },
@@ -759,6 +947,16 @@
    "checks": [
     {
      "date": "2026-11-13",
+     "by": "Hub (re-read from the IESF site)",
+     "names": [
+      "*CZ",
+      "Bobby",
+      "dep",
+      "Kenny"
+     ]
+    },
+    {
+     "date": "2026-11-21",
      "by": "Hub (re-read from the IESF site)",
      "names": [
       "*CZ",
@@ -823,6 +1021,17 @@
       "Skylark",
       "Thugitoo"
      ]
+    },
+    {
+     "date": "2026-11-21",
+     "by": "Hub (re-read from the IESF site)",
+     "names": [
+      "*SsaSpartan-",
+      "dEsire",
+      "Focus",
+      "Skylark",
+      "Thugitoo"
+     ]
     }
    ]
   },
@@ -858,7 +1067,19 @@
      "flags": []
     }
    ],
-   "checks": []
+   "checks": [
+    {
+     "date": "2026-11-21",
+     "by": "Hub (re-read from the IESF site)",
+     "names": [
+      "*def1zer",
+      "adai",
+      "Aldikon",
+      "Botpa1",
+      "dan4o"
+     ]
+    }
+   ]
   },
   {
    "title": "Dota 2",
@@ -906,6 +1127,17 @@
       "overkill",
       "Shakh"
      ]
+    },
+    {
+     "date": "2026-11-21",
+     "by": "Hub (re-read from the IESF site)",
+     "names": [
+      "*HardL",
+      "BAXA",
+      "Kuka11",
+      "overkill",
+      "Shakh"
+     ]
     }
    ]
   },
@@ -941,7 +1173,19 @@
      "flags": []
     }
    ],
-   "checks": []
+   "checks": [
+    {
+     "date": "2026-11-21",
+     "by": "Hub (re-read from the IESF site)",
+     "names": [
+      "*Equalizer",
+      "A1one",
+      "inSid10us",
+      "Krypt0n",
+      "X1ron"
+     ]
+    }
+   ]
   },
   {
    "title": "Dota 2",
@@ -980,6 +1224,17 @@
    "checks": [
     {
      "date": "2026-11-13",
+     "by": "Hub (re-read from the IESF site)",
+     "names": [
+      "*KaChal",
+      "A9",
+      "Cold-",
+      "Matson",
+      "Zesky~"
+     ]
+    },
+    {
+     "date": "2026-11-21",
      "by": "Hub (re-read from the IESF site)",
      "names": [
       "*KaChal",
@@ -1042,6 +1297,17 @@
       "Onejey",
       "young G"
      ]
+    },
+    {
+     "date": "2026-11-21",
+     "by": "Hub (re-read from the IESF site)",
+     "names": [
+      "*kur0patbI4",
+      "Byun",
+      "Miyaoo",
+      "Onejey",
+      "young G"
+     ]
     }
    ]
   },
@@ -1075,6 +1341,16 @@
    "checks": [
     {
      "date": "2026-11-13",
+     "by": "Hub (re-read from the IESF site)",
+     "names": [
+      "*blrMELW1N",
+      "blrPTENCHIK",
+      "blrRamz1kBoss",
+      "blrTUBA"
+     ]
+    },
+    {
+     "date": "2026-11-21",
      "by": "Hub (re-read from the IESF site)",
      "names": [
       "*blrMELW1N",
@@ -1131,6 +1407,17 @@
       "Raykill",
       "Ryoma"
      ]
+    },
+    {
+     "date": "2026-11-21",
+     "by": "Hub (re-read from the IESF site)",
+     "names": [
+      "*Shy",
+      "ArkaNa",
+      "arrakiz",
+      "Raykill",
+      "Ryoma"
+     ]
     }
    ]
   },
@@ -1172,6 +1459,17 @@
    "checks": [
     {
      "date": "2026-11-13",
+     "by": "Hub (re-read from the IESF site)",
+     "names": [
+      "*H8",
+      "Belief",
+      "Kralot bulo",
+      "Stojkov",
+      "zipzap"
+     ]
+    },
+    {
+     "date": "2026-11-21",
      "by": "Hub (re-read from the IESF site)",
      "names": [
       "*H8",
@@ -1231,6 +1529,17 @@
       "SeveM",
       "Zaviernz"
      ]
+    },
+    {
+     "date": "2026-11-21",
+     "by": "Hub (re-read from the IESF site)",
+     "names": [
+      "*Fury",
+      "Magic",
+      "NzRain",
+      "SeveM",
+      "Zaviernz"
+     ]
     }
    ]
   },
@@ -1266,7 +1575,19 @@
      "flags": []
     }
    ],
-   "checks": []
+   "checks": [
+    {
+     "date": "2026-11-21",
+     "by": "Hub (re-read from the IESF site)",
+     "names": [
+      "*NEUZ",
+      "Aapestt",
+      "AccuracyTG",
+      "ariucle",
+      "clouden"
+     ]
+    }
+   ]
   },
   {
    "title": "Dota 2",
@@ -1324,6 +1645,17 @@
       "NARMAN",
       "sanctity"
      ]
+    },
+    {
+     "date": "2026-11-21",
+     "by": "Hub (re-read from the IESF site)",
+     "names": [
+      "*Se",
+      "11",
+      "423",
+      "NARMAN",
+      "sanctity"
+     ]
     }
    ]
   },
@@ -1357,6 +1689,16 @@
    "checks": [
     {
      "date": "2026-11-13",
+     "by": "Hub (re-read from the IESF site)",
+     "names": [
+      "*C1丨Demo",
+      "ATOMIC",
+      "Fearless",
+      "KEENO"
+     ]
+    },
+    {
+     "date": "2026-11-21",
      "by": "Hub (re-read from the IESF site)",
      "names": [
       "*C1丨Demo",
@@ -1404,6 +1746,17 @@
    "checks": [
     {
      "date": "2026-11-13",
+     "by": "Hub (re-read from the IESF site)",
+     "names": [
+      "*Linnn",
+      "Ayzen",
+      "Darkside",
+      "Runnn",
+      "Wickyyy"
+     ]
+    },
+    {
+     "date": "2026-11-21",
      "by": "Hub (re-read from the IESF site)",
      "names": [
       "*Linnn",
@@ -1464,6 +1817,17 @@
       "PANINI.",
       "Ricky."
      ]
+    },
+    {
+     "date": "2026-11-21",
+     "by": "Hub (re-read from the IESF site)",
+     "names": [
+      "*Junn",
+      "Desz",
+      "INSTNCT",
+      "PANINI.",
+      "Ricky."
+     ]
     }
    ]
   },
@@ -1510,6 +1874,17 @@
       "Hybrid",
       "Luck."
      ]
+    },
+    {
+     "date": "2026-11-21",
+     "by": "Hub (re-read from the IESF site)",
+     "names": [
+      "*Yahiko",
+      "bobe.",
+      "GonnyGon",
+      "Hybrid",
+      "Luck."
+     ]
     }
    ]
   },
@@ -1545,7 +1920,19 @@
      "flags": []
     }
    ],
-   "checks": []
+   "checks": [
+    {
+     "date": "2026-11-21",
+     "by": "Hub (re-read from the IESF site)",
+     "names": [
+      "fNk",
+      "lauNX",
+      "MoDo",
+      "s0und",
+      "XELLOW"
+     ]
+    }
+   ]
   },
   {
    "title": "PUBG Mobile",
@@ -1577,6 +1964,16 @@
    "checks": [
     {
      "date": "2026-11-13",
+     "by": "Hub (re-read from the IESF site)",
+     "names": [
+      "EXO",
+      "NEBUNIE17",
+      "VCūDORIN23",
+      "VCūreDOXyz"
+     ]
+    },
+    {
+     "date": "2026-11-21",
      "by": "Hub (re-read from the IESF site)",
      "names": [
       "EXO",
@@ -1624,6 +2021,16 @@
       "Deathstorm",
       "FLASH"
      ]
+    },
+    {
+     "date": "2026-11-21",
+     "by": "Hub (re-read from the IESF site)",
+     "names": [
+      "*RowDY",
+      "CJboyyyy",
+      "Deathstorm",
+      "FLASH"
+     ]
     }
    ]
   },
@@ -1659,7 +2066,19 @@
      "flags": []
     }
    ],
-   "checks": []
+   "checks": [
+    {
+     "date": "2026-11-21",
+     "by": "Hub (re-read from the IESF site)",
+     "names": [
+      "*OL6A",
+      "dani",
+      "GaBi",
+      "poppins",
+      "yungher"
+     ]
+    }
+   ]
   },
   {
    "title": "PUBG Mobile",
@@ -1691,6 +2110,16 @@
    "checks": [
     {
      "date": "2026-11-13",
+     "by": "Hub (re-read from the IESF site)",
+     "names": [
+      "*PEDRINHO",
+      "FederaL",
+      "LiLBOY",
+      "Obscure"
+     ]
+    },
+    {
+     "date": "2026-11-21",
      "by": "Hub (re-read from the IESF site)",
      "names": [
       "*PEDRINHO",
@@ -1739,6 +2168,16 @@
       "Molina"
      ],
      "coach": "Hades"
+    },
+    {
+     "date": "2026-11-21",
+     "by": "Hub (re-read from the IESF site)",
+     "names": [
+      "*Reyes",
+      "COLMadeon",
+      "COLvictex",
+      "Molina"
+     ]
     }
    ],
    "note": "The page reader joined the word \"Player\"/\"Coach\" to each name; removed. Check spellings on the site."
@@ -1775,7 +2214,19 @@
      "flags": []
     }
    ],
-   "checks": []
+   "checks": [
+    {
+     "date": "2026-11-21",
+     "by": "Hub (re-read from the IESF site)",
+     "names": [
+      "*Jammie",
+      "Destroy_zloy",
+      "kitosyy",
+      "nomercyvec",
+      "rumethis"
+     ]
+    }
+   ]
   },
   {
    "title": "PUBG Mobile",
@@ -1807,6 +2258,16 @@
    "checks": [
     {
      "date": "2026-11-13",
+     "by": "Hub (re-read from the IESF site)",
+     "names": [
+      "*EFFECT",
+      "FLYQE",
+      "WARRIOR",
+      "ZERYCH"
+     ]
+    },
+    {
+     "date": "2026-11-21",
      "by": "Hub (re-read from the IESF site)",
      "names": [
       "*EFFECT",
@@ -1854,6 +2315,16 @@
       "mneROGGO357",
       "mneZ3USsorrie"
      ]
+    },
+    {
+     "date": "2026-11-21",
+     "by": "Hub (re-read from the IESF site)",
+     "names": [
+      "mneAEIMEY13333",
+      "mneLazarmvp",
+      "mneROGGO357",
+      "mneZ3USsorrie"
+     ]
     }
    ]
   },
@@ -1889,7 +2360,19 @@
      "flags": []
     }
    ],
-   "checks": []
+   "checks": [
+    {
+     "date": "2026-11-21",
+     "by": "Hub (re-read from the IESF site)",
+     "names": [
+      "Helkooky",
+      "KillerQueen",
+      "Kim",
+      "Scarlet",
+      "Sebsgirl1"
+     ]
+    }
+   ]
   },
   {
    "title": "PUBG Mobile",
@@ -1928,6 +2411,17 @@
       "MARSHALL",
       "SenKayy"
      ]
+    },
+    {
+     "date": "2026-11-21",
+     "by": "Hub (re-read from the IESF site)",
+     "names": [
+      "*MARSHALL",
+      "Carryboy",
+      "lazyboy",
+      "SenKayy"
+     ],
+     "coach": "md"
     }
    ]
   },
@@ -1961,6 +2455,16 @@
    "checks": [
     {
      "date": "2026-11-13",
+     "by": "Hub (re-read from the IESF site)",
+     "names": [
+      "*Coa77k",
+      "BISKE",
+      "LEON44",
+      "MELAZ"
+     ]
+    },
+    {
+     "date": "2026-11-21",
      "by": "Hub (re-read from the IESF site)",
      "names": [
       "*Coa77k",
@@ -2003,7 +2507,19 @@
      "flags": []
     }
    ],
-   "checks": []
+   "checks": [
+    {
+     "date": "2026-11-21",
+     "by": "Hub (re-read from the IESF site)",
+     "names": [
+      "*WolfY",
+      "JBa",
+      "mason",
+      "Momo",
+      "Swisher"
+     ]
+    }
+   ]
   },
   {
    "title": "CS2 Women",
@@ -2037,7 +2553,19 @@
      "flags": []
     }
    ],
-   "checks": []
+   "checks": [
+    {
+     "date": "2026-11-21",
+     "by": "Hub (re-read from the IESF site)",
+     "names": [
+      "*madss",
+      "emy",
+      "olya",
+      "uhKelsie",
+      "vanessa"
+     ]
+    }
+   ]
   },
   {
    "title": "CS2",
@@ -2071,7 +2599,19 @@
      "flags": []
     }
    ],
-   "checks": []
+   "checks": [
+    {
+     "date": "2026-11-21",
+     "by": "Hub (re-read from the IESF site)",
+     "names": [
+      "*viridian",
+      "damyo",
+      "liazz",
+      "sliimey",
+      "TjP"
+     ]
+    }
+   ]
   },
   {
    "title": "CS2 Women",
@@ -2105,13 +2645,25 @@
      "flags": []
     }
    ],
-   "checks": []
+   "checks": [
+    {
+     "date": "2026-11-21",
+     "by": "Hub (re-read from the IESF site)",
+     "names": [
+      "*BiBiAhn",
+      "epoh",
+      "hdizz",
+      "jaydee",
+      "riv"
+     ]
+    }
+   ]
   },
   {
    "title": "CS2",
    "nation": "Iraq",
    "code": "IRQ",
-   "coach": null,
+   "coach": "TAHA AL DULAIMI",
    "players": [
     {
      "ign": "r4id3n",
@@ -2139,7 +2691,19 @@
      "flags": []
     }
    ],
-   "checks": []
+   "checks": [
+    {
+     "date": "2026-11-21",
+     "by": "Hub (re-read from the IESF site)",
+     "names": [
+      "*r4id3n",
+      "Bibu",
+      "Oscar",
+      "VeGGo",
+      "wAti"
+     ]
+    }
+   ]
   },
   {
    "title": "CS2",
@@ -2173,7 +2737,19 @@
      "flags": []
     }
    ],
-   "checks": []
+   "checks": [
+    {
+     "date": "2026-11-21",
+     "by": "Hub (re-read from the IESF site)",
+     "names": [
+      "*Bymas",
+      "dziugss",
+      "MAGILA",
+      "tAk",
+      "Uzman"
+     ]
+    }
+   ]
   },
   {
    "title": "PUBG Mobile",
@@ -2205,6 +2781,16 @@
    "checks": [
     {
      "date": "2026-11-13",
+     "by": "Hub (re-read from the IESF site)",
+     "names": [
+      "*JONIK",
+      "AGGRESSOR",
+      "KHOJI",
+      "SP1DY"
+     ]
+    },
+    {
+     "date": "2026-11-21",
      "by": "Hub (re-read from the IESF site)",
      "names": [
       "*JONIK",
@@ -2249,7 +2835,19 @@
      "flags": []
     }
    ],
-   "checks": [],
+   "checks": [
+    {
+     "date": "2026-11-21",
+     "by": "Hub (re-read from the IESF site)",
+     "names": [
+      "*LETi",
+      "Angelka",
+      "Hanka-",
+      "Hikomi",
+      "vicu"
+     ]
+    }
+   ],
    "note": "The page reader joined the word \"Player\"/\"Coach\" to each name; removed. Check spellings on the site."
   },
   {
@@ -2279,12 +2877,26 @@
      "flags": []
     },
     {
-     "ign": "Si",
+     "ign": "SiA",
      "captain": false,
-     "flags": []
+     "flags": [
+      "Read as \"Si\" on 3 Nov (page reader cut the name); the site shows SiA (21 Nov). Spelling fix, not a roster change."
+     ]
     }
    ],
-   "checks": []
+   "checks": [
+    {
+     "date": "2026-11-21",
+     "by": "Hub (re-read from the IESF site)",
+     "names": [
+      "*Monkey D. Julie",
+      "ASTRA",
+      "Emerald",
+      "Kaoday",
+      "SiA"
+     ]
+    }
+   ]
   },
   {
    "title": "CS2 Women",
@@ -2318,7 +2930,19 @@
      "flags": []
     }
    ],
-   "checks": []
+   "checks": [
+    {
+     "date": "2026-11-21",
+     "by": "Hub (re-read from the IESF site)",
+     "names": [
+      "*Joker",
+      "cand1d",
+      "kimbee",
+      "MiyukiBB",
+      "yilammmm"
+     ]
+    }
+   ]
   },
   {
    "title": "CS2 Women",
@@ -2352,7 +2976,19 @@
      "flags": []
     }
    ],
-   "checks": []
+   "checks": [
+    {
+     "date": "2026-11-21",
+     "by": "Hub (re-read from the IESF site)",
+     "names": [
+      "*ManeschijnX",
+      "Lieszaaa",
+      "Missy",
+      "Nayomy",
+      "Qiyarah"
+     ]
+    }
+   ]
   },
   {
    "title": "CS2 Women",
@@ -2386,7 +3022,1464 @@
      "flags": []
     }
    ],
+   "checks": [
+    {
+     "date": "2026-11-21",
+     "by": "Hub (re-read from the IESF site)",
+     "names": [
+      "*Aida",
+      "CatyJones",
+      "D7",
+      "lekas",
+      "ZAna-th"
+     ]
+    }
+   ]
+  },
+  {
+   "title": "eFootball",
+   "nation": "Argentina",
+   "code": "ARG",
+   "coach": null,
+   "read": "2026-11-21",
+   "players": [
+    {
+     "ign": "KingBemyia",
+     "captain": false,
+     "flags": []
+    }
+   ],
+   "checks": []
+  },
+  {
+   "title": "eFootball",
+   "nation": "Australia",
+   "code": "AUS",
+   "coach": null,
+   "read": "2026-11-21",
+   "players": [
+    {
+     "ign": "Ricky",
+     "captain": false,
+     "flags": []
+    }
+   ],
+   "checks": []
+  },
+  {
+   "title": "eFootball",
+   "nation": "Austria",
+   "code": "AUT",
+   "coach": null,
+   "read": "2026-11-21",
+   "players": [
+    {
+     "ign": "Sem___1907",
+     "captain": false,
+     "flags": []
+    }
+   ],
+   "checks": []
+  },
+  {
+   "title": "eFootball",
+   "nation": "Azerbaijan",
+   "code": "AZE",
+   "coach": null,
+   "read": "2026-11-21",
+   "players": [
+    {
+     "ign": "Mahmodof",
+     "captain": false,
+     "flags": []
+    }
+   ],
+   "checks": []
+  },
+  {
+   "title": "eFootball",
+   "nation": "Bahrain",
+   "code": "BRN",
+   "coach": null,
+   "read": "2026-11-21",
+   "players": [
+    {
+     "ign": "FADHEL",
+     "captain": false,
+     "flags": []
+    }
+   ],
+   "checks": []
+  },
+  {
+   "title": "eFootball",
+   "nation": "Bangladesh",
+   "code": "BAN",
+   "coach": null,
+   "read": "2026-11-21",
+   "players": [
+    {
+     "ign": "mercwithd___",
+     "captain": false,
+     "flags": []
+    }
+   ],
+   "checks": []
+  },
+  {
+   "title": "eFootball",
+   "nation": "Belarus",
+   "code": "BLR",
+   "coach": null,
+   "read": "2026-11-21",
+   "players": [
+    {
+     "ign": "VladCSKA191127",
+     "captain": false,
+     "flags": []
+    }
+   ],
+   "checks": []
+  },
+  {
+   "title": "eFootball",
+   "nation": "Benin",
+   "code": "BEN",
+   "coach": null,
+   "read": "2026-11-21",
+   "players": [
+    {
+     "ign": "KDM",
+     "captain": false,
+     "flags": []
+    }
+   ],
+   "checks": []
+  },
+  {
+   "title": "eFootball",
+   "nation": "Bhutan",
+   "code": "BHU",
+   "coach": null,
+   "read": "2026-11-21",
+   "players": [
+    {
+     "ign": "Woochu",
+     "captain": false,
+     "flags": []
+    }
+   ],
+   "checks": []
+  },
+  {
+   "title": "eFootball",
+   "nation": "Bolivia",
+   "code": "BOL",
+   "coach": null,
+   "read": "2026-11-21",
+   "players": [
+    {
+     "ign": "MANU_RP",
+     "captain": false,
+     "flags": []
+    }
+   ],
+   "checks": []
+  },
+  {
+   "title": "eFootball",
+   "nation": "Bosnia and Herzegovina",
+   "code": "BIH",
+   "coach": null,
+   "read": "2026-11-21",
+   "players": [
+    {
+     "ign": "BakeTz99",
+     "captain": false,
+     "flags": []
+    }
+   ],
+   "checks": []
+  },
+  {
+   "title": "eFootball",
+   "nation": "Brazil",
+   "code": "BRA",
+   "coach": null,
+   "read": "2026-11-21",
+   "players": [
+    {
+     "ign": "HenrykinhO",
+     "captain": false,
+     "flags": []
+    }
+   ],
+   "checks": []
+  },
+  {
+   "title": "eFootball",
+   "nation": "Brunei Darussalam",
+   "code": "BRU",
+   "coach": null,
+   "read": "2026-11-21",
+   "players": [
+    {
+     "ign": "MrTanakaV2",
+     "captain": false,
+     "flags": []
+    }
+   ],
+   "checks": []
+  },
+  {
+   "title": "eFootball",
+   "nation": "Bulgaria",
+   "code": "BUL",
+   "coach": null,
+   "read": "2026-11-21",
+   "players": [
+    {
+     "ign": "Emoti",
+     "captain": false,
+     "flags": []
+    }
+   ],
+   "checks": []
+  },
+  {
+   "title": "eFootball",
+   "nation": "Cambodia",
+   "code": "CAM",
+   "coach": null,
+   "read": "2026-11-21",
+   "players": [
+    {
+     "ign": "TvRaVuth9-_-CAM",
+     "captain": false,
+     "flags": []
+    }
+   ],
+   "checks": []
+  },
+  {
+   "title": "eFootball",
+   "nation": "Colombia",
+   "code": "COL",
+   "coach": null,
+   "read": "2026-11-21",
+   "players": [
+    {
+     "ign": "Pani",
+     "captain": false,
+     "flags": []
+    }
+   ],
+   "checks": []
+  },
+  {
+   "title": "eFootball",
+   "nation": "Congo",
+   "code": "CGO",
+   "coach": null,
+   "read": "2026-11-21",
+   "players": [
+    {
+     "ign": "Prince-",
+     "captain": false,
+     "flags": []
+    }
+   ],
+   "checks": []
+  },
+  {
+   "title": "eFootball",
+   "nation": "Costa Rica",
+   "code": "CRC",
+   "coach": null,
+   "read": "2026-11-21",
+   "players": [
+    {
+     "ign": "t_challa",
+     "captain": false,
+     "flags": []
+    }
+   ],
+   "checks": []
+  },
+  {
+   "title": "eFootball",
+   "nation": "Croatia",
+   "code": "CRO",
+   "coach": null,
+   "read": "2026-11-21",
+   "players": [
+    {
+     "ign": "xXt0m3Xx",
+     "captain": false,
+     "flags": []
+    }
+   ],
+   "checks": []
+  },
+  {
+   "title": "eFootball",
+   "nation": "Cuba",
+   "code": "CUB",
+   "coach": null,
+   "read": "2026-11-21",
+   "players": [
+    {
+     "ign": "TheSergio_King",
+     "captain": false,
+     "flags": []
+    }
+   ],
+   "checks": []
+  },
+  {
+   "title": "eFootball",
+   "nation": "Czech Republic",
+   "code": "CZE",
+   "coach": null,
+   "read": "2026-11-21",
+   "players": [
+    {
+     "ign": "brynycho",
+     "captain": false,
+     "flags": []
+    }
+   ],
+   "checks": []
+  },
+  {
+   "title": "eFootball",
+   "nation": "Djibouti",
+   "code": "DJI",
+   "coach": null,
+   "read": "2026-11-21",
+   "players": [
+    {
+     "ign": "Ismodef Blaze",
+     "captain": false,
+     "flags": []
+    }
+   ],
+   "checks": []
+  },
+  {
+   "title": "eFootball",
+   "nation": "DR Congo",
+   "code": "COD",
+   "coach": null,
+   "read": "2026-11-21",
+   "players": [
+    {
+     "ign": "MAYO JR",
+     "captain": false,
+     "flags": []
+    }
+   ],
+   "checks": []
+  },
+  {
+   "title": "eFootball",
+   "nation": "Egypt",
+   "code": "EGY",
+   "coach": null,
+   "read": "2026-11-21",
+   "players": [
+    {
+     "ign": "ALMOGRABEE99",
+     "captain": false,
+     "flags": []
+    }
+   ],
+   "checks": []
+  },
+  {
+   "title": "eFootball",
+   "nation": "France",
+   "code": "FRA",
+   "coach": null,
+   "read": "2026-11-21",
+   "players": [
+    {
+     "ign": "usmakabyle",
+     "captain": false,
+     "flags": []
+    }
+   ],
+   "checks": []
+  },
+  {
+   "title": "eFootball",
+   "nation": "Georgia",
+   "code": "GEO",
+   "coach": null,
+   "read": "2026-11-21",
+   "players": [
+    {
+     "ign": "Rati",
+     "captain": false,
+     "flags": []
+    }
+   ],
+   "checks": []
+  },
+  {
+   "title": "eFootball",
+   "nation": "Germany",
+   "code": "GER",
+   "coach": null,
+   "read": "2026-11-21",
+   "players": [
+    {
+     "ign": "Goekan1903",
+     "captain": false,
+     "flags": []
+    }
+   ],
+   "checks": []
+  },
+  {
+   "title": "eFootball",
+   "nation": "Ghana",
+   "code": "GHA",
+   "coach": null,
+   "read": "2026-11-21",
+   "players": [
+    {
+     "ign": "Medicinemustshine",
+     "captain": false,
+     "flags": []
+    }
+   ],
+   "checks": []
+  },
+  {
+   "title": "eFootball",
+   "nation": "Greece",
+   "code": "GRE",
+   "coach": null,
+   "read": "2026-11-21",
+   "players": [
+    {
+     "ign": "panosboul-26",
+     "captain": false,
+     "flags": []
+    }
+   ],
+   "checks": []
+  },
+  {
+   "title": "eFootball",
+   "nation": "Guadeloupe",
+   "code": "GLP",
+   "coach": null,
+   "read": "2026-11-21",
+   "players": [
+    {
+     "ign": "ML9",
+     "captain": false,
+     "flags": []
+    }
+   ],
+   "checks": []
+  },
+  {
+   "title": "eFootball",
+   "nation": "Guatemala",
+   "code": "GUA",
+   "coach": null,
+   "read": "2026-11-21",
+   "players": [
+    {
+     "ign": "emmanuelv",
+     "captain": false,
+     "flags": []
+    }
+   ],
+   "checks": []
+  },
+  {
+   "title": "eFootball",
+   "nation": "Hong Kong, China",
+   "code": "HKG",
+   "coach": null,
+   "read": "2026-11-21",
+   "players": [
+    {
+     "ign": "JK",
+     "captain": false,
+     "flags": []
+    }
+   ],
+   "checks": []
+  },
+  {
+   "title": "eFootball",
+   "nation": "Hungary",
+   "code": "HUN",
+   "coach": null,
+   "read": "2026-11-21",
+   "players": [
+    {
+     "ign": "Vidlandia",
+     "captain": false,
+     "flags": []
+    }
+   ],
+   "checks": []
+  },
+  {
+   "title": "eFootball",
+   "nation": "Iceland",
+   "code": "ISL",
+   "coach": null,
+   "read": "2026-11-21",
+   "players": [
+    {
+     "ign": "Tiindur",
+     "captain": false,
+     "flags": []
+    }
+   ],
+   "checks": []
+  },
+  {
+   "title": "eFootball",
+   "nation": "India",
+   "code": "IND",
+   "coach": null,
+   "read": "2026-11-21",
+   "players": [
+    {
+     "ign": "peshemak7",
+     "captain": false,
+     "flags": []
+    }
+   ],
+   "checks": []
+  },
+  {
+   "title": "eFootball",
+   "nation": "Iran",
+   "code": "IRI",
+   "coach": null,
+   "read": "2026-11-21",
+   "players": [
+    {
+     "ign": "Yousef",
+     "captain": false,
+     "flags": []
+    }
+   ],
+   "checks": []
+  },
+  {
+   "title": "eFootball",
+   "nation": "Iraq",
+   "code": "IRQ",
+   "coach": null,
+   "read": "2026-11-21",
+   "players": [
+    {
+     "ign": "Abod_iraqi",
+     "captain": false,
+     "flags": []
+    }
+   ],
+   "checks": []
+  },
+  {
+   "title": "eFootball",
+   "nation": "Ireland",
+   "code": "IRL",
+   "coach": null,
+   "read": "2026-11-21",
+   "players": [
+    {
+     "ign": "Zizou",
+     "captain": false,
+     "flags": []
+    }
+   ],
+   "checks": []
+  },
+  {
+   "title": "eFootball",
+   "nation": "Italy",
+   "code": "ITA",
+   "coach": null,
+   "read": "2026-11-21",
+   "players": [
+    {
+     "ign": "LoScandalo",
+     "captain": false,
+     "flags": []
+    }
+   ],
+   "checks": []
+  },
+  {
+   "title": "eFootball",
+   "nation": "Japan",
+   "code": "JPN",
+   "coach": null,
+   "read": "2026-11-21",
+   "players": [
+    {
+     "ign": "Oshushi",
+     "captain": false,
+     "flags": []
+    }
+   ],
+   "checks": []
+  },
+  {
+   "title": "eFootball",
+   "nation": "Jordan",
+   "code": "JOR",
+   "coach": null,
+   "read": "2026-11-21",
+   "players": [
+    {
+     "ign": "ALHACKER55",
+     "captain": false,
+     "flags": []
+    }
+   ],
+   "checks": []
+  },
+  {
+   "title": "eFootball",
+   "nation": "Kazakhstan",
+   "code": "KAZ",
+   "coach": null,
+   "read": "2026-11-21",
+   "players": [
+    {
+     "ign": "Nurba",
+     "captain": false,
+     "flags": []
+    }
+   ],
+   "checks": []
+  },
+  {
+   "title": "eFootball",
+   "nation": "Kosovo",
+   "code": "KOS",
+   "coach": null,
+   "read": "2026-11-21",
+   "players": [
+    {
+     "ign": "Heisenball",
+     "captain": false,
+     "flags": []
+    }
+   ],
+   "checks": []
+  },
+  {
+   "title": "eFootball",
+   "nation": "Kuwait",
+   "code": "KUW",
+   "coach": null,
+   "read": "2026-11-21",
+   "players": [
+    {
+     "ign": "Q8wolf",
+     "captain": false,
+     "flags": []
+    }
+   ],
+   "checks": []
+  },
+  {
+   "title": "eFootball",
+   "nation": "Kyrgyzstan",
+   "code": "KGZ",
+   "coach": null,
+   "read": "2026-11-21",
+   "players": [
+    {
+     "ign": "xtreed",
+     "captain": false,
+     "flags": []
+    }
+   ],
+   "checks": []
+  },
+  {
+   "title": "eFootball",
+   "nation": "Lebanon",
+   "code": "LBN",
+   "coach": null,
+   "read": "2026-11-21",
+   "players": [
+    {
+     "ign": "Hama",
+     "captain": false,
+     "flags": []
+    }
+   ],
+   "checks": []
+  },
+  {
+   "title": "eFootball",
+   "nation": "Libya",
+   "code": "LBA",
+   "coach": null,
+   "read": "2026-11-21",
+   "players": [
+    {
+     "ign": "ahmed altarhouni",
+     "captain": false,
+     "flags": []
+    }
+   ],
+   "checks": []
+  },
+  {
+   "title": "eFootball",
+   "nation": "Lithuania",
+   "code": "LTU",
+   "coach": null,
+   "read": "2026-11-21",
+   "players": [
+    {
+     "ign": "Onyxz_LTU",
+     "captain": false,
+     "flags": []
+    }
+   ],
+   "checks": []
+  },
+  {
+   "title": "eFootball",
+   "nation": "Luxembourg",
+   "code": "LUX",
+   "coach": null,
+   "read": "2026-11-21",
+   "players": [
+    {
+     "ign": "micaelzinho92",
+     "captain": false,
+     "flags": []
+    }
+   ],
+   "checks": []
+  },
+  {
+   "title": "eFootball",
+   "nation": "Macau, China",
+   "code": "MAC",
+   "coach": null,
+   "read": "2026-11-21",
+   "players": [
+    {
+     "ign": "Kengaroo",
+     "captain": false,
+     "flags": []
+    }
+   ],
+   "checks": []
+  },
+  {
+   "title": "eFootball",
+   "nation": "Madagascar",
+   "code": "MAD",
+   "coach": null,
+   "read": "2026-11-21",
+   "players": [
+    {
+     "ign": "JZ Rayan",
+     "captain": false,
+     "flags": []
+    }
+   ],
+   "checks": []
+  },
+  {
+   "title": "eFootball",
+   "nation": "Malaysia",
+   "code": "MAS",
+   "coach": null,
+   "read": "2026-11-21",
+   "players": [
+    {
+     "ign": "HARIZ",
+     "captain": false,
+     "flags": []
+    }
+   ],
+   "checks": []
+  },
+  {
+   "title": "eFootball",
+   "nation": "Mali",
+   "code": "MLI",
+   "coach": null,
+   "read": "2026-11-21",
+   "players": [
+    {
+     "ign": "HELIUM_GALACTIC",
+     "captain": false,
+     "flags": []
+    }
+   ],
+   "checks": []
+  },
+  {
+   "title": "eFootball",
+   "nation": "Malta",
+   "code": "MLT",
+   "coach": null,
+   "read": "2026-11-21",
+   "players": [
+    {
+     "ign": "fantasystrikes",
+     "captain": false,
+     "flags": []
+    }
+   ],
+   "checks": []
+  },
+  {
+   "title": "eFootball",
+   "nation": "Moldova",
+   "code": "MDA",
+   "coach": null,
+   "read": "2026-11-21",
+   "players": [
+    {
+     "ign": "danic88",
+     "captain": false,
+     "flags": []
+    }
+   ],
+   "checks": []
+  },
+  {
+   "title": "eFootball",
+   "nation": "Mongolia",
+   "code": "MGL",
+   "coach": null,
+   "read": "2026-11-21",
+   "players": [
+    {
+     "ign": "tmra",
+     "captain": false,
+     "flags": []
+    }
+   ],
+   "checks": []
+  },
+  {
+   "title": "eFootball",
+   "nation": "Montenegro",
+   "code": "MNE",
+   "coach": null,
+   "read": "2026-11-21",
+   "players": [
+    {
+     "ign": "r_a_d_e_90",
+     "captain": false,
+     "flags": []
+    }
+   ],
+   "checks": []
+  },
+  {
+   "title": "eFootball",
+   "nation": "Morocco",
+   "code": "MAR",
+   "coach": null,
+   "read": "2026-11-21",
+   "players": [
+    {
+     "ign": "AAzbabysk",
+     "captain": false,
+     "flags": []
+    }
+   ],
+   "checks": []
+  },
+  {
+   "title": "eFootball",
+   "nation": "Myanmar",
+   "code": "MYA",
+   "coach": null,
+   "read": "2026-11-21",
+   "players": [
+    {
+     "ign": "PK",
+     "captain": false,
+     "flags": []
+    }
+   ],
+   "checks": []
+  },
+  {
+   "title": "eFootball",
+   "nation": "Namibia",
+   "code": "NAM",
+   "coach": null,
+   "read": "2026-11-21",
+   "players": [
+    {
+     "ign": "Namzanian89",
+     "captain": false,
+     "flags": []
+    }
+   ],
+   "checks": []
+  },
+  {
+   "title": "eFootball",
+   "nation": "Nepal",
+   "code": "NEP",
+   "coach": null,
+   "read": "2026-11-21",
+   "players": [
+    {
+     "ign": "Mabindinho",
+     "captain": false,
+     "flags": []
+    }
+   ],
+   "checks": []
+  },
+  {
+   "title": "eFootball",
+   "nation": "Netherlands",
+   "code": "NED",
+   "coach": null,
+   "read": "2026-11-21",
+   "players": [
+    {
+     "ign": "E_C_Oneill",
+     "captain": false,
+     "flags": []
+    }
+   ],
+   "checks": []
+  },
+  {
+   "title": "eFootball",
+   "nation": "New Zealand",
+   "code": "NZL",
+   "coach": null,
+   "read": "2026-11-21",
+   "players": [
+    {
+     "ign": "Noahja",
+     "captain": false,
+     "flags": []
+    }
+   ],
+   "checks": []
+  },
+  {
+   "title": "eFootball",
+   "nation": "Nigeria",
+   "code": "NGR",
+   "coach": null,
+   "read": "2026-11-21",
+   "players": [
+    {
+     "ign": "Kami_Zlatan",
+     "captain": false,
+     "flags": []
+    }
+   ],
+   "checks": []
+  },
+  {
+   "title": "eFootball",
+   "nation": "North Macedonia",
+   "code": "MKD",
+   "coach": null,
+   "read": "2026-11-21",
+   "players": [
+    {
+     "ign": "dragosivan",
+     "captain": false,
+     "flags": []
+    }
+   ],
+   "checks": []
+  },
+  {
+   "title": "eFootball",
+   "nation": "Oman",
+   "code": "OMA",
+   "coach": null,
+   "read": "2026-11-21",
+   "players": [
+    {
+     "ign": "Mohammed",
+     "captain": false,
+     "flags": []
+    }
+   ],
+   "checks": []
+  },
+  {
+   "title": "eFootball",
+   "nation": "Pakistan",
+   "code": "PAK",
+   "coach": null,
+   "read": "2026-11-21",
+   "players": [
+    {
+     "ign": "Pes_Pakstaniya",
+     "captain": false,
+     "flags": []
+    }
+   ],
+   "checks": []
+  },
+  {
+   "title": "eFootball",
+   "nation": "Peru",
+   "code": "PER",
+   "coach": null,
+   "read": "2026-11-21",
+   "players": [
+    {
+     "ign": "JhonaKRA",
+     "captain": false,
+     "flags": []
+    }
+   ],
+   "checks": []
+  },
+  {
+   "title": "eFootball",
+   "nation": "Poland",
+   "code": "POL",
+   "coach": null,
+   "read": "2026-11-21",
+   "players": [
+    {
+     "ign": "Ostrybuch",
+     "captain": false,
+     "flags": []
+    }
+   ],
+   "checks": []
+  },
+  {
+   "title": "eFootball",
+   "nation": "Portugal",
+   "code": "POR",
+   "coach": null,
+   "read": "2026-11-21",
+   "players": [
+    {
+     "ign": "clapped",
+     "captain": false,
+     "flags": []
+    }
+   ],
+   "checks": []
+  },
+  {
+   "title": "eFootball",
+   "nation": "Romania",
+   "code": "ROU",
+   "coach": null,
+   "read": "2026-11-21",
+   "players": [
+    {
+     "ign": "URMA57",
+     "captain": false,
+     "flags": []
+    }
+   ],
+   "checks": []
+  },
+  {
+   "title": "eFootball",
+   "nation": "Russia",
+   "code": "RUS",
+   "coach": null,
+   "read": "2026-11-21",
+   "players": [
+    {
+     "ign": "TEOtm",
+     "captain": false,
+     "flags": []
+    }
+   ],
+   "checks": []
+  },
+  {
+   "title": "eFootball",
+   "nation": "Senegal",
+   "code": "SEN",
+   "coach": null,
+   "read": "2026-11-21",
+   "players": [
+    {
+     "ign": "Le Marcheur Noir",
+     "captain": false,
+     "flags": []
+    }
+   ],
+   "checks": []
+  },
+  {
+   "title": "eFootball",
+   "nation": "Serbia",
+   "code": "SRB",
+   "coach": null,
+   "read": "2026-11-21",
+   "players": [
+    {
+     "ign": "Football_hunter4",
+     "captain": false,
+     "flags": []
+    }
+   ],
+   "checks": []
+  },
+  {
+   "title": "eFootball",
+   "nation": "Slovakia",
+   "code": "SVK",
+   "coach": null,
+   "read": "2026-11-21",
+   "players": [
+    {
+     "ign": "Boyka91",
+     "captain": false,
+     "flags": []
+    }
+   ],
+   "checks": []
+  },
+  {
+   "title": "eFootball",
+   "nation": "Slovenia",
+   "code": "SLO",
+   "coach": null,
+   "read": "2026-11-21",
+   "players": [
+    {
+     "ign": "Malnaro",
+     "captain": false,
+     "flags": []
+    }
+   ],
+   "checks": []
+  },
+  {
+   "title": "eFootball",
+   "nation": "Somalia",
+   "code": "SOM",
+   "coach": null,
+   "read": "2026-11-21",
+   "players": [
+    {
+     "ign": "Fahatt",
+     "captain": false,
+     "flags": []
+    }
+   ],
+   "checks": []
+  },
+  {
+   "title": "eFootball",
+   "nation": "South Africa",
+   "code": "RSA",
+   "coach": null,
+   "read": "2026-11-21",
+   "players": [
+    {
+     "ign": "reddevilcap10",
+     "captain": false,
+     "flags": []
+    }
+   ],
+   "checks": []
+  },
+  {
+   "title": "eFootball",
+   "nation": "Spain",
+   "code": "ESP",
+   "coach": null,
+   "read": "2026-11-21",
+   "players": [
+    {
+     "ign": "Javilota",
+     "captain": false,
+     "flags": []
+    }
+   ],
+   "checks": []
+  },
+  {
+   "title": "eFootball",
+   "nation": "Sri Lanka",
+   "code": "SRI",
+   "coach": null,
+   "read": "2026-11-21",
+   "players": [
+    {
+     "ign": "CB",
+     "captain": false,
+     "flags": []
+    }
+   ],
+   "checks": []
+  },
+  {
+   "title": "eFootball",
+   "nation": "Syria",
+   "code": "SYR",
+   "coach": null,
+   "read": "2026-11-21",
+   "players": [
+    {
+     "ign": "JawishX22",
+     "captain": false,
+     "flags": []
+    }
+   ],
+   "checks": []
+  },
+  {
+   "title": "eFootball",
+   "nation": "Chinese Taipei",
+   "code": "TPE",
+   "coach": null,
+   "read": "2026-11-21",
+   "players": [
+    {
+     "ign": "CHIU",
+     "captain": false,
+     "flags": []
+    }
+   ],
+   "checks": []
+  },
+  {
+   "title": "eFootball",
+   "nation": "Tajikistan",
+   "code": "TJK",
+   "coach": null,
+   "read": "2026-11-21",
+   "players": [
+    {
+     "ign": "ShahzodTJK",
+     "captain": false,
+     "flags": []
+    }
+   ],
+   "checks": []
+  },
+  {
+   "title": "eFootball",
+   "nation": "Thailand",
+   "code": "THA",
+   "coach": null,
+   "read": "2026-11-21",
+   "players": [
+    {
+     "ign": "Jeans",
+     "captain": false,
+     "flags": []
+    }
+   ],
+   "checks": []
+  },
+  {
+   "title": "eFootball",
+   "nation": "The Bahamas",
+   "code": "BAH",
+   "coach": null,
+   "read": "2026-11-21",
+   "players": [
+    {
+     "ign": "Illmindej",
+     "captain": false,
+     "flags": []
+    }
+   ],
+   "checks": []
+  },
+  {
+   "title": "eFootball",
+   "nation": "The Gambia",
+   "code": "GAM",
+   "coach": null,
+   "read": "2026-11-21",
+   "players": [
+    {
+     "ign": "Ontopbanks",
+     "captain": false,
+     "flags": []
+    }
+   ],
+   "checks": []
+  },
+  {
+   "title": "eFootball",
+   "nation": "Tunisia",
+   "code": "TUN",
+   "coach": null,
+   "read": "2026-11-21",
+   "players": [
+    {
+     "ign": "CESAR",
+     "captain": false,
+     "flags": []
+    }
+   ],
+   "checks": []
+  },
+  {
+   "title": "eFootball",
+   "nation": "Türkiye",
+   "code": "TUR",
+   "coach": null,
+   "read": "2026-11-21",
+   "players": [
+    {
+     "ign": "Mucahit21",
+     "captain": false,
+     "flags": []
+    }
+   ],
+   "checks": []
+  },
+  {
+   "title": "eFootball",
+   "nation": "Turkmenistan",
+   "code": "TKM",
+   "coach": null,
+   "read": "2026-11-21",
+   "players": [
+    {
+     "ign": "Yunus",
+     "captain": false,
+     "flags": []
+    }
+   ],
+   "checks": []
+  },
+  {
+   "title": "eFootball",
+   "nation": "Ukraine",
+   "code": "UKR",
+   "coach": null,
+   "read": "2026-11-21",
+   "players": [
+    {
+     "ign": "bydb_Prosche",
+     "captain": false,
+     "flags": []
+    }
+   ],
+   "checks": []
+  },
+  {
+   "title": "eFootball",
+   "nation": "United Arab Emirates",
+   "code": "UAE",
+   "coach": null,
+   "read": "2026-11-21",
+   "players": [
+    {
+     "ign": "Alahmed1989",
+     "captain": false,
+     "flags": []
+    }
+   ],
+   "checks": []
+  },
+  {
+   "title": "eFootball",
+   "nation": "Uruguay",
+   "code": "URU",
+   "coach": null,
+   "read": "2026-11-21",
+   "players": [
+    {
+     "ign": "WillyFreire10",
+     "captain": false,
+     "flags": []
+    }
+   ],
+   "checks": []
+  },
+  {
+   "title": "eFootball",
+   "nation": "Uzbekistan",
+   "code": "UZB",
+   "coach": null,
+   "read": "2026-11-21",
+   "players": [
+    {
+     "ign": "algo_08",
+     "captain": false,
+     "flags": []
+    }
+   ],
+   "checks": []
+  },
+  {
+   "title": "eFootball",
+   "nation": "Venezuela",
+   "code": "VEN",
+   "coach": null,
+   "read": "2026-11-21",
+   "players": [
+    {
+     "ign": "Carlorco",
+     "captain": false,
+     "flags": []
+    }
+   ],
+   "checks": []
+  },
+  {
+   "title": "eFootball",
+   "nation": "Wales",
+   "code": "WAL",
+   "coach": null,
+   "read": "2026-11-21",
+   "players": [
+    {
+     "ign": "Cerith Dennis",
+     "captain": false,
+     "flags": []
+    }
+   ],
+   "checks": []
+  },
+  {
+   "title": "eFootball",
+   "nation": "Zimbabwe",
+   "code": "ZIM",
+   "coach": null,
+   "read": "2026-11-21",
+   "players": [
+    {
+     "ign": "Lightaz",
+     "captain": false,
+     "flags": []
+    }
+   ],
    "checks": []
   }
+ ],
+ "reads": [
+  "2026-11-03",
+  "2026-11-13",
+  "2026-11-21"
  ]
 }

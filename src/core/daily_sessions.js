@@ -57,7 +57,7 @@ function withDailyReport(session, dailyReport, author, today) {
 const clip = (s) => { const t = String(s || '').trim(); return t.length > NOTE_LIMIT ? `${t.slice(0, NOTE_LIMIT - 1)}…` : t; };
 export function dailyFromReport(r, resultLine) {
   return {
-    objective: clip(r.focus),
+    objective: clip(r.focus || 'No focus noted'),   // V1.42: focus is optional in the two-minute report
     outcome: clip([`${resultLine} vs ${r.partner}`, r.worked].filter(Boolean).join('. ')),
     issue: clip(r.failed || 'No main issue noted'),
     nextAction: clip(r.adjust),

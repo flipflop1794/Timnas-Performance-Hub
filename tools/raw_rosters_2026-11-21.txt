@@ -1,0 +1,263 @@
+# wec.iesf.org/editions/wec-2026/teams/{code}, all 99 nation pages, read 21 Nov 2026 (structured read of each page:
+# section title, the "Players" list with its Captain mark, the "Coaches" list). "*" = captain. Used by
+# tools/site_check_2026-11-21.mjs. Format: "#CODE|Nation", then "Title :: players ; ... :: coach=Name".
+#ARG|Argentina
+Counter-Strike 2 :: BK1 ; Fakzwall ; nacho ; reversive ; righi :: coach=RUGO
+Dota 2 :: *Hermit ; Balenci ; Runaway ; Shifu ; Un Gato :: coach=Worlock
+eFootball™ :: KingBemyia
+Mobile Legends: Bang Bang Women :: *Mizz ; HawksHawks ; Miyuki ; Myzhlet ; RIZAA :: coach=alegroove
+#AUS|Australia
+Counter-Strike 2 :: *viridian ; damyo ; liazz ; sliimey ; TjP
+Counter-Strike Women :: *BiBiAhn ; epoh ; hdizz ; jaydee ; riv
+eFootball™ :: Ricky
+#AUT|Austria
+eFootball™ :: Sem___1907
+#AZE|Azerbaijan
+eFootball™ :: Mahmodof
+#BRN|Bahrain
+eFootball™ :: FADHEL
+#BAN|Bangladesh
+eFootball™ :: mercwithd___
+PUBG MOBILE :: *RowDY ; CJboyyyy ; Deathstorm ; FLASH :: coach=MD ABDUL JABBAR SHAKIL
+#BLR|Belarus
+Dota 2 :: *kur0patbI4 ; Byun ; Miyaoo ; Onejey ; young G :: coach=Mikhail Turchyn
+eFootball™ :: VladCSKA191127
+PUBG MOBILE :: *blrMELW1N ; blrPTENCHIK ; blrRamz1kBoss ; blrTUBA :: coach=RAMAN KUCHARUK
+#BEN|Benin
+eFootball™ :: KDM
+#BHU|Bhutan
+eFootball™ :: Woochu
+#BOL|Bolivia
+eFootball™ :: MANU_RP
+#BIH|Bosnia and Herzegovina
+eFootball™ :: BakeTz99
+#BRA|Brazil
+Counter-Strike Women :: *OL6A ; dani ; GaBi ; poppins ; yungher :: coach=FABRICIO SIMOES E SILVA
+eFootball™ :: HenrykinhO
+PUBG MOBILE :: *PEDRINHO ; FederaL ; LiLBOY ; Obscure :: coach=Janderson De Deus Silva
+#BRU|Brunei Darussalam
+eFootball™ :: MrTanakaV2
+#BUL|Bulgaria
+eFootball™ :: Emoti
+#CAM|Cambodia
+eFootball™ :: TvRaVuth9-_-CAM
+Mobile Legends: Bang Bang :: *Linnn ; Ayzen ; Darkside ; Runnn ; Wickyyy :: coach=Bunchhay Sin
+#COL|Colombia
+eFootball™ :: Pani
+PUBG MOBILE :: *Reyes ; COLMadeon ; COLvictex ; Molina :: coach=Hades
+#CGO|Congo
+eFootball™ :: Prince-
+#CRC|Costa Rica
+eFootball™ :: t_challa
+#CRO|Croatia
+eFootball™ :: xXt0m3Xx
+#CUB|Cuba
+eFootball™ :: TheSergio_King
+#CZE|Czech Republic
+eFootball™ :: brynycho
+#DJI|Djibouti
+eFootball™ :: Ismodef Blaze
+#DOM|Dominican Republic
+Mobile Legends: Bang Bang :: *Junn ; Desz ; INSTNCT ; PANINI. ; Ricky. :: coach=L O Y A L
+#COD|DR Congo
+eFootball™ :: MAYO JR
+#EGY|Egypt
+Counter-Strike 2 :: *b1NGO ; Alone ; b2k ; Hellsing ; wESO :: coach=Mohamed Fouad Mashhour Kamel Ahmed
+Dota 2 :: *Famousar3a ; forever ; Kemps ; MeetYourBob ; strive :: coach=Mohamed Atef Abdou Ali Elnawasra
+eFootball™ :: ALMOGRABEE99
+Mobile Legends: Bang Bang :: *shen ; #MiO# ; 7oda ; ABO AMMAR ; Aody :: coach=Amr Wafed Yassein Hafez Elsayed
+Mobile Legends: Bang Bang Women :: Names ; Nana ; Nucci ; Rio ; Syrinx :: coach=Mohmmed Mhmoud Mohmmed Teleb Abdrabou
+PUBG MOBILE :: AGA1N ; APKRINO ; NASSER74 ; ZUXXY隋 :: coach=HASSAN AHMED HAMDY IBRAHIM AHMED
+#FRA|France
+Counter-Strike Women :: *Monkey D. Julie ; ASTRA ; Emerald ; Kaoday ; SiA :: coach=Leo Gabriel Intronati
+eFootball™ :: usmakabyle
+#GEO|Georgia
+eFootball™ :: Rati
+#GER|Germany
+eFootball™ :: Goekan1903
+#GHA|Ghana
+eFootball™ :: Medicinemustshine
+#GRE|Greece
+Dota 2 :: *SsaSpartan- ; dEsire ; Focus ; Skylark ; Thugitoo :: coach=ENEA QAZOLLI
+eFootball™ :: panosboul-26
+#GLP|Guadeloupe
+eFootball™ :: ML9
+#GUA|Guatemala
+eFootball™ :: emmanuelv
+#HKG|Hong Kong, China
+Counter-Strike Women :: *Joker ; cand1d ; kimbee ; MiyukiBB ; yilammmm :: coach=Blue
+eFootball™ :: JK
+#HUN|Hungary
+eFootball™ :: Vidlandia
+#ISL|Iceland
+eFootball™ :: Tiindur
+#IND|India
+eFootball™ :: peshemak7
+#INA|Indonesia
+Counter-Strike 2 :: *neorah ; CIELLE ; Marsyv ; SpicyWolfie ; wasteofammo :: coach=Baskoro Dwi Putra
+Counter-Strike Women :: *crescents ; aphrolyn ; margeaux ; Naove ; oreopheliaa :: coach=Iqbal Mauldhan Yusup
+Dota 2 :: *Whitemon ; Fbz ; Jhocam ; jikroy ; Mikoto :: coach=Gregorius Arvindra Prasetyo
+eFootball™ :: ELGA
+Mobile Legends: Bang Bang :: *Aran ; Drichel ; Jull. ; Kevin ; Lyoni :: coach=Indra Wijaya
+Mobile Legends: Bang Bang Women :: *CINNYYY ; CHEL ; FUMI EKO ; VIVAL ; VIVIAN :: coach=Ilyas Rahmanda
+PUBG MOBILE :: *AKxSatarrrGOLD ; AKxAmetzGOLD ; AKxVinzGOLD ; AKxZaoo7GOLD :: coach=Christie Onibala
+#IRI|Iran
+Counter-Strike 2 :: *Equalizer ; A1one ; inSid10us ; Krypt0n ; X1ron :: coach=Milad
+Dota 2 :: *KaChal ; A9 ; Cold- ; Matson ; Zesky~ :: coach=SEYED
+eFootball™ :: Yousef
+#IRQ|Iraq
+Counter-Strike 2 :: *r4id3n ; Bibu ; Oscar ; VeGGo ; wAti :: coach=TAHA AL DULAIMI
+eFootball™ :: Abod_iraqi
+#IRL|Ireland
+eFootball™ :: Zizou
+#ITA|Italy
+eFootball™ :: LoScandalo
+#JPN|Japan
+eFootball™ :: Oshushi
+#JOR|Jordan
+eFootball™ :: ALHACKER55
+#KAZ|Kazakhstan
+Counter-Strike 2 :: *def1zer ; adai ; Aldikon ; Botpa1 ; dan4o :: coach=smiley
+Dota 2 :: *HardL ; BAXA ; Kuka11 ; overkill ; Shakh :: coach=Alibek Sarsenbayev
+eFootball™ :: Nurba
+#KOS|Kosovo
+eFootball™ :: Heisenball
+#KUW|Kuwait
+eFootball™ :: Q8wolf
+#KGZ|Kyrgyzstan
+Counter-Strike Women :: *Jammie ; Destroy_zloy ; kitosyy ; nomercyvec ; rumethis :: coach=Timur Nurmambetov
+eFootball™ :: xtreed
+PUBG MOBILE :: *EFFECT ; FLYQE ; WARRIOR ; ZERYCH :: coach=Anton Gentselman
+#LBN|Lebanon
+eFootball™ :: Hama
+#LBA|Libya
+eFootball™ :: ahmed altarhouni
+#LTU|Lithuania
+Counter-Strike 2 :: *Bymas ; dziugss ; MAGILA ; tAk ; Uzman :: coach=Albinas Seputis
+eFootball™ :: Onyxz_LTU
+#LUX|Luxembourg
+eFootball™ :: micaelzinho92
+#MAC|Macau, China
+eFootball™ :: Kengaroo
+#MAD|Madagascar
+eFootball™ :: JZ Rayan
+#MAS|Malaysia
+eFootball™ :: HARIZ
+Mobile Legends: Bang Bang :: *Unii ; Kyym ; NovaXcobar ; Rokji ; Sepat :: coach=SaintDeLucaz
+PUBG MOBILE :: *CZ ; Bobby ; dep ; Kenny :: coach=Pasha
+#MLI|Mali
+eFootball™ :: HELIUM_GALACTIC
+#MLT|Malta
+eFootball™ :: fantasystrikes
+#MDA|Moldova
+eFootball™ :: danic88
+#MGL|Mongolia
+Counter-Strike 2 :: *NEUZ ; Aapestt ; AccuracyTG ; ariucle ; clouden :: coach=shinobi
+Dota 2 :: *Se ; 11 ; 423 ; NARMAN ; sanctity :: coach=Chimid Batsukh
+eFootball™ :: tmra
+PUBG MOBILE :: *C1丨Demo ; ATOMIC ; Fearless ; KEENO :: coach=Sukhbat Otgon
+#MNE|Montenegro
+eFootball™ :: r_a_d_e_90
+PUBG MOBILE :: mneAEIMEY13333 ; mneLazarmvp ; mneROGGO357 ; mneZ3USsorrie :: coach=Miloš Ćirović
+#MAR|Morocco
+Counter-Strike Women :: Helkooky ; KillerQueen ; Kim ; Scarlet ; Sebsgirl1 :: coach=Haytam Nanai
+eFootball™ :: AAzbabysk
+PUBG MOBILE :: *MARSHALL ; Carryboy ; lazyboy ; SenKayy :: coach=md
+#MYA|Myanmar
+eFootball™ :: PK
+Mobile Legends: Bang Bang :: *J3X ; Coin ; Dear ; Niko ; Shyco :: coach=Thet Lynn Htut
+PUBG MOBILE :: *Mernatt ; Rexx ; Romeo ; YGSaycloudq44 :: coach=Gon Zet Naw
+#NAM|Namibia
+eFootball™ :: Namzanian89
+#NEP|Nepal
+eFootball™ :: Mabindinho
+Mobile Legends: Bang Bang :: *Yahiko ; bobe. ; GonnyGon ; Hybrid ; Luck. :: coach=Saujanya Shrestha
+#NED|Netherlands
+Counter-Strike Women :: *ManeschijnX ; Lieszaaa ; Missy ; Nayomy ; Qiyarah :: coach=Hidde Hofsté
+eFootball™ :: E_C_Oneill
+#NZL|New Zealand
+Dota 2 :: *Fury ; Magic ; NzRain ; SeveM ; Zaviernz :: coach=Tobz
+eFootball™ :: Noahja
+#NGR|Nigeria
+eFootball™ :: Kami_Zlatan
+#MKD|North Macedonia
+Dota 2 :: *H8 ; Belief ; Kralot bulo ; Stojkov ; zipzap :: coach=Blagoja Jovanov
+eFootball™ :: dragosivan
+#OMA|Oman
+eFootball™ :: Mohammed
+#PAK|Pakistan
+eFootball™ :: Pes_Pakstaniya
+#PER|Peru
+eFootball™ :: JhonaKRA
+#POL|Poland
+Counter-Strike Women :: *LETi ; Angelka ; Hanka- ; Hikomi ; vicu :: coach=Adrian Chyziak
+eFootball™ :: Ostrybuch
+#POR|Portugal
+Counter-Strike Women :: *Aida ; CatyJones ; D7 ; lekas ; ZAna-th :: coach=HS
+eFootball™ :: clapped
+#ROU|Romania
+Counter-Strike 2 :: fNk ; lauNX ; MoDo ; s0und ; XELLOW :: coach=Ionut-Catalin Stanescu
+eFootball™ :: URMA57
+PUBG MOBILE :: EXO ; NEBUNIE17 ; VCūDORIN23 ; VCūreDOXyz :: coach=Remus Petca
+#RUS|Russia
+eFootball™ :: TEOtm
+#SEN|Senegal
+eFootball™ :: Le Marcheur Noir
+#SRB|Serbia
+eFootball™ :: Football_hunter4
+PUBG MOBILE :: *Coa77k ; BISKE ; LEON44 ; MELAZ :: coach=PEKSY
+#SVK|Slovakia
+eFootball™ :: Boyka91
+#SLO|Slovenia
+eFootball™ :: Malnaro
+#SOM|Somalia
+eFootball™ :: Fahatt
+#RSA|South Africa
+Counter-Strike 2 :: *march ; Doru ; FROZ3N ; Triton ; wilj :: coach=Daniel Thomas Hufton
+Counter-Strike Women :: *Pixar ; huntress. ; KayC ; nAAtz ; scorpz :: coach=Simon Slingsby Zandstra
+Dota 2 :: *bee ; Berend ; remedy ; Skep ; soup
+eFootball™ :: reddevilcap10
+#ESP|Spain
+eFootball™ :: Javilota
+#SRI|Sri Lanka
+eFootball™ :: CB
+#SYR|Syria
+eFootball™ :: JawishX22
+#TPE|Chinese Taipei
+eFootball™ :: CHIU
+#TJK|Tajikistan
+eFootball™ :: ShahzodTJK
+#THA|Thailand
+eFootball™ :: Jeans
+#BAH|The Bahamas
+eFootball™ :: Illmindej
+#GAM|The Gambia
+eFootball™ :: Ontopbanks
+#TUN|Tunisia
+eFootball™ :: CESAR
+#TUR|Türkiye
+eFootball™ :: Mucahit21
+Mobile Legends: Bang Bang :: *Sunshine ; Harikasın Samet ; intangible ; Saviom ; Zeichnen :: coach=Jeff
+Mobile Legends: Bang Bang Women :: KUJOU ; MIEKO ; Nora ; UNOHANA ; ZENDAYA :: coach=Bereat Taha Gocen
+PUBG MOBILE :: *Solkay ; HamsiG ; Lost ; S2GKam1kaze :: coach=Mehmet Anil Guven
+#TKM|Turkmenistan
+eFootball™ :: Yunus
+#UKR|Ukraine
+eFootball™ :: bydb_Prosche
+#UAE|United Arab Emirates
+eFootball™ :: Alahmed1989
+#USA|United States
+Counter-Strike 2 :: *WolfY ; JBa ; mason ; Momo ; Swisher :: coach=Noah Oliver Francis
+Counter-Strike Women :: *madss ; emy ; olya ; uhKelsie ; vanessa :: coach=Wrenna Trampel
+#URU|Uruguay
+eFootball™ :: WillyFreire10
+#UZB|Uzbekistan
+eFootball™ :: algo_08
+PUBG MOBILE :: *JONIK ; AGGRESSOR ; KHOJI ; SP1DY :: coach=Khusanov
+#VEN|Venezuela
+Dota 2 :: *Shy ; ArkaNa ; arrakiz ; Raykill ; Ryoma :: coach=Johanny Alejandro Uzcategui Morales
+eFootball™ :: Carlorco
+#WAL|Wales
+eFootball™ :: Cerith Dennis
+#ZIM|Zimbabwe
+eFootball™ :: Lightaz

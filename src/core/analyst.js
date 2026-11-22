@@ -4,7 +4,7 @@
 import { STAT_DEFS, latestGames, durationText } from './capture.js';
 import { tagsOf, weaknessCounts } from './weakness.js';
 import { FIELDS } from './competitors.js';
-import { REPORT_TITLES, resultText } from './reports.js';
+import { REPORT_TITLES, resultText, withRating } from './reports.js';
 import { hasContactNumber } from './pii.js';
 import { localDay, shiftDay } from './dates.js';
 
@@ -127,7 +127,7 @@ export function partnerPlan(title, { partners = [], reports = [], wtags = [], ti
     const labels = {}; for (const r of rs) for (const t of tagsOfReport[r.id] || []) labels[t] = (labels[t] || 0) + 1;
     const last = rs.map((r) => r.date).sort().at(-1) || null;
     return { sessions: rs.length, won, lost, points: pts.reduce((a, r) => a + r.result.points, 0), matches: pts.reduce((a, r) => a + r.result.played, 0),
-      progress: rs.length ? Math.round((rs.reduce((a, r) => a + Number(r.progress || 0), 0) / rs.length) * 10) / 10 : null, last, idle: last ? daysBetween(last, asOf) : null, labels };
+      progress: withRating(rs).length ? Math.round((withRating(rs).reduce((a, r) => a + Number(r.progress), 0) / withRating(rs).length) * 10) / 10 : null, last, idle: last ? daysBetween(last, asOf) : null, labels };
   };
   const rows = bank.map((p) => ({ name: p.name, level: p.level, resembles: p.resembles || '', ...statFor(p.name) }))
     .sort((a, b) => (b.last || '').localeCompare(a.last || '') || a.name.localeCompare(b.name));
@@ -177,7 +177,7 @@ export function daySummary(titles, date, { reports = [], scrims = [], wtags = []
     for (const g of Object.keys(todayTags).filter((x) => flagged.has(x))) pri.push({ kind: 'recurring', text: `"${g}" keeps coming back (flagged in Weaknesses): plan a drill for it.` });
     const last = reps.at(-1); if (last?.adjust) pri.push({ kind: 'carry', text: `Start tomorrow from: ${last.adjust}` });
     return { title, date, sessions: reps.length, planned: planned.length, notLogged: notLogged.length, result,
-      progress: reps.length ? Math.round((reps.reduce((a, r) => a + Number(r.progress || 0), 0) / reps.length) * 10) / 10 : null,
+      progress: withRating(reps).length ? Math.round((withRating(reps).reduce((a, r) => a + Number(r.progress), 0) / withRating(reps).length) * 10) / 10 : null,
       fix, labels: Object.entries(todayTags).sort((a, b) => b[1] - a[1]).map(([tag, n]) => ({ tag, n })), priorities: pri.slice(0, 3) };
   });
 }

@@ -42,10 +42,11 @@ export function scrimReport(x) {
   need(!x.asOf || x.date <= x.asOf, 'A report cannot be dated in the future.');
   need(x.by && x.by.trim(), 'Who wrote the report is required.');
   need(x.partner && x.partner.trim(), 'Name the sparring partner (or "internal").');
-  need(x.focus && x.focus.trim(), 'Write what the session was meant to practise.');
-  need(Number(x.progress) >= 1 && Number(x.progress) <= 5, 'Rate how closely the team followed the plan (1 to 5).');
-  need((x.worked || '').trim() || (x.failed || '').trim(), 'Write what worked or what failed.');
-  need(x.adjust && x.adjust.trim(), 'Write the adjustment for the next session.');
+  // V1.42 two-minute report: partner, result and the one change for next time are needed; focus, what worked or
+  // failed and the plan rating are asked for but optional (a short report every day beats a full one now and then).
+  const progress = x.progress === '' || x.progress == null ? null : Number(x.progress);
+  need(progress == null || (Number.isInteger(progress) && progress >= 1 && progress <= 5), 'Rate how closely the team followed the plan (1 to 5), or leave it empty.');
+  need(x.adjust && x.adjust.trim(), 'Write the one change for the next session.');
   // V1.31: rows per map / match / game on competitive settings; when given, they decide the result.
   const rows = cleanRows(x.title, x.rows);
   const rf = rowsFields(x.title, rows);
@@ -68,7 +69,7 @@ export function scrimReport(x) {
     id: `RP-${x.date.replace(/-/g, '')}-${Math.random().toString(36).slice(2, 6)}`,
     title: x.title, date: x.date, time: (x.time || '').trim(), by: x.by.trim(), partner: x.partner.trim(),
     partnerLevel: x.partnerLevel || '', format: x.format || '', roster: ROSTER_PLAYED.includes(x.roster) ? x.roster : 'Not applicable',
-    result, focus: x.focus.trim(), progress: Number(x.progress),
+    result, focus: plain(x.focus), progress,
     detail: plain(x.detail), worked: plain(x.worked), failed: plain(x.failed),
     playerNotes: clean(x.playerNotes, 'Player notes'), adjust: plain(x.adjust),
     prevAdjust: plain(x.prevAdjust).slice(0, 400), fixCheck: FIX_CHECK.includes(x.fixCheck) ? x.fixCheck : '',
@@ -92,7 +93,9 @@ export const resultText = (r) => (r.mode === 'points'
   : `${r.won}-${r.lost}${r.drawn ? `-${r.drawn}` : ''}`);
 
 const dayDiff = (a, b) => Math.round((Date.parse(b) - Date.parse(a)) / 86400000);
-const avg = (xs) => (xs.length ? Math.round((xs.reduce((a, b) => a + b, 0) / xs.length) * 10) / 10 : null);
+// Reports without a plan rating (allowed since V1.42) are left out of the average, not counted as 0.
+const avg = (xs0) => { const xs = xs0.filter((x) => x != null && !Number.isNaN(x)); return xs.length ? Math.round((xs.reduce((a, b) => a + b, 0) / xs.length) * 10) / 10 : null; };
+export const withRating = (reps) => reps.filter((r) => r.progress != null && Number(r.progress) >= 1);
 
 // One row per calendar day with a report, newest first.
 export function byDay(reports, title) {
@@ -106,7 +109,7 @@ export function byDay(reports, title) {
       won: wl.reduce((s, r) => s + r.result.won, 0), lost: wl.reduce((s, r) => s + r.result.lost, 0), drawn: wl.reduce((s, r) => s + r.result.drawn, 0),
       points: rs.filter((r) => r.result.mode === 'points').reduce((s, r) => s + r.result.points, 0),
       played: rs.filter((r) => r.result.mode === 'points').reduce((s, r) => s + r.result.played, 0),
-      focus: [...new Set(rs.map((r) => r.focus))], authors: [...new Set(rs.map((r) => r.by))],
+      focus: [...new Set(rs.map((r) => r.focus).filter(Boolean))], authors: [...new Set(rs.map((r) => r.by))],
     };
   });
 }
@@ -151,7 +154,7 @@ export function reportsCsv(reports, { bom = false } = {}) {
   const head = ['id', 'date', 'time', 'title', 'coach', 'partner', 'partner_level', 'format', 'roster', 'won', 'lost', 'drawn', 'matches_played', 'points', 'avg_placement', 'plan_followed_1_5', 'focus', 'detail', 'worked', 'failed', 'player_notes', 'next_adjustment', 'previous_adjustment', 'previous_adjustment_check', 'vod', 'corrections', 'drills', 'per_map_or_match', 'competitive_settings'];
   const rows = [...reports].sort((a, b) => a.date.localeCompare(b.date) || a.createdAt.localeCompare(b.createdAt)).map((r) => {
     const p = r.result.mode === 'points';
-    return [r.id, r.date, r.time, r.title, r.by, r.partner, r.partnerLevel, r.format, r.roster, p ? '' : r.result.won, p ? '' : r.result.lost, p ? '' : r.result.drawn, p ? r.result.played : '', p ? r.result.points : '', p ? (r.result.avgPlacement ?? '') : '', r.progress, r.focus, r.detail, r.worked, r.failed, r.playerNotes, r.adjust, r.prevAdjust || '', r.fixCheck || '', r.vod, (r.notes || []).map((n) => `${noteDay(n.at)} ${n.by}: ${n.text}`).join(' | '), (r.drills || []).map((d) => `${d.name}: ${d.met}`).join(' | '), rowsText(r.title, r.rows), r.comp || ''];
+    return [r.id, r.date, r.time, r.title, r.by, r.partner, r.partnerLevel, r.format, r.roster, p ? '' : r.result.won, p ? '' : r.result.lost, p ? '' : r.result.drawn, p ? r.result.played : '', p ? r.result.points : '', p ? (r.result.avgPlacement ?? '') : '', r.progress ?? '', r.focus, r.detail, r.worked, r.failed, r.playerNotes, r.adjust, r.prevAdjust || '', r.fixCheck || '', r.vod, (r.notes || []).map((n) => `${noteDay(n.at)} ${n.by}: ${n.text}`).join(' | '), (r.drills || []).map((d) => `${d.name}: ${d.met}`).join(' | '), rowsText(r.title, r.rows), r.comp || ''];
   });
   // CRLF line ends: what Excel on Windows expects; other tools read it too.
   return (bom ? CSV_BOM : '') + [head, ...rows].map((row) => row.map(csvCell).join(',')).join('\r\n');
@@ -163,3 +166,24 @@ export function scrimLogCsv(games, reports, { bom = false } = {}) {
   return (bom ? CSV_BOM : '') + [SCRIM_LOG_HEAD, ...rows].map((row) => row.map(csvCell).join(',')).join('\r\n');
 }
 export { isScrimLog };
+
+// V1.42: the saved report as a message for the team's WhatsApp group (the same habit as the support staff report).
+const WA = {
+  en: { head: 'Scrim report', vs: 'vs', result: 'Result', focus: 'Focus', worked: 'Worked', failed: 'Failed', next: 'Next session', plan: 'Plan followed', fix: 'Last change' },
+  id: { head: 'Laporan scrim', vs: 'vs', result: 'Hasil', focus: 'Fokus', worked: 'Berhasil', failed: 'Gagal', next: 'Sesi berikutnya', plan: 'Rencana dijalankan', fix: 'Perubahan terakhir' },
+};
+const FIX_ID = { Fixed: 'Sudah beres', 'Better, not fixed yet': 'Membaik, belum beres', 'No change': 'Belum berubah', 'Not practised today': 'Tidak dilatih hari ini' };
+export function reportWhatsApp(r, lang = 'id') {
+  const L = WA[lang] || WA.id; const id = lang === 'id';
+  const res = id ? resultText(r.result).replace(/ pts in (\d+) match(es)?/, ' poin dari $1 match').replace(/, avg place /, ', rata-rata posisi ').replace(/, (\d+) wins?$/, ', $1 menang') : resultText(r.result);
+  const body = [
+    `${L.result}: ${res}`,
+    r.focus && `${L.focus}: ${r.focus}`,
+    r.fixCheck && `${L.fix}: ${id ? FIX_ID[r.fixCheck] || r.fixCheck : r.fixCheck}`,
+    r.worked && `${L.worked}: ${r.worked}`,
+    r.failed && `${L.failed}: ${r.failed}`,
+    r.progress != null && `${L.plan}: ${r.progress}/5`,
+    `*${L.next}:* ${r.adjust}`,
+  ].filter(Boolean);
+  return [`*${L.head} — ${r.title}*`, `${r.date}${r.time ? ` ${r.time}` : ''} · ${L.vs} ${r.partner} · ${r.by}`, '', ...body].join('\n');
+}

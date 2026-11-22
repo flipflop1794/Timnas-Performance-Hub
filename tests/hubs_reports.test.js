@@ -24,7 +24,8 @@ async function page(hash, db) {
     as: async (who) => { const el = d.getElementById('meSel'); el.value = who; el.dispatchEvent(new dom.window.Event('change', { bubbles: true })); await wait(); } };
 }
 
-const localDay = () => { const d = new Date(); d.setMinutes(d.getMinutes() - d.getTimezoneOffset()); return d.toISOString().slice(0, 10); };
+// The hub's day is Jakarta time (WIB), whatever the machine's time zone (CI runs in UTC).
+import { localDay } from '../src/core/dates.js';
 
 test('every title has its own section with Team, Scrims, Scrim reports and Competitors; no outside draft tool links', async () => {
   const h = await page('today', mock());
@@ -55,7 +56,7 @@ test('a coach files a report: saved, shown by day, closes the planned session, c
   await h.go('dota-reports');
   const f = (k, v) => { d.getElementById(`rp-Dota_2-${k}`).value = v; };
   d.querySelector('[data-report-save="Dota 2"]').click(); await h.wait();
-  assert.match(d.getElementById('rpMsg-Dota_2').textContent, /Who wrote|sparring partner|practise/);   // V1.29: partner comes from today's plan
+  assert.match(d.getElementById('rpMsg-Dota_2').textContent, /Who wrote|sparring partner|one change for the next session/);   // V1.29: partner comes from today's plan
   assert.equal([...db.store.keys()].filter((k) => k.startsWith('scrim_reports/')).length, 0, 'nothing saved when incomplete');
   f('by', 'Coach Indra'); f('partner', 'Team X'); f('won', '2'); f('lost', '1'); f('focus', 'Early rotations'); f('progress', '4'); f('worked', 'Lane swaps'); f('adjust', 'Faster turtle setup'); f('players', 'Aran: strong first lane'); f('scrim', planned[0][1].id);
   d.querySelector('[data-report-save="Dota 2"]').click(); await h.wait();
@@ -72,7 +73,7 @@ test('a coach files a report: saved, shown by day, closes the planned session, c
   assert.equal(after.notes.length, 1); assert.equal(after.result.lost, 1, 'original untouched'); assert.match(h.text(), /Score was 2-0, not 2-1/);
   // overview and Today
   await h.go('reports-all'); assert.match(h.text(), /Dota 2/); assert.match(h.text(), /Next session starts from/); assert.match(h.text(), /Faster turtle setup/);
-  await h.go('today'); await h.as('aufa'); assert.match(h.text(), /report filed today/);
+  await h.go('today'); await h.as('aufa'); assert.match(h.text(), /Scrim reports today: 1 of [0-9]+ filed/);
   await h.go('t-mlbbw-reports'); assert.match(h.text(), /No report yet/);
 });
 

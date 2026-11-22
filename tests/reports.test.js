@@ -17,10 +17,11 @@ test('a complete report is saved as operational data', () => {
 test('required fields are enforced with plain messages', () => {
   assert.throws(() => scrimReport({ ...base, by: '' }), /Who wrote/);
   assert.throws(() => scrimReport({ ...base, partner: '' }), /sparring partner/);
-  assert.throws(() => scrimReport({ ...base, focus: '' }), /practise/);
   assert.throws(() => scrimReport({ ...base, progress: 0 }), /1 to 5/);
-  assert.throws(() => scrimReport({ ...base, worked: '', failed: '' }), /worked or what failed/);
-  assert.throws(() => scrimReport({ ...base, adjust: '' }), /adjustment/);
+  assert.throws(() => scrimReport({ ...base, adjust: '' }), /one change for the next session/);
+  // V1.42 two-minute report: focus, what worked or failed and the plan rating are optional.
+  const short = scrimReport({ ...base, focus: '', worked: '', failed: '', progress: '' });
+  assert.equal(short.focus, ''); assert.equal(short.progress, null);
   assert.throws(() => scrimReport({ ...base, won: 0, lost: 0 }), /at least one game/);
   assert.throws(() => scrimReport({ ...base, won: -1 }), /whole number/);
   assert.throws(() => scrimReport({ ...base, date: '10-11-2026' }), /Date/);
