@@ -24,19 +24,62 @@ export const heroesFor = (title) => HEROES[gameOf(title)] || null;
 // rows is marked at once; confirming still refuses it.
 export function capDupInput(el) {
   const box = el?.closest?.('.capedit'); if (!box || !/^c[gb]-/.test(el.id || '')) return;
-  const mark = (inputs, skip) => {
+  const mark = (inputs, normalize) => {
     const seen = new Map(); let n = 0;
-    for (const i of inputs) { const k = i.value.trim().toLowerCase(); if (k && !skip(k)) seen.set(k, (seen.get(k) || 0) + 1); }
+    for (const i of inputs) { const k = normalize(i.value); if (k) seen.set(k, (seen.get(k) || 0) + 1); }
     for (const i of inputs) {
-      const k = i.value.trim().toLowerCase(); const dup = !!k && !skip(k) && seen.get(k) > 1;
+      const k = normalize(i.value); const dup = !!k && seen.get(k) > 1;
+      i.setCustomValidity(dup ? 'This selection is already used in this game.' : '');
       i.classList.toggle('dup', dup); if (dup) { i.setAttribute('aria-invalid', 'true'); n++; } else if (!i.classList.contains('flag')) i.removeAttribute('aria-invalid');
     }
     return n;
   };
-  const heroes = mark([...box.querySelectorAll('input[list^="capHeroes-"]')], () => false);
-  const players = mark([...box.querySelectorAll('input[list^="capPlayers-"]')], (k) => k === 'stand-in');
+  const normalize = (text) => text.trim().toLowerCase();
+  const heroes = mark([...box.querySelectorAll('input[list^="capHeroes-"]')], (text) => normalize(HEROES.mlbb.find(text) || text));
+  const players = mark([...box.querySelectorAll('input[list^="capPlayers-"]')], normalize);
   const msg = box.querySelector('[data-cap-dup]');
   if (msg) msg.textContent = [heroes ? 'The same hero is entered twice (bans and picks of both teams).' : '', players ? 'The same player is on two rows.' : ''].filter(Boolean).join(' ');
+}
+
+// Enter accepts a catalogue match and advances through the game in form order.
+export function capEnter(event) {
+  const el = event.target; const box = el?.closest?.('.capedit');
+  if (event.key !== 'Enter' || event.isComposing || event.ctrlKey || event.altKey || event.metaKey || !box?.querySelector('input[list^="capPlayers-"]') || !el.matches('input:not([type="hidden"]), select')) return false;
+  event.preventDefault();
+  const list = el.list;
+  if (list && el.value.trim()) {
+    const key = (s) => s.normalize('NFKD').toLowerCase().replace(/[^a-z0-9]/g, '');
+    const query = key(el.value);
+    if (!query) { el.setCustomValidity('Choose a name from the list.'); el.reportValidity(); return true; }
+    const options = [...list.options].map((o) => o.value);
+    const exact = options.find((name) => key(name) === query);
+    const prefix = options.filter((name) => key(name).startsWith(query)).sort((a, b) => a.length - b.length || a.localeCompare(b));
+    const contains = options.filter((name) => key(name).includes(query)).sort((a, b) => a.length - b.length || a.localeCompare(b));
+    const distance = (a, b) => {
+      let row = Array.from({ length: b.length + 1 }, (_, i) => i);
+      for (let i = 1; i <= a.length; i++) {
+        const next = [i];
+        for (let j = 1; j <= b.length; j++) next[j] = Math.min(next[j - 1] + 1, row[j] + 1, row[j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1));
+        row = next;
+      }
+      return row[b.length];
+    };
+    const close = query.length < 3 ? [] : options.map((name) => ({ name, score: distance(query, key(name)) }))
+      .filter(({ score }) => score <= (query.length > 5 ? 2 : 1)).sort((a, b) => a.score - b.score || a.name.localeCompare(b.name));
+    const match = exact || (list.id.startsWith('capHeroes-') && HEROES.mlbb.find(el.value)) || prefix[0] || contains[0] || close[0]?.name;
+    if (!match) { el.setCustomValidity('Choose a name from the list.'); el.reportValidity(); return true; }
+    el.value = match;
+  }
+  el.setCustomValidity('');
+  capDupInput(el);
+  if (!el.checkValidity()) { el.reportValidity(); return true; }
+  el.dispatchEvent(new Event('input', { bubbles: true }));
+  el.dispatchEvent(new Event('change', { bubbles: true }));
+  const fields = [...box.querySelectorAll('input:not([type="hidden"]), select, textarea, button[data-cap-confirm]')]
+    .filter((field) => !field.disabled && !field.closest('details:not([open])') && !field.closest('.hub-local-scanner'));
+  const next = fields[fields.indexOf(el) + 1];
+  next?.focus(); if (next?.matches('input')) next.select();
+  return true;
 }
 // V1.39: duration boxes take digits only and put the colon in themselves ("2040" → "20:40").
 export function mmssInput(el) {
@@ -185,7 +228,7 @@ export function captureUi(ctx) {
     const block = g.issues.some((i) => i.level === 'block');
     const iss = g.issues.length ? banner(block ? 'block' : 'synth', `<div><b>${block ? 'Cannot use this screenshot.' : 'Check before confirming:'}</b><ul class="plain">${g.issues.map((i) => `<li>${esc(i.text)}</li>`).join('')}</ul></div>`) : (pend.fromScreenshot && !g.players.some((p) => p.flags.length) ? banner('real', '<div>Read cleanly. Still check each value against the screenshot.</div>') : '');
     const dl = `<datalist id="capHeroes-${fid}">${heroesFor(title).names.map((n) => `<option value="${esc(n)}">`).join('')}</datalist>`
-      + (isScrimLog(title) ? `<datalist id="capPlayers-${fid}">${[...roster, 'stand-in'].map((n) => `<option value="${esc(n)}">`).join('')}</datalist>` : '');
+      + (isScrimLog(title) ? `<datalist id="capPlayers-${fid}">${roster.filter((n) => !/^stand[ -]?in$/i.test(n)).map((n) => `<option value="${esc(n)}">`).join('')}</datalist>` : '');
     // Short words in the boxes (phone width); full words in messages.
     const SHORT = { left: 'Left', right: 'Right', blue: 'Blue', red: 'Red', radiant: 'Radiant', dire: 'Dire' };
     const sideSel = (id, cur, extra = '', list = sides, words = SIDE_LABEL) => `<select id="${id}"${extra}><option value=""></option>${list.map((x) => `<option value="${x}" ${x === cur ? 'selected' : ''}>${words[x]}</option>`).join('')}</select>`;
@@ -261,8 +304,8 @@ export function captureUi(ctx) {
     edited.players = edited.players.map((p, i) => ({ ...p, side: val(`cg-${fid}-${i}-side`), nameSeen: val(`cg-${fid}-${i}-name`).trim(), player: val(`cg-${fid}-${i}-player`), hero: val(`cg-${fid}-${i}-hero`).trim(),
       stats: Object.fromEntries(defs.map((d) => [d.key, val(`cg-${fid}-${i}-${d.key}`)])) }));
     if (isScrimLog(title)) {
-      // V1.39: a typed player name is matched to the roster's spelling ("aran" → "Aran", "Stand-in" → "stand-in").
-      const names = [...rosterOf(title), 'stand-in'];
+      // Match typed player names to the roster's spelling ("aran" → "Aran").
+      const names = rosterOf(title);
       edited.players = edited.players.map((p) => { const t = String(p.player || '').trim(); return { ...p, player: names.find((n) => n.toLowerCase() === t.toLowerCase()) || t }; });
       edited.pickOrder = val(`cg-${fid}-po`); edited.mapVariant = val(`cg-${fid}-jmap`); edited.notes = val(`cg-${fid}-gnotes`); edited.vod = val(`cg-${fid}-vod`).trim();
       edited.players.forEach((p, i) => { p.mvp = String(i) === val(`cg-${fid}-mvp`); });

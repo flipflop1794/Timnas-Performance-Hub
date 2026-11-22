@@ -327,10 +327,13 @@ export function confirmGame(edited, { reportId = '', date, partner, gameNo, by, 
   });
   const ours = players.filter((p) => p.team === 'ours');
   need(ours.length === 5, `Our team needs exactly 5 players (now ${ours.length}).`);
-  need(ours.every((p) => p.player), 'Match each of our players to the roster (or pick "stand-in").');
+  need(ours.every((p) => p.player), 'Match each of our players to the roster.');
   // V1.39: typed names must be on the division's roster (the game screen offers them as suggestions).
-  if (log && roster) for (const p of ours) need(p.player === 'stand-in' || roster.includes(p.player), `"${p.player}" is not on the ${edited.title} roster. Pick a name from the list, or "stand-in".`);
-  const named = ours.filter((p) => p.player !== 'stand-in').map((p) => p.player);
+  if (log) for (const p of ours) {
+    need(!/^stand[ -]?in$/i.test(p.player.trim()), 'Choose a roster player; Stand In is not available.');
+    if (roster) need(roster.includes(p.player), `"${p.player}" is not on the ${edited.title} roster. Pick a name from the list.`);
+  }
+  const named = ours.filter((p) => log || p.player !== 'stand-in').map((p) => p.player.trim().toLowerCase());
   need(new Set(named).size === named.length, 'The same roster player is on two rows.');
   const heroesUsed = players.map((p) => p.hero).filter(Boolean);
   need(new Set(heroesUsed).size === heroesUsed.length, 'The same hero is on two rows.');

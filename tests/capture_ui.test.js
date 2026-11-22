@@ -50,7 +50,19 @@ test('without the website AI, games are typed the Scrim Log way and still feed t
   await h.click('[data-cap-manual="MLBB"]');
   // V1.39: player boxes start empty; the division's roster is offered as suggestions; names typed in any case.
   assert.equal(h.d.getElementById('cg-MLBB-0-player').value, '', 'player boxes start empty');
-  assert.deepEqual([...h.d.getElementById('capPlayers-MLBB').options].map((o) => o.value), ['Aran', 'Kevin', 'Drichel', 'Lyoni', 'Jull.', 'stand-in']);
+  assert.deepEqual([...h.d.getElementById('capPlayers-MLBB').options].map((o) => o.value), ['Aran', 'Kevin', 'Drichel', 'Lyoni', 'Jull.']);
+  const enter = (id) => { const el = h.d.getElementById(id); el.focus(); el.dispatchEvent(new h.dom.window.KeyboardEvent('keydown', { key: 'Enter', bubbles: true, cancelable: true })); };
+  h.set('cb-MLBB-ours-0', 'fany'); enter('cb-MLBB-ours-0');
+  assert.equal(h.d.getElementById('cb-MLBB-ours-0').value, 'Fanny');
+  assert.equal(h.d.activeElement.id, 'cb-MLBB-ours-1');
+  h.set('cb-MLBB-partner-0', 'fanny'); enter('cb-MLBB-partner-0');
+  assert.equal(h.d.activeElement.id, 'cb-MLBB-partner-0', 'duplicate cannot advance');
+  assert.equal(h.d.getElementById('cb-MLBB-partner-0').validity.customError, true);
+  h.set('cb-MLBB-partner-0', ''); h.set('cb-MLBB-ours-0', '');
+  h.set('cg-MLBB-0-hero', 'tigreal'); enter('cg-MLBB-0-hero');
+  assert.equal(h.d.getElementById('cg-MLBB-0-hero').value, 'Tigreal');
+  assert.equal(h.d.activeElement.id, 'cg-MLBB-0-player');
+  h.set('cg-MLBB-0-hero', '');
   ['aran', 'Kevin', 'Drichel', 'Lyoni', 'Jull.'].forEach((n, i) => h.set(`cg-MLBB-${i}-player`, n));
   // A hero or a player entered twice is marked at once.
   h.set('cg-MLBB-1-player', 'Aran');
