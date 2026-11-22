@@ -72,7 +72,7 @@ import { translateDom, tr as trId } from './i18n.js';
 import { autoCard, cardPlan, approveCard, cardMarkdown } from '../core/oppcard.js';
 import { usageSummary, PRICES_READ } from '../core/ai_cost.js';
 import { checkin, session as loadSession, teamDay, ITEMS, ITEM_LABEL, THRESHOLDS, MIN_BASELINE_DAYS } from '../core/wellbeing.js';
-import { captureUi, heroesFor, mmssInput, capDupInput } from './capture_ui.js';
+import { captureUi, heroesFor, mmssInput, capDupInput, capEnter } from './capture_ui.js';
 import { META_CATEGORIES, OD_MIN, OURS_MIN, metaEntry, confirmMeta, retireMeta, metaOf, currentPatch, extractedEntries, openDotaRows, ourFacts, metaFit, metaFitMaterial } from '../core/meta.js';
 import { sessionBlocks, drillResults, planMaterial, cameBack, weeklyTrend, weeklyText, weeklyMaterial, MAX_BLOCKS, DRILL_MET, blocksMinutes } from '../core/practice.js';
 import { liveEntry, liveOf, liveSummary, opponentBrief, preMatchBrief, approveBrief, approvedBrief, briefShareText, LIVE_TYPES, LIVE_PHASES, POINT_MAX, prematchMaterial, materialIds, scoutDayMaterial, daySummaryRecord } from '../core/scouting.js';
@@ -3391,7 +3391,7 @@ document.addEventListener('change', (e) => {
   if (id === 'mFile') { const f = e.target.files?.[0]; if (!f) return; const r = new FileReader(); r.onload = () => doImport(String(r.result), `OpenDota JSON file ${f.name}`); r.readAsText(f); }
   if (id === 'lMatchFile' || id === 'lFightFile') { const f = e.target.files?.[0]; if (!f) return; const r = new FileReader(); r.onload = () => { (id === 'lMatchFile' ? $('#lMatches') : $('#lFights')).value = r.result; }; r.readAsText(f); }
 });
-document.addEventListener('keydown', (e) => { if (e.key === 'Enter' && e.target.id === 'dHero') $('#dLock')?.click(); else if (/^drHero$|^drDrillHero$/.test(e.target.id)) drUi().onKey(e); });
+document.addEventListener('keydown', (e) => { if (capEnter(e)) return; if (e.key === 'Enter' && e.target.id === 'dHero') $('#dLock')?.click(); else if (/^drHero$|^drDrillHero$/.test(e.target.id)) drUi().onKey(e); });
 window.addEventListener('hashchange', render);
 if (HUB_USER) {
   DAILY = dailySessionsUi({ S, user: HUB_USER, owners: PLATFORM.actionOwners,
