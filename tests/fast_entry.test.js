@@ -76,7 +76,7 @@ test('quick picks, progress buttons, highlighted errors, kept setup and drafts',
   assert.equal(d.getElementById('rp-MLBB-focus').value, 'Faster turtle');
   // V1.29: step 1 is the result, step 2 starts with "Say it once"; the Save bar says what is still needed
   const html = d.querySelector('.panel.rp').innerHTML; assert.ok(html.indexOf('>Result<') < html.indexOf('Say it once'));
-  assert.match(d.getElementById('rpLeft-MLBB').textContent, /of 6 done|Ready to save/);
+  assert.match(d.getElementById('rpLeft-MLBB').textContent, /of 3 done|Ready to save/);
 });
 
 test('a session planned for today is one tap: partner filled and the session closed on save', async () => {

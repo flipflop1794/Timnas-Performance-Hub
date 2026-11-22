@@ -11,6 +11,7 @@
 //   followUps    follow-ups due in the window (before today) that are done
 //   reviewed     coaching proposals made in the window that have been reviewed
 import { shiftDay } from './dates.js';
+import { withRating } from './reports.js';
 
 export const PARTS = [
   ['planKept', 'Planned sessions held'], ['objective', 'Sessions with an objective'], ['reported', 'Sessions reported'],
@@ -42,7 +43,7 @@ export function titleQuality(title, { scrims = [], reports = [], cycle = [] }, f
     objective: share(held.filter((s) => (s.objectives || []).length || s.dailyReport?.objective).length, held.length),
     reported: share(held.filter((s) => s.dailyReport || reportFor.has(s.id)).length, held.length),
     onTime: share(filed.filter((f) => f.at && wibDay(f.at) <= shiftDay(f.date, 1)).length, filed.length),
-    followed: reps.length ? { value: (reps.reduce((a, r) => a + Number(r.progress || 0), 0) / reps.length - 1) / 4, hit: null, n: reps.length } : null,
+    followed: withRating(reps).length ? { value: (withRating(reps).reduce((a, r) => a + Number(r.progress), 0) / withRating(reps).length - 1) / 4, hit: null, n: withRating(reps).length } : null,
     followUps: share(fu.filter((s) => s.followUp.status === 'Done').length, fu.length),
     reviewed: share(props.filter((o) => (o.reviews || []).length).length, props.length),
   };

@@ -461,7 +461,7 @@ test('V1.29 frictionless report: "Log the result" on a planned session opens the
   const f = (k) => c.d.getElementById(`rp-MLBB-${k}`);
   assert.equal(f('partner').value, 'Team Q'); assert.equal(f('focus').value, 'Vision before lord'); assert.equal(f('scrim').value, 'SC-fr');
   const left = () => c.d.getElementById('rpLeft-MLBB').textContent;
-  assert.match(left(), /2 of 6 done — still needed: result, what worked or failed, adjustment, plan rating\./);
+  assert.match(left(), /1 of 3 done — still needed: result, change for next time\./);
   [...c.d.querySelectorAll('.chip')].find((b) => b.textContent === '2-1').click(); await sleep(30);
   c.d.querySelector('[data-rp-add*="vision"]').click(); assert.match(f('failed').value, /^vision: $/);
   c.set('rp-MLBB-failed', 'vision: no wards before lord'); c.set('rp-MLBB-adjust', 'Ward river at 7:30');

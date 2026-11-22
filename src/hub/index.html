@@ -58,6 +58,8 @@ nav.tabs{display:flex;gap:2px;overflow-x:auto;scrollbar-width:none}
 nav.tabs::-webkit-scrollbar{display:none}
 nav.tabs a{flex:none;position:relative;font-family:var(--f-display);font-weight:600;font-size:15px;letter-spacing:.05em;text-transform:uppercase;color:var(--muted);text-decoration:none;padding:10px 12px 11px;white-space:nowrap}
 nav.tabs a:hover{color:var(--ink)}
+nav.tabs button.more{flex:none;font-family:var(--f-display);font-weight:600;font-size:13px;letter-spacing:.05em;text-transform:uppercase;color:var(--muted);background:none;border:1px dashed var(--line);border-radius:4px;padding:4px 10px;margin:6px 0 6px 8px;cursor:pointer;white-space:nowrap}
+nav.tabs button.more:hover{color:var(--ink);border-color:var(--muted)}
 nav.tabs a[aria-current="page"]{color:var(--ink)}
 nav.tabs a[aria-current="page"]::after{content:"";position:absolute;left:12px;right:12px;bottom:0;height:3px;background:var(--gold)}
 main{display:flex;flex-direction:column;gap:16px;margin-top:20px}

@@ -54,7 +54,7 @@ test('a coach files a report: saved, shown by day, closes the planned session, c
   await h.go('mlbb-reports');
   const f = (k, v) => { d.getElementById(`rp-MLBB-${k}`).value = v; };
   d.querySelector('[data-report-save="MLBB"]').click(); await h.wait();
-  assert.match(d.getElementById('rpMsg-MLBB').textContent, /Who wrote|sparring partner|practise/);   // V1.29: partner comes from today's plan
+  assert.match(d.getElementById('rpMsg-MLBB').textContent, /Who wrote|sparring partner|one change for the next session/);   // V1.29: partner comes from today's plan
   assert.equal([...db.store.keys()].filter((k) => k.startsWith('scrim_reports/')).length, 0, 'nothing saved when incomplete');
   f('by', 'Coach Indra'); f('partner', 'Team X'); f('won', '2'); f('lost', '1'); f('focus', 'Early rotations'); f('progress', '4'); f('worked', 'Lane swaps'); f('adjust', 'Faster turtle setup'); f('players', 'Aran: strong first lane'); f('scrim', planned[0][1].id);
   d.querySelector('[data-report-save="MLBB"]').click(); await h.wait();
@@ -71,7 +71,7 @@ test('a coach files a report: saved, shown by day, closes the planned session, c
   assert.equal(after.notes.length, 1); assert.equal(after.result.lost, 1, 'original untouched'); assert.match(h.text(), /Score was 2-0, not 2-1/);
   // overview and Today
   await h.go('reports-all'); assert.match(h.text(), /MLBB/); assert.match(h.text(), /Next session starts from/); assert.match(h.text(), /Faster turtle setup/);
-  await h.go('today'); await h.as('aufa'); assert.match(h.text(), /report filed today/);
+  await h.go('today'); await h.as('aufa'); assert.match(h.text(), /Scrim reports today: 1 of [0-9]+ filed/);
   await h.go('t-mlbbw-reports'); assert.match(h.text(), /No report yet/);
 });
 

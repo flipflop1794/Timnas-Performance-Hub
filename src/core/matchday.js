@@ -4,6 +4,23 @@
 
 export const EVENT = { start: '2026-12-15', end: '2026-12-20', venue: 'ICE BSD City, Banten' };
 
+// V1.38: schedules reported by the press before IESF publishes its own (desk research, 21 Nov 2026). Shown as
+// "reported, not official"; a match becomes a match card only when a staff member taps "Add to match tracker".
+export const REPORTED_SCHEDULE = {
+  'Dota 2': {
+    source: 'cybersport.ru tournament page (single source, read 21 Nov 2026). Times listed as 06:00 and 07:30 with no time zone; Escorenews lists Mongolia vs North Macedonia on 16 Dec instead. Confirm against the official schedule.',
+    matches: [
+      { date: '2026-12-16', stage: 'Group A', opponent: 'Mongolia', format: 'Bo1', when: 'first match of the day' },
+      { date: '2026-12-16', stage: 'Group A', opponent: 'Kazakhstan', format: 'Bo1', when: 'second match of the day' },
+      { date: '2026-12-17', stage: 'Group A', opponent: 'North Macedonia', format: 'Bo1', when: 'first match of the day' },
+      { date: '2026-12-17', stage: 'Group A', opponent: 'Venezuela', format: 'Bo1', when: 'second match of the day' },
+      { date: '2026-12-18', stage: 'Group A', opponent: 'Egypt', format: 'Bo1', when: 'date inferred (cut off in the source)' },
+    ],
+  },
+};
+// Is this reported match already on the tracker (same title, date and opponent)?
+export const onTracker = (matches, title, r) => (matches || []).some((m) => m.title === title && m.date === r.date && m.opponent === r.opponent);
+
 // Starting templates: proposals for the staff to edit, not agreed routines.
 // owner = role, so the list works before every name is confirmed.
 const COMMON = [

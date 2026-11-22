@@ -7,7 +7,7 @@
 // Rules the prompts enforce: read only what is on the screen, never guess a number, mark what is
 // unclear. The coach confirms every value before it is saved; nothing here writes a record by itself.
 
-export const PROMPT_VERSION = 'scrim-ai-2026-12-02.1';   // V1.36 support rows (follow-up text, session, prognosis); V1.34 support_parse; V1.30 match_result (eFootball, CS2); V1.26 plan blocks, debrief drills, weekly, meta_extract, meta_fit; V1.27 prematch, scout_day, brainstorm
+export const PROMPT_VERSION = 'scrim-ai-2026-12-03.1';   // V1.38 RULES (format, patch, map pool) in prep, prematch and brainstorm material; V1.36 support rows (follow-up text, session, prognosis); V1.34 support_parse; V1.30 match_result (eFootball, CS2); V1.26 plan blocks, debrief drills, weekly, meta_extract, meta_fit; V1.27 prematch, scout_day, brainstorm
 export const DEFAULT_MODEL = 'claude-sonnet-5-5';
 
 // Titles with screenshot capture. MLBB Women plays the same game client as MLBB.
@@ -391,7 +391,8 @@ const GROUNDED = [
 export function prematchPrompt(title) {
   return [
     `You draft a one-page pre-match brief for the Indonesian ${title} players and coaches, for a match at IESF WEC 2026 between games or just before it (Bahasa Indonesia unless the material is all English).`,
-    'You receive BRIEF (what the staff know about the opponent: known, to confirm, watch for; each item with an id), LIVE (today\'s and earlier live scouting observations, each with an id, type pick / ban / strategy / player / tendency / note, and how often), BOOK (our approved draft book, MOBA only) and STANDIN (our results against partners who play like them).',
+    'You receive BRIEF (what the staff know about the opponent: known, to confirm, watch for; each item with an id), LIVE (today\'s and earlier live scouting observations, each with an id, type pick / ban / strategy / player / tendency / note, and how often), BOOK (our approved draft book, MOBA only), STANDIN (our results against partners who play like them) and RULES.',
+    `- ${RULES_RULE}`,
     '- likely: up to 5 picks, bans or strategies they are likely to use. threats: up to 3 players or tendencies to watch. key_points: exactly 3 short, concrete points the players can act on in this match. watch: up to 3 things to check during the match. tbd: what we do not know.',
     GROUNDED,
   ].join('\n');
@@ -407,6 +408,7 @@ export function brainstormPrompt(title, purpose) {
   return [
     `You are a thinking partner for the ${title} coaching staff of the Indonesian national esports team in a brainstorming session (Bahasa Indonesia unless the staff write English). Purpose: ${purpose === 'opponent' ? 'prepare for one opponent' : 'plan the next practice sessions'}.`,
     'You receive MATERIAL (the title\'s own records, each with an id), HISTORY (the session so far) and QUESTION.',
+    `- ${RULES_RULE}`,
     '- reply: a direct, practical answer in a few short paragraphs or bullet lines. Ask back when the question is unclear. Offer a counter-view when the staff seem settled too fast. sources: the ids you used.',
     '- follow_ups: up to 3 short questions the staff could ask next. suggestions: up to 3 things the answer could become in the hub: "session" (a practice session with drills: title = focus, detail = the drills with minutes and a success criterion each), "proposal" (a coaching objective: title = the problem, detail = drill and how to measure), "note" (a scouting note about the opponent: title = the nation, detail = the note). Each cites sources.',
     GROUNDED,
@@ -424,6 +426,8 @@ export function metaFitPrompt(title) {
   ].join('\n');
 }
 
+// V1.38: the competition rules the staff hold for the title, given as RULES in the material.
+const RULES_RULE = 'RULES (when present) are the competition format, game patch and map pool as the staff hold them; "provisional" or "unverified" means IESF has not confirmed it. Use them as context (for example a Bo1 group stage, a new patch or the map pool), cite their ids, and say when a point depends on a rule that is not confirmed. Never treat them as facts about the opponent.';
 const NUMBERS_RULE = 'Every digit you write must be copied exactly from FACTS (or from the item you cite). Write no other number: no totals, differences, percentages or rankings you worked out. Lines with any other number are removed automatically.';
 const SAFE_RULE = 'No predictions of WEC results or win chances, no player rankings, no comments on health, mood, wellbeing, contracts or money.';
 
@@ -453,7 +457,8 @@ export function summaryPrompt() {
 export function prepPrompt(title) {
   return [
     `You help the ${title} coaching staff of the Indonesian national team prepare for one IESF WEC 2026 match.`,
-    'You receive MATCH (opponent nation, date, days left), CARD (the opponent card: tier, observed notes, hypotheses, VOD takeaways, roster, ban candidates), STANDINS (our scrim results against partners who stand in for this opponent), WEAKNESSES (our recurring weaknesses with counts), REPORTS (our latest scrim reports), BOOK (the approved draft book, MOBA only) and PARTNERS (sparring partners in the bank, with level and which nation they resemble). Every item has an id.',
+    'You receive MATCH (opponent nation, date, days left), CARD (the opponent card: tier, observed notes, hypotheses, VOD takeaways, roster, ban candidates), STANDINS (our scrim results against partners who stand in for this opponent), WEAKNESSES (our recurring weaknesses with counts), REPORTS (our latest scrim reports), BOOK (the approved draft book, MOBA only), PARTNERS (sparring partners in the bank, with level and which nation they resemble) and RULES. Every item has an id.',
+    `- ${RULES_RULE}`,
     '- summary: two or three sentences on what this match will ask of us.',
     '- their_tendencies: up to 4 things the opponent tends to do, only from CARD or STANDINS, each citing the item ids in sources.',
     '- our_focus: up to 3 practice focuses for the days before the match; each with a concrete drill and an observable measure, citing ids (prefer recurring weaknesses that matter against this opponent).',

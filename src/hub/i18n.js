@@ -9,6 +9,10 @@ export const LANGS = { en: 'English', id: 'Bahasa Indonesia' };
 const EXACT = {
   // V1.14 Draft Room
   'Mock draft': 'Mock draft', 'Draft books': 'Draft book', 'Hero pools': 'Hero pool', 'Draft patterns': 'Pola draft', 'Drills': 'Latihan draft', 'Pro games': 'Game pro', 'Start a mock draft': 'Mulai mock draft', 'Start the clock': 'Mulai waktu', 'No ban (time ran out)': 'Tanpa ban (waktu habis)', 'Recent mock drafts': 'Mock draft terakhir', 'Draft complete': 'Draft selesai', 'Save mock draft': 'Simpan mock draft', 'Undo last step': 'Batalkan langkah terakhir', 'Save new version': 'Simpan versi baru', 'Approve this version': 'Setujui versi ini', 'Save rating': 'Simpan rating', 'Save drill': 'Simpan latihan', 'New drill': 'Latihan baru', 'Submit answer': 'Kirim jawaban', 'Close': 'Tutup', 'Check': 'Cek', 'Import public pro games': 'Impor game pro publik', 'Seconds per step': 'Detik per langkah', 'Run by': 'Dipandu oleh', 'Approver': 'Penyetuju', 'Plan on blue side': 'Rencana di blue side', 'Plan on red side': 'Rencana di red side', 'Flex picks': 'Flex pick', 'Hero': 'Hero', 'Rating': 'Rating',
+  // V1.38 rule profiles
+  'Event format': 'Format turnamen', 'Event format (Open and Women)': 'Format turnamen (Putra dan Putri)',
+  'Reported schedule — not official': 'Jadwal yang dilaporkan — belum resmi', 'Add to match tracker': 'Tambah ke daftar pertandingan', 'on the tracker': 'sudah di daftar',
+  'first match of the day': 'match pertama hari itu', 'second match of the day': 'match kedua hari itu', 'date inferred (cut off in the source)': 'tanggal diperkirakan (terpotong di sumber)',
   // header & navigation
   'Some records could not be loaded:': 'Sebagian data gagal dimuat:', 'Practice quality': 'Kualitas latihan', Trends: 'Tren', 'Main dashboard': 'Dasbor utama', '⌂ Home': '⌂ Beranda', 'Days to WEC': 'Hari menuju WEC', 'Overdue follow-ups': 'Tindak lanjut terlambat', 'Proposals waiting': 'Usulan menunggu',
   'I am': 'Saya', Today: 'Hari ini', Competitors: 'Kompetitor', Tournament: 'Turnamen', 'Other titles': 'Title lain', Performance: 'Performa', Staff: 'Staf',
@@ -203,9 +207,22 @@ const EXACT = {
   'Suggestions from the Dota 2 club data': 'Saran dari data klub Dota 2', 'Open the opponent card': 'Buka opponent card',
   Analysis: 'Analisis', Weaknesses: 'Kelemahan', 'Notes per title': 'Catatan per title', 'How to read this': 'Cara membaca', 'Show all tools': 'Tampilkan semua', 'Focus mode': 'Mode fokus',
   'Focus mode hides screens not in use yet': 'Mode fokus menyembunyikan layar yang belum dipakai',
+  'Screens not in use yet. Show all tools': 'Layar yang belum dipakai. Tampilkan semua',
   'Did not take place?': 'Tidak jadi?', 'Why (optional)': 'Alasan (opsional)', 'Mark as cancelled': 'Tandai batal', 'Objectives of this session': 'Objektif sesi ini',
   'Measured value (optional)': 'Nilai terukur (opsional)', 'partly-met': 'sebagian tercapai', 'not-met': 'tidak tercapai', 'not-measured': 'tidak diukur', 'Not available yet.': 'Belum tersedia.',
   'About a minute: tap the result, tell the story (speak or type), check and save.': 'Sekitar satu menit: ketuk hasilnya, ceritakan sesinya (bicara atau ketik), cek lalu simpan.',
+  // V1.39 two-minute scrim report
+  'Two minutes: the result, the one change for next time, save. Everything else is optional. Screenshots or a voice note fill the boxes for you.':
+    'Dua menit: hasilnya, satu perubahan untuk sesi berikutnya, simpan. Selebihnya opsional. Screenshot atau voice note mengisi kotaknya untuk Anda.',
+  'The change for next time': 'Perubahan untuk sesi berikutnya', 'Needed: one concrete change. The rest helps the analysis but is optional.': 'Wajib: satu perubahan konkret. Sisanya membantu analisis, tapi opsional.',
+  'The one change for the next session (needed)': 'Satu perubahan untuk sesi berikutnya (wajib)', 'What was this session meant to practise? (optional)': 'Apa yang ingin dilatih di sesi ini? (opsional)',
+  'What worked (optional)': 'Yang berhasil (opsional)', 'What failed (optional)': 'Yang gagal (opsional)', 'How closely did the team follow the plan? (optional)': 'Seberapa dekat tim mengikuti rencana? (opsional)',
+  'Write the one change for the next session.': 'Tulis satu perubahan untuk sesi berikutnya.',
+  'Rate how closely the team followed the plan (1 to 5), or leave it empty.': 'Nilai seberapa dekat tim mengikuti rencana (1 sampai 5), atau biarkan kosong.',
+  "The report you just saved, ready to paste in the team's WhatsApp group": 'Laporan yang baru disimpan, siap ditempel di grup WhatsApp tim',
+  "Copied: paste it in the team's WhatsApp group.": 'Tersalin: tempel di grup WhatsApp tim.',
+  'filed today': 'sudah hari ini', 'File one': 'Isi laporan',
+  'A report takes two minutes: the result, the one change for next time, save, then "Copy for WhatsApp".': 'Laporan cukup dua menit: hasilnya, satu perubahan untuk sesi berikutnya, simpan, lalu "Salin untuk WhatsApp".',
   'One report per sparring partner · a saved report can be edited (every change is kept in its history) · performance notes only.': 'Satu laporan per sparring partner · laporan tersimpan bisa diubah (setiap perubahan tersimpan di riwayatnya) · catatan performa saja.',
   'Accepted objectives first. Anything not yet reviewed is a proposal, not a training decision.': 'Objektif yang diterima lebih dulu. Yang belum direview masih usulan, bukan keputusan latihan.',
   // V1.31 results on competitive settings
@@ -656,6 +673,9 @@ const PREFIX = [
 
 // Sentences with data in them.
 const RULES = [
+  [/^More · (\d+)$/, 'Lainnya · $1'],
+  [/^Scrim reports today: (\d+) of (\d+) filed$/, 'Laporan scrim hari ini: $1 dari $2 sudah masuk'],
+  [/^(\d+) day\(s\) ago$/, '$1 hari lalu'],
 
   // V1.9 scrim reports
   [/^Win rate by day \((games|matches|maps) won\)$/, (m, u) => `Persentase menang per hari (${{ games: 'game', matches: 'pertandingan', maps: 'map' }[u]} menang)`],
@@ -763,7 +783,7 @@ const RULES = [
   [/^(Goals|Rounds|Penalties) \((us|them)\) must be a whole number from 0 to (\d+)\.$/, (m, a, b, n) => `${({ Goals: 'Gol', Rounds: 'Ronde', Penalties: 'Penalti' })[a]} (${b === 'us' ? 'kita' : 'lawan'}) harus bilangan bulat dari 0 sampai ${n}.`],
   [/^Added: (win|loss|draw) (.+)\. The result below is filled; keep going or save the report\.$/, (m, r, x) => `Ditambahkan: ${({ win: 'menang', loss: 'kalah', draw: 'seri' })[r]} ${x}. Hasil di bawah sudah terisi; lanjutkan atau simpan laporan.`],
   // V1.29 scrim report
-  [/^(\d) of (\d) done — still needed: (.+)\.$/, (m, a, b, l) => `${a} dari ${b} selesai — masih perlu: ${l.split(', ').map((x) => ({ 'sparring partner': 'sparring partner', result: 'hasil', focus: 'fokus', 'what worked or failed': 'yang berhasil atau gagal', adjustment: 'penyesuaian', 'plan rating': 'nilai rencana' })[x] || x).join(', ')}.`],
+  [/^(\d) of (\d) done — still needed: (.+)\.$/, (m, a, b, l) => `${a} dari ${b} selesai — masih perlu: ${l.split(', ').map((x) => ({ 'sparring partner': 'sparring partner', result: 'hasil', focus: 'fokus', 'what worked or failed': 'yang berhasil atau gagal', adjustment: 'penyesuaian', 'plan rating': 'nilai rencana', 'change for next time': 'perubahan untuk sesi berikutnya' })[x] || x).join(', ')}.`],
   [/^Filled from today's plan: vs (.+)\. Change anything that is different\.$/, 'Diisi dari rencana hari ini: vs $1. Ubah yang berbeda.'],
   // V1.28 Trends period
   [/^this period (.+) \((\d+)\) vs (.+) \((\d+)\) the (?:week|(\d) weeks) before$/, (m, a, na, b, nb, w) => `periode ini ${a} (${na}) vs ${b} (${nb}) pada ${w || 1} minggu sebelumnya`],
@@ -824,7 +844,8 @@ const RULES = [
   [/^Approve as \((.+) or the title coach\)$/, 'Setujui sebagai ($1 atau pelatih title)'], [/^Our players: (.+)\.$/, (m, a) => `Pemain kita: ${a === 'roster not entered' ? 'roster belum diisi' : a}.`],
   [/^Key point (\d)$/, 'Poin kunci $1'],
   [/^Open (.+) competitors$/, 'Buka kompetitor $1'], [/^No roster for (.+) yet\. Add it under$/, 'Belum ada roster untuk $1. Tambahkan di'],
-  [/^Source: wec\.iesf\.org\/editions\/wec-2026\/teams\/\{code\}, read (\S+) .*$/, 'Sumber: wec.iesf.org/editions/wec-2026/teams/{kode}, dibaca $1 (setiap halaman tim dibaca dengan pembaca halaman otomatis; eFootball tidak termasuk). Nama bertanda ⚠ perlu dicek di situs. Akun dan hero pool Dota dari OpenDota (cocok nama + kode negara; "probable" = nama cocok tanpa negara, satu klub dengan rekan yang cocok), game turnamen klub sejak 7.41, diambil 3 Nov 2026.'],
+  // V1.38: three reads (3, 13, 21 Nov); the Dota sentence only on the Dota page.
+  [/^Source: wec\.iesf\.org\/editions\/wec-2026\/teams\/\{code\}, read ([\d, -]+?) \(.*?\) Names marked ⚠ need checking on the site\.( Dota accounts.*)?$/, (_, dates, dota) => `Sumber: wec.iesf.org/editions/wec-2026/teams/{kode}, dibaca ${dates} (dibaca otomatis 3 Nov; dibaca ulang 13 dan 21 Nov, eFootball ditambahkan 21 Nov). Nama bertanda ⚠ perlu dicek di situs.${dota ? ' Akun dan hero pool Dota dari OpenDota (cocok nama + kode negara; "probable" = nama cocok tanpa negara, satu klub dengan rekan yang cocok), game turnamen klub sejak 7.41, diambil 3 Nov 2026.' : ''}`],
   [/^Focus owner: (.+?) · title coach: (.+?)\. (No analysis engine in the hub.*)$/, (m, a, b) => `Penanggung jawab fokus: ${a.replace('(Head Coach)', '(Pelatih Kepala)').replace('(Assistant Coach 2)', '(Asisten Pelatih 2)').replace('— by oversight; no focus owner named', '— lewat pengawasan; belum ada penanggung jawab fokus')} · pelatih title: ${tr(b) ?? b}. Tidak ada mesin analisis di hub untuk title ini; apa yang dilihat staf di VOD atau scrim masuk ke siklus coaching sebagai observasi.`],
   [/^(.+) \((Head Coach|Assistant Coach 2)\)$/, (m, a, b) => `${a} (${b === 'Head Coach' ? 'Pelatih Kepala' : 'Asisten Pelatih 2'})`],
   [/^Fayad \(Head Coach\) — by oversight; no focus owner named$/, 'Fayad (Pelatih Kepala) — lewat pengawasan; belum ada penanggung jawab fokus'],

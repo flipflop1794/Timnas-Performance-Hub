@@ -162,7 +162,7 @@ export function coachAiUi(ctx) {
           setMsg(msg, 'Drafting… (15–30 s)');
           const { card, standIn, book, partners } = cardFor(m.title, m.opponent);
           const reports = S.reports.filter((r) => r.title === m.title).sort((a, b) => b.date.localeCompare(a.date));
-          const material = prepMaterial({ match: m, card, standIn, weaknesses: weaknessCounts(S.wtags, m.title, today(), 14), reports, book, partners, asOf: today() });
+          const material = prepMaterial({ match: m, card, standIn, weaknesses: weaknessCounts(S.wtags, m.title, today(), 14), reports, book, partners, asOf: today(), rules: S.rules });
           const out = await ai().call({ action: 'prep', title: m.title, material });
           const prev = S.packs.find((x) => x.matchId === m.id);
           const pack = { ...packFromAi(out.raw, material, m, HUB_USER?.name || meName()), version: (prev?.version || 0) + 1 };

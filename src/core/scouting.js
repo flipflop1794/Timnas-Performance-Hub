@@ -110,7 +110,7 @@ export const approvedBrief = (records, title, nation, matchId, date) => records.
 
 // ---------- V1.27 AI material (every item with an id the AI must cite) ----------
 const liveItem = (e) => ({ id: e.id, type: e.type, hero: e.hero || undefined, player: e.player || undefined, text: e.text || undefined, phase: e.phase || undefined, date: e.date, match: e.match || undefined });
-export function prematchMaterial({ brief, live = [], standIn = null, book = null }) {
+export function prematchMaterial({ brief, live = [], standIn = null, book = null, rules = [] }) {
   const tagged = (xs, p) => xs.map((x, i) => ({ id: `${p}${i + 1}`, text: x.text, source: x.src }));
   const L = liveSummary(live);
   return {
@@ -120,6 +120,7 @@ export function prematchMaterial({ brief, live = [], standIn = null, book = null
       ...L.strategies.map((s, i) => ({ id: `CS${i + 1}`, tendency: s.label, n: s.n, small: s.n < 3 }))],
     BOOK: book ? { id: 'BOOK', bans: book.bans, protect: book.protect, flex: book.flex } : null,
     STANDIN: standIn ? { id: 'STANDIN', games: standIn.n, won: standIn.won, low_sample: !!standIn.lowSample } : null,
+    RULES: rules, // V1.38: rulesMaterial(S.rules, title) from the caller — format, patch, map pool
   };
 }
 export const materialIds = (m) => new Set(JSON.stringify(m).match(/"id":"([^"]+)"/g)?.map((s) => s.slice(6, -1)) || []);

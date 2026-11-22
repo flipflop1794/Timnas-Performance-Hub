@@ -8,6 +8,7 @@ import { weaknessCounts } from './weakness.js';
 import { shiftDay } from './dates.js';
 import { planScrim } from './scrims.js';
 import { allowedNumbers, checkLine } from './ai_check.js';
+import { rulesMaterial } from './rules.js';
 
 const gap = (a, b) => Math.round((Date.parse(b) - Date.parse(a)) / 86400000);
 const clip = (v, n = 300) => String(v ?? '').slice(0, n);
@@ -59,7 +60,7 @@ export const briefFlagged = (b) => [b.headline, ...b.titles, ...b.attention, ...
 // ---------------------------------------------------------------- preparation pack for one WEC match
 // card: { observed, hypotheses, vods, banCandidates, tier, plan } from the opponent card; standIn: patterns.standInRecord;
 // weaknesses: weaknessCounts rows; reports: latest of the title; book: approved draft book or null; partners: bank.
-export function prepMaterial({ match, card = {}, standIn = null, weaknesses = [], reports = [], book = null, partners = [], asOf }) {
+export function prepMaterial({ match, card = {}, standIn = null, weaknesses = [], reports = [], book = null, partners = [], asOf, rules = [] }) {
   const id = (p, i) => `${p}${i + 1}`;
   return {
     MATCH: { opponent: match.opponent, date: match.date, stage: match.stage || '', days_left: Math.max(0, gap(asOf, match.date)) },
@@ -76,6 +77,7 @@ export function prepMaterial({ match, card = {}, standIn = null, weaknesses = []
     REPORTS: reports.slice(0, 8).map((r) => ({ id: r.id, date: r.date, partner: r.partner, result: resultText(r.result), failed: clip(r.failed), adjustment: clip(r.adjust) })),
     BOOK: book ? [{ id: 'B1', text: clip(`Bans ${(book.bans || []).join(', ')}; protect ${(book.protect || []).join(', ')}; flex ${(book.flex || []).join(', ')}`, 400) }] : [],
     PARTNERS: partners.slice(0, 12).map((p, i) => ({ id: id('P', i), name: p.name, level: p.level || '', resembles: p.resembles || '' })),
+    RULES: rulesMaterial(rules, match.title), // V1.38: format, patch, map pool as the staff hold them
   };
 }
 export function packFromAi(raw, material, match, by) {
