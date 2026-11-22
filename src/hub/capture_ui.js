@@ -205,9 +205,9 @@ export function captureUi(ctx) {
     const logDraftTable = (team) => {
       const ours = team === 'ours';
       const picks = g.players.map((p, i) => ({ p, i })).filter(({ p }) => (p.side === g.ourSide) === ours);
-      return `<div class="tw"><table class="capgrid"><thead><tr><th>Pick</th><th>Team</th><th>Hero</th>${ours ? '<th>Our player</th>' : ''}</tr></thead><tbody>${picks.map(({ p, i }) => `<tr>${pickSel(p, i)}<td>${sideSel(`cg-${fid}-${i}-side`, p.side, cell(p, 'side'), sides, SHORT)}</td>
+      return `<div class="tw"><table class="capgrid"><thead><tr><th>Pick</th><th>Hero</th>${ours ? '<th>Our player</th>' : ''}</tr></thead><tbody>${picks.map(({ p, i }) => `<tr>${pickSel(p, i)}
         <td><input type="text" id="cg-${fid}-${i}-hero" list="capHeroes-${fid}" value="${esc(p.hero)}"${cell(p, 'hero')} size="12" placeholder="Select or enter hero">${p.hero ? '' : chips(p, i)}
-          <input type="hidden" id="cg-${fid}-${i}-name" value="${esc(p.nameSeen)}">${ours ? '' : `<input type="hidden" id="cg-${fid}-${i}-player" value="${esc(p.player || '')}">${defs.map((d) => `<input type="hidden" id="cg-${fid}-${i}-${d.key}" value="${esc(p.stats[d.key] ?? '')}">`).join('')}`}</td>
+          <input type="hidden" id="cg-${fid}-${i}-side" value="${esc(p.side)}"><input type="hidden" id="cg-${fid}-${i}-name" value="${esc(p.nameSeen)}">${ours ? '' : `<input type="hidden" id="cg-${fid}-${i}-player" value="${esc(p.player || '')}">${defs.map((d) => `<input type="hidden" id="cg-${fid}-${i}-${d.key}" value="${esc(p.stats[d.key] ?? '')}">`).join('')}`}</td>
         ${ours ? `<td><input type="text" id="cg-${fid}-${i}-player" list="capPlayers-${fid}" value="${esc(p.player || '')}" size="10" autocomplete="off" placeholder="Player"></td>` : ''}</tr>`).join('')}</tbody></table></div>`;
     };
     const logPlayerResults = () => `<details class="cap-log-results" open><summary><strong>Player results</strong> <span class="note">IRR and optional stats for our five players</span></summary>
@@ -222,7 +222,7 @@ export function captureUi(ctx) {
       ${iss}${dl}
       ${names.length ? `<p class="note">Teams on screen: ${names.map(([k, v]) => `${esc(SIDE_LABEL[k])}: ${esc(v)}`).join(' · ')}</p>` : ''}
       <div class="form">
-        <label class="field" for="cg-${fid}-our">Our team${sideSel(`cg-${fid}-our`, g.ourSide)}</label>
+        ${log ? `<input type="hidden" id="cg-${fid}-our" value="${esc(g.ourSide)}">` : `<label class="field" for="cg-${fid}-our">Our team${sideSel(`cg-${fid}-our`, g.ourSide)}</label>`}
         <label class="field" for="cg-${fid}-result">Result<select id="cg-${fid}-result"><option value=""></option><option value="win" ${g.result === 'win' ? 'selected' : ''}>Win</option><option value="loss" ${g.result === 'loss' ? 'selected' : ''}>Loss</option></select></label>
         <label class="field" for="cg-${fid}-dur">Duration (mm:ss)<input type="text" inputmode="numeric" id="cg-${fid}-dur" data-mmss maxlength="5" value="${g.durationS == null ? '' : esc(durationText(g.durationS))}" placeholder="1842"></label>
         ${log ? `<label class="field" for="cg-${fid}-po">Side<select id="cg-${fid}-po"><option value=""></option>${PICK_ORDER.map((o) => `<option value="${o}" ${g.pickOrder === o ? 'selected' : ''}>${esc(PICK_ORDER_LABEL[o])}</option>`).join('')}</select></label>
