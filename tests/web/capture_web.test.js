@@ -75,6 +75,18 @@ test('website: when the AI function is not deployed, AI buttons are hidden and t
   assert.ok(P.d.querySelector('[data-cap-manual="MLBB"]'), 'by-hand path still there');
 });
 
+for (const [title, route] of [['MLBB', 'mlbb-reports'], ['MLBB Women', 't-mlbbw-reports']]) {
+  test(`website: ${title} opens the copied local result scanner from a manual game`, async () => {
+    const P = await open(world(), 'aufa', route);
+    await P.click(`[data-cap-manual="${title}"]`);
+    assert.ok(P.d.querySelector(`[data-cap-local="${title}"]`));
+    await P.click(`[data-cap-local="${title}"]`);
+    await sleep(100);
+    assert.match(P.d.querySelector('.local-result-scanner')?.textContent || '', /full 16:9 result frame/i);
+    assert.equal(P.d.querySelectorAll('.local-scan-file input[type="file"]').length, 2);
+  });
+}
+
 test('website updated before the database (V1.13–V1.15 tables missing): the hub works as before, new parts hidden, admin sees what is pending', async () => {
   const B = world(); B.missing = new Set(['scrim_games', 'scrim_captures', 'pattern_findings', 'player_aliases', 'ai_usage', 'draft_pools', 'draft_books', 'mock_drafts', 'draft_drills', 'pro_games', 'readiness_store']);
   const P = await open(B, 'indra', 'mlbb-reports');

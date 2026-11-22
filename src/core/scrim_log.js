@@ -15,8 +15,8 @@ export const PICK_ORDER = ['FP', 'SP'];
 export const PICK_ORDER_LABEL = { FP: 'FP', SP: 'SP' };
 // V1.39: the map variants offered (the current pool). Older Scrim Log variants stay valid on saved games,
 // so fixing an old game keeps its map.
-export const MLBB_MAPS = ['Flying Clouds', 'Golden Turret', 'Healing Turtle', 'Revealing Wisps'];
-export const MLBB_MAPS_OLD = ['Default Map', 'Broken Walls', 'Dangerous Grass', 'Expanding River'];
+export const MLBB_MAPS = ['Default Map', 'Flying Clouds', 'Golden Turret', 'Healing Turtle', 'Revealing Wisps'];
+export const MLBB_MAPS_OLD = ['Broken Walls', 'Dangerous Grass', 'Expanding River'];
 const KNOWN_MAPS = [...MLBB_MAPS, ...MLBB_MAPS_OLD];
 export const TIME_SLOTS = ['Warmup', ...Array.from({ length: 10 }, (_, i) => `Jam ${i + 1}`), 'Tournament'];
 export const MAX_BANS = 5;

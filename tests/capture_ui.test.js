@@ -61,9 +61,11 @@ test('without the website AI, games are typed the Scrim Log way and still feed t
   h.set('cg-MLBB-7-hero', '');
   // V1.39: the pick number is the row's place in its team, shown and not chosen; FP / SP without words; four maps.
   assert.equal(h.d.getElementById('cg-MLBB-0-pick'), null, 'no pick-number box');
-  assert.deepEqual([...h.d.querySelectorAll('.capgrid tbody tr')].map((r) => r.cells[0].textContent), ['P1', 'P2', 'P3', 'P4', 'P5', 'P1', 'P2', 'P3', 'P4', 'P5']);
+  assert.deepEqual([...h.d.querySelectorAll('.cap-log-grid .capgrid tbody tr')].map((r) => r.cells[0].textContent), ['P1', 'P2', 'P3', 'P4', 'P5', 'P1', 'P2', 'P3', 'P4', 'P5']);
+  assert.match(h.d.querySelector('.cap-log-grid').textContent, /Our draft.*Our picks.*Opponent draft.*Opponent picks/s);
+  assert.equal(h.d.querySelectorAll('.cap-log-results tbody tr').length, 5);
   assert.deepEqual([...h.d.getElementById('cg-MLBB-po').options].map((o) => o.textContent).filter(Boolean), ['FP', 'SP']);
-  assert.deepEqual([...h.d.getElementById('cg-MLBB-jmap').options].map((o) => o.value).filter(Boolean), ['Flying Clouds', 'Golden Turret', 'Healing Turtle', 'Revealing Wisps']);
+  assert.deepEqual([...h.d.getElementById('cg-MLBB-jmap').options].map((o) => o.value).filter(Boolean), ['Default Map', 'Flying Clouds', 'Golden Turret', 'Healing Turtle', 'Revealing Wisps']);
   h.set('cg-MLBB-result', 'win'); h.set('cg-MLBB-dur', '1405'); h.set('cg-MLBB-jmap', 'Golden Turret');
   assert.equal(h.d.getElementById('cg-MLBB-dur').value, '14:05', 'digits only: the colon is put in');
   h.set('cb-MLBB-ours-0', 'Fanny'); h.set('cb-MLBB-partner-0', 'Ling'); h.set('cg-MLBB-gnotes', 'Lord fight telat'); h.set('cg-MLBB-vod', 'https://youtu.be/abc');

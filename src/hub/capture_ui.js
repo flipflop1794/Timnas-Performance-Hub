@@ -8,6 +8,12 @@ import { checkDebriefInput, checkDebriefSplit } from '../core/debrief.js';
 import { facts, checkFindings, findingRecord, markFinding, statTrail, digestPayload, MIN_SAMPLE, standInRecord, statGoalProgress } from '../core/patterns.js';
 import { GAME_SIDES, LIMITS } from '../../supabase/functions/_shared/scrim_spec.js';
 import { isScrimLog, PICK_ORDER, PICK_ORDER_LABEL, MLBB_MAPS, MAX_BANS, NOTES_MAX } from '../core/scrim_log.js';
+import { scannerGame, applyLocalScan, sameReviewedResult } from '../core/scrim_log_ocr.js';
+import { normalizeScannerHeroKey } from '../lib/localResultScanner.js';
+import LocalResultScanner, { BatchLocalResultScanner } from '../components/LocalResultScanner.jsx';
+import { createRoot } from 'react-dom/client';
+import { createElement } from 'react';
+import scannerCss from './scrim_log_scanner.css';
 
 const HEROES = {
   mlbb: heroIndex(DATA.mlbbHeroes),
@@ -41,6 +47,57 @@ export function mmssInput(el) {
 export function captureUi(ctx) {
   const { S, esc, tag, banner, setMsg, val, render, meName, sid, fillReport, localToday, PLATFORM } = ctx;
   const ai = () => PLATFORM?.ai || null;
+  const localOcr = (title) => isScrimLog(title) && !!PLATFORM;
+  const heroIcons = Object.fromEntries(DATA.mlbbHeroes.map(({ name }) => [normalizeScannerHeroKey(name), `/mlbb-icons/${normalizeScannerHeroKey(name)}.png`]));
+  let localScanner = null;
+  function closeLocalScanner() {
+    const previous = localScanner; localScanner = null;
+    if (previous?.root) queueMicrotask(() => previous.root.unmount());
+    render();
+  }
+  function attachLocalScanner() {
+    if (!localScanner) return;
+    const slot = document.getElementById(`${localScanner.mode === 'batch' ? 'capLocalBatch' : 'capLocalPending'}-${localScanner.fid}`);
+    if (slot && localScanner.node.parentNode !== slot) slot.appendChild(localScanner.node);
+  }
+  function openLocalScanner(title, mode) {
+    const fid = sid(title); const s = st(fid);
+    if (mode === 'single') syncPending(title, fid);
+    const games = mode === 'batch' ? s.ready.map((g) => scannerGame(gameToProposal(g), g.id)) : [];
+    const game = mode === 'single' && s.pending ? scannerGame(s.pending.base, `pending-${fid}`) : null;
+    if (mode === 'single' && !game || mode === 'batch' && !games.length) return;
+    if (localScanner?.root) localScanner.root.unmount();
+    if (!document.getElementById('hubLocalScannerCss')) {
+      const style = document.createElement('style'); style.id = 'hubLocalScannerCss'; style.textContent = scannerCss; document.head.appendChild(style);
+    }
+    const node = document.createElement('div'); node.className = 'hub-local-scanner';
+    localScanner = { mode, fid, node, root: createRoot(node) };
+    const apply = (index, payload) => {
+      try {
+        if (mode === 'single') {
+          syncPending(title, fid);
+          const pending = st(fid).pending;
+          pending.base = applyLocalScan(pending.base, payload);
+          pending.localScan = true; pending.fromScreenshot = true;
+        } else {
+          const old = st(fid).ready[index];
+          const edited = applyLocalScan(gameToProposal(old), payload);
+          const updated = confirmGame(edited, { date: old.date, partner: old.partner, gameNo: old.gameNo, by: old.by,
+            heroes: heroesFor(title), roster: rosterOf(title) });
+          st(fid).ready[index] = { ...updated, id: old.id, createdAt: old.createdAt, reportId: old.reportId, source: 'local-ocr',
+            scanReview: edited.scanReview, teamKills: edited.teamKills, opponentTeamKills: edited.opponentTeamKills };
+          const result = gamesResult(st(fid).ready); fillReport(fid, { won: String(result.won), lost: String(result.lost) });
+        }
+        keep(fid);
+        if (mode === 'batch') render();
+        return true;
+      } catch (error) { setMsg(`capMsg-${fid}`, error.message, 'err'); return false; }
+    };
+    localScanner.root.render(mode === 'batch'
+      ? createElement(BatchLocalResultScanner, { games, heroIcons, qualityScope: `timnas:${S.me}:${title}`, onApply: apply, onClose: closeLocalScanner })
+      : createElement(LocalResultScanner, { game, gameIndex: s.ready.length, heroIcons, qualityScope: `timnas:${S.me}:${title}`, onApply: (payload) => apply(0, payload), onClose: closeLocalScanner }));
+    attachLocalScanner();
+  }
   S.games ||= []; S.captures ||= {}; S.findings ||= []; S.aliases ||= {}; S.cap ||= {}; S.patPeriod ||= {}; S.patDropped ||= {};
 
   // ---------------------------------------------------------------- per-form capture state (this device)
@@ -83,7 +140,7 @@ export function captureUi(ctx) {
   function gamesSection(title, fid) {
     if (!gameOf(title)) return '';
     const s = st(fid); const on = !!ai();
-    const list = s.ready.map((g, i) => `<li><b>Game ${i + 1}</b> · ${g.result === 'win' ? tag('c-Verified', 'win') : tag('c-Blocked', 'loss')}${g.pickOrder ? ` · <b>${esc(g.pickOrder)}</b>` : ''}${g.mapVariant ? ` · ${esc(g.mapVariant)}` : ''} · ${esc(durationText(g.durationS))}${g.mapSide ? ` · ${esc(SIDE_LABEL[g.mapSide])} side` : ''} · <span class="note">${g.players.filter((p) => p.team === 'ours').map((p) => esc(`${p.player === 'stand-in' ? 'stand-in' : p.player} (${p.hero})`)).join(', ')}${g.draft.length ? ` · draft ${g.draft.length} actions` : ''}${g.source === 'screenshot' ? ` · from screenshot${g.corrections.length ? `, ${g.corrections.length} value${g.corrections.length > 1 ? 's' : ''} corrected` : ''}` : ' · typed'}</span>
+    const list = s.ready.map((g, i) => `<li><b>Game ${i + 1}</b> · ${g.result === 'win' ? tag('c-Verified', 'win') : tag('c-Blocked', 'loss')}${g.pickOrder ? ` · <b>${esc(g.pickOrder)}</b>` : ''}${g.mapVariant ? ` · ${esc(g.mapVariant)}` : ''} · ${esc(durationText(g.durationS))}${g.mapSide ? ` · ${esc(SIDE_LABEL[g.mapSide])} side` : ''} · <span class="note">${g.players.filter((p) => p.team === 'ours').map((p) => esc(`${p.player === 'stand-in' ? 'stand-in' : p.player} (${p.hero})`)).join(', ')}${g.draft.length ? ` · draft ${g.draft.length} actions` : ''}${g.source === 'local-ocr' ? ' · local OCR reviewed' : g.source === 'screenshot' ? ` · from screenshot${g.corrections.length ? `, ${g.corrections.length} value${g.corrections.length > 1 ? 's' : ''} corrected` : ''}` : ' · typed'}</span>
       <button type="button" class="linkbtn" data-cap-remove="${esc(`${fid}|${i}`)}">Remove</button></li>`).join('');
     if (s.savedFor) return `<div class="h3">Games</div>${banner('block', `<div><b>${s.ready.length} game(s) of the report vs ${esc(s.savedFor.partner)} (${esc(s.savedFor.date)}) are not saved yet.</b> The report itself is saved.</div>`)}<div class="toolbar"><button class="btn primary" type="button" data-cap-retry="${esc(title)}">Retry saving games</button><span class="msg" id="capMsg-${fid}" role="status"></span></div>`;
     // V1.38: MLBB and MLBB Women are entered the Scrim Log way: one entry per game, the result counted from them.
@@ -91,6 +148,7 @@ export function captureUi(ctx) {
       return `<div class="h3">Games (Scrim Log)</div>
       <p class="note">One entry per game, in the order played: side FP / SP, map, bans and picks (P1–P5 with the player), the other team's bans and picks, result, duration, VOD link and a note. The report's result is counted from these games.${on ? ' A screenshot of the result or the draft can fill the heroes and stats for you; you check every value.' : ''}</p>
       ${S.rpEdit?.[fid] ? '<p class="note">Editing the report: its games stay as saved. To change a game, use Fix in the saved report\'s game table.</p>' : list ? `<ul class="plain capgames">${list}</ul>` : '<p class="empty">No game added yet. A report needs at least one.</p>'}
+      ${localOcr(title) && s.ready.length && !S.rpEdit?.[fid] ? `<div class="toolbar"><button class="btn" type="button" data-cap-local-batch="${esc(title)}">Batch scan session (local OCR)</button><span class="note">Two result screenshots per game, in any order; review each before applying.</span></div><div id="capLocalBatch-${fid}" class="hub-local-scanner"></div>` : ''}
       ${S.rpEdit?.[fid] ? '' : s.pending ? editorHtml(title, fid, s.pending) : `<div class="toolbar"><button class="btn primary" type="button" data-cap-manual="${esc(title)}">+ Add game ${s.ready.length + 1}</button>${on ? `<label class="btn filebtn">From a screenshot<input type="file" accept="image/*" multiple data-cap-shot="${esc(title)}" hidden></label>` : ''}<span class="msg" id="capMsg-${fid}" role="status"></span></div>`}`;
     }
     return `<div class="h3">Games</div>
@@ -114,12 +172,13 @@ export function captureUi(ctx) {
   // Pools for filling an unsure hero: the Draft Room pool, else (Dota, no Draft Room) heroes used 2+ times in scrims.
   const fillPools = (title) => { const p = poolsOf(title); if (Object.keys(p).length) return p; return playerHeroes(gamesOf(title)); };
   // V1.38 Scrim Log bans: B1–B5 for each team, in ban order. A draft screenshot pre-fills them.
-  function banRows(fid, g, dr) {
+  function banRows(fid, g, dr, onlyTeam = '') {
     const fromDraft = (team) => (dr?.actions || []).filter((a) => a.action === 'ban' && a.hero && (team === 'ours' ? a.side === g.ourSide : a.side && a.side !== g.ourSide)).map((a) => a.hero);
     const typed = (team) => (g.bans?.[team] || []).filter(Boolean);
     const bans = { ours: typed('ours').length ? typed('ours') : fromDraft('ours'), partner: typed('partner').length ? typed('partner') : fromDraft('partner') };
     const row = (team, label) => `<div class="form banrow"><span class="note"><b>${label}</b></span>${Array.from({ length: MAX_BANS }, (_, k) => `<label class="field" for="cb-${fid}-${team}-${k}">B${k + 1}<input type="text" id="cb-${fid}-${team}-${k}" list="capHeroes-${fid}" size="8" value="${esc(bans[team][k] || '')}"></label>`).join('')}</div>`;
-    return `<div class="h3">Bans</div>${row('ours', 'Our bans')}${row('partner', 'Their bans')}${dr ? '<p class="note">Bans pre-filled from the draft screenshot: check them.</p>' : ''}`;
+    return onlyTeam ? row(onlyTeam, onlyTeam === 'ours' ? 'Our bans' : 'Opponent bans')
+      : `<div class="h3">Bans</div>${row('ours', 'Our bans')}${row('partner', 'Their bans')}${dr ? '<p class="note">Bans pre-filled from the draft screenshot: check them.</p>' : ''}`;
   }
   function editorHtml(title, fid, pend) {
     const g = pend.base; const game = gameOf(title); const sides = GAME_SIDES[game]; const defs = STAT_DEFS[game]; const roster = rosterOf(title);
@@ -143,7 +202,17 @@ export function captureUi(ctx) {
       ${defs.map((d) => `<td><input type="number" inputmode="${d.decimal ? 'decimal' : 'numeric'}" step="${d.decimal ? '0.1' : '1'}" min="0" id="cg-${fid}-${i}-${d.key}" value="${p.stats[d.key] ?? ''}"${cell(p, d.key)}></td>`).join('')}
       <td><input type="text" id="cg-${fid}-${i}-name" value="${esc(p.nameSeen)}"${cell(p, 'name')} size="10"></td></tr>`).join('');
     const dr = pend.draft;
-    const draftHtml = log ? banRows(fid, g, dr) : dr ? `<div class="h3">Draft</div>${dr.issues.length ? banner('synth', `<div><ul class="plain">${dr.issues.map((i) => `<li>${esc(i.text)}</li>`).join('')}</ul></div>`) : ''}
+    const logDraftTable = (team) => {
+      const ours = team === 'ours';
+      const picks = g.players.map((p, i) => ({ p, i })).filter(({ p }) => (p.side === g.ourSide) === ours);
+      return `<div class="tw"><table class="capgrid"><thead><tr><th>Pick</th><th>Team</th><th>Hero</th>${ours ? '<th>Our player</th>' : ''}</tr></thead><tbody>${picks.map(({ p, i }) => `<tr>${pickSel(p, i)}<td>${sideSel(`cg-${fid}-${i}-side`, p.side, cell(p, 'side'), sides, SHORT)}</td>
+        <td><input type="text" id="cg-${fid}-${i}-hero" list="capHeroes-${fid}" value="${esc(p.hero)}"${cell(p, 'hero')} size="12" placeholder="Select or enter hero">${p.hero ? '' : chips(p, i)}
+          <input type="hidden" id="cg-${fid}-${i}-name" value="${esc(p.nameSeen)}">${ours ? '' : `<input type="hidden" id="cg-${fid}-${i}-player" value="${esc(p.player || '')}">${defs.map((d) => `<input type="hidden" id="cg-${fid}-${i}-${d.key}" value="${esc(p.stats[d.key] ?? '')}">`).join('')}`}</td>
+        ${ours ? `<td><input type="text" id="cg-${fid}-${i}-player" list="capPlayers-${fid}" value="${esc(p.player || '')}" size="10" autocomplete="off" placeholder="Player"></td>` : ''}</tr>`).join('')}</tbody></table></div>`;
+    };
+    const logPlayerResults = () => `<details class="cap-log-results" open><summary><strong>Player results</strong> <span class="note">IRR and optional stats for our five players</span></summary>
+      <div class="tw"><table class="capgrid cap-results"><thead><tr><th>Pick</th><th>Player</th>${defs.map((d) => `<th class="n">${esc(d.label)}</th>`).join('')}</tr></thead><tbody>${g.players.map((p, i) => ({ p, i })).filter(({ p }) => p.side === g.ourSide).map(({ p, i }) => `<tr>${pickSel(p, i)}<td>${esc(p.player || p.hero || `Pick ${i + 1}`)}</td>${defs.map((d) => `<td><input type="number" inputmode="${d.decimal ? 'decimal' : 'numeric'}" step="${d.decimal ? '0.1' : '1'}" min="0" id="cg-${fid}-${i}-${d.key}" value="${esc(p.stats[d.key] ?? '')}"${cell(p, d.key)} aria-label="${esc(`${d.label} for pick ${i + 1}`)}"></td>`).join('')}</tr>`).join('')}</tbody></table></div></details>`;
+    const draftHtml = log ? '' : dr ? `<div class="h3">Draft</div>${dr.issues.length ? banner('synth', `<div><ul class="plain">${dr.issues.map((i) => `<li>${esc(i.text)}</li>`).join('')}</ul></div>`) : ''}
       <label class="field" for="cd-${fid}-first">First pick${sideSel(`cd-${fid}-first`, dr.firstPick)}</label>
       <div class="tw"><table class="capdraft"><thead><tr><th class="n">#</th><th>Team</th><th>Action</th><th>Hero</th></tr></thead><tbody>${dr.actions.map((a, i) => `<tr><td class="n">${a.order}</td><td>${sideSel(`cd-${fid}-${i}-side`, a.side, '', sides, SHORT)}</td><td><select id="cd-${fid}-${i}-action"><option ${a.action === 'pick' ? 'selected' : ''}>pick</option><option ${a.action === 'ban' ? 'selected' : ''}>ban</option></select></td><td><input type="text" id="cd-${fid}-${i}-hero" list="capHeroes-${fid}" value="${esc(a.hero)}" placeholder="${a.hero ? '' : esc(a.candidates.slice(0, 2).join(' / ') || 'pick')}"${a.flags.length ? ` class="flag" title="${esc(a.flags.map((f) => f.reason).join('; '))}" aria-invalid="true"` : ''}></td></tr>`).join('')}</tbody></table></div>
       <p class="note">Clear a hero to drop a row you cannot read.</p>` : '';
@@ -160,20 +229,28 @@ export function captureUi(ctx) {
         <label class="field" for="cg-${fid}-jmap">Map<select id="cg-${fid}-jmap"><option value=""></option>${[...MLBB_MAPS, ...(g.mapVariant && !MLBB_MAPS.includes(g.mapVariant) ? [g.mapVariant] : [])].map((m) => `<option ${g.mapVariant === m ? 'selected' : ''}>${esc(m)}</option>`).join('')}</select></label>`
     : game === 'mlbb' ? `<label class="field" for="cg-${fid}-map">Our map side (optional)${sideSel(`cg-${fid}-map`, g.mapSide, '', MAP_SIDES.mlbb)}</label>` : ''}
         ${game === 'dota' ? `<label class="field" for="cg-${fid}-mid">Match ID (optional)<input type="text" inputmode="numeric" id="cg-${fid}-mid" value="${esc(pend.matchId || '')}"></label>` : ''}
+        ${log ? `<label class="field" for="cg-${fid}-mvp">MVP (optional)<select id="cg-${fid}-mvp"><option value="">Not selected</option>${g.players.map((p, i) => p.side === g.ourSide ? `<option value="${i}" ${p.mvp ? 'selected' : ''}>${esc(p.player || p.hero || `Pick ${i + 1}`)}</option>` : '').join('')}</select></label>
+          <label class="field" for="cg-${fid}-team-kills">Team kills (optional)<input type="number" min="0" max="99" id="cg-${fid}-team-kills" value="${g.teamKills ?? ''}"></label>
+          <label class="field" for="cg-${fid}-opponent-kills">Opponent kills (optional)<input type="number" min="0" max="99" id="cg-${fid}-opponent-kills" value="${g.opponentTeamKills ?? ''}"></label>` : ''}
       </div>
       ${log ? '<p class="note">Rows go in pick order: the top row of each team is P1, the next P2, down to P5. Our rows: hero and player. K/D/A and the other stats are optional. Duration: type the digits only (2040 = 20:40).</p>'
     : game === 'mlbb' ? '<p class="note">The MLBB result screen does not show which base (blue or red) a team played; set it from the draft or your notes, or leave it empty. Blue/red splits on the Patterns tab use only games where it is set.</p>' : ''}
       ${heroBlank ? `<p class="note"><b>${heroBlank} hero${heroBlank > 1 ? 'es' : ''} to pick.</b> Hero portraits are often skins, so the AI fills only heroes it is sure of. Tap a suggestion under the box (the AI's guesses, earlier corrections and the player's usual heroes) or type the name.${ai() && !dr ? ' A draft screenshot fills them too.' : ''}</p>` : ''}
-      <div class="tw"><table class="capgrid"><thead><tr>${log ? '<th>Pick</th>' : ''}<th>Team</th><th>Hero</th><th>Our player</th>${defs.map((d) => `<th class="n">${esc(d.label)}</th>`).join('')}<th>Name on screen</th></tr></thead><tbody>${rows}</tbody></table></div>
+      ${log ? `<div class="cap-log-grid"><section class="cap-log-team"><h4>Our draft</h4>${banRows(fid, g, dr, 'ours')}<h4>Our picks</h4>${logDraftTable('ours')}</section>
+        <section class="cap-log-team opponent"><h4>Opponent draft</h4>${banRows(fid, g, dr, 'partner')}<h4>Opponent picks</h4>${logDraftTable('partner')}</section></div>
+        ${dr ? '<p class="note">Draft screenshot values are pre-filled; check the bans and picks.</p>' : ''}${logPlayerResults()}`
+        : `<div class="tw"><table class="capgrid"><thead><tr><th>Team</th><th>Hero</th><th>Our player</th>${defs.map((d) => `<th class="n">${esc(d.label)}</th>`).join('')}<th>Name on screen</th></tr></thead><tbody>${rows}</tbody></table></div>`}
       ${log ? '<p class="warn-line" role="status" data-cap-dup></p>' : ''}
       <p class="note">Highlighted cells are ones the AI was unsure of or that failed a check: hover or tap for the reason. Empty = not shown on the screen. On a phone, swipe the table sideways for the numbers.</p>
       ${draftHtml}
       ${log ? `<div class="form"><label class="field wide" for="cg-${fid}-gnotes">Game notes (optional)<textarea rows="2" id="cg-${fid}-gnotes" maxlength="${NOTES_MAX}" placeholder="e.g. Lord fight telat, vision kurang di sisi kiri">${esc(g.notes || '')}</textarea></label>
         <label class="field wide" for="cg-${fid}-vod">VOD link (optional)<input type="url" id="cg-${fid}-vod" value="${esc(g.vod || '')}" placeholder="https://"></label></div>` : ''}
       <div class="toolbar">${block ? '' : `<button class="btn primary" type="button" data-cap-confirm="${esc(title)}">${pend.fix ? 'Save the fix' : 'Confirm game'}</button>`}
+        ${log && localOcr(title) ? `<button class="btn" type="button" data-cap-local="${esc(title)}">Scan results (local OCR)</button>` : ''}
         ${ai() && !block && !pend.fix ? `<label class="btn filebtn">Add another screenshot of this game<input type="file" accept="image/*" multiple data-cap-more="${esc(title)}" hidden></label>` : ''}
         ${ai() && !dr && !block ? `<label class="btn filebtn">Add draft screenshot<input type="file" accept="image/*" data-cap-draft="${esc(title)}" hidden></label>` : ''}
         <button class="btn" type="button" data-cap-discard="${esc(title)}">${pend.fix ? 'Cancel' : 'Discard'}</button><span class="msg" id="capMsg-${fid}" role="status"></span></div>
+      ${log && localOcr(title) ? `<div id="capLocalPending-${fid}" class="hub-local-scanner"></div><p class="note">Local OCR uses the K/D/A + Gold and Damage result screens. Screenshots stay on this device; confirm the reviewed values before saving the game.</p>` : ''}
       ${ai() && !block && !pend.fix ? `<p class="note">${game === 'dota' ? 'Dota spreads a game over two screens: add the Scoreboard tab to the Overview (or the other way round) with "Add another screenshot".' : 'The Data tab adds hero damage, damage taken and turret damage: "Add another screenshot".'}</p>` : ''}</div>`;
   }
   function readEditor(title, fid, pend) {
@@ -188,6 +265,9 @@ export function captureUi(ctx) {
       const names = [...rosterOf(title), 'stand-in'];
       edited.players = edited.players.map((p) => { const t = String(p.player || '').trim(); return { ...p, player: names.find((n) => n.toLowerCase() === t.toLowerCase()) || t }; });
       edited.pickOrder = val(`cg-${fid}-po`); edited.mapVariant = val(`cg-${fid}-jmap`); edited.notes = val(`cg-${fid}-gnotes`); edited.vod = val(`cg-${fid}-vod`).trim();
+      edited.players.forEach((p, i) => { p.mvp = String(i) === val(`cg-${fid}-mvp`); });
+      edited.teamKills = val(`cg-${fid}-team-kills`); edited.opponentTeamKills = val(`cg-${fid}-opponent-kills`);
+      if (edited.scanReview && !sameReviewedResult(edited, pend.base)) edited.scanReview = { ...edited.scanReview, checkedAgainstScreenshot: false };
       edited.bans = Object.fromEntries(['ours', 'partner'].map((team) => [team, Array.from({ length: MAX_BANS }, (_, k) => val(`cb-${fid}-${team}-${k}`).trim())]));
       return { edited, draft: null, matchId: '' };   // the draft is built from the bans and picks (core/scrim_log.js)
     }
@@ -439,6 +519,8 @@ export function captureUi(ctx) {
   }
   async function onClick(t) {
     const d = t.dataset || {};
+    if (d.capLocal) { openLocalScanner(d.capLocal, 'single'); return true; }
+    if (d.capLocalBatch) { openLocalScanner(d.capLocalBatch, 'batch'); return true; }
     if (d.capMic) {
       const [title, lang] = d.capMic.split('|'); const fid = sid(title);
       if (MIC.fid === fid && MIC.lang === lang) { stopMic(); return true; }
@@ -471,6 +553,7 @@ export function captureUi(ctx) {
         const fx = s.pending.fix;
         const rec = confirmGame(edited, { date: fx ? fx.date : (val(`rp-${fid}-date`) || localToday()), partner: fx ? fx.partner : val(`rp-${fid}-partner`), gameNo: fx ? fx.gameNo : s.ready.length + 1, by: fx ? fx.by : (val(`rp-${fid}-by`) || meName()),
           base: s.pending.fromScreenshot ? (s.pending.ai || s.pending.base) : null, captureIds: s.pending.captureIds || [], heroes: heroesFor(title), draft, externalMatchId: matchId, roster: rosterOf(title) });
+        if (s.pending.localScan) rec.source = 'local-ocr';
         if (fx) {
           const old = gamesOf(title).find((x) => x.id === fx.gameId);
           rec.reportId = fx.reportId; rec.supersedes = fx.gameId; rec.fixedBy = meName() || S.me; rec.source = old?.source || rec.source; rec.captureIds = old?.captureIds || []; rec.corrections = old?.corrections || [];
@@ -558,5 +641,5 @@ export function captureUi(ctx) {
     db.collection('player_aliases').onSnapshot((snap) => { S.aliases = Object.fromEntries(snap.docs.map((x) => x.data()).filter((x) => x?.origin === 'operational' && x.title).map((x) => [x.title, x])); }, () => {});
   }
 
-  return { gamesSection, reportGames, debriefSection, beforeSave, afterSave, patternsPage, trailPanel, goalStatNote, goalStatFields, standInLine, waitingCount, onChange, onClick, subscribe, prepImage };
+  return { gamesSection, reportGames, debriefSection, beforeSave, afterSave, patternsPage, trailPanel, goalStatNote, goalStatFields, standInLine, waitingCount, onChange, onClick, subscribe, prepImage, attachLocalScanner };
 }

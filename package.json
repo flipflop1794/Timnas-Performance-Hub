@@ -4,7 +4,8 @@
   "version": "1.42.0",
   "private": true,
   "scripts": {
-    "test": "node --test tests/*.test.js tests/db/*.test.js tests/web/*.test.js && npm run test:donny",
+    "test": "node --test tests/*.test.js tests/db/*.test.js tests/web/*.test.js && npm run test:donny && npm run test:scanner",
+    "test:scanner": "node tools/local-result-scanner-test.mjs",
     "test:db": "node --test tests/db/*.test.js",
     "test:web": "node --test tests/web/*.test.js",
     "typecheck": "tsc -p tsconfig.json",
@@ -23,8 +24,10 @@
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.119.0",
+    "lucide-react": "0.383.0",
     "react": "^18.3.1",
-    "react-dom": "^18.3.1"
+    "react-dom": "^18.3.1",
+    "tesseract.js": "7.0.0"
   },
   "engines": {
     "node": ">=20"
