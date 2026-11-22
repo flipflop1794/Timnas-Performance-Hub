@@ -85,6 +85,7 @@ export const GUIDE = [
     ] }),
   S('capture', 'capture', { en: 'MLBB, MLBB Women, Dota 2 coaches', id: 'Pelatih MLBB, MLBB Women, Dota 2' }, 'mlbb-reports',
     { title: 'Games from end-of-game screenshots', steps: [
+      'MLBB and MLBB Women: add a game, enter our five heroes and roster players, then press "Scan results (local OCR)". Select the K/D/A + Gold and Damage result screenshots in either order, review all five rows, and apply them before confirming the game. "Batch scan session (local OCR)" scans games already added. Images stay on this device.',
       'In the report form, under Games, press "Read a screenshot" and pick the end-of-game screenshot (Dota: add the second screen with "Add another screenshot").',
       'Check every value. Highlighted cells are where the AI was unsure or a check failed (kills do not add up, unknown hero, duplicate hero). Tap a suggested hero to fill it.',
       'MLBB: set the map side (blue/red) yourself; it is not on the screenshot.',
@@ -92,6 +93,7 @@ export const GUIDE = [
       'No AI or a bad screenshot? "Add game by hand" gives the same screen empty. A saved game can be fixed with "Fix" under the report.',
     ] },
     { title: 'Game dari screenshot akhir game', steps: [
+      'MLBB dan MLBB Women: tambah game, isi lima hero serta pemain tim kita, lalu tekan "Scan results (local OCR)". Pilih screenshot hasil K/D/A + Gold dan Damage dalam urutan bebas, periksa kelima baris, lalu terapkan sebelum mengonfirmasi game. "Batch scan session (local OCR)" memindai game yang sudah ditambahkan. Gambar tetap di perangkat ini.',
       'Di form laporan, bagian Games, tekan "Read a screenshot" dan pilih screenshot akhir game (Dota: tambah layar kedua dengan "Add another screenshot").',
       'Cek setiap nilai. Sel yang disorot berarti AI ragu atau pengecekan gagal (kill tidak cocok, hero tidak dikenal, hero ganda). Ketuk hero yang disarankan untuk mengisi.',
       'MLBB: isi sisi map (blue/red) sendiri; tidak ada di screenshot.',

@@ -2525,6 +2525,7 @@ function render() {
   LAST_VIEW = route;
   if (document.getElementById('drClock')) drUi().startTicker();
   attachDonny();
+  if (CAP) CAP.attachLocalScanner();
 }
 // Views that show engine findings or data notes, which stay in English.
 const ORIGINAL_LANG_VIEWS = /^(dota-team|dota-post|dota-scout|dota-draft|dota-review|pubgm-(team|log|rivals|sim|review)|comp-nation|comp-card|comp-rosters|staff-sources|staff-rules)/;

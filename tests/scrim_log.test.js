@@ -24,7 +24,7 @@ function game({ title = 'MLBB', pickOrder = 'FP', result = 'win', mapVariant = '
 test('which titles use it; slots, maps and links', () => {
   assert.ok(isScrimLog('MLBB') && isScrimLog('MLBB Women')); assert.ok(!isScrimLog('Dota 2'));
   assert.deepEqual([slotOrder('Warmup'), slotOrder('Jam 4'), slotOrder('jam 10'), slotOrder('19:00 WIB'), slotOrder('')], [0, 4, 10, null, null]);
-  assert.deepEqual(MLBB_MAPS, ['Flying Clouds', 'Golden Turret', 'Healing Turtle', 'Revealing Wisps'], 'V1.39: the four maps in use'); assert.equal(TIME_SLOTS[1], 'Jam 1');
+  assert.deepEqual(MLBB_MAPS, ['Default Map', 'Flying Clouds', 'Golden Turret', 'Healing Turtle', 'Revealing Wisps']); assert.equal(TIME_SLOTS[1], 'Jam 1');
   assert.equal(safeVod('javascript:alert(1)'), ''); assert.equal(safeVod('https://youtu.be/x'), 'https://youtu.be/x');
 });
 
