@@ -187,3 +187,47 @@ export function reportWhatsApp(r, lang = 'id') {
   ].filter(Boolean);
   return [`*${L.head} — ${r.title}*`, `${r.date}${r.time ? ` ${r.time}` : ''} · ${L.vs} ${r.partner} · ${r.by}`, '', ...body].join('\n');
 }
+
+// V1.45: the scrim reports as a tidy Excel workbook. Sheet 1 "Summary" (one row per title), then one sheet per title,
+// newest first, in the order a coach reads a report: when and against whom, the result, what was practised, what
+// worked and failed, the one change for next time, then the details. Each sheet holds one kind of result, so
+// "Won/Lost" and "Points" columns are never half empty.
+const FIX_SHORT = { Fixed: 'Fixed', 'Better, not fixed yet': 'Better', 'No change': 'No change', 'Not practised today': 'Not practised' };
+const noteText = (r) => (r.notes || []).map((n) => `${noteDay(n.at)} ${n.by}: ${n.text}`).join(' | ');
+const num0 = (v) => (v == null || v === '' ? '' : Number(v));
+export function reportsSheets(reports, { titles = REPORT_TITLES, asOf = localDay() } = {}) {
+  const sheets = [];
+  const present = titles.filter((t) => reports.some((r) => r.title === t));
+  const summary = present.map((t) => {
+    const s = reportSummary(reports, t, asOf); const pts = GAME_SPEC[t].mode === 'points';
+    const all = reports.filter((r) => r.title === t);
+    return [t, all.length, s.sessions, s.sessions ? (pts ? `${s.points} pts in ${s.matches} matches` : `${s.won}-${s.lost}${s.drawn ? `-${s.drawn}` : ''}`) : '', s.progress ?? '', s.last ? s.last.date : '', s.carryOver?.adjust || ''];
+  });
+  sheets.push({ name: 'Summary', columns: [{ header: 'Title', width: 16 }, { header: 'Reports (all)', width: 12 }, { header: 'Sessions, last 7 days', width: 14 },
+    { header: 'Result, last 7 days', width: 22 }, { header: 'Plan followed, 7-day average (1–5)', width: 16 }, { header: 'Last report', width: 12 }, { header: 'Next session starts from', width: 60, wrap: true }], rows: summary });
+  for (const t of present) {
+    const pts = GAME_SPEC[t].mode === 'points'; const spec = GAME_SPEC[t];
+    const mine = reports.filter((r) => r.title === t).sort((a, b) => b.date.localeCompare(a.date) || String(b.createdAt || '').localeCompare(String(a.createdAt || '')));
+    const result = pts
+      ? [{ header: 'Matches', width: 9 }, { header: 'Points', width: 8 }, { header: 'Avg place', width: 9 }, { header: 'Match wins', width: 9 }]
+      : [{ header: `${spec.unit[0].toUpperCase()}${spec.unit.slice(1)} won`, width: 9 }, { header: `${spec.unit[0].toUpperCase()}${spec.unit.slice(1)} lost`, width: 9 }, ...(t === 'eFootball' ? [{ header: 'Drawn', width: 8 }] : [])];
+    const columns = [{ header: 'Date', width: 11 }, { header: 'Time', width: 10 }, { header: 'Sparring partner', width: 20 }, { header: 'Partner level', width: 16 }, { header: 'Format', width: 10 },
+      { header: 'Result', width: 14 }, ...result,
+      { header: 'Practised (focus)', width: 30, wrap: true }, { header: 'What worked', width: 36, wrap: true }, { header: 'What failed', width: 36, wrap: true },
+      { header: 'Next session: the one change', width: 36, wrap: true }, { header: 'Last change: fixed?', width: 13 }, { header: 'Plan followed (1–5)', width: 10 },
+      { header: spec.detail, width: 30, wrap: true }, { header: 'Per map / match / game', width: 30, wrap: true }, { header: 'Player notes', width: 30, wrap: true },
+      { header: 'Who played', width: 16 }, { header: 'Competitive settings', width: 11 }, { header: 'VOD', width: 24 }, { header: 'Written by', width: 18 }, { header: 'Corrections', width: 30, wrap: true }, { header: 'Report ID', width: 18 }];
+    const rows = mine.map((r) => {
+      const R = r.result || {};
+      const res = pts ? [num0(R.played), num0(R.points), num0(R.avgPlacement), R.wins ? R.wins : ''] : [num0(R.won), num0(R.lost), ...(t === 'eFootball' ? [num0(R.drawn)] : [])];
+      return [r.date, r.time || '', r.partner, r.partnerLevel || '', r.format || '', r.result ? resultText(r.result) : '', ...res,
+        r.focus || '', r.worked || '', r.failed || '', r.adjust || '', FIX_SHORT[r.fixCheck] || '', r.progress ?? '',
+        r.detail || '', rowsText(r.title, r.rows) || '', r.playerNotes || '', r.roster && r.roster !== 'Not applicable' ? r.roster : '', r.comp === 'yes' ? 'Yes' : r.comp === 'no' ? 'No' : '', r.vod || '', r.by, noteText(r), r.id];
+    });
+    sheets.push({ name: t, columns, rows });
+  }
+  return sheets;
+}
+
+// V1.45: any small table as CSV (Main dashboard download), with the same spreadsheet-safe cells as the reports CSV.
+export const tableCsv = (head, rows, { bom = true } = {}) => (bom ? CSV_BOM : '') + [head, ...rows].map((row) => row.map(csvCell).join(',')).join('\r\n');

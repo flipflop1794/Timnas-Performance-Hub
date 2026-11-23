@@ -58,8 +58,9 @@ import { EVENT, defaultRunbook, tLabel, wecMatch, tick, setResult, gameNote, mar
 import { VOD_TAGS, vod, reviewVod, LEVELS, partner as partnerRec, partnerStats, AREAS, GOAL_STATUS, goal as goalRec, updateGoal, plan as newPlan } from '../core/library.js';
 import { weeklyBrief } from '../core/brief.js';
 import { localDay, shiftDay } from '../core/dates.js';
-import { scrimReport, addNote as reportNote, byDay as reportDays, reportSummary, reportsCsv, scrimLogCsv, resultText, reportWhatsApp, GAME_SPEC, PROGRESS, ROSTER_PLAYED, FIX_CHECK } from '../core/reports.js';
+import { scrimReport, addNote as reportNote, byDay as reportDays, reportSummary, reportsCsv, reportsSheets, tableCsv, scrimLogCsv, resultText, reportWhatsApp, GAME_SPEC, PROGRESS, ROSTER_PLAYED, FIX_CHECK } from '../core/reports.js';
 import { isScrimLog, TIME_SLOTS } from '../core/scrim_log.js';
+import { makeXlsx } from '../core/xlsx.js';
 import { seedRosters, effective, editPlayers, recordCheck, checkStatus, dotaPool, ACCOUNT_KIND, ROLE_HINT, rosterKey, CHECK_EVERY_DAYS } from '../core/rosters.js';
 import { loadReadiness, READINESS_SLOT } from '../readiness/contract.js';
 import { mockProvider, MOCK_TITLES } from '../readiness/mockProvider.js';
@@ -855,12 +856,12 @@ function reportDraft(r) {
 function reportCard(r) {
   const spec = GAME_SPEC[r.title];
   const pl = PROGRESS.find(([n]) => n === r.progress)?.[1] || '';
-  return `<div class="obj"><header><div><span class="note">${esc(r.date)}${r.time ? ` ${esc(r.time)}` : ''}${r.format ? ` · ${esc(r.format)}` : ''} · ${esc(r.roster)} · written by ${esc(r.by)}${r._entered?.by && r._entered.by !== r.by ? ` (entered by ${esc(r._entered.by)}, ${esc(new Date(r._entered.at).toLocaleString('en-GB', { timeZone: 'Asia/Jakarta', dateStyle: 'medium', timeStyle: 'short' }))} WIB)` : ''}</span><h3>vs ${esc(r.partner)}${r.partnerLevel ? ` <span class="note">(${esc(r.partnerLevel)})</span>` : ''}</h3></div>${tag(r.progress >= 4 ? 'c-Verified' : r.progress <= 2 ? 'c-Blocked' : 'c-Low', `Plan ${r.progress}/5`)}</header>
-    <p><b>${esc(resultText(r.result))}</b> · <span class="note">Practised: ${esc(r.focus)} · ${esc(pl)}</span></p>${r.rows?.length ? `<p class="note" data-no-tr>${esc(rowsText(r.title, r.rows))}</p>` : ''}${r.ties ? `<p class="note">${esc(tiesText(r.ties))}</p>` : ''}${r.comp ? `<p class="note">${esc(r.comp === 'yes' ? 'Played on competitive settings.' : 'Not played on competitive settings.')}</p>` : ''}
+  return `<div class="obj"><header><div><span class="note">${esc(r.date)}${r.time ? ` ${esc(r.time)}` : ''}${r.format ? ` · ${esc(r.format)}` : ''} · ${esc(r.roster)} · written by ${esc(r.by)}${r._entered?.by && r._entered.by !== r.by ? ` (entered by ${esc(r._entered.by)}, ${esc(new Date(r._entered.at).toLocaleString('en-GB', { timeZone: 'Asia/Jakarta', dateStyle: 'medium', timeStyle: 'short' }))} WIB)` : ''}</span><h3>vs ${esc(r.partner)}${r.partnerLevel ? ` <span class="note">(${esc(r.partnerLevel)})</span>` : ''}</h3></div>${r.progress != null ? tag(r.progress >= 4 ? 'c-Verified' : r.progress <= 2 ? 'c-Blocked' : 'c-Low', `Plan ${r.progress}/5`) : ''}</header>
+    <p><b>${esc(resultText(r.result))}</b>${r.focus || pl ? ` · <span class="note">${[r.focus ? `Practised: ${esc(r.focus)}` : '', pl ? esc(pl) : ''].filter(Boolean).join(' · ')}</span>` : ''}</p>${r.rows?.length ? `<p class="note" data-no-tr>${esc(rowsText(r.title, r.rows))}</p>` : ''}${r.ties ? `<p class="note">${esc(tiesText(r.ties))}</p>` : ''}${r.comp ? `<p class="note">${esc(r.comp === 'yes' ? 'Played on competitive settings.' : 'Not played on competitive settings.')}</p>` : ''}
     ${r.worked ? `<p><b>Worked:</b> ${esc(r.worked)}</p>` : ''}${r.failed ? `<p><b>Failed:</b> ${esc(r.failed)}</p>` : ''}
     ${r.detail ? `<p><b>${esc(spec.detail)}:</b> ${esc(r.detail)}</p>` : ''}${r.playerNotes ? `<p><b>Player notes:</b> ${esc(r.playerNotes)}</p>` : ''}
     ${r.prevAdjust ? `<p class="note"><b>Last adjustment</b> (${esc(r.prevAdjust)}): ${esc(r.fixCheck || 'not checked')}</p>` : ''}
-    <p><b>Next session:</b> ${esc(r.adjust)}</p>${capUi().reportGames(r)}${safeUrl(r.vod) ? `<p class="note">VOD: <a href="${esc(safeUrl(r.vod))}" target="_blank" rel="noopener">${esc(r.vod)}</a></p>` : r.vod ? `<p class="note">VOD: ${esc(r.vod)}</p>` : ''}
+    <p class="rpnext"><b>Next session:</b> ${esc(r.adjust)}</p>${capUi().reportGames(r)}${safeUrl(r.vod) ? `<p class="note">VOD: <a href="${esc(safeUrl(r.vod))}" target="_blank" rel="noopener">${esc(r.vod)}</a></p>` : r.vod ? `<p class="note">VOD: ${esc(r.vod)}</p>` : ''}
     ${scrimEditBar(r)}
     ${(r.notes || []).map((n) => `<p class="note">Correction ${esc(Number.isNaN(Date.parse(n.at)) ? String(n.at || '').slice(0, 10) : localDay(new Date(n.at)))} — ${esc(n.by)}: ${esc(n.text)}</p>`).join('')}
     ${S.mode === 'demo' ? '' : `<details><summary class="note">Add a correction</summary><div class="form"><label class="field" for="rpN-${r.id}">Correction or follow-up<input type="text" id="rpN-${r.id}" placeholder="e.g. Score was 2-0, not 2-1"></label></div>
@@ -983,9 +984,9 @@ function reportsPanel(title) {
     ${!mine.length ? '<p class="empty">No report yet.</p>' : ''}
     <details class="howto"><summary>How to read this</summary><p class="note">Progress is the coach's rating of how closely the team followed the plan of the day. It is not computed, and ratings from different coaches are not directly comparable.</p></details></div>
   ${reportTrends(title)}${ready}${form}${rpHistOverlay()}
-  <div class="panel"><h2>Day by day</h2>${days.length ? days.slice(0, 14).map((d) => `<details ${d.date === t0 ? 'open' : ''}><summary><b>${esc(d.date)}</b> · ${d.n} session${d.n > 1 ? 's' : ''} · ${pts ? `${d.points} pts in ${d.played} m` : `${d.won}-${d.lost}${d.drawn ? `-${d.drawn}` : ''}`} · plan ${d.progress}/5 <span class="note">— ${esc(d.focus.join('; '))}</span></summary>${d.sessions.map(reportCard).join('')}</details>`).join('') : '<p class="empty">Nothing filed yet.</p>'}
-    ${days.length > 14 ? `<p class="note">${days.length - 14} older day(s) are in the CSV download.</p>` : ''}
-    ${mine.length ? `<div class="toolbar"><button class="btn" type="button" data-report-csv="${esc(title)}">Download CSV</button>${logMode(title) ? `<button class="btn" type="button" data-scrimlog-csv="${esc(title)}">Download games (Scrim Log format)</button>` : ''}<span class="msg" id="rpCsvMsg-${fid}"></span></div>` : ''}</div>`;
+  <div class="panel"><h2>Day by day</h2>${days.length ? days.slice(0, 14).map((d) => `<details ${d.date === t0 ? 'open' : ''}><summary><b>${esc(d.date)}</b> · ${d.n} session${d.n > 1 ? 's' : ''} · ${pts ? `${d.points} pts in ${d.played} m` : `${d.won}-${d.lost}${d.drawn ? `-${d.drawn}` : ''}`}${d.progress != null ? ` · plan ${d.progress}/5` : ''}${d.focus.length ? ` <span class="note">— ${esc(d.focus.join('; '))}</span>` : ''}</summary>${d.sessions.map(reportCard).join('')}</details>`).join('') : '<p class="empty">Nothing filed yet.</p>'}
+    ${days.length > 14 ? `<p class="note">${days.length - 14} older day(s) are in the Excel download.</p>` : ''}
+    ${mine.length ? `<div class="toolbar"><button class="btn primary" type="button" data-report-xlsx="${esc(title)}">Download Excel</button><button class="btn" type="button" data-report-csv="${esc(title)}">CSV</button>${logMode(title) ? `<button class="btn" type="button" data-scrimlog-csv="${esc(title)}">Download games (Scrim Log format)</button>` : ''}<span class="msg" id="rpCsvMsg-${fid}"></span></div>` : ''}</div>`;
 }
 V['reports-all'] = () => {
   const t0 = localToday(); const dayList = Array.from({ length: 7 }, (_, i) => shiftDay(t0, i - 6));
@@ -997,7 +998,7 @@ V['reports-all'] = () => {
     <div class="tw"><table><thead><tr><th>Title</th><th>Title coach</th>${dayList.map((d) => `<th class="n">${esc(d.slice(5))}</th>`).join('')}<th class="n">Sessions 7 d</th><th class="n">Result 7 d</th><th class="n">Plan followed</th><th>Last report</th></tr></thead><tbody>
     ${rows.map((r) => `<tr><td><b>${esc(r.t.id)}</b></td><td>${esc(r.t.coach)}</td>${r.per.map((n) => `<td class="n">${n || '<span class="note">—</span>'}</td>`).join('')}<td class="n">${r.s.sessions}</td><td class="n">${r.s.sessions ? (r.pts ? `${r.s.points} pts` : `${r.s.won}-${r.s.lost}`) : '—'}</td><td class="n">${r.s.progress ?? '—'} ${trendTag(r.s.trend)}</td><td>${r.s.last ? `${esc(r.s.last.date)} · ${esc(r.s.last.by)}` : '<span class="note">none</span>'}</td></tr>`).join('')}</tbody></table></div>
     <p class="note">Numbers in the day columns are sessions reported that day. Not every title trains every day, so an empty day is not automatically a miss.</p>
-    ${S.reports.length ? '<div class="toolbar"><button class="btn" type="button" data-report-csv="*">Download all as CSV</button><span class="msg" id="rpCsvMsg-all"></span></div>' : ''}</div>
+    ${S.reports.length ? '<div class="toolbar"><button class="btn primary" type="button" data-report-xlsx="*">Download all (Excel)</button><button class="btn" type="button" data-report-csv="*">CSV</button><span class="msg" id="rpCsvMsg-all"></span></div><p class="note">Excel: a summary sheet, then one sheet per title, newest first, with filters on every column.</p>' : ''}</div>
   <div class="cols"><div class="panel"><h2>No report yet today</h2>${missing.length ? `<ul class="plain">${missing.map((r) => `<li><b>${esc(r.t.id)}</b> <a href="#${REPORT_TAB[r.t.id]}">File</a> <span class="note">— last ${r.s.last ? esc(r.s.last.date) : 'never'}</span></li>`).join('')}</ul>` : '<p class="note">Every title has a report for today.</p>'}</div>
   <div class="panel"><h2>Next session starts from</h2>${rows.filter((r) => r.s.carryOver).length ? `<ul class="plain">${rows.filter((r) => r.s.carryOver).map((r) => `<li><b>${esc(r.t.id)}</b> — ${esc(r.s.carryOver.adjust)} <span class="note">(${esc(r.s.carryOver.by)}, ${esc(r.s.carryOver.date)})</span></li>`).join('')}</ul>` : '<p class="empty">Nothing yet.</p>'}</div></div>`;
 };
@@ -1717,6 +1718,22 @@ function cycleCard(o) {
 // the staff keep (reports, sessions, objectives, WEC matches), team level only: no individual wellbeing, no
 // compensation, no win probabilities. Every number links to the page it comes from.
 const dayGap = (a, b) => Math.round((Date.parse(b) - Date.parse(a)) / 86400000);
+// V1.45: the Main dashboard's titles table as CSV (one row per title, the same numbers as on screen).
+function overviewCsv() {
+  const t0 = today(); const titles = PQ_ORDER.filter(titleVisible);
+  const pq = practiceQuality(titles, { scrims: S.scrims, reports: S.reports, cycle: S.cycle }, t0, 7);
+  const W = trendWeeks(t0, 4);
+  const head = ['Date (WIB)', 'Title', 'Practice quality (0-100)', 'Change vs week before', 'Sessions, last 7 days', 'Result, last 7 days', 'Plan followed (1-5)', 'Results trend (2 weeks vs 2 before)', 'Next WEC match', 'Overdue follow-ups', 'Last report', 'Next session starts from'];
+  const rows = titles.map((title) => {
+    const q = pq.find((r) => r.title === title); const sm = reportSummary(S.reports, title, t0); const spec = GAME_SPEC[title];
+    const tr = teamTrends(title, { reports: S.reports }, W).find((m) => m.key === (spec.mode === 'points' ? 'ppm' : 'win'));
+    const next = S.wecMatches.filter((m) => m.title === title && m.date >= t0 && !m.result).sort((a, b) => a.date.localeCompare(b.date) || String(a.time).localeCompare(String(b.time)))[0];
+    const od = S.scrims.filter((x) => x.title === title && x.followUp && x.followUp.status !== 'Done' && x.followUp.due < t0).length;
+    return [t0, title, q.score ?? '', q.change ?? '', sm.sessions, sm.sessions ? (spec.mode === 'points' ? `${sm.points} pts in ${sm.matches} matches` : `${sm.won}-${sm.lost}${sm.drawn ? `-${sm.drawn}` : ''}`) : '',
+      sm.progress ?? '', tr ? tr.verdict : '', next ? `${next.date}${next.time ? ` ${next.time}` : ''} vs ${next.opponent}` : '', od, sm.last ? sm.last.date : '', sm.carryOver?.adjust || ''];
+  });
+  return tableCsv(head, rows);
+}
 V.overview = () => {
   if (S.mode === 'demo') return `<div class="panel">${DEMO_BANNER}<p class="empty">The dashboard uses operational records only.</p></div>`;
   const t0 = today(); const titles = PQ_ORDER.filter(titleVisible);
@@ -1755,6 +1772,7 @@ V.overview = () => {
   ${S.scrimLoad === 'error' || S.reportLoad === 'error' ? `<div class="panel">${banner('block', '<div>Sessions or reports could not be loaded: these numbers are incomplete.</div>')}</div>` : ''}
   <div class="panel"><h2>Titles</h2><div class="tw"><table><thead><tr><th>Title</th><th class="n">Practice quality</th><th class="n">Last 7 days</th><th class="n">Plan followed</th><th>Results trend</th><th>Next WEC match</th><th class="n">Overdue</th></tr></thead><tbody>
     ${titles.map(row).join('')}</tbody></table></div>
+    <div class="toolbar"><button class="btn" type="button" id="ovCsv">Download CSV</button><span class="msg" id="ovCsvMsg"></span></div>
     <p class="note">Practice quality: how rigorously the title practises (sessions held, objectives, reports, follow-ups), 0–100, ▲▼ against the week before. Last 7 days: scrim record (or points) and number of sessions. Results trend: last 2 weeks against the 2 before; "Better" or "Worse" only when the change is beyond chance. Tap a title or a number for the detail.</p></div>
   <div class="panel"><h2>WEC matches coming up</h2>${upcoming.length ? `<ul class="plain">${upcoming.slice(0, 8).map((m) => `<li><b>${esc(m.date)}</b>${m.time ? ` ${esc(m.time)}` : ''} · ${esc(m.title)} · ${esc(m.stage || 'stage TBD')} · vs ${esc(m.opponent)}</li>`).join('')}</ul>` : '<p class="empty">No WEC match entered yet (Tournament → Match-day runbook).</p>'}
     <div class="toolbar"><a class="btn" href="#brief">Weekly brief</a><a class="btn" href="#staff-quality">Practice quality</a></div></div>${FEAT.support ? supUi().overviewLine() : ''}`;
@@ -3226,6 +3244,24 @@ async function onClick(e) {
       const dl = await window.claude?.use?.('downloads'); if (!dl) throw new Error('Downloads are not available in this view; copy the day cards instead.');
       await dl.save({ filename: `scrim-log-${sid(ti).toLowerCase()}-${localToday()}.csv`, data: scrimLogCsv(games, S.reports.filter((r) => r.title === ti), { bom: true }) });
       setMsg(msgId, `Saved (${games.length} game${games.length === 1 ? '' : 's'}).`, 'ok');
+    } catch (err) { setMsg(msgId, err.code === 'declined' ? 'Download cancelled.' : err.message, err.code === 'declined' ? '' : 'err'); }
+    return;
+  }
+  if (id === 'ovCsv') {
+    try {
+      const dl = await window.claude?.use?.('downloads'); if (!dl) throw new Error('Downloads are not available in this view.');
+      await dl.save({ filename: `main-dashboard-${today()}.csv`, data: overviewCsv() }); setMsg('ovCsvMsg', 'Saved.', 'ok');
+    } catch (err) { setMsg('ovCsvMsg', err.code === 'declined' ? 'Download cancelled.' : err.message, err.code === 'declined' ? '' : 'err'); }
+    return;
+  }
+  if (t.dataset.reportXlsx) {
+    const ti = t.dataset.reportXlsx; const msgId = ti === '*' ? 'rpCsvMsg-all' : `rpCsvMsg-${sid(ti)}`;
+    try {
+      const rows = S.reports.filter((r) => (ti === '*' ? titleVisible(r.title) : r.title === ti));
+      if (!rows.length) throw new Error('No reports yet.');
+      const dl = await window.claude?.use?.('downloads'); if (!dl) throw new Error('Downloads are not available in this view; copy the day cards instead.');
+      const data = makeXlsx(reportsSheets(rows, { titles: ti === '*' ? PQ_ORDER : [ti], asOf: localToday() }));
+      await dl.save({ filename: `scrim-reports-${ti === '*' ? 'all-titles' : sid(ti).toLowerCase()}-${localToday()}.xlsx`, data }); setMsg(msgId, `Saved (${rows.length} report${rows.length === 1 ? '' : 's'}).`, 'ok');
     } catch (err) { setMsg(msgId, err.code === 'declined' ? 'Download cancelled.' : err.message, err.code === 'declined' ? '' : 'err'); }
     return;
   }

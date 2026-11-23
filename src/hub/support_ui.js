@@ -4,7 +4,7 @@
 // editing with a history the database keeps, "My summary" for each staff member (own data only) and "Support team
 // progress" for Coach Donny, the Head Coach and admins. Logic in src/core/support.js and history.js.
 import { JOBS, DISCS, DISC_LABEL, ASK, RESPONSES, SESSIONS, SESSION_LABEL, followText, supportReport, usersOfDay, fromParse, whatsappText, anonymise, summarize, perDay,
-  weekSignals, repeatAthletes, watchList, dayBoard, weekRange, noticeRecord, groupRows, isBlankRow, REPEAT_AT, HIGH_VAS } from '../core/support.js';
+  weekSignals, repeatAthletes, watchList, dayBoard, weekRange, noticeRecord, groupRows, isBlankRow, REPEAT_AT, HIGH_VAS, calWeek, weekGrid, weekText } from '../core/support.js';
 import { playersOf, coachesOf, fullName } from '../core/people.js';
 import { historyOf } from '../core/history.js';
 import { POINTS, bodySvg, pointLabel, painText, painCounts } from '../core/painmap.js';
@@ -167,6 +167,29 @@ export function supportUi(ctx) {
       ${rep.length || open.length ? `<div class="h3">To watch</div><ul class="plain">${rep.map((x) => `<li><b data-no-tr>${esc(x.athlete)}</b> — ${x.n} visits this week</li>`).join('')}${open.slice(0, 10).map((x) => `<li>${tag(x.kind === 'follow-up' ? 'c-Medium' : 'c-Blocked', x.kind === 'follow-up' ? 'follow-up' : x.kind === 'worse' ? 'worse' : `pain ≥${HIGH_VAS}`)} <b data-no-tr>${esc(x.athlete)}</b> <span class="note">${esc(x.date)}</span> — <span data-no-tr>${esc(x.text)}</span></li>`).join('')}</ul>` : ''}</div>`;
   }
 
+  // ---------------------------------------------------------------- V1.45 weekly dashboard (Monday to Sunday)
+  // Everyone's week for Coach Donny, the Head Coach and admins; a staff member sees their own week. Counts only on the
+  // page and in the WhatsApp copy: names of athletes and findings stay in the reports.
+  const DAY = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+  function weeklyPanel(list, everyone) {
+    const off = Math.min(0, U.week || 0); const w = calWeek(today(), off);
+    const cur = summarize(anonymise(list, w.from, w.to)); const prev = summarize(anonymise(list, w.prevFrom, w.prevTo));
+    const grid = weekGrid(list, w); const t0 = today();
+    const cell = (n, d) => (d > t0 ? '<td class="n"></td>' : n == null ? `<td class="n">${d === t0 ? '<span class="note">not yet</span>' : '<span class="note">—</span>'}</td>` : `<td class="n"><b>${n}</b></td>`);
+    const extra = (d) => { const rows = summarize(anonymise(list.filter((r) => r.discipline === d), w.from, w.to));
+      return d === 'physio' && rows.vasN ? `pain −${rows.vasDrop} (VAS) · better ${rows.better}/${rows.responded}` : d === 'psych' && rows.formal + rows.informal ? `formal ${rows.formal} / informal ${rows.informal}` : ''; };
+    const roles = DISCS.filter((d) => cur.byDisc[d].reports || prev.byDisc[d].reports);
+    return `<div class="panel"><h2>${everyone ? 'Weekly dashboard' : 'My week'} — ${esc(w.from)} to ${esc(w.to)}</h2>
+      <nav class="subnav" aria-label="Week"><button type="button" data-sup-week="${off - 1}">‹ Week before</button><button type="button" data-sup-week="0" aria-pressed="${off === 0}">This week</button>${off < 0 ? `<button type="button" data-sup-week="${off + 1}">Next week ›</button>` : ''}</nav>
+      <div class="stats">${statCard('Reports', cur.reports, `${prev.reports} the week before`)}${statCard('Athlete visits', cur.seen, `${prev.seen} the week before`)}${statCard('Follow-ups', cur.followUps)}${everyone ? statCard('Staff reporting', grid.length) : statCard('Days reported', `${cur.days}/7`)}</div>
+      ${grid.length ? `<div class="tw"><table><thead><tr><th>${everyone ? 'Staff' : 'Day'}</th>${w.days.map((d, i) => `<th class="n">${esc(DAY[i])} ${esc(d.slice(8))}</th>`).join('')}<th class="n">Days</th></tr></thead><tbody>
+        ${grid.map((g) => `<tr><td><b data-no-tr>${esc(g.by)}</b><br><span class="note">${esc(JOBS[g.job]?.label || DISC_LABEL[g.disc])}</span></td>${g.days.map((n, i) => cell(n, w.days[i])).join('')}<td class="n">${g.daysReported}/7</td></tr>`).join('')}</tbody></table></div>
+        <p class="note">Numbers are athletes in that day's report(s); — = no report that day.</p>` : '<p class="empty">No report this week.</p>'}
+      ${roles.length ? `<div class="cols"><div><div class="h3">Per role</div><ul class="plain">${roles.map((d) => `<li>${esc(DISC_LABEL[d])}: ${esc(`${cur.byDisc[d].reports} report(s), ${cur.byDisc[d].athletes} athlete visit(s)`)} <span class="note">(${prev.byDisc[d].athletes} the week before)</span>${extra(d) ? `<br><span class="note">${esc(extra(d))}</span>` : ''}</li>`).join('')}</ul></div>
+        <div><div class="h3">Per team</div>${Object.keys(cur.byTitle).length ? `<ul class="plain">${Object.entries(cur.byTitle).sort((a, b) => b[1] - a[1]).map(([t, n]) => `<li>${esc(t)}: <b>${n}</b> <span class="note">(${prev.byTitle[t] || 0} the week before)</span></li>`).join('')}</ul>` : '<p class="empty">No visits.</p>'}</div></div>` : ''}
+      ${cur.reports ? `<div class="toolbar"><button class="btn" type="button" data-sup-wkwa="${everyone ? 'all' : 'me'}">Copy for WhatsApp</button><span class="msg" id="supWkMsg"></span></div><p class="note">The copy holds counts only: no athlete names, no findings.</p>` : ''}</div>`;
+  }
+
   // ---------------------------------------------------------------- "Support team progress" (Donny, Head Coach, admins)
   function progress() {
     const w = weekRange(today()); const inW = U.reports.filter((r) => r.date >= w.from && r.date <= w.to);
@@ -221,8 +244,8 @@ export function supportUi(ctx) {
     if (canFile()) setTimeout(() => loadHistory(), 0);
     const head = '<div class="panel"><div class="lead">Support <em>staff</em></div><p>Daily reports of the team doctor, physiotherapists, physical coach and psychologists.</p></div>';
     const recent = U.reports.filter((r) => r.date >= shift(today(), -13));
-    if (readsAll()) return head + progress() + (canFile() ? form() : '') + reportList(recent, true) + historyOverlay();
-    if (canFile()) return head + mySummary() + form() + reportList(recent.filter((r) => r.by === me()), false) + historyOverlay();
+    if (readsAll()) return head + weeklyPanel(U.reports, true) + progress() + (canFile() ? form() : '') + reportList(recent, true) + historyOverlay();
+    if (canFile()) return head + weeklyPanel(U.reports.filter((r) => r.by === me()), false) + mySummary() + form() + reportList(recent.filter((r) => r.by === me()), false) + historyOverlay();
     return `${head}<div class="panel"><p class="note">The support staff reports are read by the support staff themselves, Coach Donny, the Head Coach and admins.</p></div>`;
   }
   // Main dashboard: one numbers-only line (leadership, Coach Donny, Head Coach, admins).
@@ -280,6 +303,14 @@ export function supportUi(ctx) {
       return true;
     }
     if (ds.supClear) { U.draft = null; try { localStorage.removeItem(DRAFT_KEY); } catch { /* */ } draft(); render(); return true; }
+    if ('supWeek' in ds) { U.week = Math.min(0, Number(ds.supWeek) || 0); render(); return true; }
+    if (ds.supWkwa) {
+      const list = ds.supWkwa === 'all' && readsAll() ? U.reports : U.reports.filter((r) => r.by === me());
+      const w = calWeek(today(), Math.min(0, U.week || 0));
+      const text = weekText(summarize(anonymise(list, w.from, w.to)), summarize(anonymise(list, w.prevFrom, w.prevTo)), w, S.lang);
+      try { await navigator.clipboard.writeText(text); setMsg('supWkMsg', 'Copied: paste it in the WhatsApp group.', 'ok'); } catch { setMsg('supWkMsg', 'Copy did not work on this device.', 'err'); }
+      return true;
+    }
     if ('supFilter' in ds) { U.filter = ds.supFilter; render(); return true; }
     if ('supPerson' in ds) { U.person = ds.supPerson; render(); return true; }
     if (ds.supHist) { U.histFor = ds.supHist; await loadHistory(true); render(); return true; }

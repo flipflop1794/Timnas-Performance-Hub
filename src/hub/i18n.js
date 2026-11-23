@@ -859,6 +859,22 @@ const RULES = [
   [/^([A-Z][^:·]{1,60}):$/, (m, f) => (tr(f) == null ? m : `${tr(f)}:`)],
 ];
 
+// V1.45 Excel download, Main dashboard CSV, support staff weekly dashboard.
+Object.assign(EXACT, {
+  'Download Excel': 'Unduh Excel', 'Download all (Excel)': 'Unduh semua (Excel)', CSV: 'CSV',
+  'Excel: a summary sheet, then one sheet per title, newest first, with filters on every column.': 'Excel: satu sheet ringkasan, lalu satu sheet per nomor, terbaru di atas, dengan filter di tiap kolom.',
+  'Weekly dashboard': 'Dashboard mingguan', 'My week': 'Minggu saya', '‹ Week before': '‹ Minggu sebelumnya', 'This week': 'Minggu ini', 'Next week ›': 'Minggu berikutnya ›',
+  Reports: 'Laporan', 'Staff reporting': 'Staf yang melapor', Staff: 'Staf', Day: 'Hari', Days: 'Hari', 'Per role': 'Per peran', 'Per team': 'Per tim',
+  Mon: 'Sen', Tue: 'Sel', Wed: 'Rab', Thu: 'Kam', Fri: 'Jum', Sat: 'Sab', Sun: 'Min',
+  "Numbers are athletes in that day's report(s); — = no report that day.": 'Angka = jumlah atlet di laporan hari itu; — = tidak ada laporan hari itu.',
+  'No report this week.': 'Belum ada laporan minggu ini.', 'The copy holds counts only: no athlete names, no findings.': 'Salinan hanya berisi angka: tanpa nama atlet, tanpa temuan.',
+});
+RULES.push(
+  [/^(Weekly dashboard|My week) — (\d{4}-\d{2}-\d{2}) to (\d{4}-\d{2}-\d{2})$/, (m, w, a, b) => `${w === 'My week' ? 'Minggu saya' : 'Dashboard mingguan'} — ${a} s/d ${b}`],
+  [/^(\d+) report\(s\), (\d+) athlete visit\(s\)$/, '$1 laporan, $2 kunjungan atlet'],
+  [/^(Mon|Tue|Wed|Thu|Fri|Sat|Sun) (\d\d)$/, (m, d, n) => `${{ Mon: 'Sen', Tue: 'Sel', Wed: 'Rab', Thu: 'Kam', Fri: 'Jum', Sat: 'Sab', Sun: 'Min' }[d]} ${n}`],
+);
+
 // V1.38 Scrim Log input for MLBB and MLBB Women.
 Object.assign(EXACT, {
   'Games (Scrim Log)': 'Game (Scrim Log)', 'No game added yet. A report needs at least one.': 'Belum ada game. Laporan butuh minimal satu.',
