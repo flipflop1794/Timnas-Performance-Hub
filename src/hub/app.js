@@ -52,7 +52,7 @@ if (HUB_USER && !HUB_USER.staffKey) {
   STAFF.push({ id: 'user', name: HUB_USER.name, role: HUB_USER.roles.map((r) => ROLE_LABEL[r] || r).join(', '), focus: HUB_USER.titles.length ? HUB_USER.titles : WEC_TITLES.map((t) => t.id) });
 }
 import { staffObservation, recommendationRecord } from '../core/records.js';
-import { FIELDS, FIELD_SOURCE, TIERS, board as rivalBoard, rivalNote, crossTitle, nationProfile, coverage, formOf, fieldForm, FORM_READ, formKey, rivalResult, retireResult } from '../core/competitors.js';
+import { FIELDS, FIELD_SOURCE, TIERS, board as rivalBoard, rivalNote, crossTitle, nationProfile, coverage, formOf, fieldForm, FORM_READ, formKey, rivalResult, retireResult, isNote } from '../core/competitors.js';
 import { planScrim, completeScrim, summary as scrimSummary, FORMATS, KINDS as SCRIM_KINDS } from '../core/scrims.js';
 import { EVENT, defaultRunbook, tLabel, wecMatch, tick, setResult, gameNote, markApplied, REPORTED_SCHEDULE, onTracker } from '../core/matchday.js';
 import { VOD_TAGS, vod, reviewVod, LEVELS, partner as partnerRec, partnerStats, AREAS, GOAL_STATUS, goal as goalRec, updateGoal, plan as newPlan } from '../core/library.js';
@@ -70,7 +70,11 @@ import { localSource } from '../readiness/donny/source.ts';
 import { SKOR_FORMULA_VERSION as DONNY_FORMULA } from '../../vendor/donny-monitoring/src/modules/skor.ts';
 import { readinessView } from '../readiness/view.js';
 import { translateDom, tr as trId } from './i18n.js';
-import { autoCard, cardPlan, approveCard, cardMarkdown } from '../core/oppcard.js';
+import { autoCard, cardPlan, approveCard, cardMarkdown, cardWhatsApp } from '../core/oppcard.js';
+import { draftPlan, lineText, draftPlanText, dataDepth, LOW as LOW_SAMPLE } from '../core/draft_plan.js';
+import { WORKSPACE_TITLES, fieldOf, fieldEdit, nationIn, starters, workspaceContext, shotMaterial } from '../core/workspace.js';
+import { MLBB_RANK, META_SOURCES, HIGH_BAN, mlbbIdeas } from '../core/meta_live.js';
+import { weaknessCounts } from '../core/weakness.js';
 import { usageSummary, PRICES_READ } from '../core/ai_cost.js';
 import { checkin, session as loadSession, teamDay, ITEMS, ITEM_LABEL, THRESHOLDS, MIN_BASELINE_DAYS } from '../core/wellbeing.js';
 import { captureUi, heroesFor, mmssInput, capDupInput, capEnter } from './capture_ui.js';
@@ -155,6 +159,12 @@ const coUi = () => (CO ||= coachAiUi({ S, esc, tag, banner, setMsg, val, render,
 // camp attendance and availability). A tab bar with hidden screens ends in "More · n", which shows them all.
 const FOCUS_HIDE = new Set(['board', 'staff-measure', 'tour-series', 'dota-post', 'dota-draft', 'dota-review', 'pubgm-sim', 'mlbb-draft', 't-mlbbw-draft',
   'players', 'pel-day', 'pel-avail', ...(FEAT.donny ? ['well-day', 'well-log'] : [])]);
+// V1.46 screens taken off the website's menus (never used; the data and the links stay): "Is it working?", the PUBG
+// Mobile strategy sim, and the Juara Umum board for everyone but leadership, the Head Coach and admins.
+const REMOVED = new Set(HUB_USER ? ['staff-measure', 'pubgm-sim', ...(HUB_USER.isAdmin || HUB_USER.roles.some((r) => ['leadership', 'head_coach'].includes(r)) ? [] : ['board'])] : []);
+// V1.46 short coach menu: a title coach of a pilot title sees Today, their game and Opponents; "More" shows the rest.
+// V1.47: the short menu is the category workspace (src/core/workspace.js WORKSPACE_TITLES).
+const COACH_MENU = TITLE_COACH && HUB_USER.titles.length === 1 && WORKSPACE_TITLES.includes(HUB_USER.titles[0]);
 const focusHidden = (id, view) => focusOn() && FOCUS_HIDE.has(id) && id !== view;
 const focusOn = () => !!HUB_USER && !S.showAll;   // the website (coaches); the offline file shows everything
 // V1.32 less noise: Weaknesses and Patterns open from the Analysis tab (sub-links on the page); per-title
@@ -162,7 +172,7 @@ const focusOn = () => !!HUB_USER && !S.showAll;   // the website (coaches); the 
 const SUB_OF = {};
 for (const team of ['dota', 'pubgm', 'mlbb', 't-mlbbw', 't-efootball', 't-cs2', 't-cs2w']) { SUB_OF[`${team}-weak`] = `${team}-trends`; SUB_OF[`${team}-patterns`] = `${team}-trends`; SUB_OF[`${team}-brain`] = `${team}-trends`; }
 const BAR_HIDE = new Set(['mlbb-rivals', 't-mlbbw-rivals', 't-efootball-rivals', 't-cs2-rivals', 't-cs2w-rivals', 'pubgm-rivals', 'dota-scout']);
-const tabShown = (id, view) => (SUPPORT_ONLY && ['readiness', 'players', 'well-day', 'well-log'].includes(id) ? false : SUB_OF[id] ? false : BAR_HIDE.has(id) ? id === view : !focusHidden(id, view));
+const tabShown = (id, view) => (SUPPORT_ONLY && ['readiness', 'players', 'well-day', 'well-log'].includes(id) ? false : SUB_OF[id] ? false : BAR_HIDE.has(id) || REMOVED.has(id) ? id === view : !focusHidden(id, view));
 const canSetDates = () => !HUB_USER || HUB_USER.isAdmin || HUB_USER.roles.includes('head_coach');
 const plUi = () => (PL ||= pelatnasUi({ S, esc, tag, banner, setMsg, val, render, meName, sid, localDay, shiftDay, titleVisible: (t) => titleVisible(t), canSetDates }));
 // V1.35 camp plan: each title's staff edit their own plan (the database enforces the same rule).
@@ -352,21 +362,35 @@ const TITLES = [
   { id: 'guide', label: 'Guide', tabs: [['guide', 'How to use the hub']] },
   { id: 'staff', label: 'Staff', tabs: [['staff-cycle', 'Coaching cycle'], ['staff-quality', 'Practice quality'], ['staff-measure', 'Is it working?'], ['staff-rules', 'Rules & decisions'], ['staff-sources', 'Sources & limits'], ...(HUB_USER?.isAdmin ? [['admin-users', 'Users & access']] : [])] },
 ];
-const viewOf = () => { const h = location.hash.slice(1).split('?')[0]; return TITLES.some((t) => t.tabs.some(([id]) => id === h)) ? h : 'today'; };
+const viewOf = () => { const h = location.hash.slice(1).split('?')[0]; return TITLES.some((t) => t.tabs.some(([id]) => id === h)) || (V[h] && (coachNav() || []).some((t) => t.tabs.some(([id]) => id === h))) ? h : 'today'; };
 const viewParams = () => new URLSearchParams(location.hash.split('?')[1]);
+// V1.47 one workspace per category: five tabs, the same in every category. Pages inside My team (trends, weaknesses,
+// patterns, roster, practice) keep "My team" lit.
+function wsTabs(t) {
+  const rp = REPORT_TAB[t]; if (!rp) return null; const team = rp.replace(/-reports$/, '');
+  return { team, tabs: [[rp, 'My team'], ['comp-card', 'Opponents'], [`${team}-meta`, 'Meta'], [`${team}-brain`, 'Ask AI'], ['tour-runbook', 'Match prep']],
+    mine: [`${team}-trends`, `${team}-weak`, `${team}-patterns`, TEAM_TAB[t], `${team}-scrims`, `${team}-draft`] };
+}
+function coachNav() {
+  if (!COACH_MENU || S.showAll) return null;
+  const t = HUB_USER.titles[0]; const w = wsTabs(t); if (!w) return null;
+  return [{ id: 'ws', label: SHORT[t] || t, tabs: w.tabs, mine: w.mine }];
+}
 function renderNav(view) {
-  const title = TITLES.find((t) => t.tabs.some(([id]) => id === view));
+  const cn = coachNav(); const has = (t) => t.tabs.some(([id]) => id === view || SUB_OF[view] === id) || (t.mine || []).includes(view);
+  const inCoach = cn ? cn.find(has) : null;
+  const title = inCoach || TITLES.find((t) => t.tabs.some(([id]) => id === view));
   const pending = S.cycle.filter((o) => o.status === 'proposed').length;
   const me = STAFF.find((x) => x.id === S.me);
   // V1.19: Home always returns to the Main dashboard.
   const home = `<button type="button" id="homeBtn" class="home" data-go="overview" aria-label="Home: Main dashboard" aria-pressed="${view === 'overview'}">⌂ Home</button>`;
   $('#titles').innerHTML = home + (HUB_USER ? `<span class="me" title="${esc(HUB_USER.email)}">${esc(HUB_USER.name)}</span><button type="button" id="signOutBtn" class="mode">Sign out</button>`
-    : `<label class="me" for="meSel">I am <select id="meSel">${STAFF.map((x) => `<option value="${x.id}" ${x.id === S.me ? 'selected' : ''}>${esc(x.name.split(' ')[0])}</option>`).join('')}</select></label>`) + TITLES.filter(groupVisible).map((t) => `<button type="button" data-go="${t.tabs[0][0]}" aria-pressed="${t === title}">${esc(t.label)}${t.id === 'staff' && pending ? ` · ${pending}` : ''}</button>`).join('')
+    : `<label class="me" for="meSel">I am <select id="meSel">${STAFF.map((x) => `<option value="${x.id}" ${x.id === S.me ? 'selected' : ''}>${esc(x.name.split(' ')[0])}</option>`).join('')}</select></label>`) + (cn || TITLES.filter(groupVisible)).map((t) => `<button type="button" data-go="${t.tabs[0][0]}" aria-pressed="${t === title}">${esc(t.label)}${t.id === 'staff' && pending ? ` · ${pending}` : ''}</button>`).join('')
     + `<button type="button" id="langBtn" class="lang" aria-label="${S.lang === 'id' ? 'Switch to English' : 'Ganti ke Bahasa Indonesia'}"><b${S.lang === 'en' ? ' class="on"' : ''}>EN</b><b${S.lang === 'id' ? ' class="on"' : ''}>ID</b></button>`
-    + `<button type="button" id="modeBtn" class="mode ${S.mode}" aria-pressed="${S.mode === 'demo'}">${S.mode === 'demo' ? 'Leave demo sandbox' : 'Demo sandbox'}</button>`
-    + (HUB_USER ? `<button type="button" id="focusBtn" class="mode" aria-pressed="${!S.showAll}" title="Focus mode hides screens not in use yet">${S.showAll ? 'Focus mode' : 'Show all tools'}</button>` : '');
-  const folded = title.tabs.filter(([id]) => !SUB_OF[id] && !BAR_HIDE.has(id) && !(SUPPORT_ONLY && !tabShown(id, view)) && focusHidden(id, view)).length;
-  $('#tabs').innerHTML = title.tabs.filter(([id]) => tabShown(id, view)).map(([id, label]) => `<a href="#${id}" ${id === view || SUB_OF[view] === id ? 'aria-current="page"' : ''}>${id === 'daily-sessions' ? dailyLabel(label) : esc(label)}</a>`).join('')
+    + (cn ? '' : `<button type="button" id="modeBtn" class="mode ${S.mode}" aria-pressed="${S.mode === 'demo'}">${S.mode === 'demo' ? 'Leave demo sandbox' : 'Demo sandbox'}</button>`)
+    + (HUB_USER ? `<button type="button" id="focusBtn" class="mode" aria-pressed="${!S.showAll}" title="${COACH_MENU ? 'The short menu shows the screens a title coach uses most' : 'Focus mode hides screens not in use yet'}">${COACH_MENU ? (S.showAll ? 'Short menu' : 'More') : S.showAll ? 'Focus mode' : 'Show all tools'}</button>` : '');
+  const folded = inCoach ? 0 : title.tabs.filter(([id]) => !SUB_OF[id] && !BAR_HIDE.has(id) && !REMOVED.has(id) && !(SUPPORT_ONLY && !tabShown(id, view)) && focusHidden(id, view)).length;
+  $('#tabs').innerHTML = title.tabs.filter(([id]) => inCoach || tabShown(id, view)).map(([id, label]) => `<a href="#${id}" ${id === view || SUB_OF[view] === id || (inCoach && id === title.tabs[0][0] && (title.mine || []).includes(view)) ? 'aria-current="page"' : ''}>${id === 'daily-sessions' ? dailyLabel(label) : esc(label)}</a>`).join('')
     + (folded ? `<button type="button" id="focusMore" class="more" title="Screens not in use yet. Show all tools">More · ${folded}</button>` : '');
 }
 
@@ -961,6 +985,26 @@ function trendsPage(title) {
 for (const [view, title] of [['dota-trends', 'Dota 2'], ['pubgm-trends', 'PUBG Mobile']]) V[view] = () => trendsPage(title) + weeklyPanel(title);
 for (const [view, title] of [['dota-weak', 'Dota 2'], ['pubgm-weak', 'PUBG Mobile']]) V[view] = () => coUi().weaknessPage(title) + ownVodPanel(title);
 
+// V1.46 "What repeats": weakness labels that came back in the last 14 days, each with the reports behind it.
+// Shown on the Scrim reports page only when a label appears in 2 or more reports, so an empty week adds nothing.
+function repeatsPanel(title) {
+  if (!FEAT.coachAi || S.mode === 'demo') return '';
+  const rows = weaknessCounts(S.wtags || [], title, localToday(), 14).filter((w) => w.n >= 2).slice(0, 4); if (!rows.length) return '';
+  const inCycle = new Set(S.cycle.filter((o) => o.title === title && !['retired', 'rejected'].includes(o.status)).map((o) => o.rec?.problem));
+  const rep = (id) => S.reports.find((r) => r.id === id);
+  return `<div class="panel"><h2>What repeats (last 14 days)</h2>
+    <p class="note">From the labels on what failed in your reports. Open a line to see the reports behind it.</p>
+    ${rows.map((w) => `<details><summary><b>${esc(w.tag)}</b> <span data-no-tr>· ${esc(L2(`${w.n} reports`, `${w.n} laporan`))} <span class="note">(${esc(L2(`${w.prev} in the 14 days before`, `${w.prev} di 14 hari sebelumnya`))})</span></span></summary>
+      <ul class="plain">${w.reports.map(rep).filter(Boolean).sort((a, b) => b.date.localeCompare(a.date)).map((r) => `<li><span class="note">${esc(r.date)} · vs <span data-no-tr>${esc(r.partner)}</span></span><br><span data-no-tr>${esc(r.failed || r.adjust || '')}</span></li>`).join('')}</ul>
+      ${w.n >= 3 ? (inCycle.has(`Recurring weakness: ${w.tag}`) ? `<p>${tag('c-Medium', 'in the coaching cycle')}</p>` : `<div class="toolbar"><button class="btn" type="button" data-co-weak-propose="${esc(`${title}|${w.tag}`)}">Make it a training focus</button></div>`) : ''}</details>`).join('')}</div>`;
+}
+// V1.47 inside "My team" of a category workspace: one small sub-menu, and the support staff's lines for this team.
+function wsTeamNav(title, here) {
+  if (!coachNav()) return '';
+  const w = wsTabs(title); if (!w) return '';
+  const items = [[REPORT_TAB[title], 'Scrim reports', 'reports'], [`${w.team}-trends`, 'Trends', 'trends'], [TEAM_TAB[title], 'Roster', 'team']];
+  return `<nav class="subnav" aria-label="My team">${items.map(([h, l, k]) => `<a href="#${h}" ${k === here ? 'aria-current="page"' : ''}>${esc(l)}</a>`).join('')}</nav>${here === 'reports' && FEAT.support ? supUi().noticesPanel([title]) : ''}`;
+}
 function reportsPanel(title) {
   loadRpHist();
   const record = HUB_USER && viewParams().get('record');
@@ -974,7 +1018,7 @@ function reportsPanel(title) {
   const unit = spec.unit;
   const ready = Sm.carryOver ? `<div class="panel"><h2>Start the next session from here</h2><p>${esc(Sm.carryOver.adjust)}</p><p class="note">Adjustment written by ${esc(Sm.carryOver.by)} on ${esc(Sm.carryOver.date)}. If the next report does not mention it, ask whether it was tried.</p></div>` : '';
   const form = S.mode === 'demo' ? '' : reportForm(title, { fid, spec, pts, unit, planned, t0 });
-  return `<div class="panel"><h2>Scrim reports — ${esc(title)}</h2>${dailyEntry(title)}
+  return `${wsTeamNav(title, 'reports')}<div class="panel"><h2>Scrim reports — ${esc(title)}</h2>${dailyEntry(title)}
     <div class="stats"><div class="stat"><span class="k">Sessions, last 7 days</span><span class="v">${Sm.sessions}</span></div>
     <div class="stat"><span class="k">${pts ? 'Points, last 7 days' : 'Record, last 7 days'}</span><span class="v">${Sm.sessions ? (pts ? `${Sm.points} (${Sm.matches} m)` : `${Sm.won}-${Sm.lost}${Sm.drawn ? `-${Sm.drawn}` : ''}`) : '—'}</span></div>
     <div class="stat"><span class="k">Plan followed (average, 1–5)</span><span class="v">${Sm.progress ?? '—'}</span>${trendTag(Sm.trend)}</div>
@@ -983,7 +1027,7 @@ function reportsPanel(title) {
     ${(() => { const n = gameOf(title) ? capUi().waitingCount(title) : 0; return n ? banner('synth', `<div><b>${n} screenshot${n > 1 ? 's were' : ' was'} read but never confirmed into a game.</b> If ${n > 1 ? 'they were' : 'it was'} a real game, add ${n > 1 ? 'them' : 'it'} again under Games and confirm; a discarded or duplicate screenshot can be ignored.</div>`) : ''; })()}
     ${!mine.length ? '<p class="empty">No report yet.</p>' : ''}
     <details class="howto"><summary>How to read this</summary><p class="note">Progress is the coach's rating of how closely the team followed the plan of the day. It is not computed, and ratings from different coaches are not directly comparable.</p></details></div>
-  ${reportTrends(title)}${ready}${form}${rpHistOverlay()}
+  ${reportTrends(title)}${ready}${repeatsPanel(title)}${form}${rpHistOverlay()}
   <div class="panel"><h2>Day by day</h2>${days.length ? days.slice(0, 14).map((d) => `<details ${d.date === t0 ? 'open' : ''}><summary><b>${esc(d.date)}</b> · ${d.n} session${d.n > 1 ? 's' : ''} · ${pts ? `${d.points} pts in ${d.played} m` : `${d.won}-${d.lost}${d.drawn ? `-${d.drawn}` : ''}`}${d.progress != null ? ` · plan ${d.progress}/5` : ''}${d.focus.length ? ` <span class="note">— ${esc(d.focus.join('; '))}</span>` : ''}</summary>${d.sessions.map(reportCard).join('')}</details>`).join('') : '<p class="empty">Nothing filed yet.</p>'}
     ${days.length > 14 ? `<p class="note">${days.length - 14} older day(s) are in the Excel download.</p>` : ''}
     ${mine.length ? `<div class="toolbar"><button class="btn primary" type="button" data-report-xlsx="${esc(title)}">Download Excel</button><button class="btn" type="button" data-report-csv="${esc(title)}">CSV</button>${logMode(title) ? `<button class="btn" type="button" data-scrimlog-csv="${esc(title)}">Download games (Scrim Log format)</button>` : ''}<span class="msg" id="rpCsvMsg-${fid}"></span></div>` : ''}</div>`;
@@ -1420,7 +1464,7 @@ function teamPage(title) {
     ${S.mode === 'demo' ? '' : `<details><summary class="btn">Add a staff observation</summary>${observationForm(title)}</details>`}</div>`;
 }
 for (const h of GAME_HUBS) {
-  V[h.team] = () => teamPage(h.title);
+  V[h.team] = () => wsTeamNav(h.title, 'team') + teamPage(h.title);
   V[`${h.team}-scrims`] = () => scrimsPanel(h.title) + partnerPlanPanel(h.title);
   V[`${h.team}-reports`] = () => reportsPanel(h.title);
   V[`${h.team}-trends`] = () => trendsPage(h.title) + weeklyPanel(h.title);
@@ -1438,10 +1482,10 @@ V['pubgm-reports'] = () => reportsPanel('PUBG Mobile');
 V['pubgm-rivals'] = () => competitorsPanel('PUBG Mobile');
 const ANA_TITLE = { dota: 'Dota 2', pubgm: 'PUBG Mobile', mlbb: 'MLBB', 't-mlbbw': 'MLBB Women', 't-efootball': 'eFootball', 't-cs2': 'CS2', 't-cs2w': 'CS2 Women' };
 function anaNav(team, here) {
-  const items = [['trends', 'Trends'], ...(V[`${team}-weak`] && FEAT.coachAi ? [['weak', 'Weaknesses']] : []), ...(V[`${team}-patterns`] && FEAT.capture ? [['patterns', 'Patterns']] : []), ...(V[`${team}-brain`] && FEAT.brainAi ? [['brain', 'Ask the AI (Brainstorm)']] : [])];
+  const items = [['trends', 'Trends'], ...(V[`${team}-weak`] && FEAT.coachAi ? [['weak', 'Weaknesses']] : []), ...(V[`${team}-patterns`] && FEAT.capture ? [['patterns', 'Patterns']] : []), ...(V[`${team}-brain`] && FEAT.brainAi && (!HUB_USER || here === 'brain') ? [['brain', 'Ask the AI (Brainstorm)']] : [])];
   return items.length > 1 ? `<nav class="subnav" aria-label="Analysis">${items.map(([k, l]) => `<a href="#${team}-${k}" ${k === here ? 'aria-current="page"' : ''}>${esc(l)}</a>`).join('')}</nav>` : '';
 }
-for (const team of Object.keys(ANA_TITLE)) for (const k of ['trends', 'weak', 'patterns', 'brain']) { const f = V[`${team}-${k}`]; if (f) V[`${team}-${k}`] = () => anaNav(team, k) + f(); }
+for (const team of Object.keys(ANA_TITLE)) for (const k of ['trends', 'weak', 'patterns', 'brain']) { const f = V[`${team}-${k}`]; if (f) V[`${team}-${k}`] = () => (k === 'trends' ? wsTeamNav(ANA_TITLE[team], 'trends') : '') + (k === 'brain' && coachNav() ? '' : anaNav(team, k)) + f(); }
 V['comp-title'] = () => {
   const ts = WEC_TITLES.map((t) => t.id).filter((t) => titleVisible(t));
   const t = ts.includes(S.compTitle) ? S.compTitle : ts[0];
@@ -2013,6 +2057,22 @@ V['tour-scout'] = () => {
 // ---------- V1.26 Focus 2: Meta tab per title ----------
 const META_LABEL = { patch: 'patch', change: 'change', strong: 'strong', weak: 'weak', strategy: 'strategy' };
 async function saveMeta(rec) { if (S.db) await S.db.collection('rivals').doc(rec.id).set(rec); else S.rivals = [...S.rivals.filter((x) => x.id !== rec.id), rec]; }
+// V1.47 MLBB meta from the official hero rank page (no public API exists): what is strong in ranked play right now,
+// what gets banned, and strong heroes none of our scrim games used (ideas to test). Ranked play is not pro play.
+function mlbbMetaPanel(title) {
+  if (!/^MLBB/.test(title)) return '';
+  const ours = new Map(); for (const g of latestGames((S.games || []).filter((x) => x.title === title))) for (const pl of g.players || []) if (pl.team === 'ours' && pl.hero) ours.set(pl.hero, (ours.get(pl.hero) || 0) + 1);
+  const R = MLBB_RANK; const banned = R.rows.filter((r) => r.ban >= HIGH_BAN).sort((a, b) => b.ban - a.ban); const ideas = mlbbIdeas(ours);
+  const scope = L2(`${R.scope}, from ${R.source}, read ${R.read} (page updated ${R.pageUpdated}). Ranked play, not pro play: a starting point, not a verdict.`,
+    `Ranked, semua rank, 1 hari terakhir, 20 teratas menurut win rate, dari ${R.source}, dibaca ${R.read} (halaman diperbarui ${R.pageUpdated}). Ranked, bukan pro: titik awal, bukan keputusan.`);
+  const women = title === 'MLBB Women' ? ` ${L2("Same game data as the men's; the women's pro scene may differ.", 'Data game yang sama dengan putra; scene pro putri bisa berbeda.')}` : '';
+  return `<div class="panel"><h2>Strong right now (official)</h2>
+    <p class="note" data-no-tr>${esc(scope + women)}</p>
+    ${banned.length ? `<p data-no-tr><b>${esc(L2('Banned most', 'Paling sering di-ban'))}:</b> ${banned.map((r) => esc(`${r.hero} ${r.ban}%`)).join(' · ')}</p>` : ''}
+    <div class="tw"><table><thead><tr><th>Hero</th><th class="n">Win %</th><th class="n">Pick %</th><th class="n">Ban %</th><th>Our scrims</th></tr></thead><tbody>${R.rows.map((r) => `<tr><td data-no-tr>${esc(r.hero)}</td><td class="n">${r.win}</td><td class="n">${r.pick}</td><td class="n">${r.ban}</td><td class="note" data-no-tr>${ours.get(r.hero) ? esc(L2(`${ours.get(r.hero)} game(s)`, `${ours.get(r.hero)} game`)) : '—'}</td></tr>`).join('')}</tbody></table></div>
+    ${ideas.length ? `<div class="h3">Ideas to test in scrims</div><p class="note">Strong in ranked play, not used in any of our confirmed scrim games yet. A question for the coach, not a recommendation.</p>
+      <ul class="plain">${ideas.map((r) => `<li data-no-tr><b>${esc(r.hero)}</b> <span class="note">— ${esc(L2(`win ${r.win}%, ban ${r.ban}%${r.contested ? ': often banned, so test it as a first pick or plan a counter' : ''}`, `win ${r.win}%, ban ${r.ban}%${r.contested ? ': sering di-ban, uji sebagai first pick atau siapkan counter' : ''}`))}</span></li>`).join('')}</ul>` : ''}</div>`;
+}
 function metaPage(title) {
   if (S.mode === 'demo') return `<div class="panel">${DEMO_BANNER}<p class="empty">The meta tracker uses operational records only.</p></div>`;
   const fid = sid(title); const entries = metaOf(S.rivals, title);
@@ -2049,6 +2109,7 @@ function metaPage(title) {
     ${X ? `${X.patch ? `<p>Patch in the text: <b>${esc(X.patch)}</b></p>` : ''}${X.dropped ? `<p class="note">${X.dropped} entr${X.dropped === 1 ? 'y' : 'ies'} left out: no exact quote from the text.</p>` : ''}
       ${X.entries.length ? `<ul class="plain">${X.entries.map((e, i) => `<li><label><input type="checkbox" id="mtX${i}-${fid}" checked> ${tag('k-observed', META_LABEL[e.category])} <b>${esc(e.item)}</b> ${esc(e.text)} <span class="note">“${esc(e.quote)}”</span></label></li>`).join('')}</ul>
       <div class="toolbar"><button class="btn primary" type="button" data-mt-add-x="${esc(title)}">Add selected (to confirm)</button></div>` : '<p class="note">Nothing to add.</p>'}${feedbackBar('meta_extract', `${title}|${X.patch || today()}`, title)}` : ''}</div>` : ''}
+  ${mlbbMetaPanel(title)}
   ${title === 'Dota 2' ? `<div class="panel"><h2>Pro hero stats (OpenDota)</h2>
     <p class="note">Public professional matches over OpenDota's recent window: picks, bans and win rate per hero. Under ${OD_MIN} picks is a small sample. Pro play is not our scrims: use it as context.</p>
     <div class="toolbar"><button class="btn" type="button" data-mt-od="1">Load from OpenDota</button><span class="msg" id="mtODMsg" role="status"></span></div>
@@ -2069,7 +2130,23 @@ function metaPage(title) {
 // ---------- V1.27 Brainstorm per title ----------
 function brainState(title) {
   S.brain ||= {};
-  return (S.brain[title] ||= { purpose: 'plan', nation: (FIELDS[title] || [])[0] || '', msgs: [] });
+  return (S.brain[title] ||= { purpose: 'plan', nation: '', msgs: [], shots: [] });
+}
+// V1.47 Ask AI: the coach never explains the context. Every question carries the workspace (squad, opponents,
+// event, matches), this title's practice records and meta; a question that names an opponent also carries that
+// opponent's brief (and the MLBB draft plan); screenshots the coach added are read first and come along as S1, S2…
+function askMaterial(title, b) {
+  const opponents = fieldOf(title, S.rivals).list;
+  const ctx = workspaceContext({ title, squad: playersOf(title).map((x) => x.nick || x.name), coaches: coachesOf(title).filter((c) => c.role === 'coach').map((c) => c.name), opponents, event: EVENT,
+    matches: S.wecMatches.filter((m) => m.title === title), asOf: today() });
+  const meta = metaOf(S.rivals, title).slice(0, 30).map((e, i) => ({ id: `M${i + 1}`, text: `${e.category}: ${e.item}${e.text ? ` — ${e.text}` : ''} (${e.source}${e.check ? ', to confirm' : ''})` }));
+  const rank = /^MLBB/.test(title) ? [{ id: 'R1', text: `Official ranked-play stats (${MLBB_RANK.source}, ${MLBB_RANK.scope}, read ${MLBB_RANK.read}): ${MLBB_RANK.rows.map((r) => `${r.hero} win ${r.win}% pick ${r.pick}% ban ${r.ban}%`).join('; ')}` }] : [];
+  let m = { WORKSPACE: ctx, META: [...meta, ...rank], SHOTS: b.shots || [], ...brainMaterial(title, b), PURPOSE: b.purpose === 'opponent' ? `answer the coach's question about ${b.nation}` : "answer the coach's question" };
+  const dp = b.purpose === 'opponent' ? draftPlanOf(title, b.nation) : null;
+  if (dp && dp.lines.length) m.DRAFT_PLAN = dp.lines.map((l, i) => { const t = lineText(l, 'en'); return { id: `D${i + 1}`, text: `${t.text}: ${t.evidence}${l.low ? ' (low sample)' : ''}` }; });
+  // The AI function takes up to 50,000 characters of material: practice detail goes first when it is too much.
+  for (const k of ['WEEKLY', 'PARTNERS', 'VODS', 'REPORTS']) if (JSON.stringify(m).length > 45000 && m[k]) delete m[k];
+  return m;
 }
 function brainMaterial(title, b) {
   if (b.purpose === 'opponent') {
@@ -2079,23 +2156,25 @@ function brainMaterial(title, b) {
   return { ...planBrainMaterial(title, { reports: S.reports, wtags: S.wtags || [], vods: S.vods, partners: S.partners, tiers: S.tiers, scrims: S.scrims, asOf: today() }), RULES: rulesMaterial(S.rules, title) };
 }
 function brainPage(title) {
-  if (S.mode === 'demo') return `<div class="panel">${DEMO_BANNER}<p class="empty">Brainstorm uses operational records only.</p></div>`;
+  if (S.mode === 'demo') return `<div class="panel">${DEMO_BANNER}<p class="empty">Ask AI uses operational records only.</p></div>`;
   const b = brainState(title); const fid = sid(title); const left = BRAIN_MAX - b.msgs.length;
-  const msg = (m, i) => m.role !== 'ai' ? `<div class="obj"><span class="note">${esc(m.by || 'Staff')}</span><p>${esc(m.text)}</p></div>`
-    : `<div class="obj"><span class="note">AI${m.sources.length ? ` · from ${esc(m.sources.join(', '))}` : ' · no record cited'}</span><p style="white-space:pre-wrap">${esc(m.text)}</p>
+  const opponents = fieldOf(title, S.rivals).list; const canShot = !!gameOf(title);
+  const msg = (m, i) => m.role !== 'ai' ? `<div class="obj"><span class="note">${esc(m.by || 'Staff')}</span><p data-no-tr>${esc(m.text)}</p>${m.shots ? `<p class="note">with ${m.shots} screenshot(s)</p>` : ''}</div>`
+    : `<div class="obj"><span class="note">AI${m.sources.length ? ` · from ${esc(m.sources.join(', '))}` : ' · no record cited'}</span><p style="white-space:pre-wrap" data-no-tr>${esc(m.text)}</p>
       ${m.unverified.length ? `<p class="note">${tag('c-Blocked', 'check')} Numbers not found in the records: ${m.unverified.map(esc).join(', ')}. Treat them as unverified.</p>` : ''}
-      ${m.suggestions.length ? `<div class="toolbar">${m.suggestions.map((s, j) => `<button class="btn small" type="button" data-br-turn="${esc(JSON.stringify({ title, i, j }))}">${esc({ session: 'Turn into a session plan', proposal: 'Turn into a coaching proposal', note: 'Turn into a scouting note' }[s.kind])}: ${esc(s.title)}</button>`).join('')}</div>` : ''}
+      <div class="toolbar">${m.nation ? (m.saved ? tag('c-Verified', `saved to ${m.nation}`) : `<button class="btn small" type="button" data-ask-save="${esc(JSON.stringify({ title, i }))}">Save to ${esc(m.nation)}'s profile</button>`) : ''}
+        ${m.suggestions.filter((x) => x.kind !== 'note').map((x, k) => `<button class="btn small" type="button" data-br-turn="${esc(JSON.stringify({ title, i, j: m.suggestions.indexOf(x) }))}">${esc({ session: 'Make it a practice session', proposal: 'Make it a training focus' }[x.kind] || x.kind)}</button>`).join('')}</div>
       ${m.follow_ups.length ? `<div class="chips">${m.follow_ups.map((q) => `<button class="chip" type="button" data-br-ask="${esc(JSON.stringify({ title, q }))}">${esc(q)}</button>`).join('')}</div>` : ''}
       ${feedbackBar('brainstorm', `${title}|${m.at}`, title)}</div>`;
-  return `<div class="panel"><div class="lead">Brainstorm — <em>${esc(title)}</em></div>
-    <p class="note">Think out loud with the AI. It reads only this title's records for the purpose you pick, names the records it used, and says TBD when the data is not there. Anything worth keeping becomes a session plan, coaching proposal or scouting note through the usual forms and approvals. Sessions are not stored: copy the summary at the end. Performance only.</p>
-    <div class="form"><label class="field" for="brP-${fid}">Purpose<select id="brP-${fid}" data-br-purpose="${esc(title)}"><option value="plan" ${b.purpose === 'plan' ? 'selected' : ''}>Plan next practice</option><option value="opponent" ${b.purpose === 'opponent' ? 'selected' : ''}>Opponent prep</option></select></label>
-      ${b.purpose === 'opponent' ? `<label class="field" for="brN-${fid}">Opponent<select id="brN-${fid}" data-br-nation="${esc(title)}">${(FIELDS[title] || []).map((n) => `<option ${n === b.nation ? 'selected' : ''}>${esc(n)}</option>`).join('')}</select></label>` : ''}</div></div>
-  <div class="panel">${b.msgs.length ? b.msgs.map(msg).join('') : '<p class="empty">Ask a first question, e.g. "What should tomorrow\'s session focus on?"</p>'}
+  return `<div class="panel"><div class="lead">Ask AI — <em>${esc(title)}</em></div>
+    <p class="note">Ask anything in your own words: an opponent, a draft, the meta, what keeps failing, a training plan. It already knows your squad, your ${opponents.length} opponents and the event, answers from the hub's records and names them. When the records do not hold the answer, it says so.</p></div>
+  <div class="panel">${b.msgs.length ? b.msgs.map(msg).join('') : `<div class="chips"><span class="note">Try:</span>${starters(title, opponents, S.lang).map((q) => `<button class="chip" type="button" data-br-ask="${esc(JSON.stringify({ title, q }))}">${esc(q)}</button>`).join('')}</div>`}
     ${brainAiOn() ? `<label class="field" for="brQ-${fid}">Your question<textarea id="brQ-${fid}" rows="3" maxlength="1500"></textarea></label>
-    <div class="toolbar"><button class="btn primary" type="button" data-br-send="${esc(title)}" ${left > 0 ? '' : 'disabled'}>Ask</button><span class="note">${left} of ${BRAIN_MAX} messages left</span>
-      ${b.msgs.length ? `<button class="btn" type="button" data-br-sum="${esc(title)}">Summarise the session</button><button class="btn" type="button" data-br-copy="${esc(title)}">Copy the session</button><button class="linkbtn" type="button" data-br-new="${esc(title)}">New session</button>` : ''}
-      <span class="msg" id="brMsg-${fid}" role="status"></span></div>` : '<p class="note">Brainstorm switches on after the V1.27 AI update.</p>'}</div>`;
+    ${canShot ? `<label class="field" for="brS-${fid}">Add a screenshot (result or draft screen, optional)<input type="file" id="brS-${fid}" accept="image/*" multiple data-ask-shot="${esc(title)}"></label>
+      ${(b.shots || []).length ? `<p class="note">${b.shots.length} screenshot(s) read and attached to the next question. <button class="linkbtn small" type="button" data-ask-shots-clear="${esc(title)}">Remove</button></p>` : ''}` : ''}
+    <div class="toolbar"><button class="btn primary" type="button" data-br-send="${esc(title)}" ${left > 0 ? '' : 'disabled'}>Ask</button>
+      ${b.msgs.length ? `<button class="btn" type="button" data-br-copy="${esc(title)}">Copy the conversation</button><button class="linkbtn" type="button" data-br-new="${esc(title)}">New conversation</button>` : ''}
+      <span class="msg" id="brMsg-${fid}" role="status"></span></div>` : '<p class="note">Ask AI switches on after the AI update.</p>'}</div>`;
 }
 for (const [view, title] of [['dota-brain', 'Dota 2'], ['pubgm-brain', 'PUBG Mobile']]) V[view] = () => brainPage(title);
 for (const h of GAME_HUBS) V[`${h.team}-brain`] = () => brainPage(h.title);
@@ -2439,8 +2518,24 @@ V['comp-rosters'] = () => {
   <div class="panel">${nations.map(card).join('')}</div>`;
 };
 
-function oppCardHtml(a, plan, ours) {
-  return `<article class="oppcard"><header><div><span class="note">${esc(a.title)} · opponent card · internal</span><h2>Indonesia vs ${esc(a.nation)}</h2></div>${plan ? tag(plan.status === 'approved' ? 'c-Verified' : 'c-Low', plan.status === 'approved' ? `approved · ${plan.approvedBy}` : `draft · ${plan.by}`) : tag('c-Low', 'no plan yet')}</header>
+const DRAFT_PLAN_TITLES = ['MLBB', 'MLBB Women'];
+const draftPlanOf = (title, nation) => (DRAFT_PLAN_TITLES.includes(title) ? draftPlan({ nation, pro: (S.dr_pro || []).filter((g) => g.title === title), games: latestGames((S.games || []).filter((g) => g.title === title)) }) : null);
+const L2 = (en, id) => (S.lang === 'id' ? id : en);
+function depthHtml(a, dp) {
+  const D = dataDepth(a, dp ? dp.rival.games : null); const c = D.counts;
+  const parts = [L2(`${c.notes} staff note(s)`, `${c.notes} catatan staf`), L2(`${c.results} public result(s)`, `${c.results} hasil publik`), ...(c.drafts != null ? [L2(`${c.drafts} rival draft(s)`, `${c.drafts} draft lawan`)] : []), L2(`${c.vods} reviewed VOD(s)`, `${c.vods} VOD ditinjau`), L2(`${c.scrims} stand-in scrim(s)`, `${c.scrims} scrim lawan serupa`)];
+  return `<p class="note">${D.thin ? `${tag('c-Low', 'Little public data')} ` : ''}<span data-no-tr>${esc(L2('Behind this page', 'Dasar halaman ini'))}: ${parts.map(esc).join(' · ')}.</span>${D.thin ? ' Read every line with its count; our own scrims and live scouting at the event will add more.' : ''}</p>`;
+}
+function draftPlanHtml(dp) {
+  if (!dp) return '';
+  const r = dp.rival;
+  return `<div class="h3">Draft plan</div>
+    <p class="note" data-no-tr>${esc(r.games ? L2(`From ${r.games} game(s) of ${dp.nation} on record${r.from ? ` (${r.from} to ${r.to})` : ''} and ${dp.ours.drafted} of our scrim games with a draft.`, `Dari ${r.games} game ${dp.nation} yang tercatat${r.from ? ` (${r.from} s/d ${r.to})` : ''} dan ${dp.ours.drafted} game scrim kita yang ada draft-nya.`)
+      : L2(`No drafts of ${dp.nation} on record yet, so this shows our side only (${dp.ours.drafted} scrim game(s) with a draft). Their games can be added in Draft Room, Public games.`, `Belum ada draft ${dp.nation} yang tercatat, jadi ini hanya sisi kita (${dp.ours.drafted} game scrim yang ada draft-nya). Game mereka bisa ditambahkan di Draft Room, Game publik.`))}</p>
+    ${dp.lines.length ? `<ul class="plain">${dp.lines.map((l) => { const t = lineText(l, S.lang); return `<li data-no-tr><b>${esc(t.text)}</b> <span class="note">— ${esc(t.evidence)}</span>${l.low ? ` ${tag('c-Low', LOW_SAMPLE[S.lang] || LOW_SAMPLE.en)}` : ''}</li>`; }).join('')}</ul>` : '<p class="empty">Not enough games yet for a draft line (a hero needs to come up at least twice).</p>'}`;
+}
+function oppCardHtml(a, plan, ours, dp = null) {
+  return `<article class="oppcard"><header><div><span class="note">${esc(a.title)} · opponent card · internal</span><h2>Indonesia vs ${esc(a.nation)}</h2>${depthHtml(a, dp)}</div>${plan ? tag(plan.status === 'approved' ? 'c-Verified' : 'c-Low', plan.status === 'approved' ? `approved · ${plan.approvedBy}` : `draft · ${plan.by}`) : tag('c-Low', 'no plan yet')}</header>
     ${plan ? `<div class="h3">Three things to know</div><ol>${plan.keys.map((k) => `<li>${esc(k)}</li>`).join('')}</ol>
       ${plan.theirPlan ? `<div class="h3">What they are likely to do</div><p>${esc(plan.theirPlan)}</p>` : ''}
       <div class="h3">Our answer</div><p><b>${esc(plan.ourAnswer)}</b></p>
@@ -2448,6 +2543,7 @@ function oppCardHtml(a, plan, ours) {
     <div class="h3">Their roster${a.coach ? ` · coach ${esc(a.coach)}` : ''}</div>
     <div class="tw"><table><thead><tr><th>Player</th><th>Role / club</th>${a.title === 'Dota 2' ? '<th>Most played (club games since 7.41)</th>' : ''}</tr></thead><tbody>${a.roster.map((p) => `<tr><td><b>${esc(p.ign)}</b>${p.captain ? ' (C)' : ''}${p.flags.length ? ' <span class="note">⚠</span>' : ''}</td><td>${esc([p.role, p.club].filter(Boolean).join(' · ') || '—')}${p.pool?.lane ? `<div class="note">${esc(p.pool.lane)}</div>` : ''}</td>${a.title === 'Dota 2' ? `<td>${p.pool?.n ? `${p.pool.top.map((h) => `${esc(h.name)} <span class="note">${h.games}</span>`).join(', ')}<div class="note">${p.pool.n} games${p.pool.probable ? ' · account probable' : ''}</div>` : '<span class="note">no data</span>'}</td>` : ''}</tr>`).join('')}</tbody></table></div>
     ${(() => { const bk = FEAT.draftRoom && ['MLBB', 'MLBB Women'].includes(a.title) ? drUi().bookFor(a.title, a.nation) : null; return bk ? `<div class="h3">Draft book (Draft Room, v${bk.version}, ${bk.status === 'approved' ? `approved by ${esc(bk.approvedBy)}` : 'draft, not approved'})</div><ul class="plain"><li>Bans: ${esc(bk.bans.join(', ') || '—')}</li><li>Protect: ${esc(bk.protect.join(', ') || '—')}</li><li>Flex: ${esc(bk.flex.join(', ') || '—')}</li>${bk.blue ? `<li>Blue: ${esc(bk.blue)}</li>` : ''}${bk.red ? `<li>Red: ${esc(bk.red)}</li>` : ''}</ul>` : ''; })()}
+    ${draftPlanHtml(dp)}
     ${a.contested.length ? `<div class="h3">Heroes both sides play (club data)</div><p class="note">A first-phase decision: ban it, or take it first. Not a verdict on who plays it better.</p><ul class="plain">${a.contested.map((c) => `<li><b>${esc(c.hero)}</b> — ${esc(c.them)} ${c.theirGames} games · our ${esc(c.us)} ${c.ourGames}</li>`).join('')}</ul>` : ''}
     ${a.banCandidates.length ? `<div class="h3">Most-played heroes — ban candidates</div><ul class="plain">${a.banCandidates.map((b) => `<li><b>${esc(b.hero)}</b> — ${esc(b.player)}, ${b.games} of ${b.of} games${b.probable ? ' <span class="note">(account probable)</span>' : ''}</li>`).join('')}</ul><p class="note">Presence in club games, not proof they will draft it for the national team.</p>` : ''}
     <div class="h3">What we know · staff tier: ${esc(a.tier)}</div>${a.tierWhy ? `<p class="note">${esc(a.tierBy)}: ${esc(a.tierWhy)}</p>` : ''}
@@ -2459,14 +2555,22 @@ function oppCardHtml(a, plan, ours) {
 }
 V['comp-card'] = () => {
   if (S.mode === 'demo') return `<div class="panel">${DEMO_BANNER}<p class="empty">Operational records only.</p></div>`;
-  const t = S.ocTitle; const field = FIELDS[t] || []; const n = field.includes(S.ocNation) ? S.ocNation : field[0];
-  const per = nationProfile(n, compData()).per.find((x) => x.title === t);
+  const t = S.ocTitle; const FL = fieldOf(t, S.rivals); const field = FL.list; const n = field.includes(S.ocNation) ? S.ocNation : field[0];
+  // An opponent the staff added (not in the published field) has no profile yet: its own notes only.
+  const per = nationProfile(n, compData()).per.find((x) => x.title === t) || { title: t, tier: 'not assessed', notes: S.rivals.filter((x) => isNote(x) && x.title === t && x.nation === n), vods: [], standIns: [], scrimsDone: 0, wecMatches: [] };
   const a = autoCard({ rivals: S.rivals, title: t, nation: n, per, team: rosterOf(t, n), data: DATA, heroes: S.heroes, ours: t === 'Dota 2' ? dotaTeam().pools : [], asOf: today() });
-  const plan = S.oppCards[rosterKey(t, n)] || null; const ours = S.roster[t] || [];
+  const plan = S.oppCards[rosterKey(t, n)] || null; const ours = S.roster[t] || []; const dp = draftPlanOf(t, n);
   return `<div class="noprint">${compHead('One page per opponent for the opponent brief two hours before a match. The hub fills in what the staff already hold; the title coach writes three key points and our answer, and the focus owner approves it.')}
-    <div class="panel"><div class="form"><label class="field" for="ocT">Title${titleOpts('ocT', t, WEC_TITLES.map((x) => x.id))}</label><label class="field" for="ocN">Opponent<select id="ocN">${field.map((x) => `<option ${x === n ? 'selected' : ''}>${esc(x)}</option>`).join('')}</select></label></div>
-      <div class="toolbar"><button class="btn" type="button" id="ocPrint">Print</button><button class="btn" type="button" id="ocDl">Download .md</button><span class="msg" id="ocMsg"></span></div></div></div>
-  <div class="cols"><div class="panel">${oppCardHtml(a, plan, ours)}</div>
+    <div class="panel"><div class="form">${restricted() && HUB_USER.titles.length === 1 ? '' : `<label class="field" for="ocT">Title${titleOpts('ocT', t, WEC_TITLES.map((x) => x.id).filter(titleVisible))}</label>`}<label class="field" for="ocN">Opponent<select id="ocN">${field.map((x) => `<option ${x === n ? 'selected' : ''}>${esc(x)}</option>`).join('')}</select></label></div>
+      <div class="toolbar"><button class="btn" type="button" id="ocPrint">Print</button><button class="btn" type="button" id="ocDl">Download .md</button><span class="msg" id="ocMsg"></span></div>
+      ${S.mode === 'demo' ? '' : `<details><summary class="note">Edit the opponent list (${field.length})</summary>
+        <p class="note">From the official WEC entry list for ${esc(t)}. Hide a team you will not meet, or add one worth studying (a scrim partner, a club). Changes are dated and can be undone.</p>
+        <div class="toolbar"><button class="btn small" type="button" data-fe="${esc(JSON.stringify({ t, n, a: 'hide' }))}">Hide ${esc(n)}</button></div>
+        <div class="form"><label class="field" for="feAdd">Add an opponent<input type="text" id="feAdd" maxlength="60" placeholder="Team or nation name"></label></div>
+        <div class="toolbar"><button class="btn small" type="button" data-fe-add="${esc(t)}">Add</button><span class="msg" id="feMsg" role="status"></span></div>
+        ${FL.hidden.length ? `<p class="note">Hidden: ${FL.hidden.map((x) => `<button class="linkbtn small" type="button" data-fe="${esc(JSON.stringify({ t, n: x, a: 'show' }))}">${esc(x)} (show again)</button>`).join(' ')}</p>` : ''}
+        ${FL.added.length ? `<p class="note">Added by the staff: ${FL.added.map((x) => `${esc(x)} <button class="linkbtn small" type="button" data-fe="${esc(JSON.stringify({ t, n: x, a: 'hide' }))}">remove</button>`).join(' · ')}</p>` : ''}</details>`}</div></div>
+  <div class="cols"><div class="panel">${oppCardHtml(a, plan, ours, dp)}</div>
   <div class="panel noprint"><h2>${plan ? 'Edit the plan' : 'Write the plan'}</h2>
     ${[0, 1, 2].map((i) => `<label class="field" for="ocK${i}">Key point ${i + 1}${i ? ' (optional)' : ''}<input type="text" id="ocK${i}" value="${esc(plan?.keys[i] || '')}"></label>`).join('')}
     <label class="field" for="ocTh">What they are likely to do<input type="text" id="ocTh" value="${esc(plan?.theirPlan || '')}" placeholder="${t === 'Dota 2' || t.startsWith('MLBB') ? 'first-phase bans, comfort picks, side' : t === 'PUBG Mobile' ? 'drops per map, rotation style' : t.startsWith('CS2') ? 'map picks and bans, default setups' : 'formation, tempo'}"></label>
@@ -2477,7 +2581,14 @@ V['comp-card'] = () => {
     ${plan && plan.status !== 'approved' ? (HUB_USER
       ? (CAN_APPROVE ? `<div class="toolbar"><button class="btn" type="button" id="ocApprove">Approve card as ${esc(HUB_USER.name)}</button><span class="msg" id="ocApMsg"></span></div><p class="note">Approval: the Head Coach or an assistant coach, not the writer of this version.</p>` : '<p class="note">Waiting for approval by the Head Coach or an assistant coach.</p>')
       : `<div class="form"><label class="field" for="ocAp">Approve as (${esc(owner(t).name)} or the title coach)<input type="text" id="ocAp" value="${esc(meName())}"></label></div><div class="toolbar"><button class="btn" type="button" id="ocApprove">Approve card</button><span class="msg" id="ocApMsg"></span></div>`) : ''}
-    <p class="note">Editing an approved card returns it to draft.</p></div></div>`;
+    <p class="note">Editing an approved card returns it to draft.</p>
+    ${plan ? `<div class="h3">Send to players</div><p class="note">Only the lines you tick are copied.${plan.status === 'approved' ? '' : ' The card is not approved yet: the message says DRAFT.'}</p>
+      <fieldset class="objpick">${plan.keys.map((k, i) => `<label class="check"><input type="checkbox" data-oc-wa="key${i}" checked> <span data-no-tr>${esc(k)}</span></label>`).join('')}
+      ${plan.theirPlan ? '<label class="check"><input type="checkbox" data-oc-wa="their" checked> What they are likely to do</label>' : ''}
+      <label class="check"><input type="checkbox" data-oc-wa="answer" checked> Our answer</label>
+      ${Object.keys(plan.focus).length ? '<label class="check"><input type="checkbox" data-oc-wa="focus" checked> One focus per player</label>' : ''}
+      ${dp && dp.lines.length ? '<label class="check"><input type="checkbox" data-oc-wa="draft"> Draft plan</label>' : ''}</fieldset>
+      <div class="toolbar"><button class="btn" type="button" id="ocWa">Copy for WhatsApp</button><span class="msg" id="ocWaMsg"></span></div>` : ''}</div></div>`;
 };
 
 // ---------- render & events ----------
@@ -2604,8 +2715,29 @@ async function onClick(e) {
     } catch (err) { setMsg(`${t.dataset.rosterSave ? 'rrMsg' : 'rcMsg'}-${fk}`, err.message, 'err'); }
     return;
   }
+  if (t.dataset.fe || t.dataset.feAdd) {
+    try {
+      const x = t.dataset.fe ? JSON.parse(t.dataset.fe) : { t: t.dataset.feAdd, n: val('feAdd'), a: 'add' };
+      const rec = fieldEdit({ title: x.t, nation: x.n, action: x.a, by: meName() || S.me });
+      if (S.db) await S.db.collection('rivals').doc(rec.id).set(rec); else S.rivals = [...S.rivals, rec];
+      if (x.a === 'add') S.ocNation = rec.nation; render();
+      setMsg('feMsg', x.a === 'add' ? `Added ${rec.nation}.` : x.a === 'hide' ? `${rec.nation} hidden.` : `${rec.nation} is back on the list.`, 'ok');
+    } catch (err) { setMsg('feMsg', err.message, 'err'); }
+    return;
+  }
+  if (id === 'ocWa') {
+    const ti = S.ocTitle, field = fieldOf(ti, S.rivals).list, na = field.includes(S.ocNation) ? S.ocNation : field[0];
+    try {
+      const plan = S.oppCards[rosterKey(ti, na)]; const dp = draftPlanOf(ti, na);
+      const on = (k) => !!document.querySelector(`[data-oc-wa="${k}"]`)?.checked;
+      const text = cardWhatsApp({ title: ti, nation: na }, plan, { lang: S.lang, draftText: dp ? draftPlanText(dp, S.lang) : '',
+        pick: { keys: (plan?.keys || []).map((_, i) => on(`key${i}`)), their: on('their'), answer: on('answer'), focus: on('focus'), draft: on('draft') } });
+      await navigator.clipboard.writeText(text); setMsg('ocWaMsg', "Copied: paste it in the team's WhatsApp group.", 'ok');
+    } catch (err) { setMsg('ocWaMsg', err.name === 'Error' ? err.message : 'Copy did not work on this device.', 'err'); }
+    return;
+  }
   if (id === 'ocSave' || id === 'ocApprove' || id === 'ocDl' || id === 'ocPrint') {
-    const ti = S.ocTitle, field = FIELDS[ti] || [], na = field.includes(S.ocNation) ? S.ocNation : field[0]; const key = rosterKey(ti, na);
+    const ti = S.ocTitle, field = fieldOf(ti, S.rivals).list, na = field.includes(S.ocNation) ? S.ocNation : field[0]; const key = rosterKey(ti, na);
     try {
       if (id === 'ocPrint') { window.print(); return; }
       if (id === 'ocDl') {
@@ -2805,17 +2937,30 @@ async function onClick(e) {
     try {
       if (!question) throw new Error('Ask a question first.');
       if (b.msgs.length >= BRAIN_MAX) throw new Error(`This session reached ${BRAIN_MAX} messages: copy it and start a new one.`);
-      const material = brainMaterial(title, b);
+      const nation = t.dataset.brSum ? b.nation : nationIn(question, fieldOf(title, S.rivals).list);
+      b.purpose = nation ? 'opponent' : 'plan'; b.nation = nation;
+      const material = askMaterial(title, b); const nShots = (b.shots || []).length;
       const history = b.msgs.map((m) => ({ role: m.role, text: m.text }));
-      b.msgs.push({ role: 'staff', text: question, by: meName() || S.me, at: new Date().toISOString() }); render();
+      b.msgs.push({ role: 'staff', text: question, by: meName() || S.me, at: new Date().toISOString(), shots: nShots }); b.shots = []; render();
       setMsg(`brMsg-${fid}`, 'Thinking… (5–20 s)');
       const out = await PLATFORM.ai.call({ action: 'brainstorm', title, purpose: b.purpose, material, history, question, prefs: [] });
       const c = checkReply(out.raw, material, [...history, { text: question }]);
-      b.msgs.push({ role: 'ai', text: c.reply, sources: c.sources, follow_ups: c.follow_ups, suggestions: c.suggestions, unverified: c.unverified, at: new Date().toISOString() });
+      b.msgs.push({ role: 'ai', text: c.reply, sources: c.sources, follow_ups: c.follow_ups, suggestions: c.suggestions, unverified: c.unverified, nation, at: new Date().toISOString() });
       render();
     } catch (err) { if (b.msgs.at(-1)?.role === 'staff' && b.msgs.at(-1).text === question) b.msgs.pop(); render(); setMsg(`brMsg-${fid}`, err.message, 'err'); }
     return;
   }
+  if (t.dataset.askSave) {
+    const x = JSON.parse(t.dataset.askSave); const b = brainState(x.title); const m = b.msgs[x.i]; if (!m?.nation) return;
+    try {
+      const rec = { id: `AI-${sid(x.title)}-${Date.now().toString(36)}`, title: x.title, nation: m.nation, note: m.text.slice(0, 1200), kind: 'hypothesis',
+        source: `Ask AI, ${today()}${m.sources.length ? ` (from ${m.sources.join(', ')})` : ''}; saved by ${meName() || S.me}`, by: meName() || S.me, date: today(), origin: 'operational' };
+      if (S.db) await S.db.collection('rivals').doc(rec.id).set(rec); else S.rivals = [...S.rivals, rec];
+      m.saved = true; render(); setMsg(`brMsg-${sid(x.title)}`, `Saved to ${m.nation}'s profile as an unconfirmed note.`, 'ok');
+    } catch (err) { setMsg(`brMsg-${sid(x.title)}`, err.message, 'err'); }
+    return;
+  }
+  if (t.dataset.askShotsClear) { brainState(t.dataset.askShotsClear).shots = []; render(); return; }
   if (t.dataset.brTurn) {
     const x = JSON.parse(t.dataset.brTurn); const b = brainState(x.title); const s = b.msgs[x.i]?.suggestions?.[x.j]; if (!s) return;
     const fid = sid(x.title);
@@ -3378,6 +3523,22 @@ document.addEventListener('click', async (e) => {
 });
 for (const ev of ['input', 'change']) document.addEventListener(ev, (e) => { mmssInput(e.target); capDupInput(e.target); draftField(e.target); rowsInput(e.target); supUi().onInput(e.target); });
 
+// V1.47 Ask AI: screenshots are read by the hub's screenshot reader first (result screen, or draft screen), then go
+// with the next question as S1, S2… The AI answers from what was read, not from the picture itself.
+document.addEventListener('change', async (e) => {
+  const title = e.target.dataset?.askShot; if (!title) return;
+  const b = brainState(title); const fid = sid(title); const files = [...(e.target.files || [])].slice(0, 4);
+  for (const [k, f] of files.entries()) {
+    try {
+      setMsg(`brMsg-${fid}`, `Reading screenshot ${k + 1} of ${files.length}… (10–20 s)`);
+      const image = await capUiReal().prepImage(f);
+      let out = await PLATFORM.ai.call({ action: 'scoreboard', title, day: today(), image }); let kind = 'result screen';
+      if (out.raw?.screen_kind === 'draft_or_loading') { out = await PLATFORM.ai.call({ action: 'draft', title, day: today(), image }); kind = 'draft screen'; }
+      b.shots = [...(b.shots || []), shotMaterial((b.shots || []).length + 1, kind, out.raw)];
+    } catch (err) { setMsg(`brMsg-${fid}`, `Screenshot ${k + 1}: ${err.message}`, 'err'); render(); return; }
+  }
+  render(); setMsg(`brMsg-${fid}`, `${files.length} screenshot(s) read. Ask your question.`, 'ok');
+});
 document.addEventListener('change', (e) => {
   // V1.27 Brainstorm purpose and opponent.
   if (e.target.dataset?.brPurpose || e.target.dataset?.brNation) {
@@ -3434,6 +3595,7 @@ if (HUB_USER) {
     titles: WEC_TITLES.map((t) => t.id), titleVisible, esc, params: viewParams, render, setMsg, reportTab: REPORT_TAB });
   document.addEventListener('submit', DAILY.submit);
 }
+if (restricted() && HUB_USER.titles[0]) { S.ocTitle = HUB_USER.titles[0]; S.tourTitle = HUB_USER.titles[0]; }
 if (restricted() && HUB_USER.titles[0] && (!location.hash || location.hash === '#')) history.replaceState(null, '', `#${REPORT_TAB[HUB_USER.titles[0]]}`);
 // V1.19: Leadership (Ketua BTN, Dewan Pengawas) land on the Main dashboard.
 if (LEADERSHIP_ONLY && (!location.hash || location.hash === '#')) history.replaceState(null, '', '#overview');

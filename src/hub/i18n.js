@@ -859,6 +859,22 @@ const RULES = [
   [/^([A-Z][^:·]{1,60}):$/, (m, f) => (tr(f) == null ? m : `${tr(f)}:`)],
 ];
 
+// V1.46 short coach menu, opponent page (data label, draft plan, WhatsApp brief), "What repeats".
+Object.assign(EXACT, {
+  Opponents: 'Lawan', 'Opponent page': 'Halaman lawan', 'Match day': 'Hari pertandingan', More: 'Lainnya', 'Short menu': 'Menu ringkas',
+  'The short menu shows the screens a title coach uses most': 'Menu ringkas menampilkan layar yang paling sering dipakai pelatih',
+  'Little public data': 'Data publik sedikit', 'Draft plan': 'Rencana draft',
+  'Read every line with its count; our own scrims and live scouting at the event will add more.': 'Baca tiap baris beserta jumlahnya; scrim kita sendiri dan scouting langsung saat event akan menambah data.',
+  'Not enough games yet for a draft line (a hero needs to come up at least twice).': 'Belum cukup game untuk satu baris draft (satu hero perlu muncul minimal dua kali).',
+  'Send to players': 'Kirim ke pemain', 'Only the lines you tick are copied.': 'Hanya baris yang Anda centang yang disalin.',
+  'Only the lines you tick are copied. The card is not approved yet: the message says DRAFT.': 'Hanya baris yang Anda centang yang disalin. Kartu belum disetujui: pesannya bertanda DRAF.',
+  'What they are likely to do': 'Kemungkinan yang mereka lakukan', 'Our answer': 'Jawaban kita', 'One focus per player': 'Satu fokus per pemain',
+  'Tick at least one line to send.': 'Centang minimal satu baris untuk dikirim.',
+  'What repeats (last 14 days)': 'Yang berulang (14 hari terakhir)',
+  'From the labels on what failed in your reports. Open a line to see the reports behind it.': 'Dari label pada bagian yang gagal di laporan Anda. Buka satu baris untuk melihat laporan di baliknya.',
+  'Make it a training focus': 'Jadikan fokus latihan',
+});
+
 // V1.45 Excel download, Main dashboard CSV, support staff weekly dashboard.
 Object.assign(EXACT, {
   'Download Excel': 'Unduh Excel', 'Download all (Excel)': 'Unduh semua (Excel)', CSV: 'CSV',
@@ -875,6 +891,35 @@ RULES.push(
   [/^pain −([\d.]+) \(VAS\) · better (\d+)\/(\d+)$/, 'nyeri −$1 (VAS) · membaik $2/$3'],
   [/^(Mon|Tue|Wed|Thu|Fri|Sat|Sun) (\d\d)$/, (m, d, n) => `${{ Mon: 'Sen', Tue: 'Sel', Wed: 'Rab', Thu: 'Kam', Fri: 'Jum', Sat: 'Sab', Sun: 'Min' }[d]} ${n}`],
 );
+
+// V1.46 support staff: follow-ups that carry over, who has not reported today, check before WEC.
+Object.assign(EXACT, {
+  'Add to today': 'Tambahkan ke hari ini', "in today's report": 'sudah di laporan hari ini',
+  'Your follow-ups from the last 14 days. Tick Done when it is finished; a newer report on the same athlete also closes it.':
+    'Tindak lanjut Anda 14 hari terakhir. Klik Selesai jika sudah tuntas; laporan baru untuk atlet yang sama juga menutupnya.',
+  'No report yet today.': 'Belum ada laporan hari ini.', 'Everyone has reported today.': 'Semua sudah melapor hari ini.', 'Copy reminder for WhatsApp': 'Salin pengingat untuk WhatsApp',
+  Visits: 'Kunjungan', 'Last seen': 'Terakhir ditangani', 'Nobody to check from the last 14 days of reports.': 'Tidak ada atlet yang perlu dicek dari laporan 14 hari terakhir.',
+  'In brackets: the week before.': 'Dalam kurung: minggu sebelumnya.', 'worse after the last treatment': 'memburuk setelah terapi terakhir',
+  'Check before WEC': 'Cek sebelum WEC',
+});
+RULES.push(
+  [/^Still open from earlier \((\d+)\)$/, 'Masih terbuka dari sebelumnya ($1)'],
+  [/^Reports today — (\d{4}-\d{2}-\d{2})$/, 'Laporan hari ini — $1'],
+  [/^In: (\d+)$/, 'Masuk: $1'], [/^Not yet: (\d+)$/, 'Belum: $1'],
+  [/^Check before WEC — (\d+) days to go$/, 'Cek sebelum WEC — $1 hari lagi'],
+  [/^Athletes from the last 14 days with a reason to check: pain (\d+)\/10 or more at the last treatment, worse after the last treatment, seen (\d+)\+ times, or a follow-up still open\. Highest concern first\.$/,
+    'Atlet 14 hari terakhir yang perlu dicek: nyeri $1/10 atau lebih di terapi terakhir, memburuk setelah terapi terakhir, ditangani $2+ kali, atau tindak lanjut masih terbuka. Yang paling perlu perhatian di atas.'],
+  [/^pain (\d+)\/10 at the last treatment$/, 'nyeri $1/10 di terapi terakhir'],
+  [/^seen (\d+)× in (\d+) days$/, 'ditangani $1× dalam $2 hari'],
+  [/^(\d+) open follow-ups?$/, '$1 tindak lanjut terbuka'],
+  [/^done (\d{4}-\d{2}-\d{2})$/, 'selesai $1'],
+  [/^(\d+) more not shown\.$/, '$1 lainnya tidak ditampilkan.'],
+  [/^Follow-up for (.+) marked done\.$/, 'Tindak lanjut untuk $1 ditandai selesai.'],
+  [/^(.+) added to today's report: write what was done and the findings\.$/, '$1 ditambahkan ke laporan hari ini: tulis yang dilakukan dan temuannya.'],
+);
+
+// Ahead of the generic "Label:" rule, which would otherwise keep it in English.
+RULES.unshift([/^Yesterday \((\d{4}-\d{2}-\d{2})\) no report from:$/, 'Kemarin ($1) tidak ada laporan dari:']);
 
 // V1.38 Scrim Log input for MLBB and MLBB Women.
 Object.assign(EXACT, {
@@ -905,6 +950,7 @@ RULES.push(
 // Page headlines ("Word <em>word</em>") are translated as a whole.
 const LEADS = {
   'Scrim reports': 'Laporan <em>scrim</em>',
+  ...Object.fromEntries(['MLBB', 'MLBB Women', 'Dota 2', 'PUBG Mobile', 'eFootball', 'CS2', 'CS2 Women'].map((t) => [`Ask AI — ${t}`, `Tanya AI — <em>${t}</em>`])),
   'What do we train today?': 'Apa yang kita <em>latih hari ini</em>?', 'Road to Juara Umum': 'Menuju <em>Juara Umum</em>', 'Weekly brief': 'Ringkasan <em>mingguan</em>',
   'Competitor analysis': 'Analisis <em>kompetitor</em>', 'Tournament week': 'Pekan <em>turnamen</em>', 'Between games': 'Antar <em>game</em>', 'Athlete readiness': 'Kesiapan <em>atlet</em>',
   'Player plans': 'Rencana <em>pemain</em>', 'Support staff': 'Tim <em>pendukung</em>', 'Coaching cycle': 'Siklus <em>coaching</em>', 'Is the hub helping?': 'Apakah hub <em>membantu</em>?',
@@ -932,3 +978,31 @@ export function translateDom(root, lang) {
   }
   for (const el of root.querySelectorAll('[placeholder],[aria-label],[title]')) for (const a of ['placeholder', 'aria-label', 'title']) { const v = el.getAttribute(a); if (v) { const t = tr(v); if (t != null) el.setAttribute(a, t); } }
 }
+
+// V1.47 category workspace: five tabs, opponent list, Ask AI, MLBB meta panel.
+Object.assign(EXACT, {
+  'My team': 'Tim saya', 'Ask AI': 'Tanya AI', 'Match prep': 'Persiapan laga', Trends: 'Tren', Roster: 'Roster',
+  'Add an opponent': 'Tambah lawan', Add: 'Tambah', 'Team or nation name': 'Nama tim atau negara',
+  'Ask AI uses operational records only.': 'Tanya AI hanya memakai data operasional.', 'Your question': 'Pertanyaan Anda', 'Try:': 'Coba:', Ask: 'Tanya',
+  'Add a screenshot (result or draft screen, optional)': 'Tambah screenshot (layar hasil atau draft, opsional)', Remove: 'Hapus',
+  'Copy the conversation': 'Salin percakapan', 'New conversation': 'Percakapan baru', 'Make it a practice session': 'Jadikan sesi latihan',
+  'Ask AI switches on after the AI update.': 'Tanya AI aktif setelah pembaruan AI.', 'no record cited': 'tanpa data yang dikutip',
+  'Strong right now (official)': 'Kuat saat ini (resmi)', 'Ideas to test in scrims': 'Ide untuk diuji di scrim',
+  'Strong in ranked play, not used in any of our confirmed scrim games yet. A question for the coach, not a recommendation.': 'Kuat di ranked, belum dipakai di game scrim kita yang terkonfirmasi. Bahan pertanyaan untuk pelatih, bukan rekomendasi.',
+  Hero: 'Hero', 'Win %': 'Win %', 'Pick %': 'Pick %', 'Ban %': 'Ban %', 'Our scrims': 'Scrim kita',
+});
+RULES.push(
+  [/^Edit the opponent list \((\d+)\)$/, 'Ubah daftar lawan ($1)'],
+  [/^Hide (.+)$/, 'Sembunyikan $1'],
+  [/^From the official WEC entry list for (.+)\. Hide a team you will not meet, or add one worth studying \(a scrim partner, a club\)\. Changes are dated and can be undone\.$/, 'Dari daftar peserta resmi WEC untuk $1. Sembunyikan tim yang tidak akan dihadapi, atau tambahkan yang layak dipelajari (lawan latih, klub). Setiap perubahan bertanggal dan bisa dibatalkan.'],
+  [/^Ask AI — (.+)$/, 'Tanya AI — $1'],
+  [/^Ask anything in your own words: an opponent, a draft, the meta, what keeps failing, a training plan\. It already knows your squad, your (\d+) opponents and the event, answers from the hub's records and names them\. When the records do not hold the answer, it says so\.$/, 'Tanyakan apa saja dengan kata-kata Anda: lawan, draft, meta, yang terus gagal, rencana latihan. AI sudah tahu skuad Anda, $1 lawan, dan event-nya, menjawab dari data hub dan menyebut sumbernya. Kalau datanya tidak ada, AI akan bilang.'],
+  [/^Save to (.+)'s profile$/, 'Simpan ke profil $1'],
+  [/^(\d+) screenshot\(s\) read and attached to the next question\.$/, '$1 screenshot terbaca dan dilampirkan ke pertanyaan berikutnya.'],
+  [/^Added (.+)\.$/, '$1 ditambahkan.'], [/^(.+) hidden\.$/, '$1 disembunyikan.'], [/^(.+) is back on the list\.$/, '$1 kembali ke daftar.'],
+  [/^Saved to (.+)'s profile as an unconfirmed note\.$/, 'Tersimpan ke profil $1 sebagai catatan belum dikonfirmasi.'],
+);
+Object.assign(EXACT, {
+  'What is strong, weak, changed or working in the current patch, each with its source. Everything starts "to confirm" until an analyst checks it. Nothing here is our own data: see "Good for us / bad for us" below.':
+    'Apa yang kuat, lemah, berubah, atau berhasil di patch ini, masing-masing dengan sumbernya. Semua dimulai "perlu dikonfirmasi" sampai dicek analis. Tidak ada data kita sendiri di sini: lihat "Bagus untuk kita / buruk untuk kita" di bawah.',
+});

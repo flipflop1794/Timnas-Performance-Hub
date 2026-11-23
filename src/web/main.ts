@@ -214,12 +214,12 @@ async function start(client: SupabaseClient, userId: string) {
     return;
   }
   const [{ data: people }, { data: roles }, { data: titles }] = await Promise.all([
-    client.from('profiles').select('id, display_name'),
+    client.from('profiles').select('id, display_name, support_job'),
     client.from('user_roles').select('user_id, role'),
     client.from('user_titles').select('user_id, title'),
   ]);
   const directory = (people || []).map((p) => ({
-    id: p.id as string, name: (p.display_name || p.id) as string,
+    id: p.id as string, name: (p.display_name || p.id) as string, supportJob: (p.support_job || null) as string | null,   // V1.46: who has not reported today
     roles: (roles || []).filter((r) => r.user_id === p.id).map((r) => r.role as Role),
     titles: (titles || []).filter((t) => t.user_id === p.id).map((t) => t.title as string),
   })).filter((person) => person.roles.length);

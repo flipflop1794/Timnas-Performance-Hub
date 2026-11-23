@@ -58,7 +58,7 @@ test('measurements: week totals, per day, signals; with names: repeat athletes, 
   assert.deepEqual(repeatAthletes(reports, w.from, w.to).map((x) => [x.athlete, x.n]), [['Aran', 4]]);
   const watch = watchList(reports, w.from, w.to);
   assert.ok(watch.some((x) => x.kind === 'worse' && x.athlete === 'Aran'));
-  assert.ok(!watch.some((x) => x.kind === 'follow-up' && x.athlete === 'Aran'), 'Aran was seen again after the follow-up');
+  assert.ok(watch.some((x) => x.kind === 'follow-up' && x.athlete === 'Aran' && x.disc === 'medic'), 'V1.46: the doctor follow-up stays open after a physio visit (only the same role or Done closes it)');
   const b = dayBoard(reports, '2026-11-19'); assert.equal(b.find((x) => x.disc === 'physio').seen, 2); assert.equal(b.find((x) => x.disc === 'medic').n, 0);
   assert.throws(() => noticeRecord({ title: 'MLBB', athlete: 'Aran', text: '', by: 'x', date: '2026-11-19' }), /line for the coaches/);
 });
@@ -112,4 +112,49 @@ test('support screen: tick a whole team, write once, add, save one report with a
   const saved = [...store.entries()].filter(([k]) => k.startsWith('support_reports/')).map(([, v]) => v);
   assert.equal(saved.length, 1); assert.equal(saved[0].rows.length, 6);
   assert.ok(saved[0].rows.every((r) => r.did === 'Stretching & mobility 30 menit'));
+});
+
+test('V1.46 follow-ups carry over: open until Done or a newer report by the same role; Done survives an edit', async () => {
+  const { openFollowUps, closeFollowUp, watchList: wl } = await import('../src/core/support.js');
+  const a = { ...rep('2026-11-17', 'physio', [{ athlete: 'Usep', title: 'MLBB', did: 'massage', followUp: 'recheck hamstring' }, { athlete: 'Vivi', title: 'MLBB Women', did: 'US', followUp: 'ice 2x' }], { by: 'Ilham' }), id: 'A' };
+  const b = { ...rep('2026-11-18', 'psych', [{ athlete: 'Usep', title: 'MLBB', did: 'talk', followUp: '' }], { by: 'Fadhil' }), id: 'B' };
+  let all = [a, b];
+  assert.deepEqual(openFollowUps(all, '2026-11-10', '2026-11-19').map((f) => f.athlete), ['Usep', 'Vivi'], 'a psychologist seeing Usep does not close the physio follow-up');
+  assert.deepEqual(openFollowUps(all, '2026-11-10', '2026-11-19', 'Fadhil'), [], 'only my own');
+  const c = { ...rep('2026-11-19', 'physio', [{ athlete: 'Vivi', title: 'MLBB Women', did: 'US again' }], { by: 'Ilham' }), id: 'C' };
+  all = [a, b, c];
+  assert.deepEqual(openFollowUps(all, '2026-11-10', '2026-11-19').map((f) => f.athlete), ['Usep'], 'a newer physio visit closes the older one');
+  const a2 = closeFollowUp(a, 0, 'Ilham', '2026-11-19T03:00:00Z'); all = [a2, b, c];
+  assert.deepEqual(openFollowUps(all, '2026-11-10', '2026-11-19'), []);
+  assert.ok(!wl(all, '2026-11-13', '2026-11-19').some((x) => x.kind === 'follow-up'));
+  const edited = supportReport({ ...a2, asOf: '2026-11-19' });
+  assert.deepEqual(edited.rows[0].fuDone, { at: '2026-11-19T03:00:00Z', by: 'Ilham' }, 'saving an edit keeps Done');
+  assert.throws(() => closeFollowUp(b, 0, 'x'), /no longer in the report/);
+});
+
+test('V1.46 who has not reported today, and the WhatsApp reminder', async () => {
+  const { reportedOn, reminderText } = await import('../src/core/support.js');
+  const staff = [{ name: 'Dokter Aji', job: 'medic' }, { name: 'Ilham', job: 'physio_men' }, { name: 'Putu', job: 'psych_women' }];
+  const reps = [rep('2026-11-19', 'physio', [{ athlete: 'Usep', did: 'x' }, { athlete: 'Aran', did: 'y' }], { by: 'Ilham' }), rep('2026-11-19', 'physio', [{ athlete: 'Leoni', did: 'x' }], { by: 'Donny' }), rep('2026-11-18', 'medic', [{ athlete: 'Usep', did: 'x' }], { by: 'Dokter Aji' })];
+  const r = reportedOn(staff, reps, '2026-11-19');
+  assert.deepEqual(r.done.map((x) => [x.name, x.n]), [['Ilham', 2], ['Donny', 1]], 'others who filed count as reported');
+  assert.deepEqual(r.missing.map((x) => x.name), ['Dokter Aji', 'Putu']);
+  assert.deepEqual(reportedOn([...staff, { name: 'New', job: 'physical', since: '2026-11-20' }], reps, '2026-11-19').missing.map((x) => x.name), ['Dokter Aji', 'Putu'], 'not missing before their first report');
+  assert.match(reminderText(r, 'id'), /Pengingat laporan harian — 2026-11-19\nBelum masuk: Dokter Aji, Putu/);
+  assert.doesNotMatch(reminderText(r, 'id'), /Usep/, 'no athlete names in the reminder');
+});
+
+test('V1.46 check before WEC: latest pain, worse, repeat visits, open follow-ups; highest concern first', async () => {
+  const { readinessList } = await import('../src/core/support.js');
+  const reps = [
+    rep('2026-11-09', 'physio', [{ athlete: 'Old', title: 'MLBB', did: 'x', vasBefore: 9, vasAfter: 8 }]),                                   // outside 14 days
+    rep('2026-11-14', 'physio', [{ athlete: 'Aran', title: 'MLBB', did: 'x', vasBefore: 8, vasAfter: 8 }]),
+    rep('2026-11-18', 'physio', [{ athlete: 'Aran', title: 'MLBB', did: 'x', vasBefore: 5, vasAfter: 3, response: 'better' }]),           // pain came down: not flagged
+    rep('2026-11-18', 'medic', [{ athlete: 'Vivi', title: 'MLBB Women', did: 'x', vasAfter: 7, response: 'worse' }]),
+    ...['2026-11-15', '2026-11-16', '2026-11-17'].map((d) => rep(d, 'psych', [{ athlete: 'Elga', title: 'eFootball', did: 'talk' }])),
+    rep('2026-11-19', 'medic', [{ athlete: 'Usep', title: 'MLBB', did: 'x', followUp: 'recheck' }]),
+  ].map((r, i) => ({ ...r, id: `R${i}` }));
+  const L = readinessList(reps, '2026-11-23', 14);
+  assert.deepEqual(L.map((a) => a.athlete), ['Vivi', 'Elga', 'Usep']);
+  assert.deepEqual(L[0].why.map((x) => x.kind), ['pain', 'worse']); assert.equal(L[1].why[0].text, 'seen 3× in 14 days'); assert.equal(L[2].open.length, 1);
 });

@@ -87,3 +87,21 @@ export function cardMarkdown(a, plan) {
   if (a.gaps.length) { L.push('', '## Gaps'); for (const g of a.gaps) L.push(`- ${g}`); }
   return L.join('\n');
 }
+
+// V1.46 the card as a short WhatsApp message for the players. Only the lines the coach ticked go out.
+// pick: { keys: [bool, ...], their, answer, focus, draft }; draftText: the draft plan lines (MLBB), already in `lang`.
+export function cardWhatsApp(a, plan, { pick = {}, draftText = '', lang = 'id' } = {}) {
+  need(plan, 'Write the plan first.');
+  const id = lang === 'id'; const on = (k) => pick[k] !== false;
+  const keys = plan.keys.filter((_, i) => (pick.keys || [])[i] !== false);
+  const focus = Object.entries(plan.focus || {});
+  const L = [`*${a.title}: Indonesia vs ${a.nation}*`,
+    plan.status === 'approved' ? `${id ? 'Disetujui oleh' : 'Approved by'} ${plan.approvedBy}` : (id ? '_DRAF, belum disetujui_' : '_DRAFT, not approved yet_'), ''];
+  keys.forEach((k, i) => L.push(`${i + 1}. ${k}`));
+  if (on('their') && plan.theirPlan) L.push('', `${id ? 'Kemungkinan mereka' : 'What they are likely to do'}: ${plan.theirPlan}`);
+  if (on('answer')) L.push('', `*${id ? 'Jawaban kita' : 'Our answer'}:* ${plan.ourAnswer}`);
+  if (on('focus') && focus.length) { L.push('', id ? 'Fokus per pemain:' : 'One focus per player:'); for (const [k, v] of focus) L.push(`- ${k}: ${v}`); }
+  if (pick.draft === true && draftText) L.push('', 'Draft:', draftText);
+  need(L.length > 3, 'Tick at least one line to send.');
+  return L.join('\n').replace(/\n{3,}/g, '\n\n').trim();
+}
