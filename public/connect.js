@@ -21,5 +21,7 @@
   $('title').textContent = 'Hubungkan ' + (NAME[p] || 'jam / band') + ' Anda';
   var go = $('go');
   go.href = window.HUB_WEARABLES + '/start?t=' + encodeURIComponent(t);
-  $('agree').addEventListener('change', function (e) { go.setAttribute('aria-disabled', e.target.checked ? 'false' : 'true'); });
+  // Browsers can restore the tick when the athlete comes back to this page: follow the box, not only its changes.
+  var sync = function () { go.setAttribute('aria-disabled', $('agree').checked ? 'false' : 'true'); };
+  $('agree').addEventListener('change', sync); window.addEventListener('pageshow', sync); sync();
 })();
