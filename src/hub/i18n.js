@@ -197,7 +197,7 @@ const EXACT = {
   'e.g. Jonathan (CS2), Rina (MLBB Women)': 'mis. Jonathan (CS2), Rina (MLBB Women)', 'Follow-up needed for all of them': 'Perlu tindak lanjut untuk semuanya',
   'Group session: write what you did or what you found.': 'Sesi kelompok: tulis yang dilakukan atau temuannya.', 'Group session: tick the athletes (or a whole team) first.': 'Sesi kelompok: centang atletnya (atau satu tim) dulu.',
   'Group session: 40 athletes at most per report.': 'Sesi kelompok: maksimal 40 atlet per laporan.', '40 athletes at most per report: save this one, then start a new report.': 'Maksimal 40 atlet per laporan: simpan yang ini, lalu buat laporan baru.',
-  'Reading… (5–15 s)': 'Membaca… (5–15 dtk)', 'Paste the report first.': 'Tempel laporannya dulu.', 'Copied: paste it in the WhatsApp group.': 'Tersalin: tempel di grup WhatsApp.',
+  'Reading… (5–15 s)': 'Membaca… (5–15 dtk)', 'Copied: counts only, no athlete names.': 'Tersalin: hanya angka, tanpa nama atlet.', 'Paste the report first.': 'Tempel laporannya dulu.', 'Copied: paste it in the WhatsApp group.': 'Tersalin: tempel di grup WhatsApp.',
   'Support staff job': 'Jabatan tim pendukung', '— (not support staff)': '— (bukan tim pendukung)', 'Support staff reports use operational records only.': 'Laporan tim pendukung hanya memakai data operasional.',
   'Support staff (team doctor, physio, physical coach, psychologist): daily report only': 'Tim pendukung (dokter, fisio, pelatih fisik, psikolog): hanya laporan harian',
   // V1.32 less noise

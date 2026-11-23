@@ -173,10 +173,10 @@ label.check{display:flex;gap:8px;align-items:flex-start;margin:4px 0;font-size:1
 .obj p.rpnext{border-left:3px solid var(--gold);padding:4px 0 4px 10px;margin:8px 0}
 .srow-card{border:1px solid var(--line-2);border-radius:10px;padding:10px 12px;margin:10px 0}.srow-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:6px}
 .carry{border:1px solid var(--line-2);border-left:3px solid var(--warn);border-radius:10px;padding:8px 12px;margin:10px 0}.carry li{display:flex;flex-wrap:wrap;gap:4px 8px;align-items:center;padding:4px 0}.carry li .toolbar{margin:0 0 0 auto}
-.srow{display:grid;grid-template-columns:minmax(0,1.1fr) repeat(3,minmax(0,1.4fr));gap:10px}.srow.srow3{grid-template-columns:repeat(3,minmax(0,1fr))}.srow textarea{width:100%}
+.srow{display:grid;grid-template-columns:minmax(0,1.1fr) repeat(3,minmax(0,1.4fr));gap:10px}.srow.srow3{grid-template-columns:repeat(3,minmax(0,1fr))}.srow.srow5{grid-template-columns:minmax(0,1.1fr) repeat(4,minmax(0,1.3fr))}.srow textarea{width:100%}
 .srow-x{display:flex;flex-wrap:wrap;gap:4px 14px;align-items:flex-end;margin-top:6px}.srow-x .wide{flex:1 1 260px}
 .srow-h{font-size:12px;color:var(--ink-3);border-bottom:1px solid var(--line-2);padding:6px 0;margin-top:6px}.srow-v{padding:8px 0;border-bottom:1px dashed var(--line-2);line-height:1.5}.srow-xv{margin:2px 0 6px}
-@media (max-width:760px){.srow,.srow.srow3{grid-template-columns:1fr}.srow-h{display:none}}
+@media (max-width:760px){.srow,.srow.srow3,.srow.srow5{grid-template-columns:1fr}.srow-h{display:none}}
 .overlay{position:fixed;inset:0;z-index:50;background:rgba(0,0,0,.45);display:flex;align-items:center;justify-content:center;padding:16px}
 .overlay-box{background:var(--surface);border:1px solid var(--line-2);border-radius:12px;padding:16px 18px;max-width:560px;width:100%;max-height:85vh;overflow:auto}
 .overlay-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;font-size:16px}.hist{border-left:2px solid var(--line-2);padding-left:10px;margin:10px 0}.hist p{margin:2px 0}
@@ -216,6 +216,8 @@ label.check{display:flex;gap:8px;align-items:flex-start;margin:4px 0;font-size:1
 .dots i.on{background:var(--good);border-color:var(--good)}.dots i.today{border:1.5px dashed var(--warn)}.dots i.future{opacity:.3}
 .sw-people,.sw-roles,.sw-check,.carry-list{list-style:none;padding-left:0;margin-left:0}
 .sw-roles li{padding:4px 0}
+.sw-rh{margin:16px 0 0}.sw-kpi .v small{font-size:15px;font-weight:600;color:var(--muted)}
+.sw-recap{list-style:none;padding:0;margin:4px 0 8px}.sw-recap li{padding:5px 0;border-bottom:1px solid var(--line)}.sw-recap li:last-child{border-bottom:0}
 .sw-vs{margin:-6px 0 8px;font-size:12px}
 .carry .carry-list li{display:block;padding:10px 0;border-bottom:1px solid var(--line)}.carry .carry-list li:last-child{border-bottom:0}
 .carry-act{display:flex;flex-wrap:wrap;gap:8px;margin-top:8px}

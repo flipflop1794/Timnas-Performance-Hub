@@ -290,3 +290,35 @@ export function weekText(cur, prev, week, lang = 'id') {
   ].filter((x) => x != null && x !== false).join('\n');
 }
 const DISC_ID = { medic: 'Dokter tim', physio: 'Fisio / massage', physical: 'Pelatih fisik', psych: 'Psikolog' };
+
+// V1.50 one staff member's week (their own reports only): days reported, athletes handled (each athlete once),
+// visits, follow-ups written and closed, per team, who came back most, and the role's own numbers. Compared with
+// the week before. The WhatsApp copy holds counts only, no names.
+export function myRecap(reports, by, week) {
+  const mine = reports.filter((r) => r.by === by);
+  const one = (from, to) => {
+    const inW = mine.filter((r) => r.date >= from && r.date <= to); const rows = inW.flatMap((r) => r.rows.map((x) => ({ ...x, disc: r.discipline })));
+    const who = {}; for (const x of rows) { const name = x.athlete || x.athleteSeen || ''; if (!name) continue; const k = `${x.title || ''}|${name}`; (who[k] ||= { athlete: name, title: x.title || '', n: 0 }).n++; }
+    const teams = {}; for (const a of Object.values(who)) teams[a.title || 'Other'] = (teams[a.title || 'Other'] || 0) + 1;
+    const closed = mine.flatMap((r) => r.rows).filter((x) => x.fuDone && String(x.fuDone.at).slice(0, 10) >= from && String(x.fuDone.at).slice(0, 10) <= to).length;
+    const s = summarize(anonymise(inW, from, to));
+    return { reports: inW.length, days: new Set(inW.map((r) => r.date)).size, athletes: Object.keys(who).length, visits: rows.filter((x) => x.athlete || x.athleteSeen).length,
+      followUps: rows.filter((x) => followText(x.followUp)).length, closed, teams, regulars: Object.values(who).filter((a) => a.n >= 2).sort((a, b) => b.n - a.n),
+      vasDrop: s.vasDrop, vasN: s.vasN, better: s.better, responded: s.responded, formal: s.formal, informal: s.informal, disc: inW[0]?.discipline || '' };
+  };
+  return { cur: one(week.from, week.to), prev: one(week.prevFrom, week.prevTo) };
+}
+export function recapText(rc, week, name, lang = 'id') {
+  const id = lang === 'id'; const c = rc.cur; const p = rc.prev;
+  const teams = Object.entries(c.teams).sort((a, b) => b[1] - a[1]).map(([t, n]) => `${t} ${n}`).join(', ');
+  return [
+    `*${id ? 'Rekap minggu saya' : 'My week'}* — ${name} — ${week.from} ${id ? 's/d' : 'to'} ${week.to}`, '',
+    `${id ? 'Hari lapor' : 'Days reported'}: ${c.days}/7 · ${id ? 'Laporan' : 'Reports'}: ${c.reports}`,
+    `${id ? 'Atlet ditangani' : 'Athletes handled'}: ${c.athletes} (${id ? 'minggu lalu' : 'week before'} ${p.athletes}) · ${id ? 'Kunjungan' : 'Visits'}: ${c.visits} (${p.visits})`,
+    teams && `${id ? 'Per tim' : 'Per team'}: ${teams}`,
+    c.followUps || c.closed ? `${id ? 'Tindak lanjut' : 'Follow-ups'}: ${c.followUps} ${id ? 'dibuat' : 'written'}, ${c.closed} ${id ? 'selesai' : 'closed'}` : null,
+    c.vasN ? `${id ? 'Nyeri turun (VAS) rata-rata' : 'Pain drop (VAS), average'}: ${c.vasDrop} (${c.vasN} ${id ? 'terapi' : 'treatments'})` : null,
+    c.responded ? `${id ? 'Membaik' : 'Better'}: ${c.better}/${c.responded}` : null,
+    c.formal + c.informal ? `${id ? 'Konseling formal / informal' : 'Counselling formal / informal'}: ${c.formal} / ${c.informal}` : null,
+  ].filter((x) => x != null && x !== false && x !== '').join('\n');
+}
