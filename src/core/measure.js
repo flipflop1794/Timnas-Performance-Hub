@@ -50,7 +50,10 @@ export function compareWindows(kpi, before, after, meta = {}) {
   }
   if (!r) return { kpi: kpi.id, label: kpi.label, status: 'insufficient', flags, before: mean(before), after: mean(after) };
   const dir = kpi.better === 'up' ? 1 : -1;
-  const clear = dir * r.lo > 0 || dir * r.hi < 0 ? (dir * r.d > 0 ? 'better' : 'worse') : 'no clear change';
+  // A change is clear only when the whole 95% interval is on one side of zero; the direction (up or down is
+  // better) decides only whether that change is "better" or "worse". (Before V1.43 a lower-is-better measure
+  // tested dir * lo > 0, i.e. lo < 0, which is true for almost any interval, so noise was called a change.)
+  const clear = r.lo > 0 || r.hi < 0 ? ((r.lo > 0 ? 1 : -1) * dir > 0 ? 'better' : 'worse') : 'no clear change';
   const status = flags.length && clear !== 'no clear change' ? `${clear} (not a fair comparison yet)` : clear;
   return { kpi: kpi.id, label: kpi.label, status, d: r.d, lo: r.lo, hi: r.hi, before: kpi.type === 'prop' ? r.p1 : r.ma, after: kpi.type === 'prop' ? r.p2 : r.mb, flags,
     note: 'An indicator change. It does not show a change in tournament win probability.' };

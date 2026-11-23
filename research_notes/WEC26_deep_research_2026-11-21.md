@@ -297,3 +297,32 @@ No 2026 results were found for any women's national team. ESL Impact was suspend
 - **MLBB:** patch 2.2.32 has been on the advanced server since 12 Nov (Popol & Kupa and Atlas nerfed, Ixia buffed, Natalia changed). It could go live before WEC. Patch lock unknown.
 - **CS2:** the map pool is confirmed (Cache replaced Overpass on 8 Jul 2026). PGL Major Singapore runs 24 Nov–13 Dec, giving free VODs of the current meta on all 7 maps. No WEC rival player was found in the Asian Major teams (Chinggis Warriors is not Mongolia's WEC five).
 - **Dota:** no 7.42a hotfix as of 21 Nov.
+
+## Round 4 — 23 Nov: official re-read, Liquipedia, rival club form
+
+- **Official site (wec.iesf.org), all 99 nation pages read 23 Nov in a browser:**
+  - 161 teams.
+  - **No player, captain or coach change since 21 Nov.**
+  - Indonesia CS2 shows "MA" before Marsyv's tag (display only).
+- **Official site, other pages:**
+  - Newest news item: 11 Nov (Athletes Committee elections).
+  - No group draws, no schedule, no rulebook. `iesf.org/rules-regulations` still says "Official documents will be available soon".
+- **Liquipedia:** blocks automated reading with a "Verify you are human" check (not bypassed). From search summaries:
+  - **Dota Mongolia:** lists a sixth player, **sogeking**, besides the official five. Possibly a substitute.
+  - **Dota Kazakhstan:** same five as the official page ("b4x4zZz" is BAXA).
+  - **MLBB:** group stage 15–17 Dec, 2 groups of 4, Bo3, top 2 advance; playoffs 19–20 Dec, single elimination. Groups not shown.
+  - **PUBGM:** Malaysia, Myanmar (SEA), Mongolia (East Asia), Kyrgyzstan and Uzbekistan (Central Asia) listed as invited; snippet incomplete.
+- **Rival club form and calendar:**
+  - **MPL MY S18** (1 Nov): SRG beat Team Rey 4–3, sixth title in a row. Team Rey is Sepat/NovaXcobar's club in S17 data.
+  - **MPL KH S11** (15 Nov): Vigor Apex beat Team Flash KH 4–2; TNR third. Which WEC players are on these clubs: unknown.
+  - **MPL ID S18** (8 Nov): Bigetron by Vitality beat NAVI 4–3 (context: Indonesia's league).
+  - **MSC 2026** (Aug): Yangon Galacticos (Myanmar) lost the final 3–4 to Team Spirit.
+  - **PMGC 2026:** Türkiye's S2G (HamsiG, S2GKam1kaze) and Mongolia's The MongolZ (Fearless) are in PMGC. Grand Finals 11–13 Dec in Istanbul. **Both rivals face the same calendar squeeze as AK Gold.** The MongolZ won PMGO 2026 S2 (Eastern Europe & Central Asia; single Mongolian source).
+  - **Dota Kazakhstan:** Kuka11 has no club (cybersport.ru), and that page lists Kazakhstan vs North Macedonia on 18 Dec. HardL is listed at CSKA Esports (undated).
+  - **CS2:** PGL Major Singapore Stage 1 runs 24–27 Nov. No WEC rival player is in the Asian Major teams.
+- **Still open:**
+  - The rulebook.
+  - Group draws for CS2, MLBB and PUBGM.
+  - The eFootball platform.
+  - Mongolia "sogeking".
+  - Malaysia Rokji vs Rough.

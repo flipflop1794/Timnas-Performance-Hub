@@ -32,7 +32,7 @@ test('team: win rate weighs each game; a week without reports is a gap; a clear 
 test('team: PUBG Mobile reports and match log; lower placement is better', () => {
   const rows = [];
   for (let i = 0; i < 8; i++) rows.push({ team: 'INA', date: '2026-11-01', placement: 12, died_phase: 2 }, { team: 'INA', date: '2026-11-12', placement: 3, died_phase: 0 }, { team: 'MGL', date: '2026-11-12', placement: 1, died_phase: 0 });
-  rows.forEach((r, i) => { r.placement += i % 3; });
+  rows.forEach((r, i) => { r.placement += Math.floor(i / 3) % 3; });   // 12–14 before, 3–5 after: each window has a spread
   const t = teamTrends('PUBG Mobile', { reports: [{ title: 'PUBG Mobile', date: '2026-11-12', progress: 4, result: { mode: 'points', played: 6, points: 60 } }], pubgm: { rows, team: 'INA', points: (r) => 20 - r.placement } }, W);
   assert.deepEqual(t.map((m) => m.key), ['ppm', 'plan', 'place', 'logppm', 'early']);
   assert.equal(t.find((m) => m.key === 'ppm').values[5], 10);

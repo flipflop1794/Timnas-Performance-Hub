@@ -38,7 +38,7 @@ test('player edits, weekly check flags added and removed players, check due afte
 test('13 Nov site re-read ships as a dated check: who joined, who left, captain and coach', () => {
   const R = seedRosters(DATA.rivalRosters);
   const my = R['MLBB|Myanmar']; const last = my.checks.find((c) => c.date === '2026-11-13');
-  assert.equal(my.checks.length, 3); assert.equal(last.result, 'changed'); assert.equal(my.checks.at(-1).result, 'no change', '21 Nov: same five');
+  assert.equal(my.checks.length, 4); assert.equal(last.result, 'changed'); assert.equal(my.checks.at(-1).result, 'no change', '21 and 23 Nov: same five');
   assert.deepEqual(last.added, ['J3X', 'Coin', 'Dear', 'Niko', 'Shyco']); assert.deepEqual(last.removed, ['KidX', 'Lucky', 'NewCold', 'Op', 'Ps']);
   assert.equal(my.players.find((p) => p.captain).ign, 'J3X'); assert.equal(my.coach, 'Thet Lynn Htut'); assert.equal(last.coachFrom, 'Jina');
   assert.ok(my.players.every((p) => p.flags.some((f) => /2026-11-13 check/.test(f))));

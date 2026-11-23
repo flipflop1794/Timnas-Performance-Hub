@@ -201,3 +201,36 @@ export function noticeRecord({ title, athlete, text, by, date, disc }) {
   need(title, 'Pick the athlete\'s team for the coach notice.'); need(txt(text), 'Write the line for the coaches.');
   return { id: `SN-${date.replace(/-/g, '')}-${Math.random().toString(36).slice(2, 6)}`, title, athlete: txt(athlete, 60), text: noNumbers(txt(text, 200), 'Coach notice'), by: txt(by, 80), disc, date, origin: 'operational', createdAt: new Date().toISOString() };
 }
+
+// ---------------------------------------------------------------- V1.45 weekly dashboard (calendar weeks, Monday to Sunday)
+// offset 0 = the week holding asOf, -1 = the week before, and so on.
+const weekday = (d) => (new Date(`${d}T00:00:00Z`).getUTCDay() + 6) % 7;   // Monday 0 … Sunday 6
+export function calWeek(asOf = localDay(), offset = 0) {
+  const from = shiftDay(shiftDay(asOf, -weekday(asOf)), 7 * offset); const to = shiftDay(from, 6);
+  return { from, to, prevFrom: shiftDay(from, -7), prevTo: shiftDay(from, -1), days: Array.from({ length: 7 }, (_, i) => shiftDay(from, i)) };
+}
+// One row per staff member: athletes seen each day of the week (null = no report that day).
+export function weekGrid(reports, week) {
+  const inW = reports.filter((r) => r.date >= week.from && r.date <= week.to);
+  const people = {};
+  for (const r of inW) (people[r.by] ||= { by: r.by, job: r.job || '', disc: r.discipline, reports: [] }).reports.push(r);
+  return Object.values(people).map((p) => ({ ...p,
+    days: week.days.map((d) => { const rs = p.reports.filter((r) => r.date === d); return rs.length ? rs.reduce((a, r) => a + (r.rows || []).length, 0) : null; }),
+    daysReported: new Set(p.reports.map((r) => r.date)).size })).sort((a, b) => DISCS.indexOf(a.disc) - DISCS.indexOf(b.disc) || a.by.localeCompare(b.by));
+}
+// The week in a few lines for the WhatsApp group: counts only, no names, no findings.
+export function weekText(cur, prev, week, lang = 'id') {
+  const id = lang === 'id';
+  const line = (d) => { const b = cur.byDisc[d]; return b.reports ? `- ${id ? DISC_ID[d] : DISC_LABEL[d]}: ${b.reports} ${id ? 'laporan' : `report${b.reports === 1 ? '' : 's'}`}, ${b.athletes} ${id ? 'atlet' : 'athlete visits'}` : null; };
+  const teams = Object.entries(cur.byTitle).sort((a, b) => b[1] - a[1]).map(([t, n]) => `${t} ${n}`).join(', ');
+  return [
+    `*${id ? 'Rekap mingguan tim support' : 'Support staff weekly'}* — ${week.from} ${id ? 's/d' : 'to'} ${week.to}`, '',
+    `${id ? 'Laporan' : 'Reports'}: ${cur.reports} (${id ? 'minggu lalu' : 'week before'} ${prev.reports}) · ${id ? 'Kunjungan atlet' : 'Athlete visits'}: ${cur.seen} (${prev.seen})`,
+    ...DISCS.map(line).filter(Boolean),
+    teams && `${id ? 'Per tim' : 'Per team'}: ${teams}`,
+    cur.followUps ? `${id ? 'Tindak lanjut' : 'Follow-ups'}: ${cur.followUps}` : null,
+    cur.vasN ? `${id ? 'Nyeri turun (VAS) rata-rata' : 'Pain drop (VAS), average'}: ${cur.vasDrop} (${cur.vasN} ${id ? 'terapi' : 'treatments'})` : null,
+    cur.formal + cur.informal ? `${id ? 'Konseling formal / informal' : 'Counselling formal / informal'}: ${cur.formal} / ${cur.informal}` : null,
+  ].filter((x) => x != null && x !== false).join('\n');
+}
+const DISC_ID = { medic: 'Dokter tim', physio: 'Fisio / massage', physical: 'Pelatih fisik', psych: 'Psikolog' };

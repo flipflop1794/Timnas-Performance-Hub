@@ -54,10 +54,11 @@ function withDailyReport(session, dailyReport, author, today) {
 // V1.16 one form: a saved scrim report is also that session's daily report, so a coach never fills both.
 // Report -> daily report: focus -> objective, result + what worked -> outcome, what failed -> main issue,
 // adjustment -> next action (the follow-up, owned by the author, due tomorrow WIB).
+export const NO_FOCUS = 'No focus noted';
 const clip = (s) => { const t = String(s || '').trim(); return t.length > NOTE_LIMIT ? `${t.slice(0, NOTE_LIMIT - 1)}…` : t; };
 export function dailyFromReport(r, resultLine) {
   return {
-    objective: clip(r.focus || 'No focus noted'),   // V1.42: focus is optional in the two-minute report
+    objective: clip(r.focus || NO_FOCUS),   // V1.42: focus is optional in the two-minute report
     outcome: clip([`${resultLine} vs ${r.partner}`, r.worked].filter(Boolean).join('. ')),
     issue: clip(r.failed || 'No main issue noted'),
     nextAction: clip(r.adjust),

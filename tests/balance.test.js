@@ -87,3 +87,22 @@ test('AI cost estimate: cache reads priced at a tenth or less, unknown models no
   assert.ok(u.byAction.scoreboard.cost < 0.04); assert.ok(u.cacheShare > 0.2);
   assert.ok(u.perScreenshot > 0.01 && u.perScreenshot < 0.02);
 });
+
+// Balance review, 23 Nov 2026: a lower-is-better measure (deaths, placement, goals conceded, out before zone 3)
+// called every comparison a change, because the interval test looked at the wrong side.
+test('lower-is-better measures: pure noise is rarely a verdict, as for higher-is-better; real changes keep their direction', () => {
+  let s = 1; const rnd = () => { s = (s * 16807) % 2147483647; return s / 2147483647; };
+  const kpi = (better, type = 'mean') => ({ id: 'x', label: 'x', type, better });
+  const calls = { up: 0, down: 0 }; const N = 1000;
+  for (let i = 0; i < N; i++) {
+    const a = Array.from({ length: 8 }, () => 5 + Math.floor(rnd() * 4)); const b = Array.from({ length: 8 }, () => 5 + Math.floor(rnd() * 4));
+    for (const dir of ['up', 'down']) if (compareWindows(kpi(dir), a, b).status !== 'no clear change') calls[dir]++;
+  }
+  assert.equal(calls.up, calls.down, 'the direction must not change how often a verdict is given');
+  assert.ok(calls.down / N < 0.1, `noise called a change ${calls.down} of ${N} times`);
+  const ones = Array(8).fill(1), zeros = Array(8).fill(0);
+  assert.equal(compareWindows(kpi('down', 'prop'), ones, zeros).status, 'better');    // out early 8/8 → 0/8
+  assert.equal(compareWindows(kpi('down', 'prop'), zeros, ones).status, 'worse');
+  assert.equal(compareWindows(kpi('down'), [9, 8, 9, 10, 9, 8, 9, 10], [3, 4, 3, 2, 3, 4, 3, 2]).status, 'better');   // deaths down
+  assert.equal(compareWindows(kpi('down'), [5, 7, 4, 8, 6, 5, 7, 6], [6, 5, 7, 5, 8, 6, 4, 7]).status, 'no clear change');
+});

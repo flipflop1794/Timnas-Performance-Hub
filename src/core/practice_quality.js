@@ -12,6 +12,8 @@
 //   reviewed     coaching proposals made in the window that have been reviewed
 import { shiftDay } from './dates.js';
 import { withRating } from './reports.js';
+// The text a session gets when its report had no focus (daily_sessions.js NO_FOCUS): not an objective.
+const NO_FOCUS = 'No focus noted';
 
 export const PARTS = [
   ['planKept', 'Planned sessions held'], ['objective', 'Sessions with an objective'], ['reported', 'Sessions reported'],
@@ -40,7 +42,7 @@ export function titleQuality(title, { scrims = [], reports = [], cycle = [] }, f
   const props = cycle.filter((o) => o.title === title && inWin(wibDay(o.createdAt)));
   const parts = {
     planKept: share(due.filter((s) => s.status === 'done').length, due.length),   // cancelled or never closed = not held
-    objective: share(held.filter((s) => (s.objectives || []).length || s.dailyReport?.objective).length, held.length),
+    objective: share(held.filter((s) => (s.objectives || []).length || (s.dailyReport?.objective && s.dailyReport.objective !== NO_FOCUS)).length, held.length),
     reported: share(held.filter((s) => s.dailyReport || reportFor.has(s.id)).length, held.length),
     onTime: share(filed.filter((f) => f.at && wibDay(f.at) <= shiftDay(f.date, 1)).length, filed.length),
     followed: withRating(reps).length ? { value: (withRating(reps).reduce((a, r) => a + Number(r.progress), 0) / withRating(reps).length - 1) / 4, hit: null, n: withRating(reps).length } : null,
