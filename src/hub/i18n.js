@@ -876,6 +876,35 @@ RULES.push(
   [/^(Mon|Tue|Wed|Thu|Fri|Sat|Sun) (\d\d)$/, (m, d, n) => `${{ Mon: 'Sen', Tue: 'Sel', Wed: 'Rab', Thu: 'Kam', Fri: 'Jum', Sat: 'Sab', Sun: 'Min' }[d]} ${n}`],
 );
 
+// V1.46 support staff: follow-ups that carry over, who has not reported today, check before WEC.
+Object.assign(EXACT, {
+  'Add to today': 'Tambahkan ke hari ini', "in today's report": 'sudah di laporan hari ini',
+  'Your follow-ups from the last 14 days. Tick Done when it is finished; a newer report on the same athlete also closes it.':
+    'Tindak lanjut Anda 14 hari terakhir. Klik Selesai jika sudah tuntas; laporan baru untuk atlet yang sama juga menutupnya.',
+  'No report yet today.': 'Belum ada laporan hari ini.', 'Everyone has reported today.': 'Semua sudah melapor hari ini.', 'Copy reminder for WhatsApp': 'Salin pengingat untuk WhatsApp',
+  Visits: 'Kunjungan', 'Last seen': 'Terakhir ditangani', 'Nobody to check from the last 14 days of reports.': 'Tidak ada atlet yang perlu dicek dari laporan 14 hari terakhir.',
+  'In brackets: the week before.': 'Dalam kurung: minggu sebelumnya.', 'worse after the last treatment': 'memburuk setelah terapi terakhir',
+  'Check before WEC': 'Cek sebelum WEC',
+});
+RULES.push(
+  [/^Still open from earlier \((\d+)\)$/, 'Masih terbuka dari sebelumnya ($1)'],
+  [/^Reports today — (\d{4}-\d{2}-\d{2})$/, 'Laporan hari ini — $1'],
+  [/^In: (\d+)$/, 'Masuk: $1'], [/^Not yet: (\d+)$/, 'Belum: $1'],
+  [/^Check before WEC — (\d+) days to go$/, 'Cek sebelum WEC — $1 hari lagi'],
+  [/^Athletes from the last 14 days with a reason to check: pain (\d+)\/10 or more at the last treatment, worse after the last treatment, seen (\d+)\+ times, or a follow-up still open\. Highest concern first\.$/,
+    'Atlet 14 hari terakhir yang perlu dicek: nyeri $1/10 atau lebih di terapi terakhir, memburuk setelah terapi terakhir, ditangani $2+ kali, atau tindak lanjut masih terbuka. Yang paling perlu perhatian di atas.'],
+  [/^pain (\d+)\/10 at the last treatment$/, 'nyeri $1/10 di terapi terakhir'],
+  [/^seen (\d+)× in (\d+) days$/, 'ditangani $1× dalam $2 hari'],
+  [/^(\d+) open follow-ups?$/, '$1 tindak lanjut terbuka'],
+  [/^done (\d{4}-\d{2}-\d{2})$/, 'selesai $1'],
+  [/^(\d+) more not shown\.$/, '$1 lainnya tidak ditampilkan.'],
+  [/^Follow-up for (.+) marked done\.$/, 'Tindak lanjut untuk $1 ditandai selesai.'],
+  [/^(.+) added to today's report: write what was done and the findings\.$/, '$1 ditambahkan ke laporan hari ini: tulis yang dilakukan dan temuannya.'],
+);
+
+// Ahead of the generic "Label:" rule, which would otherwise keep it in English.
+RULES.unshift([/^Yesterday \((\d{4}-\d{2}-\d{2})\) no report from:$/, 'Kemarin ($1) tidak ada laporan dari:']);
+
 // V1.38 Scrim Log input for MLBB and MLBB Women.
 Object.assign(EXACT, {
   'Games (Scrim Log)': 'Game (Scrim Log)', 'No game added yet. A report needs at least one.': 'Belum ada game. Laporan butuh minimal satu.',

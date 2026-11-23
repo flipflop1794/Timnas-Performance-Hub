@@ -52,7 +52,8 @@ export function supportReport(x) {
       response: RESPONSES.includes(r.response) ? r.response : '', vasBefore, vasAfter, followUp: noNumbers(txt(followText(r.followUp), 400), `Athlete ${n}`),
       ...(x.discipline === 'physio' ? { pain: cleanPain(r.pain, `Athlete ${n}`) } : {}),
       ...(x.discipline === 'psych' ? { session: SESSIONS.includes(r.session) ? r.session : '', prognosis: noNumbers(txt(r.prognosis, 600), `Athlete ${n}`) } : {}),
-      notify: !!r.notify && !!txt(r.notifyText), notifyText: noNumbers(txt(r.notifyText, 200), `Athlete ${n}`) };
+      notify: !!r.notify && !!txt(r.notifyText), notifyText: noNumbers(txt(r.notifyText, 200), `Athlete ${n}`),
+      ...(r.fuDone?.at ? { fuDone: { at: txt(r.fuDone.at, 40), by: txt(r.fuDone.by, 80) } } : {}) };
   }).filter(Boolean);
   const general = { did: noNumbers(txt(x.general?.did, 1500), 'Team activity'), found: noNumbers(txt(x.general?.found, 1500), 'Team finding'),
     teams: (Array.isArray(x.general?.teams) ? x.general.teams : []).map((t) => txt(t, 30)).filter(Boolean).slice(0, 7) };
@@ -178,16 +179,71 @@ export function repeatAthletes(reports, from, to, min = REPEAT_AT) {
   for (const r of reports) if (r.date >= from && r.date <= to) for (const x of r.rows) { const k = `${x.athlete}|${x.title}`; (m[k] ||= { athlete: x.athlete, title: x.title, n: 0, discs: new Set(), last: '' }); m[k].n++; m[k].discs.add(r.discipline); if (r.date > m[k].last) m[k].last = r.date; }
   return Object.values(m).filter((x) => x.n >= min).map((x) => ({ ...x, discs: [...x.discs] })).sort((a, b) => b.n - a.n);
 }
+// V1.46 a follow-up stays open until its author ticks Done, or until the same role writes a newer row for that
+// athlete (the newer visit carries its own follow-up). Seeing another role (a psychologist after the physio) does not close it.
+const superseded = (reports, x, r, to) => reports.some((o) => o.discipline === r.discipline && o.date > r.date && o.date <= to && o.rows.some((y) => y.athlete === x.athlete));
+export function openFollowUps(reports, from, to, by = null) {
+  const out = [];
+  for (const r of reports) {
+    if (r.date < from || r.date > to || (by && r.by !== by)) continue;
+    r.rows.forEach((x, i) => {
+      const fu = followText(x.followUp);
+      if (fu && !x.fuDone && !superseded(reports, x, r, to)) out.push({ reportId: r.id, i, athlete: x.athlete, title: x.title, date: r.date, disc: r.discipline, by: r.by, text: fu !== 'Yes' ? fu : (x.found || x.did) });
+    });
+  }
+  return out.sort((a, b) => a.date.localeCompare(b.date) || a.athlete.localeCompare(b.athlete));
+}
+// Done: the report with that row's follow-up closed (who and when). The edit history keeps the change.
+export function closeFollowUp(rep, i, by, at = new Date().toISOString()) {
+  need(rep?.rows?.[i] && followText(rep.rows[i].followUp), 'This follow-up is no longer in the report.');
+  return { ...rep, rows: rep.rows.map((x, k) => (k === i ? { ...x, fuDone: { at, by: txt(by, 80) } } : x)) };
+}
 export function watchList(reports, from, to) {
   const inP = reports.filter((r) => r.date >= from && r.date <= to).sort((a, b) => b.date.localeCompare(a.date));
-  const seenAfter = (athlete, date) => inP.some((r) => r.date > date && r.rows.some((x) => x.athlete === athlete));
+  const open = new Set(openFollowUps(reports, from, to).map((f) => `${f.reportId}#${f.i}`));
   const out = [];
-  for (const r of inP) for (const x of r.rows) {
+  for (const r of inP) r.rows.forEach((x, i) => {
     const fu = followText(x.followUp);
-    if (fu && !seenAfter(x.athlete, r.date)) out.push({ kind: 'follow-up', athlete: x.athlete, title: x.title, date: r.date, disc: r.discipline, by: r.by, text: fu !== 'Yes' ? fu : (x.found || x.did) });
+    if (open.has(`${r.id}#${i}`)) out.push({ kind: 'follow-up', athlete: x.athlete, title: x.title, date: r.date, disc: r.discipline, by: r.by, text: fu !== 'Yes' ? fu : (x.found || x.did) });
     else if (x.response === 'worse' || (Number.isInteger(x.vasAfter) && x.vasAfter >= HIGH_VAS)) out.push({ kind: x.response === 'worse' ? 'worse' : 'pain', athlete: x.athlete, title: x.title, date: r.date, disc: r.discipline, by: r.by, text: x.found || x.did });
-  }
+  });
   return out;
+}
+
+// V1.46 who has not reported today. staff: [{ name, job }] (support accounts); anyone else who filed that day is
+// listed as reported too (Coach Donny, the Head Coach).
+export function reportedOn(staff, reports, day) {
+  const filed = reports.filter((r) => r.date === day);
+  const done = [...new Set(filed.map((r) => r.by))].map((name) => ({ name, job: staff.find((s) => s.name === name)?.job || filed.find((r) => r.by === name).job || '',
+    n: filed.filter((r) => r.by === name).reduce((a, r) => a + r.rows.length, 0) }));
+  const missing = staff.filter((s) => !done.some((d) => d.name === s.name) && !(s.since && s.since > day));   // since: first report, when known
+  const order = (x) => (JOBS[x.job] ? Object.keys(JOBS).indexOf(x.job) : 99);   // others (Coach Donny) last
+  return { day, done: done.sort((a, b) => order(a) - order(b)), missing: missing.sort((a, b) => order(a) - order(b)) };
+}
+export function reminderText(r, lang = 'id') {
+  const id = lang === 'id';
+  return `${id ? 'Pengingat laporan harian' : 'Daily report reminder'} — ${r.day}\n${id ? 'Belum masuk' : 'Not in yet'}: ${r.missing.map((s) => s.name).join(', ')}\n${id ? 'Mohon isi di Hub (Performance → Support staff) atau kirim di grup. Terima kasih.' : 'Please file it in the Hub (Performance → Support staff) or send it in the group. Thank you.'}`;
+}
+
+// V1.46 athletes to check before WEC: over the last `days`, each athlete with a reason — seen 3+ times, latest pain
+// score still high, latest response worse, or follow-ups still open. Highest concern first.
+export function readinessList(reports, asOf, days = 14) {
+  const from = shiftDay(asOf, -(days - 1));
+  const inP = reports.filter((r) => r.date >= from && r.date <= asOf).sort((a, b) => a.date.localeCompare(b.date) || String(a.createdAt).localeCompare(String(b.createdAt)));
+  const m = {};
+  for (const r of inP) for (const x of r.rows) {
+    const a = (m[`${x.athlete}|${x.title}`] ||= { athlete: x.athlete, title: x.title, visits: 0, discs: new Set(), last: '', vas: null, response: '', open: [] });
+    a.visits++; a.discs.add(r.discipline); a.last = r.date;
+    if (Number.isInteger(x.vasAfter)) a.vas = x.vasAfter;          // the latest score counts
+    if (RESPONSES.includes(x.response)) a.response = x.response;
+  }
+  for (const f of openFollowUps(reports, from, asOf)) m[`${f.athlete}|${f.title}`]?.open.push(f);
+  const score = (a) => (a.vas != null && a.vas >= HIGH_VAS ? 3 : 0) + (a.response === 'worse' ? 3 : 0) + (a.visits >= REPEAT_AT ? 2 : 0) + a.open.length;
+  return Object.values(m).map((a) => {
+    const why = [a.vas != null && a.vas >= HIGH_VAS && { kind: 'pain', text: `pain ${a.vas}/10 at the last treatment` }, a.response === 'worse' && { kind: 'worse', text: 'worse after the last treatment' },
+      a.visits >= REPEAT_AT && { kind: 'repeat', text: `seen ${a.visits}× in ${days} days` }, a.open.length && { kind: 'follow-up', text: `${a.open.length} open follow-up${a.open.length === 1 ? '' : 's'}` }].filter(Boolean);
+    return { ...a, discs: [...a.discs], why, score: score(a) };
+  }).filter((a) => a.why.length).sort((a, b) => b.score - a.score || b.last.localeCompare(a.last));
 }
 // Which roles filed a report on a day (the day board).
 export function dayBoard(reports, day) {

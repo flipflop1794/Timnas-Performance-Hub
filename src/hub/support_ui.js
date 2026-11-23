@@ -4,7 +4,9 @@
 // editing with a history the database keeps, "My summary" for each staff member (own data only) and "Support team
 // progress" for Coach Donny, the Head Coach and admins. Logic in src/core/support.js and history.js.
 import { JOBS, DISCS, DISC_LABEL, ASK, RESPONSES, SESSIONS, SESSION_LABEL, followText, supportReport, usersOfDay, fromParse, whatsappText, anonymise, summarize, perDay,
-  weekSignals, repeatAthletes, watchList, dayBoard, weekRange, noticeRecord, groupRows, isBlankRow, REPEAT_AT, HIGH_VAS, calWeek, weekGrid, weekText } from '../core/support.js';
+  weekSignals, repeatAthletes, watchList, dayBoard, weekRange, noticeRecord, groupRows, isBlankRow, REPEAT_AT, HIGH_VAS, calWeek, weekGrid, weekText,
+  openFollowUps, closeFollowUp, reportedOn, reminderText, readinessList } from '../core/support.js';
+import { EVENT } from '../core/matchday.js';
 import { playersOf, coachesOf, fullName } from '../core/people.js';
 import { historyOf } from '../core/history.js';
 import { POINTS, bodySvg, pointLabel, painText, painCounts } from '../core/painmap.js';
@@ -104,6 +106,7 @@ export function supportUi(ctx) {
         <p class="note">Paste the message you send to the group. The AI only moves your own words into the fields; check them, then save. The text is sent to the AI service to be read.</p>
         <label class="field" for="supPaste">Your WhatsApp report<textarea id="supPaste" rows="6">${esc(d.paste || '')}</textarea></label>
         <div class="toolbar">${FEAT.ai && FEAT.supportAi && PLATFORM?.ai ? '<button class="btn" type="button" data-sup-parse="1">Fill the form (AI)</button>' : '<span class="note">AI reading switches on with the next AI update; type the form below meanwhile.</span>'}<span class="msg" id="supPMsg" role="status"></span></div></details>`}
+      ${d.editing ? '' : carryOver()}
       ${disc ? `${d.editing ? '' : group}${d.rows.map(row).join('')}<div class="toolbar"><button class="btn" type="button" data-sup-add="1">+ Add athlete</button></div>
       <div class="h3">For a whole team or the session (optional)</div>
       <div class="form"><label class="field wide" for="supGDid">What was done<textarea rows="2" id="supGDid">${esc(d.general.did)}</textarea></label>
@@ -112,6 +115,18 @@ export function supportUi(ctx) {
       <p class="note"><b>Seen today:</b> <span id="supUsers">${esc(users)}</span></p>
       <div class="toolbar"><button class="btn primary" type="button" data-sup-save="1">${d.editing ? 'Save changes' : 'Save report'}</button>${U.lastSaved && !d.editing ? '<button class="btn" type="button" data-sup-wa="1">Copy for WhatsApp</button>' : ''}${d.editing ? '' : '<button class="btn" type="button" data-sup-clear="1">Clear form</button>'}<span class="msg" id="supMsg" role="status"></span></div>`
     : '<p class="empty">Pick your role first (an admin can set it for you in Users & access).</p>'}</div>`;
+  }
+
+  // V1.46 follow-ups that carry over: my open follow-ups of the last 14 days, at the top of the next report.
+  // Done closes it on the report it came from (kept in the edit history); "Add to today" puts the athlete in today's report.
+  const myOpen = () => openFollowUps(U.reports, shift(today(), -13), today(), me());
+  function carryOver() {
+    const list = myOpen(); if (!list.length) return '';
+    const d = draft(); const inToday = new Set(d.rows.map((r) => `${r.title}|${r.athlete || r.athleteSeen}`));
+    return `<div class="carry"><div class="h3">Still open from earlier (${list.length})</div><p class="note">Your follow-ups from the last 14 days. Tick Done when it is finished; a newer report on the same athlete also closes it.</p>
+      <ul class="plain">${list.map((f) => `<li><b data-no-tr>${esc(f.athlete)}</b> <span class="note">${esc(f.title || '')} · ${esc(f.date)}</span> — <span data-no-tr>${esc(f.text)}</span>
+        <span class="toolbar"><button type="button" class="btn" data-sup-fudone="${esc(`${f.reportId}#${f.i}`)}">Done</button>${inToday.has(`${f.title}|${f.athlete}`) ? '<span class="note">in today\'s report</span>' : `<button type="button" class="linkbtn" data-sup-fuadd="${esc(`${f.reportId}#${f.i}`)}">Add to today</button>`}</span></li>`).join('')}</ul>
+      <span class="msg" id="supFuMsg" role="status"></span></div>`;
   }
 
   // ---------------------------------------------------------------- a saved report: the same row, read-only
@@ -129,7 +144,7 @@ export function supportUi(ctx) {
       <div class="toolbar">${editBadge(r)}${canEdit(r) && S.mode !== 'demo' ? `<button type="button" class="btn" data-sup-edit="${esc(r.id)}">Edit</button>` : ''}</div></header>
       ${r.rows.length ? `<div class="srow srow-h"><div>Athlete</div><div>${esc(A.did)}</div><div>${esc(A.found)}</div><div>${esc(A.follow)}</div></div>
       ${r.rows.map((x) => `<div class="srow srow-v"><div><b data-no-tr>${esc(x.athlete)}</b>${x.title ? `<br><span class="note">${esc(x.title)}</span>` : ''}</div>
-        <div data-no-tr>${esc(x.did || '—')}</div><div data-no-tr>${esc(x.found || '—')}</div><div data-no-tr>${esc(followText(x.followUp) === 'Yes' ? (S.lang === 'id' ? 'Ya' : 'Yes') : (followText(x.followUp) || '—'))}</div></div>
+        <div data-no-tr>${esc(x.did || '—')}</div><div data-no-tr>${esc(x.found || '—')}</div><div data-no-tr>${esc(followText(x.followUp) === 'Yes' ? (S.lang === 'id' ? 'Ya' : 'Yes') : (followText(x.followUp) || '—'))}${x.fuDone ? `<br>${tag('c-Verified', `done ${esc(String(x.fuDone.at).slice(0, 10))}`)}` : ''}</div></div>
         ${extra(x).length ? `<p class="note srow-xv">${extra(x).map((e) => `<span>${esc(e)}</span>`).join(' · ')}</p>` : ''}${(x.pain || []).length ? `<div class="pm-mini">${bodySvg({ pain: x.pain, esc, lang: S.lang, small: true })}</div>` : ''}`).join('')}` : ''}
       ${r.general.did || r.general.found ? `<p><b>Team${r.general.teams.length ? ` (${esc(r.general.teams.join(', '))})` : ''}</b><br><span data-no-tr>${esc([r.general.did, r.general.found].filter(Boolean).join(' — '))}</span></p>` : ''}</div>`;
   }
@@ -195,27 +210,50 @@ export function supportUi(ctx) {
     const w = weekRange(today()); const inW = U.reports.filter((r) => r.date >= w.from && r.date <= w.to);
     const people = {}; for (const r of U.reports.filter((x) => x.date >= w.prevFrom)) { const k = r.by; (people[k] ||= { by: r.by, job: r.job, disc: r.discipline, reports: [] }).reports.push(r); }
     const rows = Object.values(people).map((p) => {
-      const mineW = p.reports.filter((r) => r.date >= w.from); const s = summarize(anonymise(p.reports, w.from, w.to));
+      const s = summarize(anonymise(p.reports, w.from, w.to));
       const last = [...p.reports].sort((a, b) => String(b.createdAt).localeCompare(String(a.createdAt)))[0];
       const open = watchList(p.reports, w.from, w.to).filter((x) => x.kind === 'follow-up').length;
-      return { ...p, days: s.days, seen: s.seen, open, last, today: mineW.some((r) => r.date === today()), extra: p.disc === 'psych' ? `formal ${s.formal} / informal ${s.informal}` : p.disc === 'physio' && s.vasN ? `VAS −${s.vasDrop}` : '' };
+      return { ...p, days: s.days, seen: s.seen, open, last, extra: p.disc === 'psych' ? `formal ${s.formal} / informal ${s.informal}` : p.disc === 'physio' && s.vasN ? `VAS −${s.vasDrop}` : '' };
     }).sort((a, b) => DISCS.indexOf(a.disc) - DISCS.indexOf(b.disc));
-    const silent = Object.entries(JOBS).filter(([k]) => !rows.some((r) => r.job === k)).map(([, j]) => j.label);
     const cur = summarize(anonymise(U.reports, w.from, w.to)); const prev = summarize(anonymise(U.reports, w.prevFrom, w.prevTo));
-    const watch = watchList(U.reports, w.from, w.to); const rep = repeatAthletes(U.reports, w.from, w.to);
-    const label = { 'follow-up': ['c-Medium', 'follow-up'], worse: ['c-Blocked', 'worse'], pain: ['c-Blocked', `pain ≥${HIGH_VAS}`] };
     const edits = U.hist.filter((h) => String(h.at).slice(0, 10) >= w.from).map((h) => ({ h, r: U.reports.find((x) => x.id === h.record_id) })).filter((x) => x.r).sort((a, b) => String(b.h.at).localeCompare(String(a.h.at)));
     return `<div class="panel"><h2>Support team progress (7 days)</h2>
-      <div class="tw"><table><thead><tr><th>Staff</th><th class="n">Days reported</th><th class="n">Athletes handled</th><th class="n">Open follow-ups</th><th>Last report</th><th>Today</th></tr></thead><tbody>
+      <div class="tw"><table><thead><tr><th>Staff</th><th class="n">Days reported</th><th class="n">Athletes handled</th><th class="n">Open follow-ups</th><th>Last report</th></tr></thead><tbody>
       ${rows.map((p) => `<tr${p.days < 5 ? ' class="warnrow"' : ''}><td><b data-no-tr>${esc(p.by)}</b><br><span class="note">${esc(JOBS[p.job]?.label || DISC_LABEL[p.disc])}</span></td><td class="n">${p.days}/7</td><td class="n">${p.seen}${p.extra ? `<br><span class="note">${esc(p.extra)}</span>` : ''}</td>
-        <td class="n">${p.open}</td><td>${p.last ? esc(fmtAt(p.last.createdAt)) : '—'}</td><td>${p.today ? tag('c-Verified', '✓') : tag('c-Blocked', 'not yet')}</td></tr>`).join('') || '<tr><td colspan="6" class="empty">No report yet.</td></tr>'}</tbody></table></div>
-      ${silent.length ? `<p class="note">No report in the last 14 days from: ${esc(silent.join(', '))}.</p>` : ''}
-      <div class="cols"><div><div class="h3">Visits per team</div>${Object.keys(cur.byTitle).length ? `<ul class="plain">${Object.entries(cur.byTitle).sort((a, b) => b[1] - a[1]).map(([t, n]) => `<li>${esc(t)}: <b>${n}</b> <span class="note">(${prev.byTitle[t] || 0} the week before)</span></li>`).join('')}</ul>` : '<p class="empty">No visits.</p>'}</div>
-        <div><div class="h3">To watch</div>${rep.length || watch.length ? `<ul class="plain">${rep.map((x) => `<li><b data-no-tr>${esc(x.athlete)}</b> ${x.title ? `<span class="note">${esc(x.title)}</span>` : ''} — seen ${x.n}× · ${esc(x.discs.map((d) => DISC_LABEL[d]).join(', '))}</li>`).join('')}
-          ${watch.slice(0, 15).map((x) => `<li>${tag(...label[x.kind])} <b data-no-tr>${esc(x.athlete)}</b> <span class="note">${esc(x.date)} · <span data-no-tr>${esc(x.by)}</span></span> — <span data-no-tr>${esc(x.text)}</span></li>`).join('')}</ul>` : '<p class="note">Nothing open.</p>'}</div></div>
+        <td class="n">${p.open}</td><td>${p.last ? esc(fmtAt(p.last.createdAt)) : '—'}</td></tr>`).join('') || '<tr><td colspan="5" class="empty">No report yet.</td></tr>'}</tbody></table></div>
+      <div class="h3">Visits per team</div>${Object.keys(cur.byTitle).length ? `<p>${Object.entries(cur.byTitle).sort((a, b) => b[1] - a[1]).map(([t, n]) => `${esc(t)} <b>${n}</b> <span class="note">(${prev.byTitle[t] || 0})</span>`).join(' · ')}</p><p class="note">In brackets: the week before.</p>` : '<p class="empty">No visits.</p>'}
       ${painPanel(U.reports, w)}
       <div class="h3">Edited after saving (7 days)</div>${edits.length ? `<ul class="plain">${edits.slice(0, 15).map(({ h, r }) => `<li><button type="button" class="linkbtn" data-sup-hist="${esc(r.id)}">${esc(fmtAt(h.at))}</button> · <span data-no-tr>${esc(h.editor_name || '—')}</span> edited the report of ${esc(r.date)} (<span data-no-tr>${esc(r.by)}</span>)</li>`).join('')}</ul>` : '<p class="note">No report was edited this week.</p>'}
       <p class="note">Measured over ${esc(w.from)} to ${esc(w.to)}; ${inW.length} report(s). A visit is one athlete in one report.</p></div>`;
+  }
+  // V1.46 who has not reported: today and yesterday, from the support accounts (Users & access → Support staff job).
+  // Without the staff list (older database, local file) the staff are those who filed in the last 14 days.
+  function staffList() {
+    const acc = (PLATFORM?.actionOwners || []).filter((p) => p.supportJob).map((p) => ({ name: p.name, job: p.supportJob }));
+    if (acc.length) return acc;
+    const seen = {}; for (const r of U.reports.filter((x) => x.date >= shift(today(), -13))) { const p = (seen[r.by] ||= { name: r.by, job: r.job || '', since: r.date }); if (r.date < p.since) p.since = r.date; }
+    return Object.values(seen);
+  }
+  function todayPanel() {
+    const staff = staffList(); const t = reportedOn(staff, U.reports, today()); const y = reportedOn(staff, U.reports, shift(today(), -1));
+    const who = (xs, n) => xs.map((x) => `<span data-no-tr>${esc(x.name)}</span>${x.job && JOBS[x.job] ? ` <span class="note">(${esc(JOBS[x.job].label)}${n && x.n != null ? ` · ${x.n}` : ''})</span>` : ''}`).join(', ');
+    return `<div class="panel"><h2>Reports today — ${esc(today())}</h2>
+      <p>${t.done.length ? `${tag('c-Verified', `In: ${t.done.length}`)} ${who(t.done, true)}` : '<span class="note">No report yet today.</span>'}</p>
+      ${t.missing.length ? `<p>${tag('c-Blocked', `Not yet: ${t.missing.length}`)} ${who(t.missing)}</p>` : t.done.length ? '<p class="note">Everyone has reported today.</p>' : ''}
+      ${y.missing.length ? `<p class="note">Yesterday (${esc(y.day)}) no report from: ${who(y.missing)}.</p>` : ''}
+      ${t.missing.length ? `<div class="toolbar"><button class="btn" type="button" data-sup-remind="1">Copy reminder for WhatsApp</button><span class="msg" id="supRemMsg" role="status"></span></div>` : ''}</div>`;
+  }
+  // V1.46 athletes to check before WEC (last 14 days), for Coach Donny, the Head Coach and admins.
+  function readinessPanel() {
+    const list = readinessList(U.reports, today(), 14); const toGo = Math.round((Date.parse(EVENT.start) - Date.parse(today())) / 86400000);
+    const cls = { pain: 'c-Blocked', worse: 'c-Blocked', repeat: 'c-Medium', 'follow-up': 'c-Medium' };
+    return `<div class="panel"><h2>Check before WEC${toGo > 0 ? ` — ${toGo} days to go` : ''}</h2>
+      <p class="note">Athletes from the last 14 days with a reason to check: pain ${HIGH_VAS}/10 or more at the last treatment, worse after the last treatment, seen ${REPEAT_AT}+ times, or a follow-up still open. Highest concern first.</p>
+      ${list.length ? `<div class="tw"><table><thead><tr><th>Athlete</th><th>Why</th><th class="n">Visits</th><th>Last seen</th></tr></thead><tbody>
+        ${list.slice(0, 25).map((a) => `<tr><td><b data-no-tr>${esc(a.athlete)}</b>${a.title ? `<br><span class="note">${esc(a.title)}</span>` : ''}</td>
+          <td>${a.why.map((x) => tag(cls[x.kind], x.text)).join(' ')}${a.open.length ? `<br><span class="note" data-no-tr>${esc(a.open.map((f) => `${f.date}: ${f.text}`).slice(-2).join(' · '))}</span>` : ''}</td>
+          <td class="n">${a.visits}<br><span class="note">${esc(a.discs.map((d) => DISC_LABEL[d]).join(', '))}</span></td><td>${esc(a.last)}</td></tr>`).join('')}</tbody></table></div>
+        ${list.length > 25 ? `<p class="note">${list.length - 25} more not shown.</p>` : ''}` : '<p class="note">Nobody to check from the last 14 days of reports.</p>'}</div>`;
   }
   // Pain spots reported in the week (physio): a map with bigger dots where more athletes hurt, and the top spots per team.
   function painPanel(reports, w) {
@@ -244,7 +282,7 @@ export function supportUi(ctx) {
     if (canFile()) setTimeout(() => loadHistory(), 0);
     const head = '<div class="panel"><div class="lead">Support <em>staff</em></div><p>Daily reports of the team doctor, physiotherapists, physical coach and psychologists.</p></div>';
     const recent = U.reports.filter((r) => r.date >= shift(today(), -13));
-    if (readsAll()) return head + weeklyPanel(U.reports, true) + progress() + (canFile() ? form() : '') + reportList(recent, true) + historyOverlay();
+    if (readsAll()) return head + todayPanel() + readinessPanel() + weeklyPanel(U.reports, true) + progress() + (canFile() ? form() : '') + reportList(recent, true) + historyOverlay();
     if (canFile()) return head + weeklyPanel(U.reports.filter((r) => r.by === me()), false) + mySummary() + form() + reportList(recent.filter((r) => r.by === me()), false) + historyOverlay();
     return `${head}<div class="panel"><p class="note">The support staff reports are read by the support staff themselves, Coach Donny, the Head Coach and admins.</p></div>`;
   }
@@ -300,6 +338,28 @@ export function supportUi(ctx) {
         d.group = { ...blankGroup(), open: false }; keep(); render();
         setMsg('supMsg', `${fresh.length} athlete(s) added from the group session.${rows.length - fresh.length ? ` ${rows.length - fresh.length} were already in the report.` : ''} Check, then save.`, 'ok');
       } catch (err) { setMsg('supGpMsg', err.message, 'err'); }
+      return true;
+    }
+    if (ds.supFudone || ds.supFuadd) {
+      const [id, n] = String(ds.supFudone || ds.supFuadd).split('#'); const r = U.reports.find((x) => x.id === id); const x = r?.rows?.[Number(n)];
+      if (!x) return true;
+      if (ds.supFuadd) {
+        // A name typed by hand (not on the team lists) goes back in the "Not in the list?" box, as it was written.
+        const known = (roster()[x.title] || []).includes(x.athlete);
+        const d = collect(); d.rows = [...d.rows.filter((y) => !isBlankRow(y)), { ...blankRow(), ...(known ? { athlete: x.athlete } : { athleteSeen: x.athleteSeen || x.athlete }), title: x.title }];
+        keep(); render(); setMsg('supMsg', `${x.athlete} added to today's report: write what was done and the findings.`, 'ok'); return true;
+      }
+      try {
+        const next = closeFollowUp(r, Number(n), me());
+        if (S.db) await S.db.collection('support_reports').doc(r.id).set(next);
+        U.reports[U.reports.indexOf(r)] = next; render();
+        setMsg('supFuMsg', `Follow-up for ${x.athlete} marked done.`, 'ok');
+      } catch (err) { setMsg('supFuMsg', err.message, 'err'); }
+      return true;
+    }
+    if (ds.supRemind) {
+      const t = reportedOn(staffList(), U.reports, today());
+      try { await navigator.clipboard.writeText(reminderText(t, S.lang)); setMsg('supRemMsg', 'Copied: paste it in the WhatsApp group.', 'ok'); } catch { setMsg('supRemMsg', 'Copy did not work on this device.', 'err'); }
       return true;
     }
     if (ds.supClear) { U.draft = null; try { localStorage.removeItem(DRAFT_KEY); } catch { /* */ } draft(); render(); return true; }
