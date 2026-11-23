@@ -1042,17 +1042,29 @@
     {
      "ign": "Unii",
      "captain": true,
-     "flags": []
+     "flags": [
+      "Role and club from MPL MY Season 17 data (desk research, 21 Nov 2026): confirm"
+     ],
+     "role": "Jungle",
+     "club": "Selangor Red Giants (substitute)"
     },
     {
      "ign": "Kyym",
      "captain": false,
-     "flags": []
+     "flags": [
+      "Role and club from MPL MY Season 17 data (desk research, 21 Nov 2026): confirm"
+     ],
+     "role": "Mid",
+     "club": "RRQ Tora"
     },
     {
      "ign": "NovaXcobar",
      "captain": false,
-     "flags": []
+     "flags": [
+      "Role and club from MPL MY Season 17 data (desk research, 21 Nov 2026): confirm"
+     ],
+     "role": "Roam",
+     "club": "Invictus / Team Rey (to confirm)"
     },
     {
      "ign": "Rokji",
@@ -1062,7 +1074,11 @@
     {
      "ign": "Sepat",
      "captain": false,
-     "flags": []
+     "flags": [
+      "Role and club from MPL MY Season 17 data (desk research, 21 Nov 2026): confirm"
+     ],
+     "role": "EXP",
+     "club": "Team Rey"
     }
    ],
    "checks": [

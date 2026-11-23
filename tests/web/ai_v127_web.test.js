@@ -52,7 +52,7 @@ test('Brainstorm: a grounded reply, a suggestion with an unknown number left out
   const sent = B.calls.find((c) => c.action === 'brainstorm'); assert.equal(sent.purpose, 'plan'); assert.ok(JSON.stringify(sent.material).includes('"WK-vision"'));
   assert.match(p.text(), /from WK-vision/); assert.doesNotMatch(p.text(), /made-up/);
   assert.match(p.text(), /Numbers not found in the records: 77/);
-  assert.match(p.text(), /Turn into a coaching proposal: Vision before lord/); assert.doesNotMatch(p.text(), /Too many wards/);
+  assert.match(p.text(), /Make it a training focus/); assert.doesNotMatch(p.text(), /Too many wards/);
   p.d.querySelector('[data-br-turn]').click(); for (let i = 0; i < 40 && !B.tables.coaching_objectives.length; i++) await sleep(50);
   const o = B.tables.coaching_objectives.find((x) => x.data.rec?.problem === 'Vision before lord'); assert.ok(o); assert.equal(o.data.status, 'proposed');
   const useful = [...p.d.querySelectorAll('[data-fb]')].find((b) => JSON.parse(b.dataset.fb).rating === 'useful'); useful.click();
