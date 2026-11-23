@@ -21,7 +21,7 @@ export const SIDE_LABEL = { left: 'Left team', right: 'Right team', blue: 'Blue'
 export const STAT_DEFS = {
   mlbb: [
     { key: 'kills', label: 'K', higher: true, trail: true }, { key: 'deaths', label: 'D', higher: false, trail: true }, { key: 'assists', label: 'A', higher: true, trail: true },
-    { key: 'gold', label: 'Gold', higher: true, trail: true }, { key: 'rating', label: 'Rating', higher: true, trail: true, decimal: true },
+    { key: 'gold', label: 'Gold', higher: true, trail: true }, { key: 'rating', label: 'IRR', higher: true, trail: true, decimal: true },
     { key: 'hero_damage', label: 'Hero dmg', higher: true, trail: true }, { key: 'damage_taken', label: 'Dmg taken', higher: null, trail: false },
     { key: 'tower_damage', label: 'Turret dmg', higher: true, trail: false },
   ],
@@ -327,14 +327,23 @@ export function confirmGame(edited, { reportId = '', date, partner, gameNo, by, 
   });
   const ours = players.filter((p) => p.team === 'ours');
   need(ours.length === 5, `Our team needs exactly 5 players (now ${ours.length}).`);
-  need(ours.every((p) => p.player), 'Match each of our players to the roster (or pick "stand-in").');
+  need(ours.every((p) => p.player), 'Match each of our players to the roster.');
   // V1.39: typed names must be on the division's roster (the game screen offers them as suggestions).
-  if (log && roster) for (const p of ours) need(p.player === 'stand-in' || roster.includes(p.player), `"${p.player}" is not on the ${edited.title} roster. Pick a name from the list, or "stand-in".`);
-  const named = ours.filter((p) => p.player !== 'stand-in').map((p) => p.player);
+  if (log) for (const p of ours) {
+    need(!/^stand[ -]?in$/i.test(p.player.trim()), 'Choose a roster player; Stand In is not available.');
+    if (roster) need(roster.includes(p.player), `"${p.player}" is not on the ${edited.title} roster. Pick a name from the list.`);
+  }
+  const named = ours.filter((p) => log || p.player !== 'stand-in').map((p) => p.player.trim().toLowerCase());
   need(new Set(named).size === named.length, 'The same roster player is on two rows.');
   const heroesUsed = players.map((p) => p.hero).filter(Boolean);
   need(new Set(heroesUsed).size === heroesUsed.length, 'The same hero is on two rows.');
   const score = Object.fromEntries(sides.map((s) => [s, players.filter((p) => p.side === s).reduce((a, p) => a + (p.stats.kills ?? 0), 0)]));
+  const headerKills = (value, label) => {
+    if (value === '' || value == null) return null;
+    const number = Number(value);
+    need(Number.isInteger(number) && number >= 0 && number <= 99, `${label} must be a whole number from 0 to 99.`);
+    return number;
+  };
   const other = sides.find((x) => x !== edited.ourSide);
   const confirmedDraft = log ? scrimLogDraft({ players, bans: edited.bans, ourSide: edited.ourSide, otherSide: other, heroes })
     : draft ? confirmDraft(draft, { heroes, ourSide: edited.ourSide, sides }) : [];
@@ -344,6 +353,7 @@ export function confirmGame(edited, { reportId = '', date, partner, gameNo, by, 
     id: `GM-${date.replace(/-/g, '')}-${Math.random().toString(36).slice(2, 8)}`,
     title: edited.title, game, reportId, date, partner: String(partner || '').trim(), gameNo, by: String(by || '').trim(),
     ourSide: edited.ourSide, mapSide, result: edited.result, durationS, score, players,
+    ...(log ? { teamKills: headerKills(edited.teamKills, 'Team kills'), opponentTeamKills: headerKills(edited.opponentTeamKills, 'Opponent kills'), scanReview: edited.scanReview || null } : {}),
     draft: confirmedDraft, firstPick: log ? (log.pickOrder === 'FP' ? edited.ourSide : other) : draft?.firstPick || '',
     ...(log ? { ...log, draftSource: 'scrim-log' } : {}),
     source: base ? 'screenshot' : 'manual', captureIds, externalMatchId: String(externalMatchId || '').replace(/\D/g, '').slice(0, 20),
@@ -382,7 +392,7 @@ export function blankGame(title, roster, ourSide) {
   const other = sides.find((s) => s !== side);
   const row = (s, slot, player) => ({ side: s, slot, pick: slot, nameSeen: '', player, hero: '', aiHero: '', candidates: [], mvp: false, stats: Object.fromEntries(STAT_DEFS[game].map((d) => [d.key, null])), flags: [] });
   return { title, game, sides, kind: 'manual', ourSide: side, winner: '', result: '', mapSide: game === 'dota' ? side : '', durationS: null, score: {}, teamNames: {},
-    ...(isScrimLog(title) ? { pickOrder: '', mapVariant: '', notes: '', vod: '', bans: { ours: [], partner: [] } } : {}),
+    ...(isScrimLog(title) ? { pickOrder: '', mapVariant: 'Default Map', notes: '', vod: '', bans: { ours: [], partner: [] }, teamKills: null, opponentTeamKills: null } : {}),
     players: [...[0, 1, 2, 3, 4].map((i) => row(side, i + 1, isScrimLog(title) ? '' : roster[i] || '')), ...[0, 1, 2, 3, 4].map((i) => row(other, i + 1, ''))], issues: [] };
 }
 // A saved game back on the check screen (to fix it): same shape as a proposal.
@@ -390,7 +400,7 @@ export function gameToProposal(g) {
   const sides = GAME_SIDES[g.game];
   const log = isScrimLog(g.title);
   return { title: g.title, game: g.game, sides, kind: 'saved', ourSide: g.ourSide, winner: '', result: g.result, mapSide: g.mapSide || '', durationS: g.durationS, score: g.score || {}, teamNames: {},
-    ...(log ? { pickOrder: g.pickOrder || '', mapVariant: g.mapVariant || '', notes: g.notes || '', vod: g.vod || '', bans: bansOf(g) } : {}),
+    ...(log ? { pickOrder: g.pickOrder || '', mapVariant: g.mapVariant || '', notes: g.notes || '', vod: g.vod || '', bans: bansOf(g), teamKills: g.teamKills ?? null, opponentTeamKills: g.opponentTeamKills ?? null, scanReview: g.scanReview || null } : {}),
     players: g.players.map((p) => ({ side: p.side, slot: p.slot, pick: p.pick ?? p.slot, nameSeen: p.nameSeen, player: p.player, hero: p.hero, aiHero: p.aiHero || '', candidates: [], mvp: p.mvp, stats: { ...p.stats }, flags: [] })), issues: [] };
 }
 

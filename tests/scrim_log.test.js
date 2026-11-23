@@ -24,7 +24,7 @@ function game({ title = 'MLBB', pickOrder = 'FP', result = 'win', mapVariant = '
 test('which titles use it; slots, maps and links', () => {
   assert.ok(isScrimLog('MLBB') && isScrimLog('MLBB Women')); assert.ok(!isScrimLog('Dota 2'));
   assert.deepEqual([slotOrder('Warmup'), slotOrder('Jam 4'), slotOrder('jam 10'), slotOrder('19:00 WIB'), slotOrder('')], [0, 4, 10, null, null]);
-  assert.deepEqual(MLBB_MAPS, ['Flying Clouds', 'Golden Turret', 'Healing Turtle', 'Revealing Wisps'], 'V1.39: the four maps in use'); assert.equal(TIME_SLOTS[1], 'Jam 1');
+  assert.deepEqual(MLBB_MAPS, ['Default Map', 'Flying Clouds', 'Golden Turret', 'Healing Turtle', 'Revealing Wisps']); assert.equal(TIME_SLOTS[1], 'Jam 1');
   assert.equal(safeVod('javascript:alert(1)'), ''); assert.equal(safeVod('https://youtu.be/x'), 'https://youtu.be/x');
 });
 
@@ -82,7 +82,7 @@ test('Patterns split by FP / SP and by map; time slots sort after clock times in
   assert.equal(o.next.id, 'c', 'a clock time comes first'); assert.equal(sessionOverview(['MLBB'], [S('a', 'Jam 7'), S('b', 'Jam 1')], [], '2026-11-22')[0].next.id, 'b');
 });
 
-test('V1.39: player boxes start empty; typed players must be on the roster, once each (stand-in may repeat)', () => {
+test('player boxes start empty; players must be on the roster, once each, without Stand In', () => {
   assert.deepEqual(blankGame('MLBB', ROSTER, 'left').players.slice(0, 5).map((p) => p.player), ['', '', '', '', '']);
   assert.equal(blankGame('Dota 2', ROSTER, 'radiant').players[0].player, 'Erlan', 'other titles keep the roster pre-filled');
   const withRoster = { ...ctx(), roster: ROSTER };
@@ -92,7 +92,7 @@ test('V1.39: player boxes start empty; typed players must be on the roster, once
   const twice = game(); twice.players[1].player = 'Erlan';
   assert.throws(() => confirmGame(twice, withRoster), /same roster player is on two rows/);
   const subs = game(); subs.players[3].player = 'stand-in'; subs.players[4].player = 'stand-in';
-  assert.equal(confirmGame(subs, withRoster).players.filter((p) => p.player === 'stand-in').length, 2);
+  assert.throws(() => confirmGame(subs, withRoster), /Stand In is not available/);
   const empty = game(); empty.players[0].player = '';
   assert.throws(() => confirmGame(empty, withRoster), /Match each of our players/);
   // Heroes: one hero once in the whole game (bans and picks of both teams).

@@ -50,7 +50,19 @@ test('without the website AI, games are typed the Scrim Log way and still feed t
   await h.click('[data-cap-manual="MLBB"]');
   // V1.39: player boxes start empty; the division's roster is offered as suggestions; names typed in any case.
   assert.equal(h.d.getElementById('cg-MLBB-0-player').value, '', 'player boxes start empty');
-  assert.deepEqual([...h.d.getElementById('capPlayers-MLBB').options].map((o) => o.value), ['Aran', 'Kevin', 'Drichel', 'Lyoni', 'Jull.', 'stand-in']);
+  assert.deepEqual([...h.d.getElementById('capPlayers-MLBB').options].map((o) => o.value), ['Aran', 'Kevin', 'Drichel', 'Lyoni', 'Jull.']);
+  const enter = (id) => { const el = h.d.getElementById(id); el.focus(); el.dispatchEvent(new h.dom.window.KeyboardEvent('keydown', { key: 'Enter', bubbles: true, cancelable: true })); };
+  h.set('cb-MLBB-ours-0', 'fany'); enter('cb-MLBB-ours-0');
+  assert.equal(h.d.getElementById('cb-MLBB-ours-0').value, 'Fanny');
+  assert.equal(h.d.activeElement.id, 'cb-MLBB-ours-1');
+  h.set('cb-MLBB-partner-0', 'fanny'); enter('cb-MLBB-partner-0');
+  assert.equal(h.d.activeElement.id, 'cb-MLBB-partner-0', 'duplicate cannot advance');
+  assert.equal(h.d.getElementById('cb-MLBB-partner-0').validity.customError, true);
+  h.set('cb-MLBB-partner-0', ''); h.set('cb-MLBB-ours-0', '');
+  h.set('cg-MLBB-0-hero', 'tigreal'); enter('cg-MLBB-0-hero');
+  assert.equal(h.d.getElementById('cg-MLBB-0-hero').value, 'Tigreal');
+  assert.equal(h.d.activeElement.id, 'cg-MLBB-0-player');
+  h.set('cg-MLBB-0-hero', '');
   ['aran', 'Kevin', 'Drichel', 'Lyoni', 'Jull.'].forEach((n, i) => h.set(`cg-MLBB-${i}-player`, n));
   // A hero or a player entered twice is marked at once.
   h.set('cg-MLBB-1-player', 'Aran');
@@ -61,9 +73,11 @@ test('without the website AI, games are typed the Scrim Log way and still feed t
   h.set('cg-MLBB-7-hero', '');
   // V1.39: the pick number is the row's place in its team, shown and not chosen; FP / SP without words; four maps.
   assert.equal(h.d.getElementById('cg-MLBB-0-pick'), null, 'no pick-number box');
-  assert.deepEqual([...h.d.querySelectorAll('.capgrid tbody tr')].map((r) => r.cells[0].textContent), ['P1', 'P2', 'P3', 'P4', 'P5', 'P1', 'P2', 'P3', 'P4', 'P5']);
+  assert.deepEqual([...h.d.querySelectorAll('.cap-log-grid .capgrid tbody tr')].map((r) => r.cells[0].textContent), ['P1', 'P2', 'P3', 'P4', 'P5', 'P1', 'P2', 'P3', 'P4', 'P5']);
+  assert.match(h.d.querySelector('.cap-log-grid').textContent, /Our draft.*Our picks.*Opponent draft.*Opponent picks/s);
+  assert.equal(h.d.querySelectorAll('.cap-log-results tbody tr').length, 5);
   assert.deepEqual([...h.d.getElementById('cg-MLBB-po').options].map((o) => o.textContent).filter(Boolean), ['FP', 'SP']);
-  assert.deepEqual([...h.d.getElementById('cg-MLBB-jmap').options].map((o) => o.value).filter(Boolean), ['Flying Clouds', 'Golden Turret', 'Healing Turtle', 'Revealing Wisps']);
+  assert.deepEqual([...h.d.getElementById('cg-MLBB-jmap').options].map((o) => o.value).filter(Boolean), ['Default Map', 'Flying Clouds', 'Golden Turret', 'Healing Turtle', 'Revealing Wisps']);
   h.set('cg-MLBB-result', 'win'); h.set('cg-MLBB-dur', '1405'); h.set('cg-MLBB-jmap', 'Golden Turret');
   assert.equal(h.d.getElementById('cg-MLBB-dur').value, '14:05', 'digits only: the colon is put in');
   h.set('cb-MLBB-ours-0', 'Fanny'); h.set('cb-MLBB-partner-0', 'Ling'); h.set('cg-MLBB-gnotes', 'Lord fight telat'); h.set('cg-MLBB-vod', 'https://youtu.be/abc');

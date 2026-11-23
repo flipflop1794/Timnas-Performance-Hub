@@ -37,14 +37,15 @@ async function open(B, who, hash = 'today') {
     go: async (h) => { dom.window.location.hash = h; dom.window.dispatchEvent(new dom.window.HashChangeEvent('hashchange')); await sleep(40); },
     set: (id, v) => { const e = d.getElementById(id); e.value = v; e.dispatchEvent(new dom.window.Event('input', { bubbles: true })); },
     click: async (sel) => { d.querySelector(sel).click(); await sleep(60); },
-    // V1.38: MLBB games the Scrim Log way, typed by hand (FP, ten heroes, stand-ins where no roster is loaded).
+    // MLBB games use five distinct names from the division roster.
     addGames: async (title, results) => {
       const fid = title.replace(/[^A-Za-z0-9_\-.]/g, '_'); const H = ['Fanny', 'Ling', 'Lancelot', 'Hayabusa', 'Gusion', 'Tigreal', 'Franco', 'Atlas', 'Khufra', 'Chou'];
       const put = (id, v) => { const e = d.getElementById(id); e.value = v; e.dispatchEvent(new dom.window.Event('input', { bubbles: true })); };
       for (const r of results) {
         d.querySelector(`[data-cap-manual="${title}"]`).click(); await sleep(60);
         put(`cg-${fid}-po`, 'FP'); put(`cg-${fid}-result`, r);
-        H.forEach((h, i) => { put(`cg-${fid}-${i}-hero`, h); if (i < 5 && !d.getElementById(`cg-${fid}-${i}-player`).value) put(`cg-${fid}-${i}-player`, 'stand-in'); });
+        const roster = [...d.getElementById(`capPlayers-${fid}`).options].map((o) => o.value);
+        H.forEach((h, i) => { put(`cg-${fid}-${i}-hero`, h); if (i < 5 && !d.getElementById(`cg-${fid}-${i}-player`).value) put(`cg-${fid}-${i}-player`, roster[i]); });
         d.querySelector(`[data-cap-confirm="${title}"]`).click(); await sleep(60);
         assert.match(d.getElementById(`capMsg-${fid}`).textContent, /confirmed/);
       }
