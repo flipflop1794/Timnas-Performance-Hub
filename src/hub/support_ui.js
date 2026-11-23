@@ -5,7 +5,7 @@
 // progress" for Coach Donny, the Head Coach and admins. Logic in src/core/support.js and history.js.
 import { JOBS, DISCS, DISC_LABEL, ASK, RESPONSES, SESSIONS, SESSION_LABEL, followText, supportReport, usersOfDay, fromParse, whatsappText, anonymise, summarize, perDay,
   weekSignals, repeatAthletes, watchList, dayBoard, weekRange, noticeRecord, groupRows, isBlankRow, REPEAT_AT, HIGH_VAS, calWeek, weekGrid, weekText,
-  openFollowUps, closeFollowUp, reportedOn, reminderText, readinessList } from '../core/support.js';
+  openFollowUps, closeFollowUp, reportedOn, reminderText, readinessList, myRecap, recapText } from '../core/support.js';
 import { EVENT } from '../core/matchday.js';
 import { playersOf, coachesOf, fullName } from '../core/people.js';
 import { historyOf } from '../core/history.js';
@@ -25,6 +25,11 @@ export function supportUi(ctx) {
   const readsAll = () => !HUB_USER || HUB_USER.roles.some((r) => ['admin', 'head_coach', 'readiness_owner'].includes(r));
   const me = () => HUB_USER?.name || meName();
   const job = () => HUB_USER?.supportJob || '';
+  // V1.50 the pain map, VAS and body region belong to the physios (Coach Ilham, Coach Dewi): other accounts never get
+  // them in their form, and a physio role cannot be picked by hand. Without accounts (local hub) everything shows.
+  const isPhysio = () => !HUB_USER || JOBS[job()]?.disc === 'physio';
+  // The unsent draft is kept per account on this device, so one person's role and rows never open in another's form.
+  const draftKey = () => `${DRAFT_KEY}:${HUB_USER?.id || 'local'}`;
   // Athletes and coaches by full name (BTN TIMNAS list), plus anyone on the hub's rosters not on that list.
   const roster = () => Object.fromEntries(titles().map((t) => [t, [...new Set([...playersOf(t).map((p) => p.name), ...coachesOf(t).map((c) => c.name),
     ...(S.roster[t] || []).filter(Boolean).map((x) => fullName(t, x))])]]));
@@ -35,12 +40,14 @@ export function supportUi(ctx) {
   const fmtAt = (at) => { const d = new Date(at); return Number.isNaN(d.getTime()) ? String(at || '') : `${d.toLocaleString(S.lang === 'id' ? 'id-ID' : 'en-GB', { timeZone: 'Asia/Jakarta', day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit', hour12: false })} WIB`; };
 
   function draft() {
-    if (!U.draft) { try { U.draft = JSON.parse(localStorage.getItem(DRAFT_KEY) || 'null'); } catch { U.draft = null; } }
+    if (!U.draft) { try { U.draft = JSON.parse(localStorage.getItem(draftKey()) || 'null'); } catch { U.draft = null; } }
     if (!U.draft) U.draft = { date: today(), discipline: JOBS[job()]?.disc || '', rows: [blankRow()], general: { did: '', found: '', teams: [] }, paste: '', source: 'form' };
+    // A new report always takes the account's own role; only editing a saved report keeps that report's role.
+    if (!U.draft.editing) { if (job()) U.draft.discipline = JOBS[job()].disc; else if (U.draft.discipline === 'physio' && !isPhysio()) U.draft.discipline = ''; }
     U.draft.group ||= blankGroup();
     return U.draft;
   }
-  const keep = () => { try { localStorage.setItem(DRAFT_KEY, JSON.stringify(U.draft)); } catch { /* per-device convenience */ } };
+  const keep = () => { try { localStorage.setItem(draftKey(), JSON.stringify(U.draft)); } catch { /* per-device convenience */ } };
   // The form's values → the draft (no redraw while typing).
   function collect() {
     const d = draft(); const f = document.getElementById('supForm'); if (!f) return d;
@@ -64,22 +71,21 @@ export function supportUi(ctx) {
 
   // ---------------------------------------------------------------- the form: one row per athlete
   function form() {
-    const d = draft(); const disc = d.discipline; const A = ASK[disc] || ASK.physical; const R = roster();
+    const d = draft(); const disc = d.discipline; const A = ASK[disc] || ASK.physical; const R = roster(); const phys = disc === 'physio' && (isPhysio() || !!d.editing); const psy = disc === 'psych';
     const opts = (r) => `<option value=""></option>${Object.entries(R).filter(([, xs]) => xs.length).map(([t, xs]) => `<optgroup label="${esc(t)}">${xs.map((x) => `<option value="${esc(`${t}|${x}`)}" ${r.athlete === x && r.title === t ? 'selected' : ''} data-no-tr>${esc(x)}</option>`).join('')}</optgroup>`).join('')}`;
     const ta = (id, label, v, rows = 3) => `<label class="field" for="${id}">${label}<textarea rows="${rows}" id="${id}">${esc(v)}</textarea></label>`;
     const row = (r, i) => `<div class="srow-card"><div class="srow-head"><b>Athlete ${i + 1}</b><button type="button" class="linkbtn" data-sup-del="${i}">Remove</button></div>
-      <div class="srow">
+      <div class="srow${psy ? ' srow5' : ''}">
         <div><label class="field" for="sR-${i}-athlete">Athlete<select id="sR-${i}-athlete">${opts(r)}</select></label>
-          <label class="field" for="sR-${i}-seen">Not in the list? Name and team<input type="text" id="sR-${i}-seen" value="${esc(r.athlete ? '' : r.athleteSeen)}" placeholder="e.g. Jonathan (CS2)"></label></div>
-        <div>${ta(`sR-${i}-did`, esc(A.did), r.did)}</div><div>${ta(`sR-${i}-found`, esc(A.found), r.found)}</div><div>${ta(`sR-${i}-fu`, esc(A.follow), followText(r.followUp))}</div>
+          <label class="field" for="sR-${i}-seen">Not in the list? Name and team<input type="text" id="sR-${i}-seen" value="${esc(r.athlete ? '' : r.athleteSeen)}" placeholder="e.g. Jonathan (CS2)"></label>
+          ${psy ? `<label class="field" for="sR-${i}-session">Session<select id="sR-${i}-session"><option value=""></option>${SESSIONS.map((x) => `<option value="${x}" ${r.session === x ? 'selected' : ''}>${esc(SESSION_LABEL[x])}</option>`).join('')}</select></label>` : ''}</div>
+        <div>${ta(`sR-${i}-did`, esc(A.did), r.did)}</div><div>${ta(`sR-${i}-found`, esc(A.found), r.found)}</div>${psy ? `<div>${ta(`sR-${i}-prog`, 'Prognosis', r.prognosis || '')}</div>` : ''}<div>${ta(`sR-${i}-fu`, esc(A.follow), followText(r.followUp))}</div>
       </div>
       <div class="srow-x">
-        ${disc === 'psych' ? `<label class="field" for="sR-${i}-session">Session<select id="sR-${i}-session"><option value=""></option>${SESSIONS.map((x) => `<option value="${x}" ${r.session === x ? 'selected' : ''}>${esc(SESSION_LABEL[x])}</option>`).join('')}</select></label>
-          <label class="field wide" for="sR-${i}-prog">Prognosis<textarea rows="2" id="sR-${i}-prog">${esc(r.prognosis || '')}</textarea></label>` : ''}
-        ${disc === 'physio' ? `<label class="field" for="sR-${i}-region">Body region<input type="text" id="sR-${i}-region" value="${esc(r.region)}"></label>
+        ${phys ? `<label class="field" for="sR-${i}-region">Body region<input type="text" id="sR-${i}-region" value="${esc(r.region)}"></label>
           <label class="field" for="sR-${i}-vb">VAS before (0–10)<input type="number" min="0" max="10" inputmode="numeric" id="sR-${i}-vb" value="${esc(r.vasBefore ?? '')}"></label>
           <label class="field" for="sR-${i}-va">VAS after (0–10)<input type="number" min="0" max="10" inputmode="numeric" id="sR-${i}-va" value="${esc(r.vasAfter ?? '')}"></label>${painPick(r, i)}` : ''}
-        ${disc === 'physio' || disc === 'medic' ? `<label class="field" for="sR-${i}-response">Athlete response<select id="sR-${i}-response"><option value=""></option>${RESPONSES.map((x) => `<option value="${x}" ${r.response === x ? 'selected' : ''}>${x}</option>`).join('')}</select></label>` : ''}
+        ${phys || disc === 'medic' ? `<label class="field" for="sR-${i}-response">Athlete response<select id="sR-${i}-response"><option value=""></option>${RESPONSES.map((x) => `<option value="${x}" ${r.response === x ? 'selected' : ''}>${x}</option>`).join('')}</select></label>` : ''}
         <label class="field"><span><input type="checkbox" id="sR-${i}-nt" ${r.notify ? 'checked' : ''}> Tell the coach (no diagnosis)</span></label>
         <label class="field wide" for="sR-${i}-ntx">Line for the coach, if ticked<input type="text" id="sR-${i}-ntx" maxlength="200" value="${esc(r.notifyText)}" placeholder="e.g. Check with the physio before scrim"></label>
       </div></div>`;
@@ -94,14 +100,14 @@ export function supportUi(ctx) {
         ${xs.map((x) => `<label><input type="checkbox" data-sup-gp value="${esc(`${t}|${x}`)}" ${G.picks.includes(`${t}|${x}`) ? 'checked' : ''}> <span data-no-tr>${esc(x)}</span></label>`).join('')}</fieldset>`).join('') || '<p class="empty">No team lists in the hub yet: type the names below.</p>'}</div>
       <label class="field" for="supGpOther">Others not in the lists (name and team, comma-separated)<input type="text" id="supGpOther" value="${esc(G.others)}" placeholder="e.g. Jonathan (CS2), Rina (MLBB Women)"></label>
       <div class="srow srow3">${ta('supGpDid', esc(A.did), G.did, 2)}${ta('supGpFound', esc(A.found), G.found, 2)}${ta('supGpFu', 'Follow-up for all of them', followText(G.followUp), 2)}</div>
-      ${disc === 'physio' ? `<label class="field" for="supGpRegion">Body region<input type="text" id="supGpRegion" value="${esc(G.region)}"></label>` : ''}
+      ${phys ? `<label class="field" for="supGpRegion">Body region<input type="text" id="supGpRegion" value="${esc(G.region)}"></label>` : ''}
       <div class="toolbar"><span class="note">Selected:</span> <b id="supGpN">${groupCount(G)}</b><button class="btn primary" type="button" data-sup-gadd="1">Add to the report</button><span class="msg" id="supGpMsg" role="status"></span></div></details>`;
     const users = (() => { try { return usersOfDay(supportReport({ ...d, by: me() || 'x', asOf: today() })).text; } catch { return ''; } })();
     return `<div class="panel" id="supForm"><h2>${d.editing ? 'Edit report' : 'Daily report'}${job() ? ` — ${esc(JOBS[job()].label)}` : ''}</h2>
       ${d.editing ? `<p class="note draftnote">Editing the report of ${esc(d.editing.date || d.date)}. Saving keeps the old version in the edit history (who, what, date and time). <button type="button" class="linkbtn" data-sup-clear="1">Cancel editing</button></p>` : ''}
       <p class="note">Each athlete in one row: what was done, findings, follow-up. Only you, Coach Donny, the Head Coach and admins read the details${disc === 'psych' ? '' : '; the coach only gets the line you tick'}.</p>
       <div class="form"><label class="field" for="supDate">Date<input type="date" id="supDate" value="${esc(d.date)}" max="${today()}"></label>
-        ${job() ? '' : `<label class="field" for="supDisc">Your role<select id="supDisc"><option value=""></option>${DISCS.map((x) => `<option value="${x}" ${disc === x ? 'selected' : ''}>${esc(DISC_LABEL[x])}</option>`).join('')}</select></label>`}</div>
+        ${job() ? '' : `<label class="field" for="supDisc">Your role<select id="supDisc"><option value=""></option>${DISCS.filter((x) => x !== 'physio' || isPhysio()).map((x) => `<option value="${x}" ${disc === x ? 'selected' : ''}>${esc(DISC_LABEL[x])}</option>`).join('')}</select></label>`}</div>
       ${d.editing ? '' : `<details class="capdump" ${d.rows.some((r) => r.found || r.did) ? '' : 'open'}><summary>Paste from WhatsApp: the AI fills the form</summary>
         <p class="note">Paste the message you send to the group. The AI only moves your own words into the fields; check them, then save. The text is sent to the AI service to be read.</p>
         <label class="field" for="supPaste">Your WhatsApp report<textarea id="supPaste" rows="6">${esc(d.paste || '')}</textarea></label>
@@ -138,13 +144,14 @@ export function supportUi(ctx) {
   }
   function card(r) {
     const A = ASK[r.discipline] || ASK.physical;
-    const extra = (x) => [x.session && SESSION_LABEL[x.session], x.prognosis && `Prognosis: ${x.prognosis}`, x.region && `Body region: ${x.region}`, (x.pain || []).length && `Pain spots: ${painText(x.pain, S.lang)}`,
+    const psy = r.discipline === 'psych';
+    const extra = (x) => [!psy && x.session && SESSION_LABEL[x.session], !psy && x.prognosis && `Prognosis: ${x.prognosis}`, x.region && `Body region: ${x.region}`, (x.pain || []).length && `Pain spots: ${painText(x.pain, S.lang)}`,
       x.vasBefore != null && `VAS ${x.vasBefore} → ${x.vasAfter ?? '?'}`, x.response && `Response: ${x.response}`, x.notify && `To the coach: ${x.notifyText}`].filter(Boolean);
     return `<div class="obj"><header><div><span class="note">${esc(r.date)} · ${esc(DISC_LABEL[r.discipline])} · <span data-no-tr>${esc(r.by)}</span>${r.source === 'whatsapp' ? ' · from WhatsApp' : ''}</span><h3>${esc(usersOfDay(r).text)}</h3></div>
       <div class="toolbar">${editBadge(r)}${canEdit(r) && S.mode !== 'demo' ? `<button type="button" class="btn" data-sup-edit="${esc(r.id)}">Edit</button>` : ''}</div></header>
-      ${r.rows.length ? `<div class="srow srow-h"><div>Athlete</div><div>${esc(A.did)}</div><div>${esc(A.found)}</div><div>${esc(A.follow)}</div></div>
-      ${r.rows.map((x) => `<div class="srow srow-v"><div><b data-no-tr>${esc(x.athlete)}</b>${x.title ? `<br><span class="note">${esc(x.title)}</span>` : ''}</div>
-        <div data-no-tr>${esc(x.did || '—')}</div><div data-no-tr>${esc(x.found || '—')}</div><div data-no-tr>${esc(followText(x.followUp) === 'Yes' ? (S.lang === 'id' ? 'Ya' : 'Yes') : (followText(x.followUp) || '—'))}${x.fuDone ? `<br>${tag('c-Verified', `done ${esc(String(x.fuDone.at).slice(0, 10))}`)}` : ''}</div></div>
+      ${r.rows.length ? `<div class="srow srow-h${psy ? ' srow5' : ''}"><div>Athlete</div><div>${esc(A.did)}</div><div>${esc(A.found)}</div>${psy ? '<div>Prognosis</div>' : ''}<div>${esc(A.follow)}</div></div>
+      ${r.rows.map((x) => `<div class="srow srow-v${psy ? ' srow5' : ''}"><div><b data-no-tr>${esc(x.athlete)}</b>${x.title ? `<br><span class="note">${esc(x.title)}</span>` : ''}${psy && x.session ? `<br>${tag('c-Medium', SESSION_LABEL[x.session])}` : ''}</div>
+        <div data-no-tr>${esc(x.did || '—')}</div><div data-no-tr>${esc(x.found || '—')}</div>${psy ? `<div data-no-tr>${esc(x.prognosis || '—')}</div>` : ''}<div data-no-tr>${esc(followText(x.followUp) === 'Yes' ? (S.lang === 'id' ? 'Ya' : 'Yes') : (followText(x.followUp) || '—'))}${x.fuDone ? `<br>${tag('c-Verified', `done ${esc(String(x.fuDone.at).slice(0, 10))}`)}` : ''}</div></div>
         ${extra(x).length ? `<p class="note srow-xv">${extra(x).map((e) => `<span>${esc(e)}</span>`).join(' · ')}</p>` : ''}${(x.pain || []).length ? `<div class="pm-mini">${bodySvg({ pain: x.pain, esc, lang: S.lang, small: true })}</div>` : ''}`).join('')}` : ''}
       ${r.general.did || r.general.found ? `<p><b>Team${r.general.teams.length ? ` (${esc(r.general.teams.join(', '))})` : ''}</b><br><span data-no-tr>${esc([r.general.did, r.general.found].filter(Boolean).join(' — '))}</span></p>` : ''}</div>`;
   }
@@ -177,16 +184,32 @@ export function supportUi(ctx) {
       <div class="sw-when"><b>${esc(span(w.from, w.to))}</b>${off === 0 ? `<span class="sw-pill">${esc(T('This week', 'Minggu ini'))}</span>` : `<button type="button" class="linkbtn" data-sup-week="0">${esc(T('Back to this week', 'Kembali ke minggu ini'))}</button>`}</div>
       <button type="button" class="sw-arrow" data-sup-week="${off + 1}" aria-label="${esc(T('Next week', 'Minggu berikutnya'))}" ${off >= 0 ? 'disabled' : ''}>›</button></div>`;
   }
-  // ---- staff: the week strip and one line
+  // V1.50 "My week": the seven tiles, then the recap — days reported, athletes handled, visits (each with the change
+  // from the week before), follow-ups written / closed / still open, the role's own numbers, per team and who came
+  // back most. Their own reports only. The WhatsApp copy holds counts only.
   function myWeek() {
     const off = weekOff(); const w = calWeek(today(), off); const mine = U.reports.filter((r) => r.by === me()); const t0 = today();
-    const cur = summarize(anonymise(mine, w.from, w.to)); const open = myOpen().length; const disc = JOBS[job()]?.disc || mine[0]?.discipline || '';
+    const rc = myRecap(U.reports, me(), w); const c = rc.cur; const p = rc.prev; const open = off === 0 ? myOpen().length : null;
+    const disc = JOBS[job()]?.disc || c.disc || '';
     const tile = (d, i) => { const n = mine.filter((r) => r.date === d).length; const st = d > t0 ? 'future' : n ? 'on' : d === t0 ? 'today' : 'off';
       return `<button type="button" class="sw-day ${st}" data-sup-day="${esc(d)}" aria-pressed="${U.day === d}" ${d > t0 ? 'disabled' : ''} title="${esc(d)}"><span>${esc(DAYS[L()][i])}</span><b>${Number(d.slice(8))}</b></button>`; };
-    const extra = disc === 'physio' && cur.vasN ? T(` · pain down ${cur.vasDrop} on average`, ` · nyeri turun rata-rata ${cur.vasDrop}`) : disc === 'psych' && cur.formal + cur.informal ? T(` · ${cur.formal} formal, ${cur.informal} informal`, ` · ${cur.formal} formal, ${cur.informal} informal`) : '';
+    const kpi = (k, a, b, of) => `<div class="sw-kpi"><span class="k">${esc(k)}</span><span class="v">${a}${of ? `<small>/${of}</small>` : ''}</span><span class="d">${b == null ? '&nbsp;' : delta(a, b)}</span></div>`;
+    const lines = [
+      c.followUps || c.closed || open ? T(`Follow-ups: ${c.followUps} written · ${c.closed} closed${open != null ? ` · ${open} still open` : ''}`, `Tindak lanjut: ${c.followUps} dibuat · ${c.closed} selesai${open != null ? ` · ${open} masih terbuka` : ''}`) : '',
+      disc === 'physio' && c.vasN ? T(`Pain down ${c.vasDrop} on average (${c.vasN} treatments)${c.responded ? ` · better ${c.better}/${c.responded}` : ''}`, `Nyeri turun rata-rata ${c.vasDrop} (${c.vasN} terapi)${c.responded ? ` · membaik ${c.better}/${c.responded}` : ''}`) : '',
+      disc === 'medic' && c.responded ? T(`Better after treatment: ${c.better}/${c.responded}`, `Membaik setelah penanganan: ${c.better}/${c.responded}`) : '',
+      disc === 'psych' && c.formal + c.informal ? T(`Sessions: ${c.formal} formal · ${c.informal} informal`, `Sesi: ${c.formal} formal · ${c.informal} informal`) : '',
+      Object.keys(c.teams).length ? `${T('Per team', 'Per tim')}: ${Object.entries(c.teams).sort((a, b) => b[1] - a[1]).map(([t, n]) => `${t} ${n}`).join(' · ')}` : '',
+      c.regulars.length ? `${T('Seen most', 'Paling sering')}: ${c.regulars.slice(0, 4).map((a) => `${a.athlete} ${a.n}×`).join(' · ')}` : '',
+    ].filter(Boolean);
     return `<div class="panel sw"><p class="note sw-who"><span>Support staff</span>${job() ? ` · <span>${esc(JOBS[job()].label)}</span>` : ''}</p>${weekNav(w, off)}
       <div class="sw-days">${w.days.map(tile).join('')}</div>
-      <p class="sw-line" data-no-tr>${esc(T(`${cur.days}/7 days · ${cur.seen} athletes · ${open} follow-up${open === 1 ? '' : 's'} open`, `${cur.days}/7 hari · ${cur.seen} atlet · ${open} tindak lanjut terbuka`))}${esc(extra)}</p></div>`;
+      <div class="h3 sw-rh" data-no-tr>${esc(off === 0 ? T('My week so far', 'Rekap minggu saya') : T('My recap of that week', 'Rekap minggu itu'))}</div>
+      <div class="sw-kpis" data-no-tr>${kpi(T('Days reported', 'Hari lapor'), c.days, null, 7)}${kpi(T('Athletes handled', 'Atlet ditangani'), c.athletes, p.athletes)}${kpi(T('Visits', 'Kunjungan'), c.visits, p.visits)}</div>
+      ${c.reports ? `<p class="note sw-vs" data-no-tr>${esc(T('Small numbers: change from the week before. Each athlete counts once; a visit is each time you saw them.', 'Angka kecil: perubahan dari minggu lalu. Atlet dihitung sekali; kunjungan = setiap kali ditangani.'))}</p>
+      ${lines.length ? `<ul class="plain sw-recap" data-no-tr>${lines.map((x) => `<li>${esc(x)}</li>`).join('')}</ul>` : ''}
+      <div class="toolbar"><button class="btn" type="button" data-sup-mywa="1">${esc(T('Copy my recap for WhatsApp', 'Salin rekap saya untuk WA'))}</button><span class="msg" id="supMyMsg" role="status"></span></div>`
+        : `<p class="note" data-no-tr>${esc(off === 0 ? T('No report yet this week: your recap fills in as you save reports.', 'Belum ada laporan minggu ini: rekap terisi otomatis setiap kali laporan disimpan.') : T('No report that week.', 'Tidak ada laporan minggu itu.'))}</p>`}</div>`;
   }
   // ---- Coach Donny, Head Coach, admins: 1 to check · 2 today · 3 this week
   function checkBlock() {
@@ -351,8 +374,14 @@ export function supportUi(ctx) {
       try { await navigator.clipboard.writeText(reminderText(t, S.lang)); setMsg('supRemMsg', 'Copied: paste it in the WhatsApp group.', 'ok'); } catch { setMsg('supRemMsg', 'Copy did not work on this device.', 'err'); }
       return true;
     }
-    if (ds.supClear) { U.draft = null; try { localStorage.removeItem(DRAFT_KEY); } catch { /* */ } draft(); render(); return true; }
+    if (ds.supClear) { U.draft = null; try { localStorage.removeItem(draftKey()); } catch { /* */ } draft(); render(); return true; }
     if ('supWeek' in ds) { U.week = Math.min(0, Number(ds.supWeek) || 0); U.day = ''; render(); return true; }
+    if (ds.supMywa) {
+      const w = calWeek(today(), Math.min(0, U.week || 0));
+      const text = recapText(myRecap(U.reports, me(), w), w, me(), S.lang);
+      try { await navigator.clipboard.writeText(text); setMsg('supMyMsg', 'Copied: counts only, no athlete names.', 'ok'); } catch { setMsg('supMyMsg', 'Copy did not work on this device.', 'err'); }
+      return true;
+    }
     if (ds.supWkwa) {
       const list = ds.supWkwa === 'all' && readsAll() ? U.reports : U.reports.filter((r) => r.by === me());
       const w = calWeek(today(), Math.min(0, U.week || 0));
@@ -377,7 +406,7 @@ export function supportUi(ctx) {
       try {
         const out = await PLATFORM.ai.call({ action: 'support_parse', text: d.paste, roster: roster(), discipline: d.discipline || JOBS[job()]?.disc || '' });
         const p = fromParse(out.raw, roster());
-        Object.assign(d, { discipline: d.discipline || p.discipline, date: p.date && p.date <= today() ? p.date : d.date, rows: p.rows.length ? p.rows : d.rows, general: (p.general.did || p.general.found) ? p.general : d.general, source: 'whatsapp' });
+        Object.assign(d, { discipline: d.discipline || (p.discipline === 'physio' && !isPhysio() ? '' : p.discipline), date: p.date && p.date <= today() ? p.date : d.date, rows: p.rows.length ? p.rows : d.rows, general: (p.general.did || p.general.found) ? p.general : d.general, source: 'whatsapp' });
         keep(); render();
         setMsg('supPMsg', `${p.rows.length} athlete(s) filled.${p.unmatched.length ? ` Not in the roster: ${p.unmatched.join(', ')} — pick them or keep the name.` : ''}${p.notes ? ` ${p.notes}` : ''} Check, then save.`, 'ok');
       } catch (err) { setMsg('supPMsg', err.message, 'err'); }
@@ -394,7 +423,7 @@ export function supportUi(ctx) {
         if (S.db) { await S.db.collection('support_reports').doc(r.id).set(r); for (const n of notices) await S.db.collection('support_notices').doc(n.id).set(n); }
         else { if (before) U.hist.push({ record_id: r.id, at: new Date().toISOString(), editor_name: me(), before, after: r }); U.notices.push(...notices); }
         const i = U.reports.findIndex((x) => x.id === r.id); if (i >= 0) U.reports[i] = r; else U.reports.push(r);
-        U.lastSaved = r; U.draft = null; try { localStorage.removeItem(DRAFT_KEY); } catch { /* */ }
+        U.lastSaved = r; U.draft = null; try { localStorage.removeItem(draftKey()); } catch { /* */ }
         if (ed) await loadHistory(true);
         render(); setMsg('supMsg', ed ? 'Changes saved. The old version is in the edit history.' : `Saved: ${usersOfDay(r).text}.${notices.length ? ` ${notices.length} line(s) sent to the coaches.` : ''}`, 'ok');
       } catch (err) { setMsg('supMsg', err.message, 'err'); }

@@ -72,7 +72,9 @@ test('support staff: paste from WhatsApp → AI fills the form → save; Donny r
   assert.deepEqual(r.rows[0].pain, [{ p: 'knee_L', v: 6 }]); assert.deepEqual(r.rows[1].pain, [{ p: 'wrist_R', v: null }]);
   // V1.36: her own summary, then an edit that the database records (who, what, when).
   // V1.49: her week strip and one line on top (her own reports only); the history is folded.
-  await dewi.wait(() => /1\/7 days · 2 athletes/.test(dewi.text()));
+  // V1.50: the strip, then her recap (days reported, athletes handled, visits).
+  await dewi.wait(() => /Athletes handled\s*2/.test(dewi.text()));
+  assert.match(dewi.text(), /Days reported\s*1\/7/); assert.match(dewi.text(), /Visits\s*2/);
   assert.ok(dewi.d.querySelector('.sw-day.on'), 'today is a filled tile');
   dewi.d.querySelector('[data-sup-histfold]').open = true;
   dewi.d.querySelector('[data-sup-edit]').click();
