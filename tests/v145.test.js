@@ -118,12 +118,13 @@ test('page: support staff weekly dashboard — the week grid, week picker, count
   const r = supportReport({ date: w.from, discipline: 'physio', by: 'Dewi', job: 'physio_women', rows: [{ athlete: 'Vivian', title: 'MLBB Women', did: 'Massage', found: 'Tight calf' }] });
   db.store.set(`support_reports/${r.id}`, { ...r, origin: 'operational' });
   const h = await page('support', db);
-  assert.match(h.text(), new RegExp(`Weekly dashboard — ${w.from} to ${w.to}`)); assert.match(h.text(), /Mon \d\d/);
-  const row = [...h.d.querySelectorAll('#main table tbody tr')].find((tr) => /Dewi/.test(tr.textContent)); assert.ok(row); assert.match(row.textContent, /1\/7/);
+  // V1.49 layout: three numbers, then one line of 7 dots per staff member.
+  assert.match(h.text(), /This week/); assert.ok(h.d.querySelector('.sw-kpis'));
+  const row = [...h.d.querySelectorAll('.sw-people li')].find((li) => /Dewi/.test(li.textContent)); assert.ok(row); assert.match(row.textContent, /1\/7/); assert.equal(row.querySelectorAll('.dots i').length, 7);
   h.d.querySelector('[data-sup-wkwa]').click(); await h.wait();
   assert.match(h.copied(), /Laporan: 1|Reports: 1/); assert.doesNotMatch(h.copied(), /Vivian|Tight calf|Dewi/);
   h.d.querySelector('[data-sup-week="-1"]').click(); await h.wait();
-  assert.match(h.text(), new RegExp(`Weekly dashboard — ${w.prevFrom} to ${w.prevTo}`)); assert.match(h.text(), /No report this week\./);
+  assert.match(h.text(), /Back to this week/); assert.match(h.text(), /No report this week\./); assert.doesNotMatch(h.text(), /Today: /, "today's block only in the current week");
 });
 
 test('Bahasa: the weekly dashboard heading, day names, role lines and download buttons', async () => {

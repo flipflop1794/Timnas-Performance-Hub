@@ -109,3 +109,19 @@ test('Ask AI: a starter question about Malaysia sends the workspace, the opponen
   for (let i = 0; i < 40 && calls.length < 2; i++) await sleep(50);
   assert.equal(calls[1].purpose, 'plan'); assert.match(calls[1].material.PURPOSE, /^answer the coach's question$/);
 });
+
+// V1.48 MLBB Women: the same five tabs with the women's own data. Nothing from the men's side shows up.
+test('MLBB Women coach: own workspace, own 3 opponents, "little public data", women\'s meta note, women\'s starters', async () => {
+  people.ilyas = { id: 'u-ilyas', email: 'ilyas@example.test', password: 'pw', name: 'Coach Ilyas', roles: ['title_coach'], titles: ['MLBB Women'] };
+  const c = await open('ilyas');
+  assert.deepEqual(c.groups(), ['MLBB W']); assert.deepEqual(c.tabs(), FIVE); assert.equal(c.w.location.hash, '#t-mlbbw-reports'); assert.match(c.text(), /Scrim reports — MLBB Women/);
+  await c.go('comp-card');
+  assert.deepEqual([...c.d.querySelectorAll('#ocN option')].map((o) => o.textContent), ['Egypt', 'Argentina', 'Türkiye'], 'only the women\'s field');
+  assert.match(c.text(), /MLBB Women · opponent card/); assert.match(c.text(), /Little public data/); assert.match(c.text(), /Draft plan/);
+  assert.doesNotMatch(c.text(), /Malaysia|Cambodia|Myanmar/, 'no men\'s opponents');
+  await c.go('t-mlbbw-meta'); assert.equal(c.current(), 'Meta'); assert.match(c.text(), /the women's pro scene may differ/);
+  await c.go('t-mlbbw-brain'); assert.equal(c.current(), 'Ask AI'); assert.match(c.text(), /Ask AI — MLBB Women/);
+  assert.ok([...c.d.querySelectorAll('.chip')].some((b) => b.textContent === 'What should we ban against Egypt?'));
+  await c.go('tour-runbook'); assert.match(c.text(), /Match-day runbook — MLBB Women/);
+  delete people.ilyas;
+});

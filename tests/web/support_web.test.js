@@ -71,8 +71,10 @@ test('support staff: paste from WhatsApp → AI fills the form → save; Donny r
   assert.equal(r.rows[1].followUp, 'Yes', 'follow-up is a text now');
   assert.deepEqual(r.rows[0].pain, [{ p: 'knee_L', v: 6 }]); assert.deepEqual(r.rows[1].pain, [{ p: 'wrist_R', v: null }]);
   // V1.36: her own summary, then an edit that the database records (who, what, when).
-  await dewi.wait(() => /My summary \(7 days\)/.test(dewi.text()));
-  assert.match(dewi.text(), /Only your own reports/);
+  // V1.49: her week strip and one line on top (her own reports only); the history is folded.
+  await dewi.wait(() => /1\/7 days · 2 athletes/.test(dewi.text()));
+  assert.ok(dewi.d.querySelector('.sw-day.on'), 'today is a filled tile');
+  dewi.d.querySelector('[data-sup-histfold]').open = true;
   dewi.d.querySelector('[data-sup-edit]').click();
   await dewi.wait(() => /Edit report/.test(dewi.text()));
   dewi.set('sR-0-found', 'tightness quadriceps, hamstring better'); dewi.set('sR-0-fu', 'Re-check on Friday');
@@ -88,10 +90,13 @@ test('support staff: paste from WhatsApp → AI fills the form → save; Donny r
   assert.match(dewi.d.querySelector('.overlay').textContent, /Re-check on Friday/);
 
   const donny = await open(B, 'donny', 'support');
-  await donny.wait(() => /To watch/.test(donny.text()));
-  assert.match(donny.text(), /Support team progress \(7 days\)/); assert.match(donny.text(), /Edited after saving/); assert.match(donny.text(), /Viorelle/); assert.match(donny.text(), /follow-up/);
-  assert.match(donny.text(), /VAS −1\.5/);
-  assert.match(donny.text(), /Pain spots \(7 days\)/); assert.match(donny.text(), /Knee \(left\) 1×/);
+  await donny.wait(() => /To check/.test(donny.text()));
+  // V1.49: to check, today, this week — in that order; dots instead of wide tables.
+  const order = ['To check', 'Today: ', 'change from the week before'].map((x) => donny.text().indexOf(x)); assert.ok(order.every((i, k) => i >= 0 && (k === 0 || i > order[k - 1])), `blocks in order ${order}`);
+  assert.match(donny.text(), /Edited after saving \(1\)/); assert.match(donny.text(), /Viorelle/); assert.match(donny.text(), /follow-up/);
+  assert.match(donny.text(), /pain −1\.5, better/);
+  assert.match(donny.text(), /Pain spots this week/); assert.match(donny.text(), /Knee \(left\) 1×/);
+  assert.equal(donny.d.querySelector('#main table'), null, 'no wide tables on the support page');
 
   const indra = await open(B, 'indra', 'today');
   await indra.wait(() => /From the support staff/.test(indra.text()));

@@ -603,7 +603,10 @@
     {
      "ign": "KUJOU",
      "captain": false,
-     "flags": []
+     "flags": [
+      "Role from the MWI 2026 Türkiye qualifier (desk research, 23 Nov 2026): confirm"
+     ],
+     "role": "Mid"
     },
     {
      "ign": "MIEKO",
@@ -618,7 +621,10 @@
     {
      "ign": "UNOHANA",
      "captain": false,
-     "flags": []
+     "flags": [
+      "Role from the MWI 2026 Türkiye qualifier (desk research, 23 Nov 2026): confirm"
+     ],
+     "role": "Jungle"
     },
     {
      "ign": "ZENDAYA",
