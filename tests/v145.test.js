@@ -134,3 +134,17 @@ test('Bahasa: the weekly dashboard heading, day names, role lines and download b
   assert.equal(tr('3 report(s), 7 athlete visit(s)'), '3 laporan, 7 kunjungan atlet');
   assert.equal(tr('Download Excel'), 'Unduh Excel'); assert.equal(tr('Download all (Excel)'), 'Unduh semua (Excel)');
 });
+
+test('audit fixes: a report without a focus is not "a session with an objective"; long cells are clipped for Excel', async () => {
+  const { titleQuality } = await import('../src/core/practice_quality.js');
+  const { NO_FOCUS, dailyFromReport } = await import('../src/core/daily_sessions.js');
+  const r = scrimReport({ title: 'Dota 2', date: '2026-11-20', by: 'Coach', partner: 'Team C', won: '1', lost: '0', adjust: 'Smoke' });
+  assert.equal(dailyFromReport(r, '1-0').objective, NO_FOCUS);
+  const held = (objective) => [{ id: 's1', title: 'Dota 2', date: '2026-11-20', status: 'done', dailyReport: { objective, filedAt: '2026-11-20T10:00:00Z' } }];
+  assert.equal(titleQuality('Dota 2', { scrims: held(NO_FOCUS) }, '2026-11-17', '2026-11-23').parts.objective.hit, 0);
+  assert.equal(titleQuality('Dota 2', { scrims: held('Early rotations') }, '2026-11-17', '2026-11-23').parts.objective.hit, 1);
+  const big = unzip(makeXlsx([{ name: 'S', columns: [{ header: 'A' }], rows: [['x'.repeat(40000)]] }]))['xl/worksheets/sheet1.xml'];
+  assert.ok(big.length < 33000);
+  const { tr } = await import('../src/hub/i18n.js');
+  assert.equal(tr('pain −2.5 (VAS) · better 3/4'), 'nyeri −2.5 (VAS) · membaik 3/4');
+});

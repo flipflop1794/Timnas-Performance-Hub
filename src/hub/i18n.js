@@ -872,6 +872,7 @@ Object.assign(EXACT, {
 RULES.push(
   [/^(Weekly dashboard|My week) — (\d{4}-\d{2}-\d{2}) to (\d{4}-\d{2}-\d{2})$/, (m, w, a, b) => `${w === 'My week' ? 'Minggu saya' : 'Dashboard mingguan'} — ${a} s/d ${b}`],
   [/^(\d+) report\(s\), (\d+) athlete visit\(s\)$/, '$1 laporan, $2 kunjungan atlet'],
+  [/^pain −([\d.]+) \(VAS\) · better (\d+)\/(\d+)$/, 'nyeri −$1 (VAS) · membaik $2/$3'],
   [/^(Mon|Tue|Wed|Thu|Fri|Sat|Sun) (\d\d)$/, (m, d, n) => `${{ Mon: 'Sen', Tue: 'Sel', Wed: 'Rab', Thu: 'Kam', Fri: 'Jum', Sat: 'Sab', Sun: 'Min' }[d]} ${n}`],
 );
 

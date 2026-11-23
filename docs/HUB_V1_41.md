@@ -28,7 +28,10 @@ together with V1.40 (`docs/HUB_V1_40.md`) and V1.42 (`docs/HUB_V1_42.md`).
 - **Fix:**
   - Visitor access is revoked on the 5 functions. Signed-in users keep it, because the access rules use these
     functions.
-  - The default is changed: new functions, tables and sequences now start closed to visitors.
+  - The default is changed: new **tables and sequences** now start closed to visitors.
+  - **New functions do not** (corrected 23 Nov, V1.45 audit): PostgreSQL gives every new function to everyone by a
+    built-in rule that a per-schema default cannot remove. Each migration that adds a function must still revoke it
+    from `public, anon`. `tests/v141.test.js` fails if one forgets.
   - `block_update` and `jsonb_prefix` get a fixed search_path (a second advisor warning).
 - **Not changed:** the advisor also lists 31 functions that signed-in users can call. That is intended. The access
   rules call the role checks, and each role check looks at the signed-in user. The others are database triggers,

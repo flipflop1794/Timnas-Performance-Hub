@@ -43,7 +43,8 @@ const STYLES = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 function cellXml(v, ref, style) {
   if (v == null || v === '') return '';
   if (typeof v === 'number' && Number.isFinite(v)) return `<c r="${ref}" s="${style}"><v>${v}</v></c>`;
-  return `<c r="${ref}" s="${style}" t="inlineStr"><is><t xml:space="preserve">${xml(v)}</t></is></c>`;
+  const text = String(v); // Excel refuses a cell over 32,767 characters
+  return `<c r="${ref}" s="${style}" t="inlineStr"><is><t xml:space="preserve">${xml(text.length > 32000 ? `${text.slice(0, 32000)}…` : text)}</t></is></c>`;
 }
 function sheetXml({ columns, rows }) {
   const last = colName(Math.max(0, columns.length - 1));

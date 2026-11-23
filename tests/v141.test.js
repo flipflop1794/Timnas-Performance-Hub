@@ -23,3 +23,26 @@ test('the V1.41 one-paste file is exactly its migration, in one transaction (no 
   const one = read('supabase/RUN_ON_LIVE_V1_41.sql');
   assert.ok(one.includes(mig)); assert.match(one, /^begin;$/m); assert.match(one, /^commit;$/m);
 });
+
+// V1.45 audit: a per-schema default cannot close new functions (PostgreSQL grants EXECUTE to PUBLIC by a built-in
+// rule), so every function a migration adds after the core file must be revoked from anon by name, in that file or a
+// later one. The core file ends with a blanket revoke for its own functions.
+test('every function added after the core migration is revoked from visitors by name', async () => {
+  const { readdirSync } = await import('node:fs');
+  const dir = new URL('../supabase/migrations/', import.meta.url);
+  const files = readdirSync(dir).filter((f) => f.endsWith('.sql')).sort();
+  const text = files.map((f) => readFileSync(new URL(f, dir), 'utf8'));
+  const missing = []; const seen = new Set();
+  // A function redefined later ("create or replace") keeps the access it had, so only its first creation counts.
+  for (const m of text[0].matchAll(/create\s+(?:or\s+replace\s+)?function\s+public\.(\w+)\s*\(/gi)) seen.add(m[1]);
+  files.forEach((f, i) => {
+    if (i === 0) return;
+    for (const m of text[i].matchAll(/create\s+(?:or\s+replace\s+)?function\s+public\.(\w+)\s*\(/gi)) {
+      if (seen.has(m[1])) continue; seen.add(m[1]);
+      const later = text.slice(i).join('\n');
+      const revoked = [...later.matchAll(/revoke\s+(?:execute|all)\s+on\s+function\s+([\s\S]*?)\s+from\s+([^;]*);/gi)].some((r) => r[1].replace(/\s+/g, '').includes(`public.${m[1]}(`) && /\banon\b/.test(r[2]));
+      if (!revoked) missing.push(`${f}: ${m[1]}`);
+    }
+  });
+  assert.deepEqual([...new Set(missing)], []);
+});
