@@ -4,7 +4,7 @@
 import { FIELDS } from './competitors.js';
 import { localDay } from './dates.js';
 
-export const WORKSPACE_TITLES = ['MLBB'];
+export const WORKSPACE_TITLES = ['MLBB', 'MLBB Women'];
 
 // ---------------------------------------------------------------- the opponent list per category
 // Starts from the published WEC field. The category's staff can hide a nation or add one (a scrim partner, a club

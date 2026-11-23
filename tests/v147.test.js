@@ -19,7 +19,7 @@ test('opponent list: starts from the published field of that category only; hide
   assert.ok(!fieldOf('MLBB', [...recs, at(fieldEdit({ title: 'MLBB', nation: 'RRQ Hoshi', action: 'hide', by: 'Coach' }), '5')]).list.includes('RRQ Hoshi'), 'an added team can be removed');
   assert.throws(() => fieldEdit({ title: 'MLBB', nation: '', action: 'add', by: 'C' }), /Write the opponent name/);
   assert.throws(() => fieldEdit({ title: 'Chess', nation: 'X', action: 'add', by: 'C' }), /Pick a title/);
-  assert.deepEqual(WORKSPACE_TITLES, ['MLBB'], 'template first; the others switch on one by one');
+  assert.deepEqual(WORKSPACE_TITLES, ['MLBB', 'MLBB Women'], 'MLBB Men first, then MLBB Women; the others switch on one by one');
 });
 
 test('Ask AI: the opponent comes from the question, in any spelling; starters name a real opponent and fit the game', () => {
