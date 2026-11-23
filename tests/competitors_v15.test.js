@@ -25,14 +25,14 @@ test('nation profile joins notes, tiers, VODs, stand-in partners, scrims and WEC
   });
   assert.deepEqual(p.titles, ['Dota 2', 'PUBG Mobile', 'CS2', 'eFootball']);
   const d = p.per[0];
-  assert.equal(d.notes.length, 1); assert.equal(d.vodsReviewed, 1); assert.equal(d.standIns.length, 1);
+  assert.equal(d.notes.length, 3); assert.equal(d.vodsReviewed, 1);   // 3 Nov OpenDota note + 21 and 23 Nov desk research assert.equal(d.standIns.length, 1);
   assert.equal(d.scrimsDone, 1); assert.equal(d.scrimsPlanned, 1); assert.equal(d.lastScrim, '2026-11-05'); assert.equal(d.wecMatches.length, 1);
-  assert.equal(d.updated, '2026-11-04');
+  assert.equal(d.updated, '2026-11-23');
 });
 
 test('coverage suggests unscouted nations, multi-title first', () => {
   const c = coverage().find((x) => x.title === 'Dota 2');
-  assert.equal(c.field, 11); assert.equal(c.noted, 2);
+  assert.equal(c.field, 11); assert.equal(c.noted, 3);
   assert.equal(c.next[0], 'Egypt'); assert.ok(!c.next.includes('Mongolia'));
 });
 
@@ -52,7 +52,8 @@ test('scout next: an unscouted main threat comes before multi-title nations; old
   const { coverage } = await import('../src/core/competitors.js');
   const c = coverage({ tiers: { 'Dota 2|New Zealand': { tier: 'main threat', by: 'Aufa', why: 'x' } } }, '2026-11-07').find((x) => x.title === 'Dota 2');
   assert.equal(c.next[0], 'New Zealand'); assert.equal(c.next[1], 'Egypt');
-  // By 1 Dec the 3 Nov notes on Greece and Mongolia are stale.
+  // By 1 Dec the 3 Nov note on Greece is stale; Mongolia and Kazakhstan have 23 Nov notes (stale by mid-December).
   const late = coverage({}, '2026-12-01').find((x) => x.title === 'Dota 2');
-  assert.deepEqual(late.stale.sort(), ['Greece', 'Mongolia']);
+  assert.deepEqual(late.stale.sort(), ['Greece']);
+  assert.deepEqual(coverage({}, '2026-12-15').find((x) => x.title === 'Dota 2').stale.sort(), ['Greece', 'Kazakhstan', 'Mongolia']);
 });

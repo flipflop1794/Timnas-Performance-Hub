@@ -17,20 +17,20 @@ const data = JSON.parse(readFileSync(new URL('../data/wec/rival_rosters.json', i
 const R = seedRosters(data);
 
 test('21 Nov re-read: real changes flagged, unchanged teams marked checked, spelling fix and filled coach are not changes', () => {
-  const mgl = R['CS2|Mongolia']; const c = mgl.checks.at(-1);
+  const mgl = R['CS2|Mongolia']; const c = mgl.checks.find((x) => x.date === '2026-11-21');
   assert.equal(c.date, '2026-11-21'); assert.equal(c.result, 'changed');
   assert.deepEqual(c.added, ['Aapestt', 'AccuracyTG']); assert.deepEqual(c.removed, ['hoolig4n', 'RATE']);
-  assert.equal(R['CS2|Australia'].checks.at(-1).added[0], 'sliimey');
-  assert.equal(R['CS2 Women|Kyrgyzstan'].checks.at(-1).added[0], 'rumethis');
+  assert.equal(R['CS2|Australia'].checks.find((x) => x.date === '2026-11-21').added[0], 'sliimey');
+  assert.equal(R['CS2 Women|Kyrgyzstan'].checks.find((x) => x.date === '2026-11-21').added[0], 'rumethis');
   const mar = R['PUBG Mobile|Morocco']; assert.equal(mar.coach, 'md'); assert.ok(mar.players.some((p) => p.ign === 'lazyboy'));
   assert.equal(mar.players.find((p) => p.captain).ign, 'MARSHALL');
   // Not changes: France "Si" was a 3 Nov misread; Iraq's coach was simply not read on 3 Nov.
   assert.equal(R['CS2 Women|France'].checks.at(-1).result, 'no change'); assert.ok(R['CS2 Women|France'].players.some((p) => p.ign === 'SiA'));
   assert.equal(checkStatus(R['CS2|Iraq'], '2026-11-21').changed.length, 0); assert.equal(R['CS2|Iraq'].coach, 'TAHA AL DULAIMI');
-  // Everyone was checked on 21 Nov: no weekly check is due until 28 Nov.
+  // Everyone was checked again on 23 Nov (V1.44, no change): no weekly check is due until 30 Nov.
   const teams = Object.values(R);
-  assert.ok(teams.every((t) => !checkStatus(t, '2026-11-27').due));
-  assert.ok(teams.filter((t) => t.title !== 'eFootball').every((t) => t.checks.at(-1).date === '2026-11-21'));
+  assert.ok(teams.every((t) => !checkStatus(t, '2026-11-29').due));
+  assert.ok(teams.every((t) => t.checks.at(-1).date === '2026-11-23' && t.checks.at(-1).result === 'no change'));
 });
 
 test('eFootball: one player for each of the 96 rival nations, first read on 21 Nov', () => {

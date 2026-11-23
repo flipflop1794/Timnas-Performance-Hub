@@ -35,7 +35,7 @@ test('fieldForm lists the gaps; public results do not change scouting coverage',
   assert.deepEqual(w.without, ['Argentina']);
   assert.ok(w.events.length >= 2);
   const d = coverage().find((x) => x.title === 'Dota 2');
-  assert.equal(d.noted, 2, 'coverage still counts staff notes only');
+  assert.equal(d.noted, 3, 'coverage counts notes (Mongolia, Greece, Kazakhstan since 23 Nov), not public results');
 });
 
 test('page: competitors tab — last change, roster-changed flag, sort by latest change, public result to note, Today panel', async () => {
@@ -49,7 +49,7 @@ test('page: competitors tab — last change, roster-changed flag, sort by latest
   d.querySelector('[data-comp-sort="recent"]').click(); await wait();
   assert.equal(d.querySelector('[data-comp-sort="recent"]').getAttribute('aria-pressed'), 'true');
   const first = d.querySelector('#main table.comp-t tbody tr td b').textContent;
-  assert.ok(['Myanmar', 'Türkiye', 'Cambodia'].includes(first), `latest change first, got ${first}`);
+  assert.ok(['Malaysia', 'Myanmar', 'Türkiye', 'Cambodia'].includes(first), `latest change first, got ${first}`);   // Malaysia: 21 Nov note
   const btn = [...d.querySelectorAll('[data-form-note]')].find((b) => JSON.parse(b.dataset.formNote).nation === 'Türkiye');
   btn.click(); await wait();
   assert.equal(d.getElementById('rvN-MLBB').value, 'Türkiye'); assert.match(d.getElementById('rvT-MLBB').value, /WEC25/); assert.ok(d.getElementById('rvD-MLBB').open);
