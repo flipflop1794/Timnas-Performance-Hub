@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="id">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>Hubungkan jam / band — Timnas Esports</title>
+<style>
+  :root{--bg:#0A0A0E;--surface:#121218;--line:#24242E;--ink:#F5F5F7;--ink-3:#8E8E9A;--merah:#E41824;--good:#34D399;--bad:#FF6B8B}
+  @media (prefers-color-scheme: light){:root{--bg:#F4F4F6;--surface:#FFFFFF;--line:#E2E2E8;--ink:#111116;--ink-3:#6A6A78;--merah:#C8102E;--good:#0F8A5A;--bad:#B4234A}}
+  *{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.55 "Segoe UI",system-ui,-apple-system,sans-serif}
+  main{max-width:560px;margin:0 auto;padding:28px 16px 48px}
+  .card{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:20px;margin-top:16px}
+  h1{font-size:22px;margin:0 0 4px}.sub{color:var(--ink-3);margin:0}
+  ul{padding-left:20px;margin:8px 0}li{margin:4px 0}
+  .btn{display:block;text-align:center;background:var(--merah);color:#fff;text-decoration:none;font-weight:700;padding:14px;border-radius:10px;margin-top:16px}
+  .btn[aria-disabled="true"]{opacity:.45;pointer-events:none}
+  label{display:flex;gap:10px;align-items:flex-start;margin-top:14px}input{width:20px;height:20px;margin-top:2px}
+  .en{color:var(--ink-3);font-size:14px}.ok{color:var(--good);font-weight:700}.err{color:var(--bad);font-weight:700}[hidden]{display:none}
+</style>
+</head>
+<body>
+<main>
+  <h1>Timnas Esports Indonesia</h1>
+  <p class="sub">Readiness monitoring — Coach Donny Ardy Kusuma</p>
+
+  <div class="card" id="ask" hidden>
+    <h2 id="title">Hubungkan</h2>
+    <p>Data dari jam / band Anda akan dikirim otomatis ke sistem kesiapan atlet Timnas:</p>
+    <ul>
+      <li>tidur, detak jantung (istirahat, rata-rata, maksimal), HRV</li>
+      <li>langkah, menit intensitas, kalori, stres, SpO2, napas, Body Battery / recovery</li>
+    </ul>
+    <p>Hanya <b>Coach Donny</b> dan admin yang bisa membaca data ini. Password Anda <b>tidak</b> pernah masuk ke sistem kami: Anda masuk di halaman resmi WHOOP / Garmin. Anda bisa memutus koneksi kapan saja di aplikasi WHOOP / Garmin Connect, atau minta ke Coach Donny.</p>
+    <p class="en">Your watch / band data (sleep, heart rate, HRV, steps, activity, stress, SpO2, breathing, recovery) is sent to the national team's readiness system. Only Coach Donny and admins can read it. Your password never reaches us: you log in on WHOOP's or Garmin's own page. You can disconnect at any time.</p>
+    <label><input type="checkbox" id="agree"> <span>Saya setuju data di atas dikirim untuk pemantauan kesiapan saya. <span class="en">I agree.</span></span></label>
+    <a class="btn" id="go" aria-disabled="true" href="#">Lanjut ke halaman login</a>
+  </div>
+
+  <div class="card" id="msg" hidden><p id="msgText"></p></div>
+</main>
+<script src="/connect-config.js"></script>
+<script src="/connect.js"></script>
+</body>
+</html>

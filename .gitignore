@@ -15,3 +15,4 @@ data/eval/*/*.png
 data/eval/*/*.jpg
 data/eval/*/*.jpeg
 data/eval/*/*.webp
+tests/.tmp-wear/

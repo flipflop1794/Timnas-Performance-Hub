@@ -265,11 +265,38 @@ export function createHubDb(client: SupabaseClient, opts: HubDbOptions) {
     if (error) throw friendlyError(error, 'read');
     return (data as Doc) || null;
   }
+  // Test branch (wearables): WHOOP / Garmin links for Coach Donny's readiness system (Coach Donny and admins only).
+  const missing = (e: { code?: string; message?: string }) => /PGRST205|42P01|does not exist|Could not find the table/i.test(`${e.code || ''} ${e.message || ''}`);
+  const wearables = {
+    async invite(x: { athleteId: string; athleteName: string; provider: 'whoop' | 'garmin' }): Promise<string> {
+      const b = new Uint8Array(24); globalThis.crypto.getRandomValues(b);
+      const token = btoa(String.fromCharCode(...b)).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+      const { error } = await client.from('wearable_invites').insert({ token, athlete_id: x.athleteId, athlete_name: x.athleteName.slice(0, 120), provider: x.provider });
+      if (error) throw friendlyError(error);
+      return token;
+    },
+    async links(): Promise<Doc[]> {
+      const { data, error } = await client.from('wearable_links').select('*');
+      if (error) { if (missing(error)) return []; throw friendlyError(error, 'read'); }
+      return (data || []) as Doc[];
+    },
+    async daily(sinceDay: string): Promise<Doc[]> {
+      const { data, error } = await client.from('wearable_daily').select('athlete_id, provider, day, data, extra, updated_at').gte('day', sinceDay).order('day', { ascending: true });
+      if (error) { if (missing(error)) return []; throw friendlyError(error, 'read'); }
+      return (data || []) as Doc[];
+    },
+    async call(path: 'sync' | 'disconnect', body: Doc = {}): Promise<Doc> {
+      const { data, error } = await client.functions.invoke(`wearables/${path}`, { body });
+      if (error) throw new Error(`The wearables server did not answer (${error.message}). Is it deployed on this test branch?`);
+      return (data || {}) as Doc;
+    },
+  };
   return {
     collection,
     approve,
     supportSummary,
     history,
+    wearables,
     doc(path: string) { const [c, id] = path.split('/'); if (c !== 'config' || !id) throw new Error(`Unsupported document path: ${path}`); return configDoc(id); },
   };
 }

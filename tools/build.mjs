@@ -79,5 +79,7 @@ if (mode) {
   writeFileSync(new URL('index.html', outDir), page);
   // Home-screen install: manifest and icons (public/).
   if (!test) cpSync(new URL('../public/', import.meta.url), outDir, { recursive: true });
+  // Test branch (wearables): the athlete's connect page (public/connect.html) needs the server function's address.
+  writeFileSync(new URL('connect-config.js', outDir), `window.HUB_WEARABLES = ${JSON.stringify(`${url}/functions/v1/wearables`)};\n`);
   console.log(`${test ? 'dist-web-test' : 'dist-web'}/index.html (${(code.length / 1024).toFixed(0)} KB script)`);
 }

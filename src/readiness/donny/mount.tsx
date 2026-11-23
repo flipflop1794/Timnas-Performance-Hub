@@ -12,6 +12,7 @@ import { HalamanAtlet, MENU_ATLET } from '../../../vendor/donny-monitoring/web/s
 import { type AppCtx, AppContext, fmtTanggal, Ikon, labelOtoritas, labelPeran } from '../../../vendor/donny-monitoring/web/src/ui.js';
 import donnyCss from '../../../vendor/donny-monitoring/web/src/styles.css';
 import { createDonnyStore, fromRows, toRows, type HubDb } from './store.js';
+import { WearablePanel, type Wearables } from './wearables.js';
 
 // Hub staff keys whose user id in his team list differs from the first name.
 export const HUB_TO_DONNY: Record<string, string> = { aufa: 'aufa', donny: 'donny', fayad: 'muslih' };
@@ -45,7 +46,7 @@ const IKON: Record<string, string> = { papan: 'papan', sesi: 'sesi', kotak_masuk
 type Halaman = { peran: 'staf'; h: Parameters<typeof HalamanStaf>[0]['halaman'] } | { peran: 'manajer'; h: Parameters<typeof HalamanManajer>[0]['halaman'] } | { peran: 'atlet'; h: Parameters<typeof HalamanAtlet>[0]['halaman'] };
 const awal = (a: Actor): Halaman => (a.peran === 'manajer_tim' ? { peran: 'manajer', h: 'atlet' } : { peran: 'staf', h: { id: 'papan' } });
 
-function Shell({ store, person, demo, saved }: { store: Store; person: HubPerson; demo: boolean; saved: boolean }) {
+function Shell({ store, person, demo, saved, wear }: { store: Store; person: HubPerson; demo: boolean; saved: boolean; wear?: Wearables }) {
   const [versi, setVersi] = useState(0);
   useEffect(() => { const f = () => setVersi((v) => v + 1); (store as unknown as { _redraw?: () => void })._redraw = f; return () => { (store as unknown as { _redraw?: () => void })._redraw = undefined; }; }, [store]);
   const staff = useMemo(() => staffActors(store), [store, versi]);
@@ -129,6 +130,9 @@ function Shell({ store, person, demo, saved }: { store: Store; person: HubPerson
             <div className="siapa"><div><b>{ctx.nama(actor.userId)}</b><div className="kecil">{labelPeran(actor)}{otoritas && <span className={`lencana-otoritas ${actor.peran === 'manajer_tim' ? 'super' : ''}`}>{otoritas}</span>}</div></div></div>
           </header>
           <main className="konten" key={actor.userId}>
+            {/* Test branch (wearables): real WHOOP / Garmin connections, above his Integrasi page (staff with control only). */}
+            {page.peran === 'staf' && (page.h as { id: string }).id === 'integrasi' && wear && ctx.kontrol && !demo &&
+              <WearablePanel wear={wear} svc={store.svc as never} storage={store.storage} onImported={() => { void store.persist(); setVersi((v) => v + 1); }} />}
             {page.peran === 'staf' && <HalamanStaf halaman={page.h as never} pindah={(h) => setHalaman({ peran: 'staf', h } as Halaman)} />}
             {page.peran === 'manajer' && <HalamanManajer halaman={page.h as never} />}
             {page.peran === 'atlet' && <HalamanAtlet halaman={page.h as never} pindah={(h) => setHalaman({ peran: 'atlet', h } as Halaman)} />}
@@ -143,6 +147,8 @@ function Shell({ store, person, demo, saved }: { store: Store; person: HubPerson
 const SCOPED = String(donnyCss).replace(/:root\b/g, ':host').replace(/(^|\})\s*(html|body)\s*\{/g, '$1 .shadow-body {');
 const HUB_FIT = `.shadow-body{display:block;font-family:"Plus Jakarta Sans",system-ui,sans-serif}.hub-embedded{min-height:640px;height:auto}.hub-embedded .side{position:sticky;top:0;align-self:flex-start;max-height:100vh;overflow:auto}
 .hub-for{margin-top:12px}.hub-entry{background:#ffc940;color:#2b1d00}.hub-note{padding:18px;border:1px solid #6b3a40;background:#2a0d11;color:#fff;border-radius:6px;font:14px/1.5 system-ui,sans-serif}
+.hub-wear{margin-bottom:18px;border:2px solid #ffc940}.hub-wear table{width:100%;border-collapse:collapse}.hub-wear td,.hub-wear th{text-align:left;padding:8px 6px;border-bottom:1px solid rgba(128,128,128,.25);vertical-align:top}
+.hub-wear-bar{display:flex;gap:8px;flex-wrap:wrap;margin:8px 0}.hub-url{display:block;width:100%;margin-top:6px;font-size:12px}.hub-ok{color:#0F8A5A}.hub-msg{margin:6px 0}
 @media (max-width:760px){.hub-embedded{display:block}.hub-embedded .side{position:static;max-height:none}}`;
 
 export type Mounted = { node: HTMLElement; store: Store; root: Root; unmount(): void };
@@ -171,6 +177,6 @@ export function mountDonny({ db, sid, person, demo, onError }: { db: HubDb | nul
   if (demo) seedStructure(store!, true);
   else if (!db) seedStructure(store!);
   const root = createRoot(body);
-  root.render(<Shell store={store!} person={person} demo={demo} saved={!demo && !!db} />);
+  root.render(<Shell store={store!} person={person} demo={demo} saved={!demo && !!db} wear={(db as { wearables?: Wearables } | null)?.wearables} />);
   return { node, store: store!, root, unmount: () => root.unmount() };
 }
