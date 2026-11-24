@@ -12,6 +12,9 @@ const PARTS = {
   lowerback: { en: 'Lower back', ind: 'Punggung bawah', view: 'back', dx: 0, y: 205, extra: true },
   gluteal: { en: 'Gluteal', ind: 'Gluteal (bokong)', view: 'back', dx: 20, y: 238 },
   trochanter: { en: 'Greater trochanter', ind: 'Trokanter mayor (pinggul samping)', view: 'back', dx: 40, y: 262 },
+  // V1.52 the physios' ask (support team, 24 Nov): the back of the thigh and the calf, left and right.
+  hamstring: { en: 'Hamstring', ind: 'Hamstring (paha belakang)', view: 'back', dx: 27, y: 306 },
+  calf: { en: 'Calf', ind: 'Betis', view: 'back', dx: 25, y: 382 },
   eyes: { en: 'Eyes', ind: 'Mata', view: 'front', dx: 0, y: 36, extra: true },
   cervical: { en: 'Low cervical', ind: 'Leher bawah (servikal)', view: 'front', dx: 8, y: 76 },
   rib2: { en: 'Second rib', ind: 'Iga kedua', view: 'front', dx: 24, y: 100 },
