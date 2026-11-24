@@ -206,7 +206,7 @@ function whoopApi(client: SupabaseClient) {
 // coachAi: the V1.20 tables exist; coachAiFn: the deployed scrim-ai function has the V1.20 actions.
 // readAi (V1.30): the deployed scrim-ai function reads eFootball and CS2 screenshots (match_result).
 // practiceAi (V1.26): the deployed scrim-ai function has the weekly / meta_extract / meta_fit actions.
-export type Features = { capture: boolean; draftRoom: boolean; donny: boolean; pelatnas: boolean; ai: boolean; aiPlan: boolean; coachAi: boolean; coachAiFn: boolean; practiceAi: boolean; brainAi: boolean; readAi: boolean; support: boolean; supportAi: boolean };
+export type Features = { capture: boolean; draftRoom: boolean; donny: boolean; pelatnas: boolean; ai: boolean; aiPlan: boolean; coachAi: boolean; coachAiFn: boolean; practiceAi: boolean; brainAi: boolean; readAi: boolean; support: boolean; supportAi: boolean; recapAi: boolean };   // recapAi (V1.52): the deployed function has recap / after
 export async function probeFeatures(client: SupabaseClient): Promise<Features> {
   const has = async (table: string) => {
     try {
@@ -215,10 +215,10 @@ export async function probeFeatures(client: SupabaseClient): Promise<Features> {
     } catch { return false; }
   };
   const ai = async () => {
-    try { const { data, error } = await client.functions.invoke('scrim-ai', { body: { action: 'ping' } }); const d = (data || {}) as { ai?: boolean; actions?: string[] }; return { on: !error && !!d.ai, plan: !error && !!d.ai && (d.actions || []).includes('plan'), coach: !error && !!d.ai && (d.actions || []).includes('prep'), practice: !error && !!d.ai && (d.actions || []).includes('meta_fit'), brain: !error && !!d.ai && (d.actions || []).includes('brainstorm'), read: !error && !!d.ai && (d.actions || []).includes('match_result'), sup: !error && !!d.ai && (d.actions || []).includes('support_parse') }; } catch { return { on: false, plan: false, coach: false, practice: false, brain: false, read: false, sup: false }; }
+    try { const { data, error } = await client.functions.invoke('scrim-ai', { body: { action: 'ping' } }); const d = (data || {}) as { ai?: boolean; actions?: string[] }; return { on: !error && !!d.ai, plan: !error && !!d.ai && (d.actions || []).includes('plan'), coach: !error && !!d.ai && (d.actions || []).includes('prep'), practice: !error && !!d.ai && (d.actions || []).includes('meta_fit'), brain: !error && !!d.ai && (d.actions || []).includes('brainstorm'), read: !error && !!d.ai && (d.actions || []).includes('match_result'), sup: !error && !!d.ai && (d.actions || []).includes('support_parse'), recap: !error && !!d.ai && (d.actions || []).includes('after') }; } catch { return { on: false, plan: false, coach: false, practice: false, brain: false, read: false, sup: false, recap: false }; }
   };
   const [capture, draftRoom, donny, pelatnas, coachAi, aiOn, support] = await Promise.all([has('scrim_games'), has('draft_books'), has('readiness_store'), has('pelatnas_availability'), has('prep_packs'), ai(), has('support_reports')]);
-  return { capture, draftRoom, donny, pelatnas, ai: aiOn.on, aiPlan: aiOn.plan, coachAi, coachAiFn: aiOn.coach, practiceAi: aiOn.practice, brainAi: aiOn.brain, readAi: aiOn.read, support, supportAi: aiOn.sup };
+  return { capture, draftRoom, donny, pelatnas, ai: aiOn.on, aiPlan: aiOn.plan, coachAi, coachAiFn: aiOn.coach, practiceAi: aiOn.practice, brainAi: aiOn.brain, readAi: aiOn.read, support, supportAi: aiOn.sup, recapAi: aiOn.recap };
 }
 
 async function start(client: SupabaseClient, userId: string) {

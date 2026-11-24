@@ -7,6 +7,7 @@ import { allowedNumbers, checkLine } from '../core/ai_check.js';
 import { tagsOf, tagRecord, untagged, weaknessCounts, cleanTags, FLAG_AT } from '../core/weakness.js';
 import { proposeBr, brRows, MAPS } from '../pubgm/screenshot.js';
 import { shiftDay } from '../core/dates.js';
+import { afterMaterial, afterFromAi, canAfter, decideNote, sessionBrief, briefText } from '../core/recap.js';
 
 const COLL = { briefs: 'leadership_briefs', packs: 'prep_packs', wtags: 'weakness_tags' };
 
@@ -97,14 +98,51 @@ export function coachAiUi(ctx) {
       return `<li><span class="note">${esc(r.date)} · vs ${esc(r.partner)}${t ? ` · ${esc(t.source === 'ai' ? 'AI' : t.by)}` : ''}</span><br>${esc(r.failed || '—')}
         <div class="chips">${tagsOf(title).map((x) => `<button type="button" class="chip${have.includes(x) ? ' planned' : ''}" aria-pressed="${have.includes(x)}" ${writes(title) ? '' : 'disabled'} data-co-wt="${esc(`${r.id}|${x}`)}">${esc(x)}</button>`).join('')}</div></li>`; }).join('')}</ul>` : '<p class="empty">No reports in the last 14 days.</p>'}</div>`;
   }
-  // After a report is saved: label it in the background (one small AI call). Silent on failure.
+  // V1.52 after a report is saved: ONE call returns its weakness labels and three lines for the coach (what
+  // repeated, one focus, one question). The lines sit on the saved report until the coach taps Use or Ignore.
+  // Without the new server function, the V1.20 labels-only call below still runs. Silent on failure.
+  const afterOn = () => !!ai() && !!ctx.afterOn?.();
+  const rowFor = (reportId) => S.wtags.find((t) => t.reportId === reportId);
   async function autoTag(report) {
+    if (afterOn() && canAfter(report)) {
+      try {
+        const material = afterMaterial(report, S.reports, S.wtags, today());
+        const out = await ai().call({ action: 'after', title: report.title, material });
+        const { tags, note } = afterFromAi(out.raw, material, report.title, { model: out.model || '' });
+        await put('wtags', { ...tagRecord(report, tags, { by: 'AI', source: 'ai' }), ...(note ? { after: note } : {}) });
+        render();
+      } catch { /* labels can be added on the Weaknesses tab */ }
+      return;
+    }
     if (!ai() || !String(report.failed || '').trim() || !tagsOf(report.title).length) return;
     try {
       const out = await ai().call({ action: 'tags', title: report.title, reports: [{ id: report.id, failed: report.failed, adjust: report.adjust }] });
       const got = (out.raw?.reports || []).find((x) => x.id === report.id);
       if (got) await put('wtags', tagRecord(report, got.tags, { by: 'AI', source: 'ai' }));
     } catch { /* labels can be added on the Weaknesses tab */ }
+  }
+
+  // The note under a saved report. Ignored notes disappear; a used one stays as one line.
+  function afterNote(r) {
+    const t = rowFor(r.id); const n = t?.after; if (!live() || !n || n.status === 'ignored') return '';
+    const src = n.basedOn.filter((x) => x !== r.id).map((x) => S.reports.find((y) => y.id === x)).filter(Boolean);
+    if (n.status === 'used') return `<p class="note aftn">${tag('c-Verified', 'next-session focus')} <span data-no-tr>${esc(n.focus)}</span>${n.question ? ` · <span data-no-tr>${esc(n.question)}</span>` : ''}</p>`;
+    return `<div class="aftn"><div class="h3">For the next session <span class="note">AI, from your reports only</span></div>
+      <ul class="plain">${n.repeats ? `<li><b>Repeats:</b> <span data-no-tr>${esc(n.repeats)}</span>${src.length ? ` <span class="note">(${src.map((y) => `${esc(y.date)} vs <span data-no-tr>${esc(y.partner)}</span>`).join(', ')})</span>` : ''}</li>` : ''}
+        <li><b>Focus:</b> <span data-no-tr>${esc(n.focus)}</span></li>${n.question ? `<li><b>Ask the players:</b> <span data-no-tr>${esc(n.question)}</span></li>` : ''}</ul>
+      ${writes(r.title) ? `<div class="toolbar"><button class="btn primary" type="button" data-co-aft="${esc(`${r.id}|used`)}">Use as next focus</button><button class="btn" type="button" data-co-aft="${esc(`${r.id}|ignored`)}">Ignore</button><span class="msg" id="aftMsg-${esc(sid(r.id))}" role="status"></span></div>` : ''}</div>`;
+  }
+  // "Before today's session": lines from what is already recorded (no AI call). Replaces "Start the next session from here".
+  function briefCard(title) {
+    if (!live()) return '';
+    const b = sessionBrief(title, { reports: S.reports, tagRows: S.wtags, scrims: S.scrims }, today()); if (!b) return '';
+    return `<div class="panel"><h2>Before today's session — ${esc(title)}</h2>
+      <ul class="plain">${b.session ? `<li><b>Session:</b> ${esc([b.session.time, b.session.partner ? `vs ${b.session.partner}` : b.session.kind].filter(Boolean).join(' '))}</li>` : ''}
+        <li><b>Change from the last session:</b> <span data-no-tr>${esc(b.change.text)}</span> <span class="note">(${esc(b.change.date)}, vs <span data-no-tr>${esc(b.change.partner)}</span>)</span></li>
+        ${b.focus ? `<li><b>Focus:</b> <span data-no-tr>${esc(b.focus.text)}</span></li>` : ''}
+        ${b.repeats ? `<li><b>Keeps coming back:</b> ${esc(b.repeats.tag)} <span class="note">(${b.repeats.n} reports in 14 days)</span></li>` : ''}
+        ${b.question ? `<li><b>Ask the players:</b> <span data-no-tr>${esc(b.question)}</span></li>` : ''}</ul>
+      <div class="toolbar"><button class="btn" type="button" data-co-brief-wa="${esc(title)}">Copy for WhatsApp</button><span class="msg" id="sbMsg-${esc(sid(title))}" role="status"></span></div></div>`;
   }
 
   // ---------------------------------------------------------------- PUBG Mobile results from screenshots
@@ -189,7 +227,18 @@ export function coachAiUi(ctx) {
         const [rid, tg] = ds.coWt.split('|'); const r = S.reports.find((x) => x.id === rid); if (!r) return true;
         const cur = S.wtags.find((x) => x.reportId === rid)?.tags || [];
         const next = cur.includes(tg) ? cur.filter((x) => x !== tg) : cleanTags(r.title, [...cur, tg]);
-        await put('wtags', tagRecord(r, next, { by: HUB_USER?.name || meName(), source: 'coach' })); render(); return true;
+        const had = rowFor(rid);
+        await put('wtags', { ...tagRecord(r, next, { by: HUB_USER?.name || meName(), source: 'coach' }), ...(had?.after ? { after: had.after } : {}) }); render(); return true;
+      }
+      if (ds.coAft) {
+        const [rid, status] = ds.coAft.split('|'); const t = rowFor(rid); if (!t) return true;
+        await put('wtags', decideNote(t, status, HUB_USER?.name || meName())); render(); return true;
+      }
+      if (ds.coBriefWa) {
+        const b = sessionBrief(ds.coBriefWa, { reports: S.reports, tagRows: S.wtags, scrims: S.scrims }, today()); if (!b) return true;
+        const id = `sbMsg-${sid(ds.coBriefWa)}`;
+        try { await navigator.clipboard.writeText(briefText(b, S.lang)); setMsg(id, 'Copied: paste it in the WhatsApp group.', 'ok'); } catch { setMsg(id, 'Copy did not work on this device.', 'err'); }
+        return true;
       }
       if (ds.coWeakPropose) {
         const [title, tg] = ds.coWeakPropose.split('|'); const w = weaknessCounts(S.wtags, title, today(), 14).find((x) => x.tag === tg);
@@ -213,5 +262,5 @@ export function coachAiUi(ctx) {
     try { setMsg('brMsg', `Reading ${files.length} screenshot(s)…`); await readBr(files); render(); } catch (err) { setMsg('brMsg', err.message, 'err'); }
     return true;
   }
-  return { subscribe, briefPanel, prepPage, weaknessPage, brSection, autoTag, onClick, onChange };
+  return { subscribe, briefPanel, prepPage, weaknessPage, brSection, autoTag, afterNote, briefCard, onClick, onChange };
 }
