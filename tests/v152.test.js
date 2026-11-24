@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { checkRecap, afterMaterial, afterFromAi, canAfter, decideNote, usedFocus, sessionBrief, briefText } from '../src/core/recap.js';
+import { sameLine, checkRecap, afterMaterial, afterFromAi, canAfter, decideNote, usedFocus, sessionBrief, briefText } from '../src/core/recap.js';
 import { scrimReport, REPORT_TITLES } from '../src/core/reports.js';
 import { tagRecord } from '../src/core/weakness.js';
 import { handle } from '../supabase/functions/_shared/scrim_ai_handler.js';
@@ -24,7 +24,7 @@ test('V1.52 recap: scores must be written in the recap; partner too; rows come o
     rows: [{ map: 'de_mirage', us: 13, them: 9, ct: 8 }, { map: 'Inferno', us: 10, them: 13, ct: -1 }, { map: 'Nuke', us: 16, them: 14, ct: -1 }] }, { today: '2026-11-24' });
   assert.deepEqual(out.rows, [{ map: 'Mirage', us: '13', them: '9', ct: '8' }, { map: 'Inferno', us: '10', them: '13', ct: '' }]);
   assert.equal(out.fields.partner, 'Team Alpha'); assert.equal(out.fields.date, '2026-11-20'); assert.equal(out.fields.adjust, 'default T side Inferno.');
-  assert.match(out.flags.find((f) => f.field === 'rows').text, /1 result line\(s\) left out/, 'a map with scores that are not in the text is dropped');
+  assert.match(out.flags.find((f) => f.field === 'rows').text, /1 result line was left out/, 'a map with scores that are not in the text is dropped');
   // A partner the coach did not write, and a date in the future, are not filled.
   const bad = checkRecap('CS2', cs, { ...blank, date: '2026-12-30', partner: 'Team Beta', rows: [] }, { today: '2026-11-24' });
   assert.equal(bad.fields.partner, undefined); assert.equal(bad.fields.date, undefined); assert.match(bad.flags[0].text, /not written in your recap/);
@@ -90,4 +90,12 @@ test('V1.52 scrim-ai: recap and after are title actions, validated and logged', 
   assert.equal(ok.status, 200);
   const sent = JSON.parse(calls.at(-1).messages[0].content[0].text); assert.equal(sent.EARLIER.length, 5); assert.equal(sent.REPORT.adjustment, 'default T'); assert.deepEqual(sent.WEAKNESSES, [{ label: 'utility', reports_14_days: 3 }]);
   assert.ok(afterSchema('CS2').properties.tags.items.enum.length); assert.equal(inserts.at(-1).action, 'after');
+});
+
+test('V1.52 tidy-ups: a focus that repeats the coach\'s own change is shown once', () => {
+  assert.ok(sameLine('Latihan bertahan corner.', ' latihan  bertahan corner')); assert.ok(!sameLine('', '')); assert.ok(!sameLine('retake B', 'retake A'));
+  const rep = { id: 'R1', title: 'eFootball', date: '2026-11-24', partner: 'Team Z', adjust: 'latihan bertahan corner', createdAt: '2026-11-24T10:00:00Z' };
+  const row = (focus) => [{ id: 'WT-R1', title: 'eFootball', reportId: 'R1', date: '2026-11-24', tags: [], after: { status: 'used', focus, question: 'Siapa jaga tiang dekat?', repeats: '', basedOn: ['R1'] } }];
+  assert.equal(sessionBrief('eFootball', { reports: [rep], tagRows: row('Latihan bertahan corner.') }, '2026-11-24').focus, null, 'same sentence as the change: not repeated');
+  assert.equal(sessionBrief('eFootball', { reports: [rep], tagRows: row('Jaga tiang dekat.') }, '2026-11-24').focus.text, 'Jaga tiang dekat.');
 });

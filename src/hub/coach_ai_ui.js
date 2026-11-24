@@ -7,7 +7,7 @@ import { allowedNumbers, checkLine } from '../core/ai_check.js';
 import { tagsOf, tagRecord, untagged, weaknessCounts, cleanTags, FLAG_AT } from '../core/weakness.js';
 import { proposeBr, brRows, MAPS } from '../pubgm/screenshot.js';
 import { shiftDay } from '../core/dates.js';
-import { afterMaterial, afterFromAi, canAfter, decideNote, sessionBrief, briefText } from '../core/recap.js';
+import { afterMaterial, afterFromAi, canAfter, decideNote, sessionBrief, briefText, sameLine } from '../core/recap.js';
 
 const COLL = { briefs: 'leadership_briefs', packs: 'prep_packs', wtags: 'weakness_tags' };
 
@@ -111,6 +111,7 @@ export function coachAiUi(ctx) {
         const { tags, note } = afterFromAi(out.raw, material, report.title, { model: out.model || '' });
         await put('wtags', { ...tagRecord(report, tags, { by: 'AI', source: 'ai' }), ...(note ? { after: note } : {}) });
         render();
+        if (note) showTop(report.title);
       } catch { /* labels can be added on the Weaknesses tab */ }
       return;
     }
@@ -125,12 +126,30 @@ export function coachAiUi(ctx) {
   // The note under a saved report. Ignored notes disappear; a used one stays as one line.
   function afterNote(r) {
     const t = rowFor(r.id); const n = t?.after; if (!live() || !n || n.status === 'ignored') return '';
+    const same = sameLine(n.focus, r.adjust);   // the coach's own change is already on the report: not said twice
+    if (n.status !== 'used' && same && !n.repeats && !n.question) return '';
     const src = n.basedOn.filter((x) => x !== r.id).map((x) => S.reports.find((y) => y.id === x)).filter(Boolean);
     if (n.status === 'used') return `<p class="note aftn">${tag('c-Verified', 'next-session focus')} <span data-no-tr>${esc(n.focus)}</span>${n.question ? ` · <span data-no-tr>${esc(n.question)}</span>` : ''}</p>`;
     return `<div class="aftn"><div class="h3">For the next session <span class="note">AI, from your reports only</span></div>
       <ul class="plain">${n.repeats ? `<li><b>Repeats:</b> <span data-no-tr>${esc(n.repeats)}</span>${src.length ? ` <span class="note">(${src.map((y) => `${esc(y.date)} vs <span data-no-tr>${esc(y.partner)}</span>`).join(', ')})</span>` : ''}</li>` : ''}
-        <li><b>Focus:</b> <span data-no-tr>${esc(n.focus)}</span></li>${n.question ? `<li><b>Ask the players:</b> <span data-no-tr>${esc(n.question)}</span></li>` : ''}</ul>
+        ${same ? '' : `<li><b>Focus:</b> <span data-no-tr>${esc(n.focus)}</span></li>`}${n.question ? `<li><b>Ask the players:</b> <span data-no-tr>${esc(n.question)}</span></li>` : ''}</ul>
       ${writes(r.title) ? `<div class="toolbar"><button class="btn primary" type="button" data-co-aft="${esc(`${r.id}|used`)}">Use as next focus</button><button class="btn" type="button" data-co-aft="${esc(`${r.id}|ignored`)}">Ignore</button><span class="msg" id="aftMsg-${esc(sid(r.id))}" role="status"></span></div>` : ''}</div>`;
+  }
+  // The undecided note of the newest report, right above the form: where the coach is after saving.
+  const topId = (title) => `aftTop-${sid(title)}`;
+  function afterTop(title) {
+    if (!live() || !writes(title)) return '';
+    const r = S.reports.filter((x) => x.title === title).sort((a, b) => b.date.localeCompare(a.date) || String(b.createdAt).localeCompare(String(a.createdAt)))[0];
+    if (!r || rowFor(r.id)?.after?.status !== 'new') return '';
+    const body = afterNote(r); if (!body) return '';
+    return `<div class="panel" id="${esc(topId(title))}"><p class="note">From your report of ${esc(r.date)} vs <span data-no-tr>${esc(r.partner)}</span></p>${body}</div>`;
+  }
+  // The note arrives a few seconds after saving: bring it into view, unless the coach is already typing again.
+  function showTop(title, tries = 12) {
+    const el = document.getElementById(topId(title));
+    if (!el) { if (tries > 0) setTimeout(() => showTop(title, tries - 1), 250); return; }
+    if (/^(INPUT|TEXTAREA|SELECT)$/.test(document.activeElement?.tagName || '')) return;
+    el.scrollIntoView?.({ block: 'center', behavior: 'smooth' });
   }
   // "Before today's session": lines from what is already recorded (no AI call). Replaces "Start the next session from here".
   function briefCard(title) {
@@ -142,7 +161,7 @@ export function coachAiUi(ctx) {
         ${b.focus ? `<li><b>Focus:</b> <span data-no-tr>${esc(b.focus.text)}</span></li>` : ''}
         ${b.repeats ? `<li><b>Keeps coming back:</b> ${esc(b.repeats.tag)} <span class="note">(${b.repeats.n} reports in 14 days)</span></li>` : ''}
         ${b.question ? `<li><b>Ask the players:</b> <span data-no-tr>${esc(b.question)}</span></li>` : ''}</ul>
-      <div class="toolbar"><button class="btn" type="button" data-co-brief-wa="${esc(title)}">Copy for WhatsApp</button><span class="msg" id="sbMsg-${esc(sid(title))}" role="status"></span></div></div>`;
+      <div class="toolbar"><button class="btn" type="button" data-co-brief-wa="${esc(title)}">Copy this brief</button><span class="msg" id="sbMsg-${esc(sid(title))}" role="status"></span></div></div>`;
   }
 
   // ---------------------------------------------------------------- PUBG Mobile results from screenshots
@@ -262,5 +281,5 @@ export function coachAiUi(ctx) {
     try { setMsg('brMsg', `Reading ${files.length} screenshot(s)…`); await readBr(files); render(); } catch (err) { setMsg('brMsg', err.message, 'err'); }
     return true;
   }
-  return { subscribe, briefPanel, prepPage, weaknessPage, brSection, autoTag, afterNote, briefCard, onClick, onChange };
+  return { subscribe, briefPanel, prepPage, weaknessPage, brSection, autoTag, afterNote, afterTop, briefCard, onClick, onChange };
 }

@@ -63,6 +63,15 @@ So this version adds **no new tab and no new button to find**. The AI sits in th
   - on My day, for a coach or analyst with one or two titles
 - A focus chosen more than a week ago is not shown.
 
+## Tidy-ups after looking at it in a browser (24 Nov)
+- The note after saving also appears **right above the form**, and the page moves to it when it arrives (unless the
+  coach is already typing again). It was only at the bottom of the page, inside the saved report.
+- A focus that is the same sentence as the coach's own change is **shown once** (in the note and on the card).
+- Messages in plain words: "Filled 4 boxes and 2 result lines", "1 result line was left out"; no internal label.
+- The card's button is **"Copy this brief"** ("Copy for WhatsApp" already copies the saved report on the same page).
+- The text under the paste box is one line.
+- Built on top of V1.51 (Whoop); the header reads V1.52.
+
 ## Put it live (3 steps, in this order)
 1. **Database:** run `supabase/RUN_ON_LIVE_V1_52.sql`. It adds the two new call types to the AI usage log. No table
    is added and no data changes.

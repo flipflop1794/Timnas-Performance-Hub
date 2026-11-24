@@ -397,12 +397,13 @@ export function captureUi(ctx) {
   // V1.52: with the recap reader deployed, the same box takes the WhatsApp recap the coach already sends and fills
   // the whole report (date, partner, result rows, text fields). It sits at the top of the form.
   const recapOn = () => !!ai() && !!ctx.recapOn?.();
+  const plural = (n, one, many) => `${n} ${n === 1 ? one : many}`;
   function debriefSection(title, fid) {
     const on = !!ai();
     if (recapOn()) {
       const log = isScrimLog(title);
       return `<details class="capdump" open><summary>Paste your WhatsApp recap: the AI fills the report</summary>
-        <p class="note">Paste the recap you send to the group, or dictate it (Indonesian, English or mixed). The AI moves your own words and scores into the form${log ? '; the games themselves still come from the screenshots below' : ''}. A score that is not in your text is never filled in. Check, then save. Performance only: health or personal details are left out.</p>
+        <p class="note">${log ? 'Fills the text boxes with your own words; the games still come from the screenshots below.' : 'Fills the form with your own words and the scores you wrote.'} Check, then save.</p>
         <label class="field" for="rp-${fid}-dump">Your recap<textarea rows="5" id="rp-${fid}-dump" maxlength="${LIMITS.recapChars}" placeholder="${esc(RECAP_EXAMPLE[title] || '')}"></textarea></label>
         <div class="toolbar">${micOk() ? `<button class="btn" type="button" data-cap-mic="${esc(`${title}|id-ID`)}" aria-pressed="${MIC.fid === fid && MIC.lang === 'id-ID'}">${MIC.fid === fid && MIC.lang === 'id-ID' ? '■ Stop' : '🎙 Bicara (ID)'}</button>` : ''}<button class="btn primary" type="button" data-cap-debrief="${esc(title)}">Fill the report</button><span class="msg" id="capDbMsg-${fid}" role="status"></span></div>
         <div id="capDbOut-${fid}"></div></details>`;
@@ -652,9 +653,9 @@ export function captureUi(ctx) {
           if (fields.detail || fields.players) { const det = document.getElementById(`rp-${fid}-detail`)?.closest('details'); if (det) det.open = true; }
           const el = document.getElementById(`rp-${fid}-dump`); if (el) el.value = text;
           const n = Object.keys(fields).length + (isScrimLog(title) ? 0 : rows.length);
-          setMsg(`capDbMsg-${fid}`, n ? `Filled ${Object.keys(fields).length} field(s)${rows.length && !isScrimLog(title) ? ` and ${rows.length} result line(s)` : ''}. Check them, then save.` : 'Nothing could be filled from this text. Type the report below.', n ? 'ok' : 'err');
+          setMsg(`capDbMsg-${fid}`, n ? `Filled ${plural(Object.keys(fields).length, 'box', 'boxes')}${rows.length && !isScrimLog(title) ? ` and ${plural(rows.length, 'result line', 'result lines')}` : ''}. Check them, then save.` : 'Nothing could be filled from this text. Type the report below.', n ? 'ok' : 'err');
           const o2 = document.getElementById(`capDbOut-${fid}`);
-          if (o2) o2.innerHTML = flags.length || notPlaced ? banner('synth', `<div><ul class="plain">${flags.map((f) => `<li><b>${esc(f.field)}</b>: ${esc(f.text)}</li>`).join('')}${notPlaced ? `<li>Not placed in any field: ${esc(notPlaced)}</li>` : ''}</ul></div>`) : '';
+          if (o2) o2.innerHTML = flags.length || notPlaced ? banner('synth', `<div><ul class="plain">${flags.map((f) => `<li>${f.field === 'rows' || f.field === 'partner' ? '' : `<b>${esc(f.field)}</b>: `}${esc(f.text)}</li>`).join('')}${notPlaced ? `<li>Not placed in any field: ${esc(notPlaced)}</li>` : ''}</ul></div>`) : '';
           for (const f of flags) document.getElementById(`rp-${fid}-${f.field}`)?.setAttribute('aria-invalid', 'true');
         } catch (err) { setMsg(`capDbMsg-${fid}`, err.message, 'err'); }
         return true;

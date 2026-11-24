@@ -46,7 +46,7 @@ test('paste a recap → rows and text filled; save → one call for labels and n
   const B = world();
   B.answers.recap = { date: '', partner: 'Team Zeta', rows: [{ us: 2, them: 1, extra: '', pen_us: -1, pen_them: -1 }, { us: 0, them: 1, extra: '', pen_us: -1, pen_them: -1 }, { us: 5, them: 5, extra: '', pen_us: -1, pen_them: -1 }],
     focus: '', worked: '', failed: 'Kebobolan dari set piece lagi.', adjust: 'latihan bertahan corner.', player_notes: '', detail: 'Formasi 4-2-3-1.', not_placed: '' };
-  B.answers.after = { tags: [], repeats: 'Kebobolan dari set piece muncul lagi.', focus: 'Latihan bertahan corner.', question: 'Siapa yang menjaga tiang dekat saat corner?', based_on: ['R0'] };
+  B.answers.after = { tags: [], repeats: 'Kebobolan dari set piece muncul lagi.', focus: 'Jaga tiang dekat saat corner.', question: 'Siapa yang menjaga tiang dekat saat corner?', based_on: ['R0'] };
   const p = await open(B, 't-efootball-reports');
   assert.match(p.text(), /Paste your WhatsApp recap: the AI fills the report/); assert.match(p.text(), /Before today's session — eFootball/);
   assert.ok(p.d.querySelector('details.capdump').compareDocumentPosition(p.d.getElementById('rp-eFootball-partner')) & 4, 'the paste box comes before the partner field');
@@ -56,7 +56,7 @@ test('paste a recap → rows and text filled; save → one call for labels and n
   assert.equal(p.val('rp-eFootball-partner'), 'Team Zeta'); assert.equal(p.val('rp-eFootball-adjust'), 'latihan bertahan corner.'); assert.equal(p.val('rp-eFootball-failed'), 'Kebobolan dari set piece lagi.');
   assert.equal(p.val('rpr-eFootball-0-us'), '2'); assert.equal(p.val('rpr-eFootball-1-them'), '1'); assert.equal(p.d.getElementById('rpr-eFootball-2-us'), null, 'the 5-5 line is not in the recap: left out');
   assert.equal(p.val('rp-eFootball-won'), '1'); assert.equal(p.val('rp-eFootball-lost'), '1');
-  assert.match(p.d.getElementById('capDbMsg-eFootball').textContent, /and 2 result line\(s\)/); assert.match(p.text(), /1 result line\(s\) left out/);
+  assert.match(p.d.getElementById('capDbMsg-eFootball').textContent, /Filled 4 boxes and 2 result lines\./); assert.match(p.text(), /1 result line was left out/);
 
   await p.click('[data-report-save]');
   for (let i = 0; i < 40 && B.calls.length < 2; i++) await sleep(50);
@@ -70,7 +70,7 @@ test('paste a recap → rows and text filled; save → one call for labels and n
   assert.equal(B.tables.weakness_tags[0].data.after.status, 'used'); assert.equal(B.tables.weakness_tags[0].data.after.decidedBy, 'Coach Elga');
   assert.match(p.text(), /next-session focus/); assert.doesNotMatch(p.text(), /Use as next focus/);
   const card = [...p.d.querySelectorAll('.panel')].find((x) => /Before today's session/.test(x.textContent)).textContent;
-  assert.match(card, /Focus:\s*Latihan bertahan corner\./); assert.match(card, /Ask the players:/);
+  assert.match(card, /Focus:\s*Jaga tiang dekat saat corner\./); assert.match(card, /Ask the players:/);
   // My day shows the same card for a coach with one title.
   await p.go('today'); assert.match(p.text(), /Before today's session — eFootball/);
 });

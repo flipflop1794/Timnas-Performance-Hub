@@ -14,6 +14,9 @@ import { shiftDay } from './dates.js';
 
 const isDay = (s) => /^\d{4}-\d{2}-\d{2}$/.test(s || '') && !Number.isNaN(Date.parse(s));
 const lower = (s) => String(s || '').toLowerCase().replace(/\s+/g, ' ').trim();
+// Two lines that say the same thing (case, spaces and end punctuation aside) are shown once.
+export const sameLine = (a, b) => { const k = (s) => lower(s).replace(/[.!?;:,\s]+$/, ''); return !!k(a) && k(a) === k(b); };
+const cnt = (n, one, many) => `${n} ${n === 1 ? one : many}`;
 const known = (v) => Number.isInteger(v) && v >= 0;
 
 // ---------------------------------------------------------------- 1. recap → report form
@@ -43,7 +46,7 @@ export function checkRecap(title, source, raw, { roster = [], today } = {}) {
     if (!row) { dropped++; continue; }
     try { if (cleanRows(title, [row]).length) rows.push(row); else dropped++; } catch { dropped++; }
   }
-  if (dropped) flags.push({ field: 'rows', text: `${dropped} result line(s) left out: a score or placement was not written in your recap. Add them by hand.` });
+  if (dropped) flags.push({ field: 'rows', text: `${cnt(dropped, 'result line was', 'result lines were')} left out: a score or placement was not written in your recap. Add ${dropped === 1 ? 'it' : 'them'} by hand.` });
   return { fields, rows, flags, notPlaced };
 }
 
@@ -91,7 +94,7 @@ export function sessionBrief(title, { reports = [], tagRows = [], scrims = [] },
     title, asOf,
     session: planned ? { time: planned.time || '', partner: planned.partner || '', kind: planned.kind || 'scrim' } : null,
     change: { text: last.adjust, date: last.date, partner: last.partner },
-    focus: fresh ? { text: fresh.after.focus, date: fresh.date } : null,
+    focus: fresh && !sameLine(fresh.after.focus, last.adjust) ? { text: fresh.after.focus, date: fresh.date } : null,   // the same sentence as the change is shown once
     question: fresh?.after.question || '',
     repeats: top ? { tag: top.tag, n: top.n } : null,
     daysSince: Math.round((Date.parse(asOf) - Date.parse(last.date)) / 86400000),
