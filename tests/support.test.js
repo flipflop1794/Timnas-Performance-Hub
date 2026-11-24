@@ -107,7 +107,7 @@ test('support screen: tick a whole team, write once, add, save one report with a
   await fire('supGpOther', 'Jonathan (CS2)');
   d.querySelector('[data-sup-gadd]').click(); await wait();
   assert.equal(d.querySelectorAll('[id^="sR-"][id$="-did"]').length, 6, 'one row per athlete');
-  assert.match(d.getElementById('supMsg').textContent, /6 athlete\(s\) added from the group session/);
+  assert.match(d.getElementById('supMsg').textContent, /6 athletes added from the group session/);
   d.querySelector('[data-sup-save]').click(); await wait();
   const saved = [...store.entries()].filter(([k]) => k.startsWith('support_reports/')).map(([, v]) => v);
   assert.equal(saved.length, 1); assert.equal(saved[0].rows.length, 6);

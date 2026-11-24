@@ -71,7 +71,7 @@ test('Draft Room: hero pools, pro-game import kept apart, patterns and pool gaps
   await click(h, '[data-dr-section="pro"]');
   const rows = [1, 2, 3, 4, 5].map((i) => `2026-11-0${i},MPL ID S18,AE,BTR,blue,Fanny|Ling,Masha,Esmeralda|Zhuxin|Selena|Alice|Lancelot,Hayabusa|Layla|Tigreal|Valir|Akai,https://liquipedia.net/x`);
   set(h, 'drCsv', ['date,event,blue,red,winner,blue_bans,red_bans,blue_picks,red_picks,source', ...rows, '2026-11-09,MPL ID S18,AE,BTR,blue,Nobody,,,,'].join('\n'));
-  await click(h, '[data-dr-check]'); assert.match(h.text(), /1 row\(s\) left out/); assert.match(h.text(), /5 game\(s\) ready/);
+  await click(h, '[data-dr-check]'); assert.match(h.text(), /1 row left out/); assert.match(h.text(), /5 games ready/);
   await click(h, '[data-dr-import]'); assert.match(h.text(), /MPL ID S18: 5 games/);
   await click(h, '[data-dr-section="patterns"]');
   assert.match(h.text(), /Ours — national-team scrims/); assert.match(h.text(), /Public pro games/); assert.match(h.text(), /blue side won 100%/);

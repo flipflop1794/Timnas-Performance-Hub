@@ -6,7 +6,7 @@ import { DATA } from './data.gen.js';
 import { heroIndex, gameOf, proposeGame, proposeDraft, confirmGame, blankGame, gameToProposal, mergeGames, heroesFromDraft, heroChoices, heroMemory, playerHeroes, findDuplicate, STAT_DEFS, SIDE_LABEL, MAP_SIDES, durationText, parseDuration, formatDurationInput, latestGames, gamesResult, extractionAccuracy, learnAliases } from '../core/capture.js';
 import { checkDebriefInput, checkDebriefSplit } from '../core/debrief.js';
 import { checkRecap } from '../core/recap.js';
-import { translateDom } from './i18n.js';
+import { translateDom, pluralDom } from './i18n.js';
 // The boxes of the report form, as the coach reads them (a warning names the box it is about).
 const FLAG_LABEL = { focus: 'Focus', worked: 'What worked', failed: 'What failed', adjust: 'Change for next time', players: 'Player notes', notes: 'Player notes', detail: 'Detail' };
 // V1.52: what a recap looks like, per title (the placeholder of the paste box).
@@ -659,7 +659,7 @@ export function captureUi(ctx) {
           setMsg(`capDbMsg-${fid}`, n ? `Filled ${plural(Object.keys(fields).length, 'box', 'boxes')}${rows.length && !isScrimLog(title) ? ` and ${plural(rows.length, 'result line', 'result lines')}` : ''}. Check them, then save.` : 'Nothing could be filled from this text. Type the report below.', n ? 'ok' : 'err');
           const o2 = document.getElementById(`capDbOut-${fid}`);
           if (o2) o2.innerHTML = flags.length || notPlaced ? banner('synth', `<div><ul class="plain">${flags.map((f) => `<li>${f.field === 'rows' || f.field === 'partner' ? '' : `<b>${esc(FLAG_LABEL[f.field] || f.field)}:</b> `}${esc(f.text)}</li>`).join('')}${notPlaced ? `<li>Not placed in any field: ${notPlaced.startsWith('(a part about') ? esc(notPlaced) : `<span data-no-tr>${esc(notPlaced)}</span>`}</li>` : ''}</ul></div>`) : '';
-          if (o2 && S.lang === 'id') translateDom(o2, 'id');   // written after the page was translated
+          if (o2 && S.lang === 'id') translateDom(o2, 'id'); else pluralDom(o2);   // written after the page was translated
           for (const f of flags) document.getElementById(`rp-${fid}-${f.field}`)?.setAttribute('aria-invalid', 'true');
         } catch (err) { setMsg(`capDbMsg-${fid}`, err.message, 'err'); }
         return true;
@@ -676,7 +676,7 @@ export function captureUi(ctx) {
         if (fields.detail || fields.players) { const det = document.getElementById(`rp-${fid}-detail`)?.closest('details'); if (det) det.open = true; }
         setMsg(`capDbMsg-${fid}`, `Filled ${Object.keys(fields).length} field(s). Check them, then save.`, 'ok');
         if (out) out.innerHTML = flags.length || notPlaced ? banner('synth', `<div><ul class="plain">${flags.map((f) => `<li><b>${esc(FLAG_LABEL[f.field] || f.field)}:</b> ${esc(f.text)}</li>`).join('')}${notPlaced ? `<li>Not placed in any field: ${notPlaced.startsWith('(a part about') ? esc(notPlaced) : `<span data-no-tr>${esc(notPlaced)}</span>`}</li>` : ''}</ul></div>`) : '';
-        if (out && S.lang === 'id') translateDom(out, 'id');
+        if (out && S.lang === 'id') translateDom(out, 'id'); else pluralDom(out);
         for (const f of flags) document.getElementById(`rp-${fid}-${f.field}`)?.setAttribute('aria-invalid', 'true');
       } catch (err) { setMsg(`capDbMsg-${fid}`, err.message, 'err'); }
       return true;

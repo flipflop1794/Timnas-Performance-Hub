@@ -124,7 +124,7 @@ test('page: support staff weekly dashboard — the week grid, week picker, count
   h.d.querySelector('[data-sup-wkwa]').click(); await h.wait();
   assert.match(h.copied(), /Laporan: 1|Reports: 1/); assert.doesNotMatch(h.copied(), /Vivian|Tight calf|Dewi/);
   h.d.querySelector('[data-sup-week="-1"]').click(); await h.wait();
-  assert.match(h.text(), /Back to this week/); assert.match(h.text(), /No report this week\./); assert.doesNotMatch(h.text(), /Today: /, "today's block only in the current week");
+  assert.match(h.text(), /Back to this week/); assert.match(h.text(), /No report that week/); assert.doesNotMatch(h.text(), /Today: /, "today's block only in the current week");
 });
 
 test('Bahasa: the weekly dashboard heading, day names, role lines and download buttons', async () => {

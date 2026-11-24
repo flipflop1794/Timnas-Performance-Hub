@@ -69,7 +69,7 @@ import { mountDonny, staffActors, actorFor } from '../readiness/donny/mount.tsx'
 import { localSource } from '../readiness/donny/source.ts';
 import { SKOR_FORMULA_VERSION as DONNY_FORMULA } from '../../vendor/donny-monitoring/src/modules/skor.ts';
 import { readinessView } from '../readiness/view.js';
-import { translateDom, tr as trId } from './i18n.js';
+import { translateDom, tr as trId, plural, pluralDom } from './i18n.js';
 import { autoCard, cardPlan, approveCard, cardMarkdown, cardWhatsApp } from '../core/oppcard.js';
 import { draftPlan, lineText, draftPlanText, dataDepth, LOW as LOW_SAMPLE } from '../core/draft_plan.js';
 import { WORKSPACE_TITLES, fieldOf, fieldEdit, nationIn, starters, workspaceContext, shotMaterial } from '../core/workspace.js';
@@ -1129,7 +1129,7 @@ const rpLeftText = (m) => (m.length ? `${RP_NEEDED.length - m.length} of ${RP_NE
 function updateLeft(fid) {
   const el = document.getElementById(`rpLeft-${fid}`); if (!el) return;
   el.textContent = rpLeftText(rpMissing(fid, !!document.getElementById(`rp-${fid}-played`)));
-  if (S.lang === 'id') translateDom(el.parentElement, 'id');
+  if (S.lang === 'id') translateDom(el.parentElement, 'id'); else pluralDom(el.parentElement);
 }
 const chip = (fid, values, label, extra = '') => `<button type="button" class="chip${extra}" data-rp-fill="${esc(JSON.stringify({ fid, v: values }))}">${esc(label)}</button>`;
 // ---------- V1.30 eFootball and CS2: result screenshots read by the AI, checked by the coach (src/core/match_read.js) ----------
@@ -2661,6 +2661,7 @@ function render() {
     translateDom(document.querySelector('header.top'), 'id'); translateDom($('#main'), 'id');
     if (ORIGINAL_LANG_VIEWS.test(view)) $('#main').insertAdjacentHTML('afterbegin', '<p class="note lang-note">Catatan: temuan analisis otomatis, catatan staf, nama dan sumber data ditampilkan dalam bahasa aslinya (Inggris).</p>');
   }
+  if (S.lang !== 'id') pluralDom($('#main'));
   if (LEADERSHIP_ONLY && view !== 'overview') $('#main').insertAdjacentHTML('afterbegin', `<p class="note" data-readonly>Read-only view for leadership: forms here are for the coaching staff and will not save. <a href="#overview">Back to the Main dashboard</a></p>`);
   if (HUB_USER && !HUB_USER.seesAllTitles) {
     const vt = viewTitle(view);
@@ -2681,7 +2682,7 @@ function render() {
 }
 // Views that show engine findings or data notes, which stay in English.
 const ORIGINAL_LANG_VIEWS = /^(dota-team|dota-post|dota-scout|dota-draft|dota-review|pubgm-(team|log|rivals|sim|review)|comp-nation|comp-card|comp-rosters|staff-sources|staff-rules)/;
-const setMsg = (id, text, cls = '') => { const el = document.getElementById(id); if (el) { el.textContent = id === 'dailyMsg' ? dailyText(text, S.lang) : S.lang === 'id' ? (trId(text) ?? text) : text; el.className = `msg ${cls}`; } };
+const setMsg = (id, text, cls = '') => { const el = document.getElementById(id); if (el) { el.textContent = id === 'dailyMsg' ? dailyText(text, S.lang) : S.lang === 'id' ? (trId(text) ?? text) : plural(text); el.className = `msg ${cls}`; } };
 const val = (id) => document.getElementById(id)?.value ?? '';
 async function doImport(text, label) {
   const r = importMatch(text, { ourAccounts: accounts(), known: Object.keys(S.matches).map(Number) });

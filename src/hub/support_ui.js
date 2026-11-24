@@ -270,7 +270,7 @@ export function supportUi(ctx) {
         c.followUps || c.closed || p.open ? esc(T(`follow-ups: ${c.followUps} written, ${c.closed} closed, ${p.open} open`, `tindak lanjut: ${c.followUps} dibuat, ${c.closed} selesai, ${p.open} terbuka`)) : '',
         role ? esc(role) : '',
       ].filter(Boolean).join(' · ')
-        : esc(p.last ? T(`No report this week · last report ${dm(p.last)}`, `Belum ada laporan minggu ini · laporan terakhir ${dm(p.last)}`) : T('No report filed in the hub yet', 'Belum pernah mengisi laporan di hub'));
+        : esc(p.last ? T(`No report ${off === 0 ? 'this' : 'that'} week · last report ${dm(p.last)}`, `${off === 0 ? 'Belum ada laporan minggu ini' : 'Tidak ada laporan minggu itu'} · laporan terakhir ${dm(p.last)}`) : (off === 0 ? T('No report filed in the hub yet', 'Belum pernah mengisi laporan di hub') : T('No report that week', 'Tidak ada laporan minggu itu')));
       return `<li class="sw-pp"><div class="sw-pp-top"><span><button type="button" class="linkbtn" data-sup-who="${esc(p.name)}" aria-expanded="${open}"><b data-no-tr>${esc(p.name)}</b></button> <span class="note">${esc(JOBS[p.job]?.label || DISC_LABEL[p.disc] || '')}</span></span><span class="sw-p-right">${dots({ days: p.days, daysReported: c.days })}<span class="note">${c.days}/7</span></span></div>
         <div class="note sw-pp-line" data-no-tr>${line}</div>${open ? (c.reports ? dayList(p.name, w, false) : '') : ''}</li>`;
     };
@@ -291,7 +291,7 @@ export function supportUi(ctx) {
       ${Object.keys(cur.byTitle).length ? `<p class="note" data-no-tr>${esc(T('Per team', 'Per tim'))}: ${Object.entries(cur.byTitle).sort((a, b) => b[1] - a[1]).map(([t, n]) => `${esc(t)} ${n}`).join(' · ')}</p>` : ''}
       ${painCounts(U.reports, w.from, w.to).total ? `<details class="sw-more"><summary data-no-tr>${esc(T('Pain spots this week', 'Titik nyeri minggu ini'))}</summary>${painPanel(U.reports, w)}</details>` : ''}
       ${edits.length ? `<details class="sw-more"><summary data-no-tr>${esc(T(`Edited after saving (${edits.length})`, `Diedit setelah disimpan (${edits.length})`))}</summary><ul class="plain">${edits.slice(0, 15).map(({ h, r }) => `<li><button type="button" class="linkbtn" data-sup-hist="${esc(r.id)}">${esc(fmtAt(h.at))}</button> · <span data-no-tr>${esc(h.editor_name || '—')}</span> · ${esc(r.date)} (<span data-no-tr>${esc(r.by)}</span>)</li>`).join('')}</ul></details>` : ''}
-      ${cur.reports || board.length ? `<div class="toolbar"><button class="btn" type="button" data-sup-wkwa="all">${esc(T('Copy the week for WhatsApp', 'Salin rekap minggu untuk WA'))}</button><span class="msg" id="supWkMsg"></span></div>` : ''}</div>`;
+      ${cur.reports || board.length ? `<div class="toolbar"><button class="btn" type="button" data-sup-wkwa="all">${esc(T('Copy the week for WhatsApp', 'Salin rekap minggu untuk WA'))}</button>${board.length ? `<button class="btn" type="button" data-sup-boardwa="1">${esc(T('Copy the staff list (Head Coach team only)', 'Salin daftar staf (khusus tim Head Coach)'))}</button>` : ''}<span class="msg" id="supWkMsg"></span></div>` : ''}</div>`;
   }
   // Who is on the support staff: the support accounts (Users & access → Support staff job); without that list, whoever
   // filed in the last 14 days.
@@ -427,10 +427,17 @@ export function supportUi(ctx) {
     if (ds.supWkwa) {
       const list = ds.supWkwa === 'all' && readsAll() ? U.reports : U.reports.filter((r) => r.by === me());
       const w = calWeek(today(), Math.min(0, U.week || 0));
-      let text = weekText(summarize(anonymise(list, w.from, w.to)), summarize(anonymise(list, w.prevFrom, w.prevTo)), w, S.lang);
-      // V1.54: the readers of every report also get one line per staff member (names of staff, counts only).
-      if (ds.supWkwa === 'all' && readsAll()) text += `\n\n${boardText(teamBoard(staffList(), U.reports, w, Math.min(0, U.week || 0) === 0 ? today() : w.to), w, S.lang)}`;
+      // The group copy holds counts only: no athlete names and no staff names (it goes to the WhatsApp group).
+      const text = weekText(summarize(anonymise(list, w.from, w.to)), summarize(anonymise(list, w.prevFrom, w.prevTo)), w, S.lang);
       try { await navigator.clipboard.writeText(text); setMsg('supWkMsg', 'Copied: paste it in the WhatsApp group.', 'ok'); } catch { setMsg('supWkMsg', 'Copy did not work on this device.', 'err'); }
+      return true;
+    }
+    // V1.55: the per-person list is its own copy, for the three readers only (it names staff members).
+    if (ds.supBoardwa) {
+      if (!readsAll()) return true;
+      const off = Math.min(0, U.week || 0); const w = calWeek(today(), off);
+      const text = boardText(teamBoard(staffList(), U.reports, w, off === 0 ? today() : w.to), w, S.lang);
+      try { await navigator.clipboard.writeText(text); setMsg('supWkMsg', S.lang === 'id' ? 'Tersalin: memuat nama staf. Hanya untuk tim Head Coach, jangan ke grup.' : 'Copied: it names staff members. For the Head Coach team only, not the group.', 'ok'); } catch { setMsg('supWkMsg', 'Copy did not work on this device.', 'err'); }
       return true;
     }
     if (ds.supWho) { U.who = U.who === ds.supWho ? '' : ds.supWho; render(); return true; }

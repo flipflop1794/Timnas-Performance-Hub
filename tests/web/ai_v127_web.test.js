@@ -68,5 +68,5 @@ test('Live scouting: the AI pre-match draft fills the key points; a line with an
   const ai = await p.wait('#scAI'); assert.ok(ai, 'AI draft button shown');
   ai.click(); for (let i = 0; i < 60 && !/AI pre-match draft/.test(p.text()); i++) await sleep(50);
   assert.equal(p.d.getElementById('scK0').value, 'Ward their jungle entrances early');
-  assert.match(p.text(), /2 line\(s\) left out/); assert.match(p.text(), /TBD: Their WEC draft order/);
+  assert.match(p.text(), /2 lines left out/); assert.match(p.text(), /TBD: Their WEC draft order/);
 });

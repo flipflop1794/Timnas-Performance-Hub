@@ -55,7 +55,7 @@ test('weekly summary: the Head Coach drafts with AI, an unchecked number is mark
   const f = await open(B, 'fayad', 'overview');
   await f.click('[data-co-brief]');
   assert.equal(B.calls[0].action, 'summary'); assert.ok(B.calls[0].material.titles.some((x) => x.title === 'MLBB' && x.record_7d === '2-1'));
-  assert.match(f.text(), /1 line\(s\) with an unchecked number/); assert.match(f.text(), /number not in the figures: 40/);
+  assert.match(f.text(), /1 line with an unchecked number/); assert.match(f.text(), /number not in the figures: 40/);
   await f.click('[data-co-brief-publish]');
   const [b] = B.tables.leadership_briefs; assert.equal(b.data.status, 'published'); assert.equal(b.data.attention.length, 0); assert.equal(b.title, null);
   const k = await open(B, 'ketua', 'overview');
@@ -88,7 +88,7 @@ test('weaknesses: AI labels reports, a label seen 3 times is flagged and becomes
   const B = world(); for (let i = 0; i < 3; i++) report(B, `R${i}`, 'MLBB', i + 1, 'late vision before lord');
   B.answers.tags = (body) => ({ reports: body.reports.map((r) => ({ id: r.id, tags: ['vision', 'objective timing'] })) });
   const i = await open(B, 'indra', 'mlbb-weak');
-  assert.match(i.text(), /3 report\(s\) with something failing are not labelled yet/);
+  assert.match(i.text(), /3 reports with something failing are not labelled yet/);
   await i.click('[data-co-tag="MLBB"]');
   assert.equal(B.tables.weakness_tags.length, 3); assert.match(i.text(), /vision\s*keeps coming back/);
   await i.click('[data-co-weak-propose="MLBB|vision"]');

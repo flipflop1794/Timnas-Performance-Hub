@@ -145,7 +145,7 @@ test('real screen → only sure heroes filled → coach taps suggestions → Dat
   await h.click('[data-cap-confirm="MLBB"]');
   assert.match(h.d.getElementById('capMsg-MLBB').textContent, /Game 1 fixed \(Aran deaths 2 → 2|Game 1 fixed/);
   assert.match(h.text(), /Correction .* Game 1 corrected/);
-  assert.match(h.text(), /1 game version\(s\) corrected/);
+  assert.match(h.text(), /1 game version corrected/);
   // Patterns: one game (the fix replaced the old version), map side from the coach.
   await h.go('mlbb-patterns');
   assert.match(h.text(), /Confirmed games1/); assert.match(h.text(), /We picked second \(SP\)/); assert.match(h.text(), /Fanny/);
@@ -178,7 +178,7 @@ test('findings: checked against the facts, marked by the coach, promoted into a 
   ] };
   await h.click('[data-pat-run="MLBB"]');
   const sent = h.calls.at(-1); assert.equal(sent.action, 'digest'); assert.ok(sent.facts.some((f) => f.id === 'all')); assert.ok(!sent.facts.some((f) => 'games' in f));
-  assert.match(h.d.getElementById('patRunMsg-MLBB').textContent, /1 finding\(s\) added, 1 dropped/);
+  assert.match(h.d.getElementById('patRunMsg-MLBB').textContent, /1 finding added, 1 dropped/);
   assert.match(h.text(), /Won 4 of 6 games \(67%\)/); assert.match(h.text(), /numbers not in the cited facts \(90\)/);
   await h.click('[data-pat-mark$="|useful"]'); assert.match(h.text(), /Marked useful by/);
   const id = h.d.querySelector('[data-pat-promote]').dataset.patPromote;

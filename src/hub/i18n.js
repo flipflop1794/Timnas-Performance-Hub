@@ -992,6 +992,19 @@ export function tr(text) {
   return null;
 }
 
+// V1.55 plain plurals for the English page: "2 session(s)" reads "2 sessions", "1 line(s)" reads "1 line". The source
+// strings keep "(s)" (the Indonesian rules above match them); this runs on the finished English text only.
+export function plural(text) {
+  if (!text || !text.includes('(s)')) return text;
+  return text.replace(/(\d+)((?:[  ][A-Za-z][A-Za-z-]*){1,3}?)\(s\)/g, (m, n, words) => `${n}${words}${Number(n) === 1 ? '' : 's'}`).replace(/([a-z])\(s\)/g, '$1s');
+}
+export function pluralDom(root) {
+  if (!root) return;
+  const doc = root.ownerDocument || root; const walk = doc.createTreeWalker(root, 4); let n;
+  while ((n = walk.nextNode())) { if (n.nodeValue.includes('(s)') && !n.parentElement?.closest('script,style,textarea')) n.nodeValue = plural(n.nodeValue); }
+  for (const el of root.querySelectorAll('[title*="(s)"],[aria-label*="(s)"]')) for (const a of ['title', 'aria-label']) { const v = el.getAttribute(a); if (v) el.setAttribute(a, plural(v)); }
+}
+
 // Translate a rendered subtree in place.
 export function translateDom(root, lang) {
   if (lang !== 'id') return;

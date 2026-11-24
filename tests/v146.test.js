@@ -91,7 +91,7 @@ test('page: MLBB opponent page shows what stands behind it and the draft plan; t
   const db = mock(); for (const i of [1, 2, 3]) db.store.set(`pro_games/pro-${i}`, proGame(i));
   const h = await page('comp-card', db);
   const sel = h.d.getElementById('ocT'); sel.value = 'MLBB'; sel.dispatchEvent(new h.w.Event('change', { bubbles: true })); await h.wait();
-  assert.match(h.text(), /Indonesia vs Malaysia/); assert.match(h.text(), /Behind this page: .*3 rival draft\(s\)/);
+  assert.match(h.text(), /Indonesia vs Malaysia/); assert.match(h.text(), /Behind this page: .*3 rival drafts/);
   assert.doesNotMatch(h.text(), /Little public data/, 'Malaysia has research notes on record');
   const nat = h.d.getElementById('ocN'); const pickNation = async (n) => { nat.ownerDocument.getElementById('ocN').value = n; h.d.getElementById('ocN').dispatchEvent(new h.w.Event('change', { bubbles: true })); await h.wait(); };
   await pickNation('Nepal');
