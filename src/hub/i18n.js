@@ -947,6 +947,34 @@ RULES.push(
   [/^(.+) is both banned and picked, or entered twice\.$/, '$1 di-ban sekaligus di-pick, atau diisi dua kali.'],
 );
 
+// V1.52 AI inside the scrim report: paste a recap, the note after saving, before today's session.
+Object.assign(EXACT, {
+  'Paste your WhatsApp recap: the AI fills the report': 'Tempel rekap WhatsApp Anda: AI mengisi laporan',
+  'Your recap': 'Rekap Anda', 'Fill the report': 'Isi laporan', 'Paste the recap first.': 'Tempel rekapnya dulu.', 'Reading your recap… (5–15 s)': 'Membaca rekap Anda… (5–15 dtk)',
+  'Nothing could be filled from this text. Type the report below.': 'Tidak ada yang bisa diisi dari teks ini. Ketik laporannya di bawah.',
+  'For the next session': 'Untuk sesi berikutnya', 'AI, from your reports only': 'AI, hanya dari laporan Anda', 'Repeats:': 'Berulang:', 'Focus:': 'Fokus:', 'Ask the players:': 'Tanyakan ke pemain:',
+  'Use as next focus': 'Pakai sebagai fokus berikutnya', Ignore: 'Abaikan', 'next-session focus': 'fokus sesi berikutnya',
+  'What worked:': 'Yang berhasil:', 'What failed:': 'Yang gagal:', 'Change for next time:': 'Perubahan untuk berikutnya:', 'Player notes:': 'Catatan pemain:', 'Detail:': 'Detail:',
+  'Copy this brief': 'Salin ringkasan ini','Not placed in any field:': 'Tidak masuk ke kotak mana pun:',
+  'Not placed in any field: (a part about health or personal matters was left out)': 'Tidak masuk ke kotak mana pun: (bagian tentang kesehatan atau hal pribadi tidak dimasukkan)',
+  'Fills the text boxes with your own words; the games still come from the screenshots below. Check, then save.': 'Mengisi kotak teks dengan kata-kata Anda sendiri; game-nya tetap dari screenshot di bawah. Cek, lalu simpan.',
+  'Fills the form with your own words and the scores you wrote. Check, then save.': 'Mengisi formulir dengan kata-kata Anda sendiri dan skor yang Anda tulis. Cek, lalu simpan.',
+  'Session:': 'Sesi:', 'Change from the last session:': 'Perubahan dari sesi terakhir:', 'Keeps coming back:': 'Masih berulang:',
+});
+RULES.unshift(
+  [/^Paste the recap you send to the group, or dictate it \(Indonesian, English or mixed\)\. The AI moves your own words and scores into the form(; the games themselves still come from the screenshots below)?\. A score that is not in your text is never filled in\. Check, then save\. Performance only: health or personal details are left out\.$/,
+    (m, log) => `Tempel rekap yang Anda kirim ke grup, atau diktekan (Indonesia, Inggris atau campur). AI memindahkan kata-kata dan skor Anda ke formulir${log ? '; game-nya tetap diisi dari screenshot di bawah' : ''}. Skor yang tidak ada di teks Anda tidak pernah diisi. Cek, lalu simpan. Hanya performa: detail kesehatan atau pribadi tidak dimasukkan.`],
+  [/^Before today's session — (.+)$/, 'Sebelum sesi hari ini — $1'],
+  [/^Filled (\d+) box(?:es)? and (\d+) result lines?\. Check them, then save\.$/, 'Mengisi $1 kotak dan $2 baris hasil. Cek, lalu simpan.'],
+  [/^Filled (\d+) box(?:es)?\. Check them, then save\.$/, 'Mengisi $1 kotak. Cek, lalu simpan.'],
+  [/^From your report of (\S+) vs$/, 'Dari laporan Anda tanggal $1 vs'],
+  [/^Check this field: it contains words you did not say \((.+)\)\.$/, 'Cek kotak ini: ada kata yang tidak Anda ucapkan ($1).'],
+  [/^(\d+) result lines? (?:was|were) left out: a score or placement was not written in your recap\. Add (?:it|them) by hand\.$/,'$1 baris hasil tidak dimasukkan: skor atau peringkatnya tidak tertulis di rekap Anda. Tambahkan sendiri.'],
+  [/^Sparring partner "(.+)" is not written in your recap: type it yourself\.$/, 'Lawan sparring "$1" tidak tertulis di rekap Anda: ketik sendiri.'],
+  [/^\((\d+) reports in 14 days\)$/, '($1 laporan dalam 14 hari)'],
+  [/^Paste at most (\d+) characters at a time\.$/, 'Tempel paling banyak $1 karakter sekali.'],
+);
+
 // Page headlines ("Word <em>word</em>") are translated as a whole.
 const LEADS = {
   'Scrim reports': 'Laporan <em>scrim</em>',

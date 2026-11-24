@@ -15,10 +15,11 @@ import {
   tagsSchema, tagsPrompt, tagsOf, summarySchema, summaryPrompt, prepSchema, prepPrompt, brResultSchema, brResultPrompt,
   weeklySchema, weeklyPrompt, metaExtractSchema, metaExtractPrompt, metaFitSchema, metaFitPrompt,
   prematchSchema, prematchPrompt, scoutDaySchema, scoutDayPrompt, brainstormSchema, brainstormPrompt, readGameOf, matchResultSchema, matchResultPrompt, supportParseSchema, supportParsePrompt, SUPPORT_DISCIPLINES,
+  recapSchema, recapPrompt, afterSchema, afterPrompt,
 } from './scrim_spec.js';
 
 // V1.20: summary (weekly, all titles), prep (one WEC match), tags (weakness labels), br_result (PUBG Mobile screenshot).
-const ACTIONS = ['scoreboard', 'draft', 'debrief', 'digest', 'plan', 'summary', 'prep', 'tags', 'br_result', 'weekly', 'meta_extract', 'meta_fit', 'prematch', 'scout_day', 'brainstorm', 'match_result', 'support_parse'];
+const ACTIONS = ['scoreboard', 'draft', 'debrief', 'digest', 'plan', 'summary', 'prep', 'tags', 'br_result', 'weekly', 'meta_extract', 'meta_fit', 'prematch', 'scout_day', 'brainstorm', 'match_result', 'support_parse', 'recap', 'after'];
 const IMAGE_ACTIONS = ['scoreboard', 'draft', 'br_result', 'match_result'];
 // Calls per day (WIB) for the whole staff, unless the TEAM_DAILY_CALL_CAP secret says otherwise.
 export const TEAM_DAILY_CAP = 600;
@@ -151,6 +152,23 @@ export async function handle(req, deps) {
       if (!text) return fail(400, 'Paste the text first.');
       if (text.length > LIMITS.metaChars) return fail(413, `Paste at most ${LIMITS.metaChars} characters at a time.`);
       request = messagesRequest({ model, system: metaExtractPrompt(title), schema: metaExtractSchema(), maxTokens: 3000, content: [{ type: 'text', text: JSON.stringify({ SOURCE: String(body.source || '').slice(0, 200), TEXT: text }) }] });
+    } else if (action === 'recap') {
+      // V1.52: the coach's WhatsApp recap, read into the whole report (date, partner, rows, text fields).
+      const text = String(body.text || '').trim();
+      if (!text) return fail(400, 'Paste the recap first.');
+      if (text.length > LIMITS.recapChars) return fail(413, `Paste at most ${LIMITS.recapChars} characters at a time.`);
+      const roster = (Array.isArray(body.roster) ? body.roster : []).map((x) => String(x).slice(0, 40)).slice(0, 12);
+      request = messagesRequest({ model, system: recapPrompt(title, roster), schema: recapSchema(title), maxTokens: 2500, content: [{ type: 'text', text }] });
+    } else if (action === 'after') {
+      // V1.52: the note after a saved report (what repeated, one focus, one question) plus its weakness labels.
+      const clip = (v, n = 500) => String(v ?? '').slice(0, n);
+      const rep = (r) => ({ id: clip(r?.id, 60), date: clip(r?.date, 10), partner: clip(r?.partner, 80), result: clip(r?.result, 60), focus: clip(r?.focus), worked: clip(r?.worked), failed: clip(r?.failed), adjustment: clip(r?.adjust),
+        previous_adjustment: clip(r?.prevAdjust, 400), previous_adjustment_check: clip(r?.fixCheck, 40) });
+      const m = body.material || {};
+      if (!m.report || !(clip(m.report.failed).trim() || clip(m.report.adjust).trim())) return fail(400, 'Nothing to work from: the report has no problem or change written.');
+      const earlier = (Array.isArray(m.earlier) ? m.earlier : []).slice(0, LIMITS.afterEarlier).map(rep);
+      const weaknesses = (Array.isArray(m.weaknesses) ? m.weaknesses : []).slice(0, 6).map((w) => ({ label: clip(w?.tag, 40), reports_14_days: Number(w?.n) || 0 }));
+      request = messagesRequest({ model, system: afterPrompt(title), schema: afterSchema(title), maxTokens: 700, content: [{ type: 'text', text: JSON.stringify({ REPORT: rep(m.report), EARLIER: earlier, WEAKNESSES: weaknesses }) }] });
     } else if (action === 'debrief') {
       const text = String(body.text || '').trim();
       if (!text) return fail(400, 'Type or dictate the note first.');

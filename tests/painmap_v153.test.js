@@ -1,4 +1,4 @@
-// V1.52 the physios asked for the back of the thigh and the calf, left and right, on the back figure.
+// V1.53 the physios asked for the back of the thigh and the calf, left and right, on the back figure.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { POINTS, isPoint, pointLabel, cleanPain, bodySvg } from '../src/core/painmap.js';

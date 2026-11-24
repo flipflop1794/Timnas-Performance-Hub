@@ -70,7 +70,7 @@ test('AI material carries the title rules with citable ids; prompts explain them
   const pre = prematchMaterial({ brief: { known: [], tbd: [], watch: [] }, rules: rulesMaterial(DEFAULT_RULES, 'MLBB') });
   assert.ok(materialIds(pre).has('R-mlbb-format'));
   for (const p of [prepPrompt('Dota 2'), prematchPrompt('MLBB'), brainstormPrompt('CS2', 'opponent')]) assert.match(p, /RULES \(when present\)/);
-  assert.equal(PROMPT_VERSION, 'scrim-ai-2026-12-03.1');
+  assert.equal(PROMPT_VERSION, 'scrim-ai-2026-12-05.1');
 });
 
 test('reported Dota schedule: five Group A Bo1s for Indonesia, matches that are already on the tracker are recognised', () => {

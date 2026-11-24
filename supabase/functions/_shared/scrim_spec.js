@@ -7,7 +7,7 @@
 // Rules the prompts enforce: read only what is on the screen, never guess a number, mark what is
 // unclear. The coach confirms every value before it is saved; nothing here writes a record by itself.
 
-export const PROMPT_VERSION = 'scrim-ai-2026-12-03.1';   // V1.38 RULES (format, patch, map pool) in prep, prematch and brainstorm material; V1.36 support rows (follow-up text, session, prognosis); V1.34 support_parse; V1.30 match_result (eFootball, CS2); V1.26 plan blocks, debrief drills, weekly, meta_extract, meta_fit; V1.27 prematch, scout_day, brainstorm
+export const PROMPT_VERSION = 'scrim-ai-2026-12-05.1';   // V1.52 recap (WhatsApp recap into the whole report) and after (note after saving, with the labels);V1.38 RULES (format, patch, map pool) in prep, prematch and brainstorm material; V1.36 support rows (follow-up text, session, prognosis); V1.34 support_parse; V1.30 match_result (eFootball, CS2); V1.26 plan blocks, debrief drills, weekly, meta_extract, meta_fit; V1.27 prematch, scout_day, brainstorm
 export const DEFAULT_MODEL = 'claude-sonnet-5-5';
 
 // Titles with screenshot capture. MLBB Women plays the same game client as MLBB.
@@ -42,6 +42,8 @@ export const LIMITS = {
   summaryFacts: 80,               // V1.20 weekly leadership summary
   prepItems: 40,                  // V1.20 preparation pack: items per list
   tagReports: 20,                 // V1.20 weakness tags: reports per call
+  recapChars: 6000,               // V1.52 pasted WhatsApp recap
+  afterEarlier: 5,                // V1.52 after-save note: earlier reports sent
 };
 
 const str = { type: 'string' };
@@ -97,6 +99,62 @@ export const DEBRIEF_FIELDS = ['focus', 'worked', 'failed', 'adjust', 'player_no
 export const DRILL_CALLS = ['yes', 'no', 'not tried', 'not said'];
 export const debriefSchema = () => obj({ ...Object.fromEntries(DEBRIEF_FIELDS.map((k) => [k, str])), not_placed: str,
   drills: { type: 'array', items: obj({ index: int, met: { type: 'string', enum: DRILL_CALLS }, quote: str }) } });
+
+// V1.52 recap: the WhatsApp recap a coach already sends to the group, read into the WHOLE scrim report: date,
+// partner, one row per map / match / game as the title is played, and the same text fields as the debrief.
+// Numbers not written in the recap come back as -1 (never guessed); the hub checks every number against the text.
+export const RECAP_KIND = { CS2: 'cs', 'CS2 Women': 'cs', 'PUBG Mobile': 'br', eFootball: 'foot', MLBB: 'moba', 'MLBB Women': 'moba', 'Dota 2': 'moba' };
+const RECAP_ROW = {
+  cs: () => obj({ map: str, us: int, them: int, ct: int }),
+  br: () => obj({ map: str, place: int, kills: int }),
+  foot: () => obj({ us: int, them: int, extra: { type: 'string', enum: ['', 'et', 'pk'] }, pen_us: int, pen_them: int }),
+  moba: () => obj({ side: { type: 'string', enum: ['', 'blue', 'red', 'radiant', 'dire'] }, res: { type: 'string', enum: ['win', 'loss', ''] } }),
+};
+const RECAP_HELP = {
+  cs: 'rows: one per MAP played, in order. map: the map name as written (Mirage, Inferno, Dust II ...). us / them: rounds we won / they won. ct: the rounds we won on CT side when the recap says it, else -1.',
+  br: 'rows: one per MATCH played, in order. map: Erangel, Miramar, Sanhok, Vikendi, Rondo or Livik when written, else "". place: our placement (1-16). kills: our team eliminations in that match. A recap that gives only a total (points or kills over several matches) gets NO rows: put the total in detail.',
+  foot: 'rows: one per MATCH played, in order. us / them: goals for / against. extra: "et" when decided in extra time, "pk" when decided on penalties, else "". pen_us / pen_them: the shoot-out score when extra is "pk", else -1.',
+  moba: 'rows: one per GAME played, in order. res: "win" or "loss" for our team. side: the map side we played when the recap says it (MLBB: blue or red; Dota 2: radiant or dire), else "". A recap that gives only the series score (e.g. "menang 2-1") gets one row per game in the order written when the order is clear, else NO rows.',
+};
+export const recapSchema = (title) => obj({
+  date: str, partner: str,
+  rows: { type: 'array', items: RECAP_ROW[RECAP_KIND[title] || 'moba']() },
+  ...Object.fromEntries(DEBRIEF_FIELDS.map((k) => [k, str])), not_placed: str,
+});
+export function recapPrompt(title, roster) {
+  return [
+    `A ${title} national-team coach pasted the recap of a scrim session that they send to the staff WhatsApp group (Indonesian, English or both, informal, with abbreviations). Read it into the fields of the hub's scrim report.`,
+    '- date: the session date as YYYY-MM-DD only when the recap names it, else "".',
+    '- partner: the sparring partner (opponent team) exactly as written, "internal" for an internal scrim, else "".',
+    `- ${RECAP_HELP[RECAP_KIND[title] || 'moba']}`,
+    '- Any number the recap does not state is -1. Never compute, estimate or complete a score.',
+    '- focus (what the session was meant to practise), worked (what went well), failed (what went badly), adjust (the one change for the next session), player_notes (per-player performance notes, "Name: note; Name: note"), detail (draft, heroes, maps, drops, formation or other game-specific detail).',
+    '- Use the coach\'s own words and language for the text fields. Do not translate, add advice, add facts, or soften criticism. A field the coach did not write about stays "".',
+    '- Every part of the recap goes into exactly one place. Anything that fits nowhere goes into not_placed.',
+    '- Performance only: a sentence about health, injury, sleep, mood, family or contact details goes into not_placed and nowhere else.',
+    roster.length ? `- Roster player names (match nicknames to these spellings): ${roster.join(', ')}.` : '',
+  ].filter(Boolean).join('\n');
+}
+
+// V1.52 after-save note: when a scrim report is saved, three short lines for the coach (what repeated, one focus
+// for the next session, one question for the players) and the weakness labels, in ONE call (it replaces the
+// separate 'tags' call). Built only from this report and the title's earlier reports.
+export const afterSchema = (title) => obj({
+  tags: { type: 'array', items: tagsOf(title).length ? { type: 'string', enum: tagsOf(title) } : str },
+  repeats: str, focus: str, question: str,
+  based_on: { type: 'array', items: str },
+});
+export function afterPrompt(title) {
+  return [
+    `You help the ${title} coach of the Indonesian national esports team right after they saved a scrim report. You receive REPORT (the one just saved), EARLIER (the title's previous reports, newest first, may be empty) and WEAKNESSES (labels counted over the last 14 days).`,
+    tagsOf(title).length ? `- tags: up to 3 labels for what REPORT says failed, from this list only: ${tagsOf(title).join(', ')}. Nothing failing gets [].` : '- tags: [].',
+    '- repeats: ONE sentence naming a problem in REPORT that also appears in EARLIER (same problem in the coach\'s words, or a previous adjustment that was not fixed). If nothing clearly repeats, or EARLIER is empty, return "".',
+    '- focus: ONE concrete thing to practise in the next session, taken from what REPORT says failed and the adjustment the coach chose. Do not invent a new topic.',
+    '- question: ONE open question the coach can ask the players about that focus. No blame, no player named.',
+    '- based_on: the ids of the reports (REPORT and EARLIER) the lines rest on.',
+    'Rules: at most 25 words per line. Write in the language the coach used in REPORT (Bahasa Indonesia unless the report is in English). Use only what is in the material: no outside game knowledge, no meta advice, no numbers that are not in the material, nothing about health or personal matters. If REPORT says nothing failed and no adjustment, return "" for repeats, focus and question.',
+  ].join('\n');
+}
 
 // V1.17 next-session plan: one suggested focus, built only from the coaches' own reports and findings.
 // V1.26: plus 2-4 timed drills, each with an objective and a success criterion.

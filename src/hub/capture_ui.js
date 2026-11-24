@@ -5,6 +5,20 @@
 import { DATA } from './data.gen.js';
 import { heroIndex, gameOf, proposeGame, proposeDraft, confirmGame, blankGame, gameToProposal, mergeGames, heroesFromDraft, heroChoices, heroMemory, playerHeroes, findDuplicate, STAT_DEFS, SIDE_LABEL, MAP_SIDES, durationText, parseDuration, formatDurationInput, latestGames, gamesResult, extractionAccuracy, learnAliases } from '../core/capture.js';
 import { checkDebriefInput, checkDebriefSplit } from '../core/debrief.js';
+import { checkRecap } from '../core/recap.js';
+import { translateDom } from './i18n.js';
+// The boxes of the report form, as the coach reads them (a warning names the box it is about).
+const FLAG_LABEL = { focus: 'Focus', worked: 'What worked', failed: 'What failed', adjust: 'Change for next time', players: 'Player notes', notes: 'Player notes', detail: 'Detail' };
+// V1.52: what a recap looks like, per title (the placeholder of the paste box).
+const RECAP_EXAMPLE = {
+  'Dota 2': 'e.g. Scrim vs Team X, menang 2-1. Game 1 radiant menang, game 2 dire kalah, game 3 radiant menang. Draft game 2 kurang lane dominator. Next: latihan smoke timing sebelum Roshan.',
+  MLBB: 'e.g. Scrim vs Team X jam 2. Draft bagus, rotasi early ke turtle cepat. Lord fight masih telat. Next: set up vision sebelum lord.',
+  'MLBB Women': 'e.g. Scrim vs Team X jam 2. Draft bagus, rotasi early ke turtle cepat. Lord fight masih telat. Next: set up vision sebelum lord.',
+  'PUBG Mobile': 'e.g. Scrim lobby Team X. Match 1 Erangel #3 8 kill, match 2 Miramar #11 2 kill, match 3 Erangel #1 12 kill. Drop Pochinki contested, rotasi telat di zona 4. Next: fallback drop.',
+  eFootball: 'e.g. Sparring vs Team X: 2-1, 0-1, 1-1 menang penalti 4-3. Formasi 4-2-3-1. Kebobolan dari set piece. Next: latihan bertahan corner.',
+  CS2: 'e.g. Scrim vs Team X. Mirage 13-9 (CT 8), Inferno 10-13. Utility B site telat, retake bagus. Next: default T side Inferno.',
+  'CS2 Women': 'e.g. Scrim vs Team X. Mirage 13-9 (CT 8), Inferno 10-13. Utility B site telat, retake bagus. Next: default T side Inferno.',
+};
 import { facts, checkFindings, findingRecord, markFinding, statTrail, digestPayload, MIN_SAMPLE, standInRecord, statGoalProgress } from '../core/patterns.js';
 import { GAME_SIDES, LIMITS } from '../../supabase/functions/_shared/scrim_spec.js';
 import { isScrimLog, PICK_ORDER, PICK_ORDER_LABEL, MLBB_MAPS, MAX_BANS, NOTES_MAX } from '../core/scrim_log.js';
@@ -383,8 +397,20 @@ export function captureUi(ctx) {
     rec.onend = () => { if (MIC.rec === rec) { MIC.rec = null; MIC.fid = null; MIC.lang = null; paintMic(); } };
     MIC.rec = rec; MIC.fid = fid; MIC.lang = lang; rec.start(); paintMic();
   }
+  // V1.52: with the recap reader deployed, the same box takes the WhatsApp recap the coach already sends and fills
+  // the whole report (date, partner, result rows, text fields). It sits at the top of the form.
+  const recapOn = () => !!ai() && !!ctx.recapOn?.();
+  const plural = (n, one, many) => `${n} ${n === 1 ? one : many}`;
   function debriefSection(title, fid) {
     const on = !!ai();
+    if (recapOn()) {
+      const log = isScrimLog(title);
+      return `<details class="capdump" open><summary>Paste your WhatsApp recap: the AI fills the report</summary>
+        <p class="note">${log ? 'Fills the text boxes with your own words; the games still come from the screenshots below.' : 'Fills the form with your own words and the scores you wrote.'} Check, then save.</p>
+        <label class="field" for="rp-${fid}-dump">Your recap<textarea rows="5" id="rp-${fid}-dump" maxlength="${LIMITS.recapChars}" placeholder="${esc(RECAP_EXAMPLE[title] || '')}"></textarea></label>
+        <div class="toolbar">${micOk() ? `<button class="btn" type="button" data-cap-mic="${esc(`${title}|id-ID`)}" aria-pressed="${MIC.fid === fid && MIC.lang === 'id-ID'}">${MIC.fid === fid && MIC.lang === 'id-ID' ? '■ Stop' : '🎙 Bicara (ID)'}</button>` : ''}<button class="btn primary" type="button" data-cap-debrief="${esc(title)}">Fill the report</button><span class="msg" id="capDbMsg-${fid}" role="status"></span></div>
+        <div id="capDbOut-${fid}"></div></details>`;
+    }
     // V1.16: first thing on the form, and open when AI is on: one dictated note replaces typing four boxes.
     return `<details class="capdump"${on ? ' open' : ''}><summary>Say it once: one note, AI fills the fields${on ? '' : ' (website only)'}</summary>
       <p class="note">Dictate with your phone keyboard's microphone or type freely (Indonesian, English or mixed). The AI only moves your own words into the fields below; check them before saving. Performance only: health or personal details are left out.</p>
@@ -617,6 +643,27 @@ export function captureUi(ctx) {
     }
     if (d.capDebrief) {
       const title = d.capDebrief; const fid = sid(title); const out = document.getElementById(`capDbOut-${fid}`);
+      if (recapOn()) {
+        try {
+          const text = String(val(`rp-${fid}-dump`) || '').trim();
+          if (!text) throw new Error('Paste the recap first.');
+          if (text.length > LIMITS.recapChars) throw new Error(`Paste at most ${LIMITS.recapChars} characters at a time.`);
+          setMsg(`capDbMsg-${fid}`, 'Reading your recap… (5–15 s)');
+          const res = await ai().call({ action: 'recap', title, text, roster: rosterOf(title) });
+          const { fields, rows, flags, notPlaced } = checkRecap(title, text, res.raw, { roster: rosterOf(title), today: localToday() });
+          if (rows.length && !isScrimLog(title)) ctx.applyRows(fid, title, rows);
+          fillReport(fid, fields);
+          if (fields.detail || fields.players) { const det = document.getElementById(`rp-${fid}-detail`)?.closest('details'); if (det) det.open = true; }
+          const el = document.getElementById(`rp-${fid}-dump`); if (el) el.value = text;
+          const n = Object.keys(fields).length + (isScrimLog(title) ? 0 : rows.length);
+          setMsg(`capDbMsg-${fid}`, n ? `Filled ${plural(Object.keys(fields).length, 'box', 'boxes')}${rows.length && !isScrimLog(title) ? ` and ${plural(rows.length, 'result line', 'result lines')}` : ''}. Check them, then save.` : 'Nothing could be filled from this text. Type the report below.', n ? 'ok' : 'err');
+          const o2 = document.getElementById(`capDbOut-${fid}`);
+          if (o2) o2.innerHTML = flags.length || notPlaced ? banner('synth', `<div><ul class="plain">${flags.map((f) => `<li>${f.field === 'rows' || f.field === 'partner' ? '' : `<b>${esc(FLAG_LABEL[f.field] || f.field)}:</b> `}${esc(f.text)}</li>`).join('')}${notPlaced ? `<li>Not placed in any field: ${notPlaced.startsWith('(a part about') ? esc(notPlaced) : `<span data-no-tr>${esc(notPlaced)}</span>`}</li>` : ''}</ul></div>`) : '';
+          if (o2 && S.lang === 'id') translateDom(o2, 'id');   // written after the page was translated
+          for (const f of flags) document.getElementById(`rp-${fid}-${f.field}`)?.setAttribute('aria-invalid', 'true');
+        } catch (err) { setMsg(`capDbMsg-${fid}`, err.message, 'err'); }
+        return true;
+      }
       try {
         const text = checkDebriefInput(val(`rp-${fid}-dump`));
         setMsg(`capDbMsg-${fid}`, 'Sorting your note into the fields…');
@@ -628,7 +675,8 @@ export function captureUi(ctx) {
         fillReport(fid, fields);
         if (fields.detail || fields.players) { const det = document.getElementById(`rp-${fid}-detail`)?.closest('details'); if (det) det.open = true; }
         setMsg(`capDbMsg-${fid}`, `Filled ${Object.keys(fields).length} field(s). Check them, then save.`, 'ok');
-        if (out) out.innerHTML = flags.length || notPlaced ? banner('synth', `<div><ul class="plain">${flags.map((f) => `<li><b>${esc(f.field)}</b>: ${esc(f.text)}</li>`).join('')}${notPlaced ? `<li>Not placed in any field: ${esc(notPlaced)}</li>` : ''}</ul></div>`) : '';
+        if (out) out.innerHTML = flags.length || notPlaced ? banner('synth', `<div><ul class="plain">${flags.map((f) => `<li><b>${esc(FLAG_LABEL[f.field] || f.field)}:</b> ${esc(f.text)}</li>`).join('')}${notPlaced ? `<li>Not placed in any field: ${notPlaced.startsWith('(a part about') ? esc(notPlaced) : `<span data-no-tr>${esc(notPlaced)}</span>`}</li>` : ''}</ul></div>`) : '';
+        if (out && S.lang === 'id') translateDom(out, 'id');
         for (const f of flags) document.getElementById(`rp-${fid}-${f.field}`)?.setAttribute('aria-invalid', 'true');
       } catch (err) { setMsg(`capDbMsg-${fid}`, err.message, 'err'); }
       return true;

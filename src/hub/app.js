@@ -33,7 +33,7 @@ const TITLE_COACH = !!HUB_USER && HUB_USER.roles.includes('title_coach') && !HUB
 const SUPPORT_ONLY = !!HUB_USER && HUB_USER.roles.length > 0 && HUB_USER.roles.every((r) => r === 'support');
 const LEADERSHIP_ONLY = !!HUB_USER && HUB_USER.roles.length > 0 && HUB_USER.roles.every((r) => r === 'leadership');
 // V1.15: newer parts switch on only when the live database / server has them (all on in the artifact build).
-const FEAT = { capture: true, draftRoom: true, donny: true, pelatnas: true, ai: true, aiPlan: true, coachAi: true, coachAiFn: true, practiceAi: true, brainAi: true, readAi: true, support: true, supportAi: true, ...(PLATFORM?.features || {}) };
+const FEAT = { capture: true, draftRoom: true, donny: true, pelatnas: true, ai: true, aiPlan: true, coachAi: true, coachAiFn: true, practiceAi: true, brainAi: true, readAi: true, support: true, supportAi: true, recapAi: false, ...(PLATFORM?.features || {}) };
 // V1.27 pre-match brief, day scouting summary and Brainstorm: only when the deployed function has those actions.
 const brainAiOn = () => S.mode !== 'demo' && FEAT.ai && FEAT.brainAi && !!PLATFORM?.ai;
 // V1.27 feedback on an AI output: useful / not useful / wrong (+ one line). It is how the AI gets better over time.
@@ -75,6 +75,7 @@ import { draftPlan, lineText, draftPlanText, dataDepth, LOW as LOW_SAMPLE } from
 import { WORKSPACE_TITLES, fieldOf, fieldEdit, nationIn, starters, workspaceContext, shotMaterial } from '../core/workspace.js';
 import { MLBB_RANK, META_SOURCES, HIGH_BAN, mlbbIdeas } from '../core/meta_live.js';
 import { weaknessCounts } from '../core/weakness.js';
+import { usedFocus } from '../core/recap.js';
 import { usageSummary, PRICES_READ } from '../core/ai_cost.js';
 import { checkin, session as loadSession, teamDay, ITEMS, ITEM_LABEL, THRESHOLDS, MIN_BASELINE_DAYS } from '../core/wellbeing.js';
 import { captureUi, heroesFor, mmssInput, capDupInput, capEnter } from './capture_ui.js';
@@ -98,6 +99,7 @@ import { gameBreakdown, breakdownText, BASE_MIN, FLAG_PCT, ownVod, addMark, vodT
 import { tagsOf } from '../core/weakness.js';
 import { coachAiUi } from './coach_ai_ui.js';
 import { supportUi } from './support_ui.js';
+import { wearableUi } from './wearable_ui.js';
 import { JOBS as SUPPORT_JOBS } from '../core/support.js';
 import { standInRecord } from '../core/patterns.js';
 import { weeks as trendWeeks, period as trendPeriod, PERIOD_WEEKS as TR_PERIODS, teamTrends, playerTrends, MIN_VALUES as TR_MIN } from '../core/trends.js';
@@ -133,6 +135,8 @@ const S = {
 // every helper below exists.
 let CAP = null;
 const capUiReal = () => (CAP ||= captureUi({ S, esc, tag, banner, setMsg, val, render, meName, sid, fillReport, localToday: localDay, shiftDay, PLATFORM: PLATFORM && !FEAT.ai ? { ...PLATFORM, ai: null } : PLATFORM, reportNote,
+  // V1.52: the recap reader fills the result rows too (the form is redrawn with the rows, then the totals follow).
+  recapOn: () => FEAT.recapAi, applyRows: (fid, title, raw) => { storeDraft(fid, { ...rpDraft(fid), rows: JSON.stringify(raw), at: new Date().toISOString() }); render(); rrApply(fid, title, raw); },
   staffObservation, recommendationRecord, propose, saveObj, owner, rulesFor: (title) => snapshot(S.rules, title === 'PUBG Mobile' ? ['pubgm-scoring'] : title === 'Dota 2' ? ['dota-patch'] : []) }));
 // Scrim capture switched off (its tables are not in the database yet): the hub works as V1.12 did.
 const CAP_OFF = { gamesSection: () => '', reportGames: () => '', debriefSection: () => '', beforeSave: () => null, afterSave: async () => {}, trailPanel: () => '', goalStatNote: () => '', goalStatFields: () => '', standInLine: () => '', waitingCount: () => 0, onChange: () => false, onClick: async () => false, subscribe: () => {},
@@ -148,11 +152,13 @@ let CP = null;
 // V1.20 coach AI (src/hub/coach_ai_ui.js): weekly leadership summary, preparation packs, weaknesses, PUBGM screenshots.
 let CO = null;
 let SU = null;
-const supUi = () => (SU ||= supportUi({ S, esc, tag, banner, setMsg, val, render, PLATFORM, HUB_USER, FEAT, today: () => localDay(), meName: () => meName(), titles: () => WEC_TITLES.map((t) => t.id) }));
+let WR = null;
+const wrUi = () => (WR ||= wearableUi({ S, esc, tag, setMsg, render, PLATFORM, today: () => localDay() }));
+const supUi = () => (SU ||= supportUi({ S, esc, tag, banner, setMsg, val, render, PLATFORM, HUB_USER, FEAT, wearPanel: () => wrUi().donnyPanel(), today: () => localDay(), meName: () => meName(), titles: () => WEC_TITLES.map((t) => t.id) }));
 const coUi = () => (CO ||= coachAiUi({ S, esc, tag, banner, setMsg, val, render, sid, PLATFORM, HUB_USER, CAN_APPROVE, today: () => today(), EVENT,
   titles: () => PQ_ORDER, titleVisible: (t) => titleVisible(t), cardFor: (t, n) => prepCardFor(t, n), meName: () => meName(), prepImage: (f) => capUiReal().prepImage(f),
   saveScrims: (xs) => saveScrimList(xs), propose: (t, label, w) => proposeWeakness(t, label, w), onSaved: (rows) => savePubgmRows(rows),
-  aiOn: () => FEAT.ai && FEAT.coachAi && FEAT.coachAiFn && !!PLATFORM?.ai }));
+  aiOn: () => FEAT.ai && FEAT.coachAi && FEAT.coachAiFn && !!PLATFORM?.ai, afterOn: () => FEAT.recapAi }));
 // Focus mode (website only, per device): hide screens that are not used yet, so coaches see what matters before WEC.
 // Nothing is deleted; "Show all tools" brings everything back.
 // V1.41: also the screens with no entries on the live site after the camp's first week (draft rooms, player plans,
@@ -512,6 +518,7 @@ V.today = () => {
     <p>Accepted objectives first. Anything not yet reviewed is a proposal, not a training decision.</p></div>
     ${attentionPanel(me)}
     ${reportsTodayPanel(me)}
+    ${HUB_USER && FEAT.coachAi && !HUB_USER.seesAllTitles && HUB_USER.titles.length <= 2 ? HUB_USER.titles.filter((t) => GAME_SPEC[t]).map((t) => coUi().briefCard(t)).join('') : ''}
     ${supUi().noticesPanel(me.focus || [])}
     ${TITLE_COACH ? '' : dayPanel(me)}
     ${TITLE_COACH ? '' : queueHtml(me.id)}
@@ -886,7 +893,7 @@ function reportCard(r) {
     ${r.detail ? `<p><b>${esc(spec.detail)}:</b> ${esc(r.detail)}</p>` : ''}${r.playerNotes ? `<p><b>Player notes:</b> ${esc(r.playerNotes)}</p>` : ''}
     ${r.prevAdjust ? `<p class="note"><b>Last adjustment</b> (${esc(r.prevAdjust)}): ${esc(r.fixCheck || 'not checked')}</p>` : ''}
     <p class="rpnext"><b>Next session:</b> ${esc(r.adjust)}</p>${capUi().reportGames(r)}${safeUrl(r.vod) ? `<p class="note">VOD: <a href="${esc(safeUrl(r.vod))}" target="_blank" rel="noopener">${esc(r.vod)}</a></p>` : r.vod ? `<p class="note">VOD: ${esc(r.vod)}</p>` : ''}
-    ${scrimEditBar(r)}
+    ${FEAT.coachAi ? coUi().afterNote(r) : ''}${scrimEditBar(r)}
     ${(r.notes || []).map((n) => `<p class="note">Correction ${esc(Number.isNaN(Date.parse(n.at)) ? String(n.at || '').slice(0, 10) : localDay(new Date(n.at)))} — ${esc(n.by)}: ${esc(n.text)}</p>`).join('')}
     ${S.mode === 'demo' ? '' : `<details><summary class="note">Add a correction</summary><div class="form"><label class="field" for="rpN-${r.id}">Correction or follow-up<input type="text" id="rpN-${r.id}" placeholder="e.g. Score was 2-0, not 2-1"></label></div>
       <div class="toolbar"><button class="btn" type="button" data-report-note="${esc(r.id)}">Add note</button><span class="msg" id="rpNMsg-${r.id}"></span></div></details>`}</div>`;
@@ -1003,7 +1010,7 @@ function wsTeamNav(title, here) {
   if (!coachNav()) return '';
   const w = wsTabs(title); if (!w) return '';
   const items = [[REPORT_TAB[title], 'Scrim reports', 'reports'], [`${w.team}-trends`, 'Trends', 'trends'], [TEAM_TAB[title], 'Roster', 'team']];
-  return `<nav class="subnav" aria-label="My team">${items.map(([h, l, k]) => `<a href="#${h}" ${k === here ? 'aria-current="page"' : ''}>${esc(l)}</a>`).join('')}</nav>${here === 'reports' && FEAT.support ? supUi().noticesPanel([title]) : ''}`;
+  return `<nav class="subnav" aria-label="My team">${items.map(([h, l, k]) => `<a href="#${h}" ${k === here ? 'aria-current="page"' : ''}>${esc(l)}</a>`).join('')}</nav>${here === 'reports' ? wrUi().coachPanel(title) : ''}${here === 'reports' && FEAT.support ? supUi().noticesPanel([title]) : ''}`;
 }
 function reportsPanel(title) {
   loadRpHist();
@@ -1016,7 +1023,9 @@ function reportsPanel(title) {
   const planned = S.scrims.filter((x) => x.title === title && x.status === 'planned').sort((a, b) => a.date.localeCompare(b.date));
   const stale = Sm.daysSince != null && Sm.daysSince >= 3;
   const unit = spec.unit;
-  const ready = Sm.carryOver ? `<div class="panel"><h2>Start the next session from here</h2><p>${esc(Sm.carryOver.adjust)}</p><p class="note">Adjustment written by ${esc(Sm.carryOver.by)} on ${esc(Sm.carryOver.date)}. If the next report does not mention it, ask whether it was tried.</p></div>` : '';
+  // V1.52: "Before today's session" (change, chosen focus, what keeps coming back, WhatsApp copy) takes this place.
+  const card = FEAT.coachAi ? coUi().briefCard(title) : '';
+  const ready = card || (Sm.carryOver ? `<div class="panel"><h2>Start the next session from here</h2><p>${esc(Sm.carryOver.adjust)}</p><p class="note">Adjustment written by ${esc(Sm.carryOver.by)} on ${esc(Sm.carryOver.date)}. If the next report does not mention it, ask whether it was tried.</p></div>` : '');
   const form = S.mode === 'demo' ? '' : reportForm(title, { fid, spec, pts, unit, planned, t0 });
   return `${wsTeamNav(title, 'reports')}<div class="panel"><h2>Scrim reports — ${esc(title)}</h2>${dailyEntry(title)}
     <div class="stats"><div class="stat"><span class="k">Sessions, last 7 days</span><span class="v">${Sm.sessions}</span></div>
@@ -1027,7 +1036,7 @@ function reportsPanel(title) {
     ${(() => { const n = gameOf(title) ? capUi().waitingCount(title) : 0; return n ? banner('synth', `<div><b>${n} screenshot${n > 1 ? 's were' : ' was'} read but never confirmed into a game.</b> If ${n > 1 ? 'they were' : 'it was'} a real game, add ${n > 1 ? 'them' : 'it'} again under Games and confirm; a discarded or duplicate screenshot can be ignored.</div>`) : ''; })()}
     ${!mine.length ? '<p class="empty">No report yet.</p>' : ''}
     <details class="howto"><summary>How to read this</summary><p class="note">Progress is the coach's rating of how closely the team followed the plan of the day. It is not computed, and ratings from different coaches are not directly comparable.</p></details></div>
-  ${reportTrends(title)}${ready}${repeatsPanel(title)}${form}${rpHistOverlay()}
+  ${reportTrends(title)}${ready}${repeatsPanel(title)}${FEAT.coachAi ? coUi().afterTop(title) : ''}${form}${rpHistOverlay()}
   <div class="panel"><h2>Day by day</h2>${days.length ? days.slice(0, 14).map((d) => `<details ${d.date === t0 ? 'open' : ''}><summary><b>${esc(d.date)}</b> · ${d.n} session${d.n > 1 ? 's' : ''} · ${pts ? `${d.points} pts in ${d.played} m` : `${d.won}-${d.lost}${d.drawn ? `-${d.drawn}` : ''}`}${d.progress != null ? ` · plan ${d.progress}/5` : ''}${d.focus.length ? ` <span class="note">— ${esc(d.focus.join('; '))}</span>` : ''}</summary>${d.sessions.map(reportCard).join('')}</details>`).join('') : '<p class="empty">Nothing filed yet.</p>'}
     ${days.length > 14 ? `<p class="note">${days.length - 14} older day(s) are in the Excel download.</p>` : ''}
     ${mine.length ? `<div class="toolbar"><button class="btn primary" type="button" data-report-xlsx="${esc(title)}">Download Excel</button><button class="btn" type="button" data-report-csv="${esc(title)}">CSV</button>${logMode(title) ? `<button class="btn" type="button" data-scrimlog-csv="${esc(title)}">Download games (Scrim Log format)</button>` : ''}<span class="msg" id="rpCsvMsg-${fid}"></span></div>` : ''}</div>`;
@@ -1277,6 +1286,8 @@ function objectivesSection(fid, dv) {
   return `<div class="h3">Objectives of this session</div>${ids.map((id, i) => `<div class="form"><label class="field" for="rp-${fid}-ob${i}">${esc(name(id))}<select id="rp-${fid}-ob${i}"><option value="">skip</option>${OBJ_RESULTS.map((r) => `<option value="${r}" ${dv(`ob${i}`) === r ? 'selected' : ''}>${r}</option>`).join('')}</select></label>
     <label class="field" for="rp-${fid}-obv${i}">Measured value (optional)<input type="text" id="rp-${fid}-obv${i}" value="${esc(dv(`obv${i}`))}"></label></div>`).join('')}`;
 }
+// V1.52: with the recap reader on the website, the paste box is the first thing on the form.
+const RECAP_TOP = () => !!PLATFORM?.ai && FEAT.ai && FEAT.recapAi && FEAT.capture;
 function reportForm(title, { fid, spec, pts, unit, planned, t0 }) {
   const d = rpDraft(fid); let auto = {}; const dv = (k, def = '') => (d[k] != null && !(d[k] === '' && auto[k] != null) ? d[k] : auto[k] != null ? auto[k] : def);
   const mine = S.reports.filter((r) => r.title === title).sort((a, b) => b.date.localeCompare(a.date) || b.createdAt.localeCompare(a.createdAt));
@@ -1285,7 +1296,7 @@ function reportForm(title, { fid, spec, pts, unit, planned, t0 }) {
   const plannedToday = planned.filter((x) => x.date === t0 && x.partner);
   const partners = uniq(mine.map((r) => r.partner)).filter((p) => !plannedToday.some((x) => x.partner === p)).slice(0, 5);
   const objectives = S.cycle.filter((o) => o.title === title && ['accepted', 'modified'].includes(o.status)).map((o) => o.rec.problem);
-  const focuses = uniq([...objectives, ...mine.map((r) => r.focus)]).slice(0, 5);
+  const focuses = uniq([usedFocus(S.wtags || [], title)?.after.focus, ...objectives, ...mine.map((r) => r.focus)]).slice(0, 5);   // V1.52: the focus the coach chose from the note comes first
   const scores = title === 'eFootball' ? [['1-0', 1, 0, 0], ['0-1', 0, 1, 0], ['Draw', 0, 0, 1], ['2-0', 2, 0, 0], ['1-1', 1, 1, 0], ['0-2', 0, 2, 0]] : [['2-0', 2, 0, 0], ['2-1', 2, 1, 0], ['1-2', 1, 2, 0], ['0-2', 0, 2, 0], ['1-0', 1, 0, 0], ['0-1', 0, 1, 0]];
   const hasDraft = Object.keys(d).some((k) => k !== 'at' && d[k] !== '');
   // V1.29: one session planned today and nothing typed yet: start from it (partner, format, focus, drills).
@@ -1309,6 +1320,7 @@ function reportForm(title, { fid, spec, pts, unit, planned, t0 }) {
     <p class="note">Two minutes: the result, the one change for next time, save. Everything else is optional. Screenshots or a voice note fill the boxes for you.</p>
     ${hasDraft ? `<p class="note draftnote">Draft kept on this device${d.at ? ` (last typed ${esc(new Date(d.at).toTimeString().slice(0, 5))})` : ''}. <button type="button" class="linkbtn" data-rp-clear="${esc(fid)}">Clear form</button></p>` : ''}
     ${auto.partner ? `<p class="note draftnote">Filled from today's plan: vs ${esc(auto.partner)}. Change anything that is different.</p>` : ''}
+    ${RECAP_TOP() && !ed ? capUi().debriefSection(title, fid) : ''}
     ${log ? step(1, 'Session and games', 'Partner and time slot, then each game the Scrim Log way.') : step(1, 'Result', 'Who you played and the score.')}
     ${last ? `<div class="toolbar">${chip(fid, { partner: last.partner, level: last.partnerLevel, format: last.format, roster: last.roster, focus: last.focus, by: last.by }, 'Copy setup from last report', ' wide')}<span class="note">vs ${esc(last.partner)}, ${esc(last.date)}</span></div>` : ''}
     <div class="form">
@@ -1326,7 +1338,7 @@ function reportForm(title, { fid, spec, pts, unit, planned, t0 }) {
     ${pts ? `${num('played', 'Matches played')}${num('points', 'Total points')}` : `${num('won', `${esc(cap(unit))} won`)}${num('lost', `${esc(cap(unit))} lost`)}`}
     </div>`}
     ${step(2, 'The change for next time', 'Needed: one concrete change. The rest helps the analysis but is optional.')}
-    ${capUi().debriefSection(title, fid)}
+    ${RECAP_TOP() && !ed ? '' : capUi().debriefSection(title, fid)}
     ${txt('adjust', 'The one change for the next session (needed)', 'One concrete change to try next time', true)}
     ${last?.adjust ? `<div class="fixcheck"><span class="note">Last time (${esc(last.date)}, vs ${esc(last.partner)}) the adjustment was:</span> <b>${esc(last.adjust)}</b>
       <input type="hidden" id="rp-${fid}-prevadj" value="${esc(last.adjust)}">
@@ -2686,6 +2698,7 @@ async function onClick(e) {
   // V1.13 capture / patterns buttons only, so every other click stays synchronous until its own first await.
   if (Object.keys(t.dataset).some((k) => /^(cap|pat)[A-Z]/.test(k)) && await capUi().onClick(t)) return;
   if (Object.keys(t.dataset).some((k) => /^sup[A-Z]/.test(k)) && await supUi().onClick(t)) return;
+  if (Object.keys(t.dataset).some((k) => /^wr[A-Z]/.test(k)) && await wrUi().onClick(t)) return;
   if (Object.keys(t.dataset).some((k) => /^dr[A-Z]/.test(k)) && await drUi().onClick(t)) return;
   if (FEAT.coachAi && Object.keys(t.dataset).some((k) => /^co[A-Z]/.test(k)) && await coUi().onClick(t)) return;
   if (Object.keys(t.dataset).some((k) => /^pl[A-Z]/.test(k)) && await plUi().onClick(t)) return;
