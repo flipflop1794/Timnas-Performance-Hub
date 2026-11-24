@@ -217,6 +217,18 @@ label.check{display:flex;gap:8px;align-items:flex-start;margin:4px 0;font-size:1
 .sw-people,.sw-roles,.sw-check,.carry-list{list-style:none;padding-left:0;margin-left:0}
 .sw-roles li{padding:4px 0}
 .sw-rh{margin:16px 0 0}.sw-kpi .v small{font-size:15px;font-weight:600;color:var(--muted)}
+/* V1.51 Whoop: recovery rings in Whoop's colours */
+.wr-list{list-style:none;padding:0;margin:8px 0}.wr-a{border-bottom:1px solid var(--line)}.wr-a:last-child{border-bottom:0}
+.wr-row{display:flex;align-items:center;gap:12px;width:100%;min-height:56px;padding:8px 0;background:none;border:0;color:inherit;font:inherit;text-align:left;cursor:pointer}
+div.wr-row{cursor:default}.wr-txt{display:flex;flex-direction:column;min-width:0;flex:1}.wr-txt .note{font-size:13px}.wr-tags{flex:none}
+.wr-ring{--c:var(--line-2);flex:none;width:46px;height:46px;border-radius:50%;display:grid;place-items:center;background:conic-gradient(var(--c) calc(var(--p)*1%),var(--line) 0)}
+.wr-ring b{width:36px;height:36px;border-radius:50%;display:grid;place-items:center;background:var(--surface);font-size:14px}
+.wr-ring.green{--c:var(--good)}.wr-ring.yellow{--c:var(--warn)}.wr-ring.red{--c:var(--bad)}
+.wr-dots i.green{background:var(--good);border-color:var(--good)}.wr-dots i.yellow{background:var(--warn);border-color:var(--warn)}.wr-dots i.red{background:var(--bad);border-color:var(--bad)}
+.wr-more{padding:0 0 12px 58px}.wr-more .dots{flex-wrap:wrap;margin:4px 0}
+.wr-wait{list-style:none;padding:0}.wr-wait li{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid var(--line)}
+.wr-setup{border:1px dashed var(--line-2);border-radius:10px;padding:10px 12px;margin:8px 0}.wr-url code{word-break:break-all}
+@media (max-width:600px){.wr-more{padding-left:0}}
 .sw-recap{list-style:none;padding:0;margin:4px 0 8px}.sw-recap li{padding:5px 0;border-bottom:1px solid var(--line)}.sw-recap li:last-child{border-bottom:0}
 .sw-vs{margin:-6px 0 8px;font-size:12px}
 .carry .carry-list li{display:block;padding:10px 0;border-bottom:1px solid var(--line)}.carry .carry-list li:last-child{border-bottom:0}

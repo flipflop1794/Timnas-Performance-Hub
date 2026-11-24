@@ -292,7 +292,7 @@ export function supportUi(ctx) {
     // V1.49: most urgent first. The readers' own report form is folded (they rarely file); staff open on their form.
     if (readsAll()) {
       const d = draft(); const busy = !!d.editing || d.rows.some((r) => !isBlankRow(r));
-      return `<div class="sw-page">${checkBlock()}${weekOff() === 0 ? todayBlock() : ''}${weekBlock()}${reportList(recent, true)}
+      return `<div class="sw-page">${checkBlock()}${ctx.wearPanel?.() || ''}${weekOff() === 0 ? todayBlock() : ''}${weekBlock()}${reportList(recent, true)}
         ${canFile() ? `<details class="panel sw-fold" ${busy ? 'open' : ''}><summary data-no-tr>${esc(d.editing ? T('Edit report', 'Ubah laporan') : T('File my own report', 'Isi laporan saya'))}</summary>${form()}</details>` : ''}${historyOverlay()}</div>`;
     }
     if (canFile()) return `<div class="sw-page">${myWeek()}${form()}${reportList(recent.filter((r) => r.by === me()), false)}${historyOverlay()}</div>`;

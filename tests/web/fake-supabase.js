@@ -167,6 +167,13 @@ function client(B, sessionUserId) {
     from: (t) => query(t),
     // The scrim-ai server function: tests set B.ai = async (body, userId) => ({ data } | { status, error }).
     functions: { invoke: async (name, { body }) => {
+      // V1.51 the whoop server function: tests set B.whoop = async (body, userId) => ({ data } | { status, error }).
+      if (name === 'whoop') {
+        if (!B.whoop) return { data: null, error: Object.assign(new Error('Edge Function returned a non-2xx status code'), { context: { status: 404, json: async () => ({}) } }) };
+        const w = await B.whoop(structuredClone(body), uid());
+        if (w.error) return { data: null, error: Object.assign(new Error('Edge Function returned a non-2xx status code'), { context: { status: w.status || 400, json: async () => ({ error: w.error }) } }) };
+        return { data: w.data, error: null };
+      }
       if (name === 'scrim-ai' && body?.action === 'ping' && B.ai) return { data: { ok: true, ai: B.aiKey !== false, actions: B.aiActions || ['scoreboard', 'draft', 'debrief', 'digest', 'plan', 'summary', 'prep', 'tags', 'br_result'] }, error: null };
       if (name !== 'scrim-ai' || !B.ai) return { data: null, error: Object.assign(new Error('Edge Function returned a non-2xx status code'), { context: { status: 404, json: async () => ({}) } }) };
       const out = await B.ai(structuredClone(body), uid());

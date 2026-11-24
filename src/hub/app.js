@@ -98,6 +98,7 @@ import { gameBreakdown, breakdownText, BASE_MIN, FLAG_PCT, ownVod, addMark, vodT
 import { tagsOf } from '../core/weakness.js';
 import { coachAiUi } from './coach_ai_ui.js';
 import { supportUi } from './support_ui.js';
+import { wearableUi } from './wearable_ui.js';
 import { JOBS as SUPPORT_JOBS } from '../core/support.js';
 import { standInRecord } from '../core/patterns.js';
 import { weeks as trendWeeks, period as trendPeriod, PERIOD_WEEKS as TR_PERIODS, teamTrends, playerTrends, MIN_VALUES as TR_MIN } from '../core/trends.js';
@@ -148,7 +149,9 @@ let CP = null;
 // V1.20 coach AI (src/hub/coach_ai_ui.js): weekly leadership summary, preparation packs, weaknesses, PUBGM screenshots.
 let CO = null;
 let SU = null;
-const supUi = () => (SU ||= supportUi({ S, esc, tag, banner, setMsg, val, render, PLATFORM, HUB_USER, FEAT, today: () => localDay(), meName: () => meName(), titles: () => WEC_TITLES.map((t) => t.id) }));
+let WR = null;
+const wrUi = () => (WR ||= wearableUi({ S, esc, tag, setMsg, render, PLATFORM, today: () => localDay() }));
+const supUi = () => (SU ||= supportUi({ S, esc, tag, banner, setMsg, val, render, PLATFORM, HUB_USER, FEAT, wearPanel: () => wrUi().donnyPanel(), today: () => localDay(), meName: () => meName(), titles: () => WEC_TITLES.map((t) => t.id) }));
 const coUi = () => (CO ||= coachAiUi({ S, esc, tag, banner, setMsg, val, render, sid, PLATFORM, HUB_USER, CAN_APPROVE, today: () => today(), EVENT,
   titles: () => PQ_ORDER, titleVisible: (t) => titleVisible(t), cardFor: (t, n) => prepCardFor(t, n), meName: () => meName(), prepImage: (f) => capUiReal().prepImage(f),
   saveScrims: (xs) => saveScrimList(xs), propose: (t, label, w) => proposeWeakness(t, label, w), onSaved: (rows) => savePubgmRows(rows),
@@ -1003,7 +1006,7 @@ function wsTeamNav(title, here) {
   if (!coachNav()) return '';
   const w = wsTabs(title); if (!w) return '';
   const items = [[REPORT_TAB[title], 'Scrim reports', 'reports'], [`${w.team}-trends`, 'Trends', 'trends'], [TEAM_TAB[title], 'Roster', 'team']];
-  return `<nav class="subnav" aria-label="My team">${items.map(([h, l, k]) => `<a href="#${h}" ${k === here ? 'aria-current="page"' : ''}>${esc(l)}</a>`).join('')}</nav>${here === 'reports' && FEAT.support ? supUi().noticesPanel([title]) : ''}`;
+  return `<nav class="subnav" aria-label="My team">${items.map(([h, l, k]) => `<a href="#${h}" ${k === here ? 'aria-current="page"' : ''}>${esc(l)}</a>`).join('')}</nav>${here === 'reports' ? wrUi().coachPanel(title) : ''}${here === 'reports' && FEAT.support ? supUi().noticesPanel([title]) : ''}`;
 }
 function reportsPanel(title) {
   loadRpHist();
@@ -2686,6 +2689,7 @@ async function onClick(e) {
   // V1.13 capture / patterns buttons only, so every other click stays synchronous until its own first await.
   if (Object.keys(t.dataset).some((k) => /^(cap|pat)[A-Z]/.test(k)) && await capUi().onClick(t)) return;
   if (Object.keys(t.dataset).some((k) => /^sup[A-Z]/.test(k)) && await supUi().onClick(t)) return;
+  if (Object.keys(t.dataset).some((k) => /^wr[A-Z]/.test(k)) && await wrUi().onClick(t)) return;
   if (Object.keys(t.dataset).some((k) => /^dr[A-Z]/.test(k)) && await drUi().onClick(t)) return;
   if (FEAT.coachAi && Object.keys(t.dataset).some((k) => /^co[A-Z]/.test(k)) && await coUi().onClick(t)) return;
   if (Object.keys(t.dataset).some((k) => /^pl[A-Z]/.test(k)) && await plUi().onClick(t)) return;

@@ -183,6 +183,24 @@ function aiApi(client: SupabaseClient) {
   };
 }
 
+// V1.51: the whoop server function (Whoop links and numbers). A missing function reads as "not set up yet".
+function whoopApi(client: SupabaseClient) {
+  return {
+    async call(body: Record<string, unknown>) {
+      const { data, error } = await client.functions.invoke('whoop', { body });
+      if (error) {
+        const ctx = (error as unknown as { context?: Response }).context;
+        let msg = error.message;
+        try { const j = await ctx?.json?.(); if (j?.error) msg = j.error; } catch { /* not JSON */ }
+        if (ctx?.status === 404) msg = 'Whoop is not set up on the server yet.';
+        else if (/Failed to send|Failed to fetch|NetworkError/i.test(msg)) msg = 'Could not reach the server. Check your connection.';
+        throw Object.assign(new Error(msg), { status: ctx?.status || 0 });
+      }
+      return data;
+    },
+  };
+}
+
 // V1.15: which newer parts the live database and server already have. The website can be updated before the
 // database: anything not switched on yet stays hidden instead of failing (Staff → Users & access lists them).
 // coachAi: the V1.20 tables exist; coachAiFn: the deployed scrim-ai function has the V1.20 actions.
@@ -229,7 +247,7 @@ async function start(client: SupabaseClient, userId: string) {
   W.claude = { use: async (n: string) => (n === 'db' ? db : n === 'downloads' ? { save: download } : null) };
   W.__HUB_USER__ = me;
   const features = await probeFeatures(client);
-  W.__HUB_PLATFORM__ = { signOut: () => client.auth.signOut(), admin: me.isAdmin ? adminApi(client) : null, download, ai: aiApi(client), features, actionOwners };
+  W.__HUB_PLATFORM__ = { signOut: () => client.auth.signOut(), admin: me.isAdmin ? adminApi(client) : null, download, ai: aiApi(client), whoop: whoopApi(client), features, actionOwners };
   // @ts-ignore -- the hub is plain JavaScript; importing it starts it.
   await import('../hub/app.js');
 }
