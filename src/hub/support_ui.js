@@ -278,7 +278,7 @@ export function supportUi(ctx) {
     const dots = (g) => `<span class="dots" aria-label="${esc(T(`${g.daysReported} of 7 days`, `${g.daysReported} dari 7 hari`))}">${g.days.map((n, i) => `<i class="${w.days[i] > t0 ? 'future' : n != null ? 'on' : w.days[i] === t0 ? 'today' : ''}" title="${esc(`${DAYS[L()][i]} ${dm(w.days[i])}${n != null ? `: ${n}` : ''}`)}"></i>`).join('')}</span>`;
     const roleLine = (d) => { const s = summarize(anonymise(U.reports.filter((r) => r.discipline === d), w.from, w.to)); const b = cur.byDisc[d];
       const x = d === 'physio' && s.vasN ? T(` · pain −${s.vasDrop}, better ${s.better}/${s.responded}`, ` · nyeri −${s.vasDrop}, membaik ${s.better}/${s.responded}`) : d === 'psych' && s.formal + s.informal ? ` · formal ${s.formal} / informal ${s.informal}` : '';
-      return `<li><b>${esc(DISC_LABEL[d])}</b> <span class="note" data-no-tr>${esc(T(`${b.reports} reports · ${b.athletes} athletes${x}`, `${b.reports} laporan · ${b.athletes} atlet${x}`))}</span></li>`; };
+      return `<li><b>${esc(DISC_LABEL[d])}</b> <span class="note" data-no-tr>${esc(T(`${b.reports} report${b.reports === 1 ? "" : "s"} · ${b.athletes} athlete${b.athletes === 1 ? "" : "s"}${x}`, `${b.reports} laporan · ${b.athletes} atlet${x}`))}</span></li>`; };
     const roles = DISCS.filter((d) => cur.byDisc[d].reports);
     const edits = U.hist.filter((h) => String(h.at).slice(0, 10) >= w.from && String(h.at).slice(0, 10) <= w.to).map((h) => ({ h, r: U.reports.find((x) => x.id === h.record_id) })).filter((x) => x.r);
     return `<div class="panel sw">${weekNav(w, off)}

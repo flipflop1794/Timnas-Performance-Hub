@@ -48,7 +48,7 @@ export const GUIDE = [
     { title: 'Tim pendukung: laporan harian', steps: [
       'Performance → Tim pendukung. Satu baris per atlet: yang dilakukan, temuan, tindak lanjut. Psikolog juga memilih jenis sesi (konseling formal, informal, observasi) dan menulis prognosis; fisio tetap mengisi area tubuh dan VAS.',
       'Paling cepat: tempel pesan yang Anda kirim ke grup WhatsApp lalu tekan "Isi formulir (AI)". Cek barisnya (atlet, temuan, tindakan, VAS), lalu "Simpan laporan". Grup tetap jalan: "Salin untuk WhatsApp" memberi teks yang sama.',
-      'Detailnya hanya dibaca Anda, Coach Donny, Head Coach dan admin. Centang "Beri tahu pelatih" pada atlet untuk mengirim satu kalimat netral (tanpa diagnosa) ke pelatih timnya.',
+      'Detailnya hanya dibaca Anda, Coach Donny, Head Coach dan admin. Centang "Beri tahu pelatih" pada atlet untuk mengirim satu kalimat netral (tanpa diagnosis) ke pelatih timnya.',
       'Masing-masing melihat "Ringkasan saya" (hanya laporan Anda sendiri; staf pendukung lain tidak bisa melihatnya). Ada yang salah? "Ubah": database mencatat siapa mengubah apa, dan kapan. Coach Donny, Head Coach dan admin melihat "Progres tim pendukung": per orang, per tim, yang perlu dipantau dan setiap perubahan.',
     ] }),
   S('pelatnas', 'pelatnas', { en: 'All staff; camp dates: Head Coach, admins', id: 'Semua staf; tanggal pelatnas: Head Coach, admin' }, 'pel-day',

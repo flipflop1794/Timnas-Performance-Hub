@@ -169,7 +169,7 @@ const EXACT = {
   'Or pick a spot': 'Atau pilih titik', 'Pain (0–10)': 'Nyeri (0–10)', 'No spot picked yet.': 'Belum ada titik yang dipilih.', 'Pain spots (7 days)': 'Titik nyeri (7 hari)', 'Pain spots': 'Titik nyeri',
   // V1.34 support staff
   'Support staff': 'Tim pendukung', 'Team doctor': 'Dokter tim', 'Physio (men)': 'Fisio putra', 'Physio (women)': 'Fisio putri', 'Physical coach': 'Pelatih fisik', Psychologist: 'Psikolog', 'Psychologist (men)': 'Psikolog putra', 'Psychologist (women)': 'Psikolog putri',
-  'Physio / massage': 'Fisio / masase', 'Physical conditioning': 'Kondisi fisik', 'Therapy (P)': 'Terapi (P)', 'Complaint, examination, diagnosis (S / O / A)': 'Keluhan, pemeriksaan, diagnosa (S / O / A)',
+  'Physio / massage': 'Fisio / masase', 'Physical conditioning': 'Kondisi fisik', 'Therapy (P)': 'Terapi (P)', 'Complaint, examination, diagnosis (S / O / A)': 'Keluhan, pemeriksaan, diagnosis (S / O / A)',
   Treatment: 'Tindakan', 'Complaint / assessment': 'Keluhan / asesmen', 'What you did (session, measurement)': 'Yang dilakukan (sesi, pengukuran)', 'What you found (fatigue, load)': 'Temuan (kelelahan, beban)',
   'What you did (observation, session)': 'Yang dilakukan (observasi, sesi)', 'What you did': 'Yang dilakukan', 'What you found': 'Temuan',
   'Daily reports of the team doctor, physiotherapists, physical coach and psychologist.': 'Laporan harian dokter tim, fisioterapis, pelatih fisik dan psikolog.',
@@ -181,7 +181,7 @@ const EXACT = {
   '+ Add athlete': '+ Tambah atlet', 'For a whole team or the session (optional)': 'Untuk satu tim atau sesi (opsional)', 'Seen today:': 'User hari ini:', 'Copy for WhatsApp': 'Salin untuk WhatsApp',
   'Pick your role first (an admin can set it for you in Users & access).': 'Pilih peran Anda dulu (admin bisa mengaturnya di Users & access).',
   'Not in the list? Name and team': 'Tidak ada di daftar? Nama dan tim', 'Body region': 'Area tubuh', 'VAS before (0–10)': 'VAS sebelum (0–10)', 'VAS after (0–10)': 'VAS sesudah (0–10)',
-  'Athlete response': 'Respon atlet', 'Follow-up needed': 'Perlu tindak lanjut', 'Tell the coach (no diagnosis)': 'Beri tahu pelatih (tanpa diagnosa)', 'Line for the coach, if ticked': 'Kalimat untuk pelatih, jika dicentang',
+  'Athlete response': 'Respons atlet', 'Follow-up needed': 'Perlu tindak lanjut', 'Tell the coach (no diagnosis)': 'Beri tahu pelatih (tanpa diagnosis)', 'Line for the coach, if ticked': 'Kalimat untuk pelatih, jika dicentang',
   'e.g. Check with the physio before scrim': 'mis. Cek dengan fisio sebelum scrim', 'e.g. Jonathan (CS2)': 'mis. Jonathan (CS2)', better: 'membaik', same: 'sama', worse: 'memburuk',
   'This week — support staff': 'Minggu ini — tim pendukung', 'Reports filed (7 days)': 'Laporan masuk (7 hari)', 'Athlete visits': 'Kunjungan atlet', 'Follow-ups flagged': 'Tindak lanjut ditandai',
   'Seen 3+ times': 'Ditangani 3+ kali', 'Physio: pain drop (VAS)': 'Fisio: penurunan nyeri (VAS)', 'Better after treatment': 'Membaik setelah tindakan', 'Nothing unusual this week.': 'Tidak ada yang janggal minggu ini.',
