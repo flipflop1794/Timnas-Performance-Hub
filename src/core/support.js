@@ -322,3 +322,63 @@ export function recapText(rc, week, name, lang = 'id') {
     c.formal + c.informal ? `${id ? 'Konseling formal / informal' : 'Counselling formal / informal'}: ${c.formal} / ${c.informal}` : null,
   ].filter((x) => x != null && x !== false && x !== '').join('\n');
 }
+
+// ---------------------------------------------------------------- V1.54 the work behind the numbers
+// For each staff member: their week day by day in their own words, and what they have done since their first report.
+// For Coach Donny, the Head Coach and admins: one line per staff member. All of it counts what was REPORTED.
+const period = (reports, by, from, to) => myRecap(reports, by, { from, to, prevFrom: '0000-00-00', prevTo: '0000-00-00' }).cur;
+// One entry per day of the week: who was seen and what was done (their words), plus the team-level part.
+export function myDays(reports, by, week) {
+  const mine = reports.filter((r) => r.by === by && r.date >= week.from && r.date <= week.to);
+  return week.days.map((date) => {
+    const rs = mine.filter((r) => r.date === date).sort((a, b) => String(a.createdAt).localeCompare(String(b.createdAt)));
+    return { date, reports: rs.length,
+      items: rs.flatMap((r) => r.rows.map((x) => ({ athlete: x.athlete || x.athleteSeen || '', title: x.title || '', did: x.did || x.found || '', response: x.response || '', followUp: followText(x.followUp), done: !!x.fuDone }))),
+      general: rs.filter((r) => r.general?.did || r.general?.found).map((r) => ({ teams: r.general.teams || [], did: r.general.did || r.general.found })) };
+  });
+}
+// Days reported in a row, ending today (or yesterday when today's report is not in yet).
+export function reportStreak(reports, by, asOf) {
+  const days = new Set(reports.filter((r) => r.by === by && r.date <= asOf).map((r) => r.date));
+  let d = days.has(asOf) ? asOf : shiftDay(asOf, -1); let n = 0;
+  while (days.has(d)) { n++; d = shiftDay(d, -1); }
+  return n;
+}
+// Everything since the first report: the same counts as the weekly recap, plus the streak.
+export function soFar(reports, by, asOf) {
+  const mine = reports.filter((r) => r.by === by && r.date <= asOf); if (!mine.length) return null;
+  const since = mine.reduce((a, r) => (r.date < a ? r.date : a), mine[0].date);
+  return { since, streak: reportStreak(reports, by, asOf), ...period(reports, by, since, asOf) };
+}
+// The role's own result in one short line ('' when there is nothing to show yet).
+export function roleResult(disc, c, lang = 'en') {
+  const id = lang === 'id';
+  if (disc === 'physio') return [c.vasN ? (id ? `nyeri turun rata-rata ${c.vasDrop} (${c.vasN} terapi)` : `pain down ${c.vasDrop} on average (${c.vasN} treatments)`) : '', c.responded ? (id ? `membaik ${c.better}/${c.responded}` : `better ${c.better}/${c.responded}`) : ''].filter(Boolean).join(' · ');
+  if (disc === 'medic') return c.responded ? (id ? `membaik setelah penanganan ${c.better}/${c.responded}` : `better after treatment ${c.better}/${c.responded}`) : '';
+  if (disc === 'psych') return c.formal + c.informal ? (id ? `sesi formal ${c.formal} · informal ${c.informal}` : `sessions: ${c.formal} formal · ${c.informal} informal`) : '';
+  if (disc === 'physical') return c.reports ? (id ? `${c.reports} sesi dilaporkan` : `${c.reports} session${c.reports === 1 ? '' : 's'} reported`) : '';
+  return '';
+}
+// One row per staff member for the week: the accounts on the support staff (also those with no report) and anyone
+// else who filed. staff: [{ name, job }]. Sorted by role, then name: it is a list, not a ranking.
+export function teamBoard(staff, reports, week, asOf) {
+  const people = new Map();
+  for (const p of staff || []) people.set(p.name, { name: p.name, job: p.job || '', disc: JOBS[p.job]?.disc || '' });
+  for (const r of reports) if (r.date >= week.prevFrom && r.date <= week.to && !people.has(r.by)) people.set(r.by, { name: r.by, job: r.job || '', disc: r.discipline });
+  return [...people.values()].map((p) => {
+    const mine = reports.filter((r) => r.by === p.name); const rc = myRecap(reports, p.name, week);
+    const disc = p.disc || rc.cur.disc || mine[0]?.discipline || '';
+    const last = mine.reduce((a, r) => (r.date <= asOf && r.date > a ? r.date : a), '');
+    return { ...p, disc, cur: rc.cur, prev: rc.prev, last,
+      days: week.days.map((d) => { const rs = mine.filter((r) => r.date === d); return rs.length ? rs.reduce((a, r) => a + (r.rows || []).length, 0) : null; }),
+      open: openFollowUps(reports, shiftDay(asOf, -13), asOf, p.name).length };
+  }).sort((a, b) => (DISCS.indexOf(a.disc) + 99) % 99 - (DISCS.indexOf(b.disc) + 99) % 99 || a.name.localeCompare(b.name));
+}
+// The board as WhatsApp text: staff names and counts only, no athlete names, no findings.
+export function boardText(board, week, lang = 'id') {
+  const id = lang === 'id';
+  return [`*${id ? 'Tim support minggu ini' : 'Team support this week'}* — ${week.from} ${id ? 's/d' : 'to'} ${week.to}`, '',
+    ...board.map((p) => { const c = p.cur; const role = roleResult(p.disc, c, lang);
+      return `- ${p.name} (${id ? DISC_ID[p.disc] || '-' : DISC_LABEL[p.disc] || '-'}): ${id ? 'lapor' : 'reported'} ${c.days}/7 ${id ? 'hari' : 'days'}${c.reports ? ` · ${c.athletes} ${id ? 'atlet' : 'athletes'} · ${c.visits} ${id ? 'kunjungan' : 'visits'}` : ''}${c.followUps || c.closed || p.open ? ` · ${id ? 'tindak lanjut' : 'follow-ups'} ${c.followUps} ${id ? 'dibuat' : 'written'}, ${c.closed} ${id ? 'selesai' : 'closed'}, ${p.open} ${id ? 'terbuka' : 'open'}` : ''}${role ? ` · ${role}` : ''}`; }),
+    '', id ? 'Dihitung dari laporan yang masuk ke hub, bukan dari semua pekerjaan.' : 'Counted from the reports filed in the hub, not from all the work done.'].join('\n');
+}

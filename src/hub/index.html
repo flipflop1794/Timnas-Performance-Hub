@@ -213,6 +213,13 @@ label.check{display:flex;gap:8px;align-items:flex-start;margin:4px 0;font-size:1
 .sw .up{color:var(--good)}.sw .down{color:var(--bad)}
 .sw-people li{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid var(--line)}.sw-people li:last-child{border-bottom:0}
 .sw-p-right{display:flex;align-items:center;gap:8px;flex:none}
+/* V1.54 the work behind the numbers: day by day, so far, one line per staff member */
+.sw-board li.sw-pp{display:block}.sw-pp-top{display:flex;justify-content:space-between;align-items:center;gap:10px}.sw-pp-line{margin-top:4px;line-height:1.5}
+.sw-daylist{margin:6px 0 10px}.sw-dl{border-bottom:1px solid var(--line);padding:8px 0}.sw-dl:last-child{border-bottom:0}
+.sw-dl.off{display:flex;justify-content:space-between;align-items:center;gap:10px;color:var(--muted)}
+details.sw-dl>summary{cursor:pointer}details.sw-dl ul{list-style:none;padding:0;margin:8px 0 0}details.sw-dl li{padding:6px 0 6px 10px;border-left:2px solid var(--line-2);margin-bottom:6px}
+.sw-sofar{margin-top:14px;padding:12px;border-radius:10px;background:var(--good-soft)}.sw-sofar .h3{margin:0 0 8px}
+.sw-chips{display:flex;flex-wrap:wrap;gap:6px 14px}.sw-chip b{font-family:var(--f-display);font-size:20px}
 .dots{display:inline-flex;gap:5px}.dots i{width:12px;height:12px;border-radius:50%;border:1.5px solid var(--line-2)}
 .dots i.on{background:var(--good);border-color:var(--good)}.dots i.today{border:1.5px dashed var(--warn)}.dots i.future{opacity:.3}
 .sw-people,.sw-roles,.sw-check,.carry-list{list-style:none;padding-left:0;margin-left:0}
