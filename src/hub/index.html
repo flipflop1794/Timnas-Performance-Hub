@@ -439,6 +439,18 @@ tr.cp-now td{background:var(--gold-soft)}.cp-phases{display:grid;grid-template-c
 .chip.on{border-color:var(--gold-line);background:var(--gold-soft)}
 .panel.pro{border-style:dashed}
 @media (prefers-reduced-motion:no-preference){.drseg button,.dr-slot{transition:background-color .12s,border-color .12s}}
+/* V1.55 visual pass. One-row menu: the rest opens under "Menu". Red is for the main action, the page you are on and
+   errors; links and names are the text colour, underlined. */
+.titles{align-items:center}
+.titles .tmore{flex-basis:100%;display:flex;flex-wrap:wrap;gap:4px;align-items:center;padding:8px 0 2px;margin-top:4px;border-top:1px solid var(--line)}
+.titles .tmore[hidden]{display:none}
+.titles #focusBtn[aria-pressed="true"]{background:var(--line-2);border-color:var(--ink-3);color:var(--ink)}
+@media (max-width:480px){.titles .lbl{display:none}.titles button.lang b{padding:4px 7px}}
+.titles button.menu{color:var(--ink)}.titles button.menu[aria-expanded="true"]{background:var(--line-2);border-color:var(--ink-3)}
+a,.linkbtn{color:var(--ink);text-decoration:underline;text-decoration-color:var(--ink-3);text-underline-offset:3px}
+a:hover,.linkbtn:hover{text-decoration-color:var(--ink)}
+a.btn,nav.tabs a,.subnav a{text-decoration:none}
+@media (max-width:760px){.edition{display:none}.brand{font-size:19px}.bar1{padding-block:10px 6px;gap:6px 10px}.titles button{font-size:13px;padding:5px 10px;padding-right:13px}.titles .me{font-size:13px}}
 </style>
 <header class="top"><div class="wrap">
   <div class="bar1">
