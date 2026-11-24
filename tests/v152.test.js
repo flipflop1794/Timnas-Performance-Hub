@@ -38,6 +38,13 @@ test('V1.52 recap: scores must be written in the recap; partner too; rows come o
   // Health sentences never reach a field (the debrief rule still applies).
   const h = checkRecap('MLBB', 'Rotasi telat. Kevin sakit demam.', { ...blank, date: '', partner: '', rows: [], failed: 'Rotasi telat. Kevin sakit demam.' });
   assert.equal(h.fields.failed, 'Rotasi telat.');
+  // Found with the real AI (24 Nov): a PUBG Mobile lobby keeps the word "lobby"; a sentence is not in two boxes.
+  const lobby = checkRecap('PUBG Mobile', 'Scrim 2 match vs lobby T1 SEA. M1 Erangel #3 7 kill', { ...blank, date: '', partner: 'T1 SEA', rows: [] });
+  assert.equal(lobby.fields.partner, 'Lobby T1 SEA');
+  assert.equal(checkRecap('CS2', 'Scrim vs T1 SEA', { ...blank, date: '', partner: 'T1 SEA', rows: [] }).fields.partner, 'T1 SEA');
+  const dup = checkRecap('Dota 2', 'Scrim bo3 vs BOOM. Draft game 2 kurang stun.', { ...blank, date: '', partner: 'BOOM', rows: [], failed: 'Draft game 2 kurang stun.', detail: 'Scrim bo3 vs BOOM. Draft game 2 kurang stun' });
+  assert.equal(dup.fields.detail, 'Scrim bo3 vs BOOM.'); assert.equal(dup.fields.failed, 'Draft game 2 kurang stun.');
+  assert.equal(checkRecap('Dota 2', 'Draft kurang stun.', { ...blank, date: '', partner: '', rows: [], failed: 'Draft kurang stun.', detail: 'Draft kurang stun.' }).fields.detail, undefined);
 });
 
 const mk = (title, date, extra = {}) => ({ ...scrimReport({ title, date, by: 'Coach', partner: 'Team X', won: 1, lost: 1, adjust: 'vision sebelum lord', failed: 'lord fight telat', ...extra }), id: `R-${date}` });

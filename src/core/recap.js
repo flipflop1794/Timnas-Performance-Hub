@@ -26,7 +26,7 @@ export function checkRecap(title, source, raw, { roster = [], today } = {}) {
   const src = lower(source); const nums = new Set(numbersIn(source).map((n) => String(Number(n))));
   const said = (n) => nums.has(String(n));
   const partner = String(raw?.partner || '').trim().slice(0, 80);
-  if (partner) { if (src.includes(lower(partner))) fields.partner = partner; else flags.push({ field: 'partner', text: `Sparring partner "${partner}" is not written in your recap: type it yourself.` }); }
+  if (partner) { if (src.includes(lower(partner))) fields.partner = rowKind(title) === 'br' && !/lobby/i.test(partner) && src.includes(`lobby ${lower(partner)}`) ? `Lobby ${partner}` : partner; else flags.push({ field: 'partner', text: `Sparring partner "${partner}" is not written in your recap: type it yourself.` }); }
   if (isDay(raw?.date) && (!today || raw.date <= today)) fields.date = raw.date;
   const kind = rowKind(title); const rows = []; let dropped = 0;
   for (const x of (Array.isArray(raw?.rows) ? raw.rows : []).slice(0, 12)) {
@@ -47,6 +47,12 @@ export function checkRecap(title, source, raw, { roster = [], today } = {}) {
     try { if (cleanRows(title, [row]).length) rows.push(row); else dropped++; } catch { dropped++; }
   }
   if (dropped) flags.push({ field: 'rows', text: `${cnt(dropped, 'result line was', 'result lines were')} left out: a score or placement was not written in your recap. Add ${dropped === 1 ? 'it' : 'them'} by hand.` });
+  // A sentence the AI put in detail and also in another box stays in the other box only.
+  if (fields.detail) {
+    const others = ['focus', 'worked', 'failed', 'adjust'].map((k) => lower(fields[k])).filter(Boolean);
+    const kept = fields.detail.split(/(?<=[.!?])\s+/).filter((s) => { const k = lower(s).replace(/[.!?\s]+$/, ''); return k && !others.some((o) => o.includes(k)); });
+    if (kept.length) fields.detail = kept.join(' '); else delete fields.detail;
+  }
   return { fields, rows, flags, notPlaced };
 }
 
