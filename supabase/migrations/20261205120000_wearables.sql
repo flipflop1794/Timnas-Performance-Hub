@@ -13,7 +13,7 @@ create table public.wearable_config (
   id int primary key default 1 check (id = 1),
   client_id text,
   client_secret_enc text,           -- encrypted by the function
-  cron_secret text not null default encode(extensions.gen_random_bytes(24), 'hex'),
+  cron_secret text not null default replace(gen_random_uuid()::text || gen_random_uuid()::text, '-', ''),
   updated_by uuid references public.profiles (id),
   updated_at timestamptz not null default now()
 );
@@ -62,13 +62,23 @@ alter table public.wearable_days enable row level security;
 revoke all on public.wearable_config, public.wearable_invites, public.wearable_links, public.wearable_days from public, anon, authenticated;
 
 -- Every 3 hours the database asks the function to pull new Whoop data for every connected athlete.
--- pg_cron and pg_net are Supabase extensions; the function URL is this project's.
-create extension if not exists pg_cron;
-create extension if not exists pg_net;
-select cron.schedule('whoop-sync', '17 */3 * * *', $cron$
-  select net.http_post(
-    url := 'https://cwedqaupevboyzuxvdto.supabase.co/functions/v1/whoop',
-    headers := jsonb_build_object('content-type', 'application/json', 'x-cron-secret', (select cron_secret from public.wearable_config where id = 1)),
-    body := '{"action":"sync_all"}'::jsonb,
-    timeout_milliseconds := 60000)
-$cron$);
+-- pg_cron and pg_net are Supabase extensions; the function URL is this project's. Where they are not available (the
+-- test database), the tables are still made and the 3-hourly pull is skipped.
+do $do$
+begin
+  if not exists (select 1 from pg_available_extensions where name = 'pg_cron')
+     or not exists (select 1 from pg_available_extensions where name = 'pg_net') then
+    raise notice 'pg_cron / pg_net not available: no 3-hourly Whoop pull here';
+    return;
+  end if;
+  create extension if not exists pg_cron;
+  create extension if not exists pg_net;
+  execute $cron$select cron.schedule('whoop-sync', '17 */3 * * *', $job$
+    select net.http_post(
+      url := 'https://cwedqaupevboyzuxvdto.supabase.co/functions/v1/whoop',
+      headers := jsonb_build_object('content-type', 'application/json', 'x-cron-secret', (select cron_secret from public.wearable_config where id = 1)),
+      body := '{"action":"sync_all"}'::jsonb,
+      timeout_milliseconds := 60000)
+  $job$)$cron$;
+end
+$do$;
