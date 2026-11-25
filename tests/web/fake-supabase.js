@@ -12,7 +12,7 @@ const SUPPORT = new Set(['support_reports', 'support_notices']);
 
 export function backend() {
   const B = { users: [], tables: {}, channels: new Set(), log: [] };
-  for (const t of [...DOC_TABLES, 'support_reports', 'support_notices', 'record_history', 'scrim_report_corrections', 'app_config', 'roster_players', 'profiles', 'user_roles', 'user_titles']) B.tables[t] = [];
+  for (const t of [...DOC_TABLES, 'support_reports', 'support_notices', 'record_history', 'scrim_report_corrections', 'app_config', 'roster_players', 'profiles', 'user_roles', 'user_titles', 'hub_checkins']) B.tables[t] = [];
   B.addUser = (u) => { B.users.push(u); B.tables.profiles.push({ id: u.id, email: u.email, display_name: u.name, staff_key: u.staffKey || null, created_at: new Date().toISOString() });
     for (const r of u.roles || []) B.tables.user_roles.push({ user_id: u.id, role: r }); for (const t of u.titles || []) B.tables.user_titles.push({ user_id: u.id, title: t }); };
   const roles = (id) => B.tables.user_roles.filter((r) => r.user_id === id).map((r) => r.role);
@@ -33,6 +33,8 @@ export function backend() {
     if (table === 'support_notices') return canRead(uid, row.title) || supWrite(uid);
     if (DOC_TABLES.includes(table)) return canRead(uid, row.title);
     if (table === 'scrim_report_corrections') { const r = B.tables.scrim_reports.find((x) => x.id === row.report_id); return !!r && canRead(uid, r.title); }
+    // V1.59 daily login: your own days; the Head Coach team reads everyone's.
+    if (table === 'hub_checkins') return row.user_id === uid || supRead(uid);
     return roles(uid).length > 0 || (table === 'profiles' && row.id === uid);
   };
   B.write = (uid, table, op, row, old) => {
@@ -62,6 +64,12 @@ export function backend() {
     if (table === 'roster_players') return has(uid, 'admin') || has(uid, 'head_coach') || has(uid, 'readiness_owner') ? null : deny;
     if (table === 'user_roles' || table === 'user_titles') return has(uid, 'admin') ? null : deny;
     if (table === 'profiles') return has(uid, 'admin') || row.id === uid ? null : deny;
+    // V1.59 like the database: only the day is sent (insert only), today or yesterday (Jakarta), by someone with a role.
+    if (table === 'hub_checkins') {
+      if (op !== 'insert' || row.user_id !== undefined || row.first_at !== undefined) return { code: '42501', message: 'permission denied for table hub_checkins' };
+      const t0 = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Jakarta' }).format(new Date()); const y = new Date(`${t0}T00:00:00Z`); y.setUTCDate(y.getUTCDate() - 1);
+      return roles(uid).length > 0 && (row.day === t0 || row.day === y.toISOString().slice(0, 10)) ? null : deny;
+    }
     return deny;
   };
   B.roles = roles;
@@ -86,6 +94,7 @@ function client(B, sessionUserId) {
     const now = new Date(Date.now() + (B.skew || 0) + ++tick).toISOString();
     if (DOC_TABLES.includes(table) || SUPPORT.has(table)) return { ...row, title: FIXED[table] || row.data?.title || null, created_by: old ? old.created_by : uid(), created_at: old ? old.created_at : now, updated_by: uid(), updated_at: now };
     if (table === 'scrim_report_corrections') return { ...row, id: B.tables[table].length + 1, created_by: uid(), created_at: now };
+    if (table === 'hub_checkins') return { user_id: uid(), day: row.day, first_at: now };
     return { ...row, updated_by: uid(), updated_at: now };
   };
   B.selected ||= {};
@@ -124,6 +133,7 @@ function client(B, sessionUserId) {
         for (const row of payload) {
           const old = action === 'upsert' ? T.find((r) => r[conflict] === row[conflict]) : null;
           if (action === 'insert' && row.id != null && T.some((r) => r.id === row.id)) return { data: null, error: { code: '23505', message: 'duplicate key' } };
+          if (table === 'hub_checkins' && T.some((r) => r.user_id === id && r.day === row.day)) return { data: null, error: { code: '23505', message: 'duplicate key value violates unique constraint "hub_checkins_pkey"' } };
           const err = B.write(id, table, old ? 'update' : 'insert', { ...row, title: FIXED[table] || row.data?.title || null }, old);
           if (err) return { data: null, error: err };
         }

@@ -225,6 +225,16 @@ details.sw-dl>summary{cursor:pointer}details.sw-dl ul{list-style:none;padding:0;
 .sw-people,.sw-roles,.sw-check,.carry-list{list-style:none;padding-left:0;margin-left:0}
 .sw-roles li{padding:4px 0}
 .sw-dayrep{margin:0 0 12px;padding:10px 12px;border:1px solid var(--line);border-radius:10px}.sw-dayrep-h{display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:6px}
+/* V1.59 streaks and milestones: personal, green for reached (red stays for the main action and errors). */
+.ach{margin-top:16px}.panel.ach{margin-top:0}
+.ach-top{display:flex;flex-wrap:wrap;gap:8px;margin:6px 0 8px}
+.ach-n{flex:1 1 88px;min-width:88px;padding:10px 12px;border:1px solid var(--line);border-radius:10px;background:var(--surface)}
+.ach-n b{display:block;font-family:var(--f-display);font-size:26px;line-height:1.15}.ach-n span{display:block;font-size:12px;color:var(--muted)}
+.ach-bs{display:flex;flex-wrap:wrap;gap:6px;margin:8px 0}
+.ach-b{display:inline-flex;align-items:center;gap:4px;padding:4px 10px;border-radius:999px;border:1px solid var(--line-2);font-size:13px;color:var(--muted)}
+.ach-b.on{color:var(--ink);border-color:var(--good);background:var(--good-soft)}.ach-b.lost{text-decoration:line-through;opacity:.6}.ach-b small{font-size:11px;color:var(--muted)}
+.ach-mini{font-size:12px;white-space:nowrap;margin-right:8px}.ach-msg{display:block;flex-basis:100%;margin-top:4px}
+.sw-day{position:relative}.sw-in{position:absolute;left:50%;bottom:4px;width:5px;height:5px;margin-left:-2.5px;border-radius:50%;background:var(--good)}
 .sw-rh{margin:16px 0 0}.sw-kpi .v small{font-size:15px;font-weight:600;color:var(--muted)}
 /* V1.51 Whoop: recovery rings in Whoop's colours */
 .wr-list{list-style:none;padding:0;margin:8px 0}.wr-a{border-bottom:1px solid var(--line)}.wr-a:last-child{border-bottom:0}

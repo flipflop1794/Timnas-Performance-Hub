@@ -28,6 +28,7 @@ export const GUIDE = [
       'One report per sparring partner, the same day; "Copy setup from last report" saves typing for the next one. Saving also closes the planned session and records the objective results.',
       'Player notes are about performance only. No health, family or contact details (the hub refuses phone and ID numbers).',
       'Made a mistake? Press "Edit" on the saved report (the author, the Head Coach, assistant coaches and admins). The database keeps the old version: "Edited 1×" shows who changed what, and when.',
+      'At the top of Scrim reports, the title\'s coaches see 🔥 days of reports in a row (every report of the title counts, whoever files it), ✅ their own days signed in, the days to WEC and the milestones. Up to 2 days off a week never break a streak.',
       'MLBB and MLBB Women: step 1 is the Scrim Log. Pick the time slot, then "+ Add game" for every game: side FP / SP, map, our bans and picks (rows in pick order, P1 at the top, with the player), their bans and picks, result, duration (digits only: 2040 = 20:40), VOD link and a note. The report\'s result is counted from the games; "Download games (Scrim Log format)" gives the same columns as the Scrim Log export.',
     ] },
     { title: 'Isi laporan scrim harian', steps: [
@@ -36,12 +37,14 @@ export const GUIDE = [
       'Satu laporan per lawan sparring, di hari yang sama; "Copy setup from last report" menghemat ketikan untuk laporan berikutnya. Menyimpannya juga menutup sesi yang direncanakan dan mencatat hasil objektif.',
       'Catatan pemain hanya soal performa. Tanpa kesehatan, keluarga atau kontak (hub menolak nomor HP dan nomor ID).',
       'Ada yang salah? Tekan "Ubah" pada laporan tersimpan (penulis, Head Coach, asisten pelatih dan admin). Database menyimpan versi lama: "Diubah 1×" menunjukkan siapa mengubah apa, dan kapan.',
+      'Di atas Laporan scrim, pelatih sebuah title melihat 🔥 hari laporan beruntun (semua laporan title itu dihitung, siapa pun yang mengisi), ✅ hari login mereka sendiri, hari menuju WEC dan lencana. Libur sampai 2 hari per minggu tidak memutus streak.',
       'MLBB dan MLBB Women: langkah 1 adalah Scrim Log. Pilih slot waktu, lalu "+ Tambah game" untuk setiap game: side FP / SP, map, ban dan pick kita (baris sesuai urutan pick, P1 paling atas, dengan pemainnya), ban dan pick lawan, hasil, durasi (angka saja: 2040 = 20:40), link VOD dan catatan. Hasil laporan dihitung dari game; "Unduh game (format Scrim Log)" memberi kolom yang sama dengan ekspor Scrim Log.',
     ] }),
   S('support', 'support', { en: 'Team doctor, physios, physical coach, psychologist', id: 'Dokter tim, fisio, pelatih fisik, psikolog' }, 'support',
     { title: 'Support staff: the daily report', steps: [
       'Performance → Daily report. One row per athlete: what was done, findings, follow-up. Psychologists also pick the session (formal, informal counselling, observation) and write a prognosis; physios keep body region and VAS.',
       'Your week is on its own tab, "Weekly progress": the days you reported, athletes handled, visits, your recap for WhatsApp, day by day. A day without a report has "Add it": it opens the Daily report on that date.',
+      '"My achievements" on Weekly progress: 🔥 days reported in a row, ✅ days you opened the hub in a row, the days to WEC and your milestones (first report, 7 days in a row, full week, visits, follow-ups closed, Road to WEC). Up to 2 days off a week never break a streak. Only you see your own; the Head Coach team sees the numbers next to each name.',
       'Fastest: paste the message you send to the WhatsApp group and press "Fill the form (AI)". Check the rows (athlete, finding, treatment, VAS), then "Save report". The group can keep going: "Copy for WhatsApp" gives the same text back.',
       'Only you, Coach Donny, the Head Coach and admins read the details. Tick "Tell the coach" on an athlete to send one neutral line (no diagnosis) to that team\'s coaches.',
       'Each of you sees "My summary" (your own reports only; other support staff cannot see it). Made a mistake? "Edit": the database records who changed what, and when. Coach Donny, the Head Coach and admins see "Support team progress": per person, per team, what to watch and every edit.',
@@ -49,6 +52,7 @@ export const GUIDE = [
     { title: 'Tim pendukung: laporan harian', steps: [
       'Performance → Laporan harian. Satu baris per atlet: yang dilakukan, temuan, tindak lanjut. Psikolog juga memilih jenis sesi (konseling formal, informal, observasi) dan menulis prognosis; fisio tetap mengisi area tubuh dan VAS.',
       'Minggu Anda ada di tab sendiri, "Progres mingguan": hari lapor, atlet ditangani, kunjungan, rekap untuk WhatsApp, hari demi hari. Hari tanpa laporan punya tombol "Tambahkan": membuka Laporan harian pada tanggal itu.',
+      '"Pencapaian saya" di Progres mingguan: 🔥 hari lapor beruntun, ✅ hari login beruntun, hari menuju WEC dan lencana Anda (laporan pertama, 7 hari beruntun, minggu penuh, kunjungan, tindak lanjut tuntas, Road to WEC). Libur sampai 2 hari per minggu tidak memutus streak. Hanya Anda yang melihat milik Anda; tim Head Coach melihat angkanya di samping setiap nama.',
       'Paling cepat: tempel pesan yang Anda kirim ke grup WhatsApp lalu tekan "Isi formulir (AI)". Cek barisnya (atlet, temuan, tindakan, VAS), lalu "Simpan laporan". Grup tetap jalan: "Salin untuk WhatsApp" memberi teks yang sama.',
       'Detailnya hanya dibaca Anda, Coach Donny, Head Coach dan admin. Centang "Beri tahu pelatih" pada atlet untuk mengirim satu kalimat netral (tanpa diagnosis) ke pelatih timnya.',
       'Masing-masing melihat "Ringkasan saya" (hanya laporan Anda sendiri; staf pendukung lain tidak bisa melihatnya). Ada yang salah? "Ubah": database mencatat siapa mengubah apa, dan kapan. Coach Donny, Head Coach dan admin melihat "Progres tim pendukung": per orang, per tim, yang perlu dipantau dan setiap perubahan.',

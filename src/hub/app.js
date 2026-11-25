@@ -60,6 +60,7 @@ import { EVENT, defaultRunbook, tLabel, wecMatch, tick, setResult, gameNote, mar
 import { VOD_TAGS, vod, reviewVod, LEVELS, partner as partnerRec, partnerStats, AREAS, GOAL_STATUS, goal as goalRec, updateGoal, plan as newPlan } from '../core/library.js';
 import { weeklyBrief } from '../core/brief.js';
 import { localDay, shiftDay } from '../core/dates.js';
+import { streak, coachBadges, newlyEarned, daysToWec } from '../core/streaks.js';
 import { scrimReport, addNote as reportNote, byDay as reportDays, reportSummary, reportsCsv, reportsSheets, tableCsv, scrimLogCsv, resultText, reportWhatsApp, GAME_SPEC, PROGRESS, ROSTER_PLAYED, FIX_CHECK } from '../core/reports.js';
 import { isScrimLog, TIME_SLOTS } from '../core/scrim_log.js';
 import { makeXlsx } from '../core/xlsx.js';
@@ -156,7 +157,7 @@ let CO = null;
 let SU = null;
 let WR = null;
 const wrUi = () => (WR ||= wearableUi({ S, esc, tag, setMsg, render, PLATFORM, today: () => localDay() }));
-const supUi = () => (SU ||= supportUi({ S, esc, tag, banner, setMsg, val, render, PLATFORM, HUB_USER, FEAT, wearPanel: () => wrUi().donnyPanel(), today: () => localDay(), meName: () => meName(), titles: () => WEC_TITLES.map((t) => t.id) }));
+const supUi = () => (SU ||= supportUi({ S, esc, tag, banner, setMsg, val, render, PLATFORM, HUB_USER, FEAT, wearPanel: () => wrUi().donnyPanel(), checkins: () => S.checkins, today: () => localDay(), meName: () => meName(), titles: () => WEC_TITLES.map((t) => t.id) }));
 const coUi = () => (CO ||= coachAiUi({ S, esc, tag, banner, setMsg, val, render, sid, PLATFORM, HUB_USER, CAN_APPROVE, today: () => today(), EVENT,
   titles: () => PQ_ORDER, titleVisible: (t) => titleVisible(t), cardFor: (t, n) => prepCardFor(t, n), meName: () => meName(), prepImage: (f) => capUiReal().prepImage(f),
   saveScrims: (xs) => saveScrimList(xs), propose: (t, label, w) => proposeWeakness(t, label, w), onSaved: (rows) => savePubgmRows(rows),
@@ -1022,6 +1023,31 @@ function wsTeamNav(title, here) {
   const items = [[REPORT_TAB[title], 'Scrim reports', 'reports'], [`${w.team}-trends`, 'Trends', 'trends'], [TEAM_TAB[title], 'Roster', 'team']];
   return `<nav class="subnav" aria-label="My team">${items.map(([h, l, k]) => `<a href="#${h}" ${k === here ? 'aria-current="page"' : ''}>${esc(l)}</a>`).join('')}</nav>${here === 'reports' ? wrUi().coachPanel(title) : ''}${here === 'reports' && FEAT.support ? supUi().noticesPanel([title]) : ''}`;
 }
+// V1.59 streaks and milestones for a title's coaches (and analysts), at the top of their Scrim reports page: the title's
+// report streak (whoever files), their own login streak, the WEC countdown and the milestones. Personal: no ranking.
+const TL = (en, id) => (S.lang === 'id' ? id : en);
+const loginSet = (userId) => (Array.isArray(S.checkins) ? new Set(S.checkins.filter((c) => c.user_id === userId).map((c) => String(c.day).slice(0, 10))) : null);
+const titleDaySet = (title, extra) => { const s = new Set(S.reports.filter((r) => r.title === title).map((r) => r.date)); if (extra) s.add(extra); return s; };
+const titleBadges = (title, extra) => coachBadges({ reportDays: titleDaySet(title, extra), reports: S.reports.filter((r) => r.title === title).length + (extra ? 1 : 0), loginDays: HUB_USER ? loginSet(HUB_USER.id) : null, asOf: localToday() });
+const achChips = (list) => list.map((b) => `<span class="ach-b${b.earned ? ' on' : ''}${b.lost ? ' lost' : ''}">${b.earned ? '✓' : b.lost ? '✕' : '○'} ${esc(b.label[S.lang === 'id' ? 'id' : 'en'])}${!b.earned && !b.lost && b.need ? ` <small>${b.have || 0}/${b.need}</small>` : ''}</span>`).join('');
+// V1.59 for the Head Coach team (they read everyone's logins): each coach's login streak, under the reports table.
+function coachLogins(t0) {
+  if (!HUB_USER || !HUB_USER.roles.some((r) => ['admin', 'head_coach', 'readiness_owner'].includes(r)) || !Array.isArray(S.checkins)) return '';
+  const coaches = (PLATFORM?.actionOwners || []).filter((p) => p.roles.some((r) => ['title_coach', 'analyst'].includes(r)) && !p.roles.some((r) => ['admin', 'head_coach', 'assistant_coach', 'readiness_owner'].includes(r)));
+  if (!coaches.length) return '';
+  const line = coaches.map((p) => `${esc(p.name)}${p.titles.length === 1 ? ` <span class="note">(${esc(SHORT[p.titles[0]] || p.titles[0])})</span>` : ''} ✅${streak(loginSet(p.id), t0).n}`).join(' · ');
+  return `<p class="note" data-no-tr><b>${esc(TL("Coaches' logins, days in a row", 'Login pelatih, hari beruntun'))}:</b> ${line}</p>`;
+}
+function achCard(title) {
+  if (!HUB_USER || HUB_USER.seesAllTitles || !HUB_USER.titles.includes(title) || S.mode === 'demo') return '';
+  const t0 = localToday(); const R = titleDaySet(title); const s = streak(R, t0); const LG = loginSet(HUB_USER.id); const lg = LG ? streak(LG, t0) : null;
+  const toGo = daysToWec(t0); const short = SHORT[title] || title;
+  const n = (v, en, id) => `<div class="ach-n"><b>${v}</b><span>${esc(TL(en, id))}</span></div>`;
+  return `<div class="panel ach" data-no-tr><div class="ach-top">${n(`🔥 ${s.n}`, `day${s.n === 1 ? '' : 's'} of ${short} reports in a row`, `hari laporan ${short} beruntun`)}${lg ? n(`✅ ${lg.n}`, `day${lg.n === 1 ? '' : 's'} signed in in a row`, 'hari login beruntun') : ''}${toGo > 0 ? n(toGo, 'days to WEC', 'hari lagi menuju WEC') : ''}</div>
+    <p class="note">${esc(R.has(t0) ? TL("Today's report is in ✓", 'Laporan hari ini sudah masuk ✓') : TL('No report yet today: file one to keep the streak.', 'Belum ada laporan hari ini: isi satu untuk menjaga streak.'))}</p>
+    <div class="ach-bs">${achChips(titleBadges(title))}</div>
+    <p class="note">${esc(TL(`Every ${short} scrim report counts, whoever files it. Up to 2 days off a week never break a streak; a login counts once a day.`, `Semua laporan scrim ${short} dihitung, siapa pun yang mengisi. Libur sampai 2 hari per minggu tidak memutus streak; login dihitung sekali sehari.`))}</p></div>`;
+}
 function reportsPanel(title) {
   loadRpHist();
   const record = HUB_USER && viewParams().get('record');
@@ -1037,7 +1063,7 @@ function reportsPanel(title) {
   const card = FEAT.coachAi ? coUi().briefCard(title) : '';
   const ready = card || (Sm.carryOver ? `<div class="panel"><h2>Start the next session from here</h2><p>${esc(Sm.carryOver.adjust)}</p><p class="note">Adjustment written by ${esc(Sm.carryOver.by)} on ${esc(Sm.carryOver.date)}. If the next report does not mention it, ask whether it was tried.</p></div>` : '');
   const form = S.mode === 'demo' ? '' : reportForm(title, { fid, spec, pts, unit, planned, t0 });
-  return `${wsTeamNav(title, 'reports')}<div class="panel"><h2>Scrim reports — ${esc(title)}</h2>${dailyEntry(title)}
+  return `${wsTeamNav(title, 'reports')}${achCard(title)}<div class="panel"><h2>Scrim reports — ${esc(title)}</h2>${dailyEntry(title)}
     <div class="stats"><div class="stat"><span class="k">Sessions, last 7 days</span><span class="v">${Sm.sessions}</span></div>
     <div class="stat"><span class="k">${pts ? 'Points, last 7 days' : 'Record, last 7 days'}</span><span class="v">${Sm.sessions ? (pts ? `${Sm.points} (${Sm.matches} m)` : `${Sm.won}-${Sm.lost}${Sm.drawn ? `-${Sm.drawn}` : ''}`) : '—'}</span></div>
     <div class="stat"><span class="k">Plan followed (average, 1–5)</span><span class="v">${Sm.progress ?? '—'}</span>${trendTag(Sm.trend)}</div>
@@ -1058,9 +1084,10 @@ V['reports-all'] = () => {
   return `<div class="panel"><div class="lead">Scrim <em>reports</em></div>
     <p>What every coach filed in the last seven days, all titles. Open a title's <b>Scrim reports</b> tab to file or read the details.</p>
     ${S.reports.length ? '' : '<p class="empty">No reports filed yet. Coaches file them from each title\'s Scrim reports tab.</p>'}
-    <div class="tw"><table><thead><tr><th>Title</th><th>Title coach</th>${dayList.map((d) => `<th class="n">${esc(d.slice(5))}</th>`).join('')}<th class="n">Sessions 7 d</th><th class="n">Result 7 d</th><th class="n">Plan followed</th><th>Last report</th></tr></thead><tbody>
-    ${rows.map((r) => `<tr><td><b>${esc(r.t.id)}</b></td><td>${esc(r.t.coach)}</td>${r.per.map((n) => `<td class="n">${n || '<span class="note">—</span>'}</td>`).join('')}<td class="n">${r.s.sessions}</td><td class="n">${r.s.sessions ? (r.pts ? `${r.s.points} pts` : `${r.s.won}-${r.s.lost}`) : '—'}</td><td class="n">${r.s.progress ?? '—'} ${trendTag(r.s.trend)}</td><td>${r.s.last ? `${esc(r.s.last.date)} · ${esc(r.s.last.by)}` : '<span class="note">none</span>'}</td></tr>`).join('')}</tbody></table></div>
+    <div class="tw"><table><thead><tr><th>Title</th><th>Title coach</th>${dayList.map((d) => `<th class="n">${esc(d.slice(5))}</th>`).join('')}<th class="n">Sessions 7 d</th><th class="n">Result 7 d</th><th class="n">Plan followed</th><th class="n">Streak</th><th>Last report</th></tr></thead><tbody>
+    ${rows.map((r) => `<tr><td><b>${esc(r.t.id)}</b></td><td>${esc(r.t.coach)}</td>${r.per.map((n) => `<td class="n">${n || '<span class="note">—</span>'}</td>`).join('')}<td class="n">${r.s.sessions}</td><td class="n">${r.s.sessions ? (r.pts ? `${r.s.points} pts` : `${r.s.won}-${r.s.lost}`) : '—'}</td><td class="n">${r.s.progress ?? '—'} ${trendTag(r.s.trend)}</td><td class="n" data-no-tr>🔥 ${streak(titleDaySet(r.t.id), t0).n}</td><td>${r.s.last ? `${esc(r.s.last.date)} · ${esc(r.s.last.by)}` : '<span class="note">none</span>'}</td></tr>`).join('')}</tbody></table></div>
     <p class="note">Numbers in the day columns are sessions reported that day. Not every title trains every day, so an empty day is not automatically a miss.</p>
+    ${coachLogins(t0)}
     ${S.reports.length ? '<div class="toolbar"><button class="btn primary" type="button" data-report-xlsx="*">Download all (Excel)</button><button class="btn" type="button" data-report-csv="*">CSV</button><span class="msg" id="rpCsvMsg-all"></span></div><p class="note">Excel: a summary sheet, then one sheet per title, newest first, with filters on every column.</p>' : ''}</div>
   <div class="cols"><div class="panel"><h2>No report yet today</h2>${missing.length ? `<ul class="plain">${missing.map((r) => `<li><b>${esc(r.t.id)}</b> <a href="#${REPORT_TAB[r.t.id]}">File</a> <span class="note">— last ${r.s.last ? esc(r.s.last.date) : 'never'}</span></li>`).join('')}</ul>` : '<p class="note">Every title has a report for today.</p>'}</div>
   <div class="panel"><h2>Next session starts from</h2>${rows.filter((r) => r.s.carryOver).length ? `<ul class="plain">${rows.filter((r) => r.s.carryOver).map((r) => `<li><b>${esc(r.t.id)}</b> — ${esc(r.s.carryOver.adjust)} <span class="note">(${esc(r.s.carryOver.by)}, ${esc(r.s.carryOver.date)})</span></li>`).join('')}</ul>` : '<p class="empty">Nothing yet.</p>'}</div></div>`;
@@ -1375,7 +1402,7 @@ function reportForm(title, { fid, spec, pts, unit, planned, t0 }) {
       ${txt('vod', 'VOD link or timestamp (optional)')}</details>
     <p class="note">One report per sparring partner · a saved report can be edited (every change is kept in its history) · performance notes only.</p>
     <div class="savebar"><p class="note" id="rpLeft-${fid}" aria-live="polite">${esc(rpLeftText(rpMissing(fid, pts, { values: { ...auto, ...d, progress: prog } })))}</p>
-      <div class="toolbar"><button class="btn primary" type="button" data-report-save="${esc(title)}">${ed ? 'Save changes' : 'Save report'}</button>${!ed && S.rpLast?.[fid] ? `<button class="btn" type="button" data-rp-wa="${esc(fid)}" title="The report you just saved, ready to paste in the team's WhatsApp group">Copy for WhatsApp</button>` : ''}${(() => { const m = S.rpDone?.[fid]; return m && Date.now() - m.at < 20000 ? `<span class="msg ok" id="rpMsg-${fid}" role="status">${esc(m.text)}</span>` : `<span class="msg" id="rpMsg-${fid}" role="status"></span>`; })()}</div></div></div>`;
+      <div class="toolbar"><button class="btn primary" type="button" data-report-save="${esc(title)}">${ed ? 'Save changes' : 'Save report'}</button>${!ed && S.rpLast?.[fid] ? `<button class="btn" type="button" data-rp-wa="${esc(fid)}" title="The report you just saved, ready to paste in the team's WhatsApp group">Copy for WhatsApp</button>` : ''}${(() => { const m = S.rpDone?.[fid]; return m && Date.now() - m.at < 20000 ? `<span class="msg ok" id="rpMsg-${fid}" role="status">${esc(m.text)}</span>` : `<span class="msg" id="rpMsg-${fid}" role="status"></span>`; })()}${(() => { const m = S.rpStreak?.[fid]; return m && Date.now() - m.at < 30000 ? `<span class="msg ok ach-msg" data-no-tr>${esc(m.text)}</span>` : ''; })()}</div></div></div>`;
 }
 
 
@@ -2646,7 +2673,21 @@ function restoreForms(st) {
   const ds = m.querySelectorAll('details'); if (ds.length === st.open.length) ds.forEach((d, i) => { d.open = st.open[i]; });
   if (st.focus) { const el = document.getElementById(st.focus.id); if (el) { el.focus({ preventScroll: true }); try { if (st.focus.s != null) el.setSelectionRange(st.focus.s, st.focus.e); } catch { /* not a text field */ } } }
 }
+// V1.59 daily login: the first render of each (Jakarta) day records that this person opened the hub, then loads the
+// days for the streaks (own days; the Head Coach team reads everyone's). S.checkins: undefined while loading, null
+// when the database does not record logins yet (the streaks then count reports only).
+function checkinTick() {
+  const t0 = localDay(); const api = PLATFORM?.checkins;
+  if (!HUB_USER || !api || S.checkDay === t0) return;
+  S.checkDay = t0;
+  (async () => {
+    try { await api.mark(t0); } catch { /* counted next time */ }
+    try { S.checkins = await api.list(shiftDay(t0, -120)); } catch { S.checkins = S.checkins || null; }
+    render();
+  })();
+}
 function render() {
+  checkinTick();
   const view = viewOf(); const route = location.hash;
   const sameRoute = route === LAST_VIEW;
   const kept = KEEP_FORMS && sameRoute ? captureForms() : null;
@@ -3364,6 +3405,7 @@ async function onClick(e) {
         won: g('won'), lost: g('lost'), drawn: g('drawn'), played: g('played'), points: g('points'), avgPlacement: g('avg'), chicken: g('chicken'),
         focus: g('focus'), progress: g('progress'), worked: g('worked'), failed: g('failed'), detail: g('detail'), playerNotes: g('players'), adjust: g('adjust'), vod: g('vod'), prevAdjust: g('prevadj'), fixCheck: g('fix'), asOf: localToday(),
         drills: drillResults(blocksOfScrim(g('scrim')), [0, 1, 2, 3].map((i) => g(`dr${i}`))), rows: rrRows(g('rows')), comp: g('comp') });
+      const hadBadges = titleBadges(title);   // V1.59: what this report earns
       // Closing a planned session here avoids typing the same result twice.
       const sc = r.scrimId ? S.scrims.find((x) => x.id === r.scrimId && x.status === 'planned') : null;
       const per = {}; (sc?.objectives || []).slice(0, 4).forEach((oid, i) => { const v = g(`ob${i}`); if (OBJ_RESULTS.includes(v)) per[oid] = { result: v, measure: g(`obv${i}`) }; });
@@ -3386,6 +3428,10 @@ async function onClick(e) {
       const keep = Object.fromEntries(RP_KEEP_AFTER_SAVE.map((k) => [k, g(k)]).filter(([, v]) => v));
       storeDraft(fid, { ...keep, at: new Date().toISOString() });
       (S.rpLast ||= {})[fid] = r;   // V1.42: "Copy for WhatsApp" sends this one
+      {   // V1.59 the streak line beside the saved message
+        const n = streak(titleDaySet(title, r.date), localToday()).n; const got = newlyEarned(hadBadges, titleBadges(title, S.reports.some((x) => x.id === r.id) ? null : r.date));
+        (S.rpStreak ||= {})[fid] = { at: Date.now(), text: [`🔥 ${TL(`${SHORT[title] || title}: day ${n} in a row`, `${SHORT[title] || title}: hari ke-${n} berturut-turut`)}`, ...got.map((b) => `${TL('New milestone', 'Lencana baru')}: ${b.label[S.lang === 'id' ? 'id' : 'en']} 🎉`)].join(' · ') };
+      }
       render(); setMsg(`rpMsg-${fid}`, `Report saved (${resultText(r.result)} vs ${r.partner}${nGames ? `, ${nGames} game${nGames > 1 ? 's' : ''}${logMode(title) ? '' : ' with stats'}` : ''})${daily ? '; it is also the daily report, with your next action due tomorrow' : ''}. Next partner? The setup is kept.`, 'ok');
     } catch (err) { setMsg(`rpMsg-${fid}`, err.message, 'err'); markInvalid(fid, err.message); }
     } finally { S.rpSaving[fid] = false; t.disabled = false; }
