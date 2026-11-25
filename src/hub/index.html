@@ -446,6 +446,8 @@ tr.cp-now td{background:var(--gold-soft)}.cp-phases{display:grid;grid-template-c
 .titles #focusBtn[aria-pressed="true"]{background:var(--line-2);border-color:var(--ink-3);color:var(--ink)}
 @media (max-width:600px){.btn.small,.chip{min-height:40px;padding-block:8px}button.linkbtn{padding-block:6px}}
 @media (max-width:480px){.titles .lbl{display:none}.titles button.lang b{padding:4px 7px}}
+/* V1.58 phones: the page tabs a little tighter, so two tabs ("Laporan harian", "Progres mingguan") fit on a 360 px phone. */
+@media (max-width:480px){nav.tabs a{padding-inline:9px;font-size:14px;letter-spacing:.03em}nav.tabs a[aria-current="page"]::after{left:9px;right:9px}}
 /* V1.56 Sign out on the top row, always visible, pushed to the right end. */
 .titles button.out{margin-left:auto;color:var(--ink);background:transparent;border-color:var(--ink-3);white-space:nowrap}
 a,.linkbtn{color:var(--ink);text-decoration:underline;text-decoration-color:var(--ink-3);text-underline-offset:3px}
