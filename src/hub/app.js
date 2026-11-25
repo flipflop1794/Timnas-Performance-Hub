@@ -1043,7 +1043,7 @@ function achCard(title) {
   const t0 = localToday(); const R = titleDaySet(title); const s = streak(R, t0); const LG = loginSet(HUB_USER.id); const lg = LG ? streak(LG, t0) : null;
   const toGo = daysToWec(t0); const short = SHORT[title] || title;
   const n = (v, en, id) => `<div class="ach-n"><b>${v}</b><span>${esc(TL(en, id))}</span></div>`;
-  return `<div class="panel ach" data-no-tr><div class="ach-top">${n(`🔥 ${s.n}`, `day${s.n === 1 ? '' : 's'} of ${short} reports in a row`, `hari laporan ${short} beruntun`)}${lg ? n(`✅ ${lg.n}`, `day${lg.n === 1 ? '' : 's'} signed in in a row`, 'hari login beruntun') : ''}${toGo > 0 ? n(toGo, 'days to WEC', 'hari lagi menuju WEC') : ''}</div>
+  return `<div class="panel ach" data-no-tr><div class="ach-top">${n(`🔥 ${s.n}`, `day${s.n === 1 ? '' : 's'} of ${short} reports in a row`, `hari laporan ${short} beruntun`)}${lg ? n(`✅ ${lg.n}`, `login day${lg.n === 1 ? '' : 's'} in a row`, 'hari login beruntun') : ''}${toGo > 0 ? n(toGo, 'days to WEC', 'hari lagi menuju WEC') : ''}</div>
     <p class="note">${esc(R.has(t0) ? TL("Today's report is in ✓", 'Laporan hari ini sudah masuk ✓') : TL('No report yet today: file one to keep the streak.', 'Belum ada laporan hari ini: isi satu untuk menjaga streak.'))}</p>
     <div class="ach-bs">${achChips(titleBadges(title))}</div>
     <p class="note">${esc(TL(`Every ${short} scrim report counts, whoever files it. Up to 2 days off a week never break a streak; a login counts once a day.`, `Semua laporan scrim ${short} dihitung, siapa pun yang mengisi. Libur sampai 2 hari per minggu tidak memutus streak; login dihitung sekali sehari.`))}</p></div>`;
@@ -2678,12 +2678,16 @@ function restoreForms(st) {
 // when the database does not record logins yet (the streaks then count reports only).
 function checkinTick() {
   const t0 = localDay(); const api = PLATFORM?.checkins;
-  if (!HUB_USER || !api || S.checkDay === t0) return;
-  S.checkDay = t0;
+  if (!HUB_USER || !api) return;
+  // V1.60 the days are read again every 10 minutes, so the Head Coach team sees logins made later in the day.
+  // (A failed login record is tried again after a minute, not on every page.)
+  if (Date.now() - (S.checkAt || 0) < (S.checkDay === t0 ? 600000 : 60000)) return;
+  const first = S.checkDay !== t0; S.checkDay = t0; S.checkAt = Date.now();
   (async () => {
-    try { await api.mark(t0); } catch { /* counted next time */ }
+    if (first) { try { await api.mark(t0); } catch { S.checkDay = null; /* tried again on the next page */ } }
+    const before = JSON.stringify(S.checkins);
     try { S.checkins = await api.list(shiftDay(t0, -120)); } catch { S.checkins = S.checkins || null; }
-    render();
+    if (JSON.stringify(S.checkins) !== before) render();
   })();
 }
 function render() {
