@@ -23,6 +23,10 @@ export function supportUi(ctx) {
   // Who may file (support staff, Coach Donny, Head Coach, admins) and who reads every report (the last three).
   const canFile = () => !HUB_USER || !!HUB_USER.canSupport;
   const readsAll = () => !HUB_USER || HUB_USER.roles.some((r) => ['admin', 'head_coach', 'readiness_owner'].includes(r));
+  // V1.58 the support staff themselves (they file, they do not read everyone's): two tabs, "Daily report" for the
+  // day-to-day input and "Weekly progress" for their week.
+  const writer = () => canFile() && !readsAll();
+  const toDaily = () => { if (location.hash.replace(/^#/, '').split('?')[0] !== 'support') location.hash = 'support'; render(); };
   const me = () => HUB_USER?.name || meName();
   const job = () => HUB_USER?.supportJob || '';
   // V1.50 the pain map, VAS and body region belong to the physios (Coach Ilham, Coach Dewi): other accounts never get
@@ -227,7 +231,7 @@ export function supportUi(ctx) {
       c.regulars.length ? `${T('Seen most', 'Paling sering')}: ${c.regulars.slice(0, 4).map((a) => `${a.athlete} ${a.n}×`).join(' · ')}` : '',
     ].filter(Boolean);
     return `<div class="panel sw"><p class="note sw-who"><span>Support staff</span>${job() ? ` · <span>${esc(JOBS[job()].label)}</span>` : ''}</p>${weekNav(w, off)}
-      <div class="sw-days">${w.days.map(tile).join('')}</div>
+      <div class="sw-days">${w.days.map(tile).join('')}</div>${U.day ? dayReports() : ''}
       <div class="h3 sw-rh" data-no-tr>${esc(off === 0 ? T('My work this week', 'Pekerjaan saya minggu ini') : T('My work that week', 'Pekerjaan saya minggu itu'))}</div>
       <div class="sw-kpis" data-no-tr>${kpi(T('Days reported', 'Hari lapor'), c.days, null, 7)}${kpi(T('Athletes handled', 'Atlet ditangani'), c.athletes, p.athletes)}${kpi(T('Visits', 'Kunjungan'), c.visits, p.visits)}</div>
       ${c.reports ? `<p class="note sw-vs" data-no-tr>${esc(T('Small numbers: change from the week before. Each athlete counts once; a visit is each time you saw them.', 'Angka kecil: perubahan dari minggu lalu. Atlet dihitung sekali; kunjungan = setiap kali ditangani.'))}</p>
@@ -236,6 +240,13 @@ export function supportUi(ctx) {
         : `<p class="note" data-no-tr>${esc(off === 0 ? T('No report yet this week: your recap fills in as you save reports.', 'Belum ada laporan minggu ini: rekap terisi otomatis setiap kali laporan disimpan.') : T('No report that week.', 'Tidak ada laporan minggu itu.'))}</p>`}
       <div class="h3 sw-rh" data-no-tr>${esc(T('Day by day', 'Hari demi hari'))}</div>${dayList(me(), w, true)}
       ${off === 0 ? soFarBlock(me(), disc) : ''}</div>`;
+  }
+  // V1.58 a day tapped on the strip: that day's reports right under it (Edit opens them in the Daily report tab).
+  function dayReports() {
+    const list = U.reports.filter((r) => r.by === me() && r.date === U.day).sort((a, b) => String(b.createdAt).localeCompare(String(a.createdAt)));
+    return `<div class="sw-dayrep"><div class="sw-dayrep-h"><b data-no-tr>${esc(T(`Reports of ${dm(U.day)}`, `Laporan ${dm(U.day)}`))}</b>
+      <button type="button" class="linkbtn" data-sup-day="">${esc(T('Close', 'Tutup'))}</button></div>
+      ${list.length ? list.map(card).join('') : `<p class="note" data-no-tr>${esc(T('No report that day.', 'Tidak ada laporan hari itu.'))}</p>`}</div>`;
   }
   // ---- Coach Donny, Head Coach, admins: 1 to check · 2 today · 3 this week
   function checkBlock() {
@@ -309,12 +320,13 @@ export function supportUi(ctx) {
       ${Object.entries(c.byTitle).map(([t, xs]) => `<li class="note">${esc(t)}: <span data-no-tr>${esc(xs.slice(0, 3).map(([p, n]) => `${pointLabel(p, S.lang)} ${n}×`).join(', '))}</span></li>`).join('')}</ul></div>`;
   }
   // The history: 14 days, or one day picked on the week strip. Folded unless a day is picked.
-  function reportList(list, filter) {
+  // V1.58 the Daily report tab passes day '' (its list is always the 14 days; a day is picked on Weekly progress).
+  function reportList(list, filter, day = U.day) {
     const f = U.filter; const p = U.person; const people = [...new Set(list.map((r) => r.by))];
-    const shown = list.filter((r) => (!f || r.discipline === f) && (!p || r.by === p) && (!U.day || r.date === U.day)).sort((a, b) => b.date.localeCompare(a.date) || String(b.createdAt).localeCompare(String(a.createdAt)));
-    const title = U.day ? T(`Reports of ${dm(U.day)}`, `Laporan ${dm(U.day)}`) : T(`History, 14 days (${list.length})`, `Riwayat 14 hari (${list.length})`);
-    return `<details class="panel sw-fold" ${U.day || U.histOpen ? 'open' : ''} data-sup-histfold="1"><summary data-no-tr>${esc(title)}</summary>
-      ${U.day ? `<p><button type="button" class="linkbtn" data-sup-day="">${esc(T('Show all 14 days', 'Tampilkan semua 14 hari'))}</button></p>` : ''}
+    const shown = list.filter((r) => (!f || r.discipline === f) && (!p || r.by === p) && (!day || r.date === day)).sort((a, b) => b.date.localeCompare(a.date) || String(b.createdAt).localeCompare(String(a.createdAt)));
+    const title = day ? T(`Reports of ${dm(day)}`, `Laporan ${dm(day)}`) : T(`History, 14 days (${list.length})`, `Riwayat 14 hari (${list.length})`);
+    return `<details class="panel sw-fold" ${day || U.histOpen ? 'open' : ''} data-sup-histfold="1"><summary data-no-tr>${esc(title)}</summary>
+      ${day ? `<p><button type="button" class="linkbtn" data-sup-day="">${esc(T('Show all 14 days', 'Tampilkan semua 14 hari'))}</button></p>` : ''}
       ${filter ? `<nav class="subnav" aria-label="Role">${['', ...DISCS].map((d) => `<button type="button" data-sup-filter="${d}" aria-pressed="${f === d}">${esc(d ? DISC_LABEL[d] : 'All')}</button>`).join('')}</nav>
       ${people.length > 1 ? `<nav class="subnav" aria-label="Staff">${['', ...people].map((x) => `<button type="button" data-sup-person="${esc(x)}" aria-pressed="${p === x}">${x ? `<span data-no-tr>${esc(x)}</span>` : 'Everyone'}</button>`).join('')}</nav>` : ''}` : ''}
       ${shown.length ? shown.slice(0, 40).map(card).join('') : `<p class="empty" data-no-tr>${esc(T('No report.', 'Tidak ada laporan.'))}</p>`}</details>`;
@@ -337,8 +349,15 @@ export function supportUi(ctx) {
       return `<div class="sw-page">${checkBlock()}${ctx.wearPanel?.() || ''}${weekOff() === 0 ? todayBlock() : ''}${weekBlock()}${reportList(recent, true)}
         ${canFile() ? `<details class="panel sw-fold" ${busy ? 'open' : ''}><summary data-no-tr>${esc(d.editing ? T('Edit report', 'Ubah laporan') : T('File my own report', 'Isi laporan saya'))}</summary>${form()}</details>` : ''}${historyOverlay()}</div>`;
     }
-    if (canFile()) return `<div class="sw-page">${myWeek()}${form()}${reportList(recent.filter((r) => r.by === me()), false)}${historyOverlay()}</div>`;
+    // V1.58 support staff: the Daily report tab is the form and their own reports; their week is on Weekly progress.
+    if (canFile()) return `<div class="sw-page">${form()}${reportList(recent.filter((r) => r.by === me()), false, '')}${historyOverlay()}</div>`;
     return `<div class="panel"><p class="note">The support staff reports are read by the support staff themselves, Coach Donny, the Head Coach and admins.</p></div>`;
+  }
+  // V1.58 Weekly progress (support staff only): the week strip, "My work this week", the recap, day by day, so far.
+  function weekPage() {
+    if (S.mode === 'demo' || (HUB_USER && !FEAT.support) || !writer()) return page();
+    setTimeout(() => loadHistory(), 0);
+    return `<div class="sw-page">${myWeek()}${historyOverlay()}</div>`;
   }
   // Main dashboard: one numbers-only line (leadership, Coach Donny, Head Coach, admins).
   function overviewLine() {
@@ -442,8 +461,9 @@ export function supportUi(ctx) {
     }
     if (ds.supWho) { U.who = U.who === ds.supWho ? '' : ds.supWho; render(); return true; }
     if (ds.supAddday) {
+      // V1.58 from Weekly progress: the Daily report tab opens on that date.
       const d = collect() || draft(); if (!d.editing) { d.date = ds.supAddday; keep(); }
-      render(); setTimeout(() => { const el = document.getElementById('supDate'); el?.scrollIntoView?.({ block: 'center' }); el?.focus?.(); }, 60); return true;
+      toDaily(); setTimeout(() => { const el = document.getElementById('supDate'); el?.scrollIntoView?.({ block: 'center' }); el?.focus?.(); }, 60); return true;
     }
     if ('supDay' in ds) { U.day = ds.supDay && U.day !== ds.supDay ? ds.supDay : ''; render(); return true; }
     if ('supFilter' in ds) { U.filter = ds.supFilter; render(); return true; }
@@ -454,7 +474,7 @@ export function supportUi(ctx) {
       const r = U.reports.find((x) => x.id === ds.supEdit); if (!r) return true;
       U.draft = { date: r.date, discipline: r.discipline, rows: r.rows.map((x) => ({ ...blankRow(), ...x, followUp: followText(x.followUp), vasBefore: x.vasBefore ?? '', vasAfter: x.vasAfter ?? '' })),
         general: { ...r.general }, paste: '', source: r.source, group: blankGroup(), editing: { id: r.id, createdAt: r.createdAt, by: r.by, job: r.job, date: r.date } };
-      keep(); render(); document.getElementById('supForm')?.scrollIntoView?.({ block: 'start' }); return true;
+      keep(); toDaily(); setTimeout(() => document.getElementById('supForm')?.scrollIntoView?.({ block: 'start' }), 60); return true;
     }
     if (ds.supParse) {
       const d = collect(); if (!d.paste.trim()) { setMsg('supPMsg', 'Paste the report first.', 'err'); return true; }
@@ -502,5 +522,5 @@ export function supportUi(ctx) {
     if (span) { try { span.textContent = usersOfDay(supportReport({ ...d, by: 'x', asOf: today() })).text; } catch { span.textContent = ''; } }
     return true;
   }
-  return { page, noticesPanel, overviewLine, subscribe, onClick, onInput, readsAll, canFile };
+  return { page, weekPage, noticesPanel, overviewLine, subscribe, onClick, onInput, readsAll, canFile, writer };
 }

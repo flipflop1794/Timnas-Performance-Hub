@@ -81,6 +81,8 @@ test('psychologist: Session and a Prognosis text column in the row; the saved re
   await f.wait(() => f.d.querySelector('.srow-h.srow5'));
   assert.match(f.d.querySelector('.srow-h.srow5').textContent, /Prognosis/); assert.match(f.d.querySelector('.srow-v.srow5').textContent, /Baik bila rutin latihan napas/);
   assert.match(f.d.querySelector('.srow-v.srow5').textContent, /Formal counselling/);
+  // V1.58 the recap is on the Weekly progress tab
+  f.w.location.hash = 'support-week'; f.w.dispatchEvent(new f.w.HashChangeEvent('hashchange'));
   await f.wait(() => /Sessions: 1 formal · 0 informal/.test(f.text()));
   assert.match(f.text(), /Sessions: 1 formal · 0 informal/, 'the psychologist recap counts sessions');
 });

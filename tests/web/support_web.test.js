@@ -73,9 +73,16 @@ test('support staff: paste from WhatsApp → AI fills the form → save; Donny r
   // V1.36: her own summary, then an edit that the database records (who, what, when).
   // V1.49: her week strip and one line on top (her own reports only); the history is folded.
   // V1.50: the strip, then her recap (days reported, athletes handled, visits).
+  // V1.58: the Daily report tab keeps the form and her reports; her week is on Weekly progress.
+  assert.doesNotMatch(dewi.text(), /Athletes handled|Days reported|My work this week/, 'no weekly numbers on the Daily report tab');
+  assert.match(dewi.d.getElementById('tabs').textContent, /Daily report.*Weekly progress/);
+  dewi.w.location.hash = 'support-week'; dewi.w.dispatchEvent(new dewi.w.HashChangeEvent('hashchange'));
   await dewi.wait(() => /Athletes handled\s*2/.test(dewi.text()));
   assert.match(dewi.text(), /Days reported\s*1\/7/); assert.match(dewi.text(), /Visits\s*2/);
   assert.ok(dewi.d.querySelector('.sw-day.on'), 'today is a filled tile');
+  assert.equal(dewi.d.getElementById('supForm'), null, 'no form on Weekly progress');
+  dewi.w.location.hash = 'support'; dewi.w.dispatchEvent(new dewi.w.HashChangeEvent('hashchange'));
+  await dewi.wait(() => dewi.d.querySelector('[data-sup-histfold]'));
   dewi.d.querySelector('[data-sup-histfold]').open = true;
   dewi.d.querySelector('[data-sup-edit]').click();
   await dewi.wait(() => /Edit report/.test(dewi.text()));

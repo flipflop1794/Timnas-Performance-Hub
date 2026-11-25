@@ -34,8 +34,8 @@ function world() {
   add(shiftDay(t0, -9), [{ athlete: 'Kiboy', title: 'MLBB', did: 'Stretching punggung' }]);
   return B;
 }
-async function open(B, who) {
-  const dom = new JSDOM(html, { runScripts: 'dangerously', pretendToBeVisual: true, url: 'https://hub.example.test/#support',
+async function open(B, who, hash = 'support') {
+  const dom = new JSDOM(html, { runScripts: 'dangerously', pretendToBeVisual: true, url: `https://hub.example.test/#${hash}`,
     beforeParse(w) { w.localStorage.setItem('hub-lang', 'en'); w.__HUB_TEST_CLIENT__ = B.client(people[who].id); } });
   const d = dom.window.document;
   for (let i = 0; i < 120 && /Loading/.test(d.getElementById('main')?.textContent || 'Loading'); i++) await sleep(25);
@@ -44,8 +44,9 @@ async function open(B, who) {
     click: async (sel) => { const e = d.querySelector(sel); assert.ok(e, `no ${sel}`); e.click(); await sleep(200); } };
 }
 
+// V1.58: this is the Weekly progress tab; the Daily report tab has only the form and their reports.
 test('a staff member: My work this week, day by day in their own words, and what they have done so far', async () => {
-  const B = world(); const p = await open(B, 'ilham');
+  const B = world(); const p = await open(B, 'ilham', 'support-week');
   await p.wait(() => /My work this week/.test(p.text()));
   assert.match(p.text(), /My work this week/); assert.match(p.text(), /Day by day/);
   const day = [...p.d.querySelectorAll('details.sw-dl')].find((x) => /Rinz/.test(x.textContent));
@@ -58,8 +59,31 @@ test('a staff member: My work this week, day by day in their own words, and what
     const y = shiftDay(t0, -1);
     assert.ok(p.d.querySelector(`[data-sup-addday="${y}"]`), 'yesterday has no report: Add it');
     await p.click(`[data-sup-addday="${y}"]`);
-    assert.equal(p.d.getElementById('supDate').value, y);
+    await p.wait(() => p.d.getElementById('supDate'));
+    assert.equal(p.w.location.hash, '#support', 'Add it opens the Daily report tab'); assert.equal(p.d.getElementById('supDate').value, y);
   }
+});
+
+// V1.58 the two tabs of a staff member: Daily report = the form and their reports; Weekly progress = their week.
+test('V1.58 support staff: Daily report is for input only; a day on Weekly progress shows its reports, Edit goes back to the form', async () => {
+  const B = world(); const p = await open(B, 'ilham');
+  await p.wait(() => p.d.getElementById('supForm'));
+  const tabs = p.d.getElementById('tabs').textContent;
+  assert.match(tabs, /Daily report/); assert.match(tabs, /Weekly progress/); assert.doesNotMatch(tabs, /Support staff/);
+  assert.doesNotMatch(p.text(), /My work this week|Day by day|What you have done so far|Days reported/, 'no weekly numbers on the daily tab');
+  assert.ok(p.d.querySelector('[data-sup-histfold]'), 'their own reports of 14 days, folded, under the form');
+  p.w.location.hash = 'support-week'; p.w.dispatchEvent(new p.w.HashChangeEvent('hashchange'));
+  await p.wait(() => /My work this week/.test(p.text()));
+  assert.equal(p.d.getElementById('supForm'), null, 'no form on Weekly progress');
+  await p.click(`[data-sup-day="${t0}"]`);
+  const rep = p.d.querySelector('.sw-dayrep'); assert.ok(rep, 'the day opens under the strip'); assert.match(rep.textContent, /Massage bahu kanan/);
+  await p.click('.sw-dayrep [data-sup-edit]');
+  await p.wait(() => /Edit report/.test(p.text()));
+  assert.equal(p.w.location.hash, '#support', 'Edit opens the Daily report tab'); assert.equal(p.d.getElementById('sR-0-did').value, 'Massage bahu kanan');
+  // Coach Donny reads everyone's: his page is unchanged and has no Weekly progress tab.
+  const d = await open(B, 'donny');
+  await d.wait(() => /Team support this week/.test(d.text()));
+  assert.doesNotMatch(d.d.getElementById('tabs').textContent, /Weekly progress|Daily report/);
 });
 
 test('Coach Donny: one line per staff member, also those with no report; a name opens that week; staff see none of it', async () => {
@@ -76,7 +100,7 @@ test('Coach Donny: one line per staff member, also those with no report; a name 
   const openRow = [...p.d.querySelectorAll('.sw-board li.sw-pp')].find((li) => /Coach Ilham/.test(li.textContent));
   assert.match(openRow.querySelector('.sw-daylist').textContent, /Rinz/); assert.equal(openRow.querySelector('[data-sup-addday]'), null, 'no "Add it" on someone else\'s week');
   // Another support staff member sees neither the board nor Coach Ilham's work.
-  const e = await open(B, 'ekky');
+  const e = await open(B, 'ekky', 'support-week');
   await e.wait(() => /My work this week/.test(e.text()));
   assert.doesNotMatch(e.text(), /Team support this week|Coach Ilham|Massage bahu/);   // (athlete names are in his own form's picker)
   assert.equal(e.d.querySelector('.sw-board'), null); assert.equal(e.d.querySelector('details.sw-dl'), null, 'no day of work listed: he filed nothing');

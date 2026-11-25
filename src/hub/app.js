@@ -31,6 +31,8 @@ const CAN_APPROVE = !HUB_USER || HUB_USER.roles.some((r) => ['admin', 'head_coac
 const TITLE_COACH = !!HUB_USER && HUB_USER.roles.includes('title_coach') && !HUB_USER.roles.some((r) => ['admin', 'head_coach', 'assistant_coach', 'readiness_owner'].includes(r));
 // V1.34: an account with only the support role (team doctor, physio, physical coach, psychologist).
 const SUPPORT_ONLY = !!HUB_USER && HUB_USER.roles.length > 0 && HUB_USER.roles.every((r) => r === 'support');
+// V1.58: support staff who file but do not read everyone's reports get two tabs: Daily report and Weekly progress.
+const SUPPORT_WRITER = !!HUB_USER && !!HUB_USER.canSupport && !HUB_USER.roles.some((r) => ['admin', 'head_coach', 'readiness_owner'].includes(r));
 const LEADERSHIP_ONLY = !!HUB_USER && HUB_USER.roles.length > 0 && HUB_USER.roles.every((r) => r === 'leadership');
 // V1.15: newer parts switch on only when the live database / server has them (all on in the artifact build).
 const FEAT = { capture: true, draftRoom: true, donny: true, pelatnas: true, ai: true, aiPlan: true, coachAi: true, coachAiFn: true, practiceAi: true, brainAi: true, readAi: true, support: true, supportAi: true, recapAi: false, ...(PLATFORM?.features || {}) };
@@ -364,7 +366,7 @@ const TITLES = [
   { id: 'dota', label: 'Dota 2', tabs: [['dota-team', 'Team'], ['dota-scrims', 'Scrims & practice'], ['dota-reports', 'Scrim reports'], ['dota-trends', 'Analysis'], ...(FEAT.coachAi ? [['dota-weak', 'Weaknesses']] : []), ...(FEAT.capture ? [['dota-patterns', 'Patterns']] : []), ['dota-post', 'Post-match'], ['dota-scout', 'Competitors'], ['dota-meta', 'Meta'], ...(FEAT.brainAi ? [['dota-brain', 'Brainstorm']] : []), ['dota-draft', 'Draft room'], ['dota-review', 'Series review']] },
   { id: 'pubgm', label: 'PUBG Mobile', tabs: [['pubgm-team', 'Team'], ['pubgm-scrims', 'Scrims & practice'], ['pubgm-reports', 'Scrim reports'], ['pubgm-trends', 'Analysis'], ...(FEAT.coachAi ? [['pubgm-weak', 'Weaknesses']] : []), ['pubgm-log', 'Log & import'], ['pubgm-rivals', 'Competitors'], ['pubgm-meta', 'Meta'], ...(FEAT.brainAi ? [['pubgm-brain', 'Brainstorm']] : []), ['pubgm-sim', 'Strategy sim']] },
   ...GAME_HUBS.map((h) => ({ id: h.id, label: h.label, tabs: hubTabs(h) })),
-  { id: 'well', label: 'Performance', tabs: [['readiness', 'Athlete readiness'], ['support', 'Support staff'], ['players', 'Player plans'], ['well-day', 'Wellbeing check'], ['well-log', 'Log check-in & load']] },
+  { id: 'well', label: 'Performance', tabs: [['readiness', 'Athlete readiness'], ['support', SUPPORT_WRITER ? 'Daily report' : 'Support staff'], ...(SUPPORT_WRITER ? [['support-week', 'Weekly progress']] : []), ['players', 'Player plans'], ['well-day', 'Wellbeing check'], ['well-log', 'Log check-in & load']] },
   { id: 'guide', label: 'Guide', tabs: [['guide', 'How to use the hub']] },
   { id: 'staff', label: 'Staff', tabs: [['staff-cycle', 'Coaching cycle'], ['staff-quality', 'Practice quality'], ['staff-measure', 'Is it working?'], ['staff-rules', 'Rules & decisions'], ['staff-sources', 'Sources & limits'], ...(HUB_USER?.isAdmin ? [['admin-users', 'Users & access']] : [])] },
 ];
@@ -412,6 +414,7 @@ const V = {};
 let DAILY;
 V['daily-sessions'] = () => DAILY.page();
 V.support = () => supUi().page();
+V['support-week'] = () => supUi().weekPage();
 const dailyLabel = (text) => esc(dailyText(text, S.lang));
 // V1.32: the scrim report is the daily session report too, so the separate "Log a session" button is gone here.
 const dailyEntry = () => '';
