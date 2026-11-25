@@ -54,9 +54,9 @@ test('support staff: opening the hub is today\'s login; Progres mingguan shows t
   assert.deepEqual(B.tables.hub_checkins.map((c) => [c.user_id, c.day]), [['u-ilham', t0]], 'one row: who and which day');
   assert.doesNotMatch(p.text(), /My achievements/, 'the daily tab stays for input');
   await p.go('support-week');
-  await p.wait(() => /My achievements/.test(p.text()) && /signed in in a row/.test(p.text()));
+  await p.wait(() => /My achievements/.test(p.text()) && /login days? in a row/.test(p.text()));
   const ach = p.d.querySelector('.ach').textContent;
-  assert.match(ach, /🔥 2\s*days reported in a row/); assert.match(ach, /✅ 1\s*day signed in in a row/); assert.match(ach, /days to WEC/);
+  assert.match(ach, /🔥 2\s*days reported in a row/); assert.match(ach, /✅ 1\s*login day in a row/); assert.match(ach, /days to WEC/);
   const on = [...p.d.querySelectorAll('.ach-b.on')].map((b) => b.textContent);
   assert.ok(on.some((x) => /First report/.test(x)), 'first report reached');
   assert.match([...p.d.querySelectorAll('.ach-b')].map((b) => b.textContent).join('|'), /7 days in a row 2\/7/);
@@ -74,10 +74,10 @@ test('support staff: opening the hub is today\'s login; Progres mingguan shows t
 test('coach: the title\'s streak, their login, the milestones on Scrim reports; the Head Coach team sees streaks next to names', async () => {
   const B = world();
   const c = await open(B, 'honjaw', 'mlbb-reports');
-  await c.wait(() => c.d.querySelector('.panel.ach') && /signed in/.test(c.d.querySelector('.panel.ach').textContent));
+  await c.wait(() => c.d.querySelector('.panel.ach') && /login day/.test(c.d.querySelector('.panel.ach').textContent));
   const card = c.d.querySelector('.panel.ach').textContent;
-  assert.match(card, /🔥 2\s*days of MLBB reports in a row/); assert.match(card, /✅ 1\s*day signed in in a row/); assert.match(card, /No report yet today/);
-  assert.match(card, /First scrim report/); assert.match(card, /25 scrim reports 2\/25/);
+  assert.match(card, /🔥 2\s*days of MLBB reports in a row/); assert.match(card, /✅ 1\s*login day in a row/); assert.match(card, /No report yet today/);
+  assert.match(card, /First scrim report/); assert.match(card, /15 scrim reports 2\/15/);
   // The Head Coach team: their own page shows no personal card; the streaks are next to the names.
   B.tables.hub_checkins.push({ user_id: 'u-ilham', day: d1, first_at: `${d1}T01:00:00Z` }, { user_id: 'u-ilham', day: t0, first_at: `${t0}T01:00:00Z` });
   const f = await open(B, 'fayad', 'support');
@@ -94,6 +94,6 @@ test('before the database records logins: streaks from reports only, no login li
   const B = world(); B.missing = new Set(['hub_checkins']);
   const p = await open(B, 'ilham', 'support-week');
   await p.wait(() => /My achievements/.test(p.text()));
-  assert.match(p.d.querySelector('.ach').textContent, /🔥 2/); assert.doesNotMatch(p.text(), /signed in|Signed in/);
+  assert.match(p.d.querySelector('.ach').textContent, /🔥 2/); assert.doesNotMatch(p.text(), /login day|Logged in/);
   assert.equal(p.d.querySelector('.sw-in'), null);
 });

@@ -32,16 +32,20 @@ test('Road to WEC: from the day it went live to the day before WEC, at most two 
 
 test('badges: support staff and coaches; count milestones in tiers; what a save just earned', () => {
   const days = ['2026-11-23', '2026-11-24'];
-  const s = supportBadges({ reportDays: days, visits: 31, closed: 12, loginDays: ['2026-11-24', '2026-11-25'], asOf: '2026-11-25' });
+  const s = supportBadges({ reportDays: days, visits: 31, closed: 7, loginDays: ['2026-11-24', '2026-11-25'], asOf: '2026-11-25', disc: 'physio' });
   const by = Object.fromEntries(s.map((b) => [b.id, b]));
   assert.equal(by.first.earned, true); assert.equal(by.streak7.earned, false); assert.equal(by.streak7.have, 2);
-  assert.deepEqual([by.visits50.have, by.visits50.need, by.visits50.earned], [31, 50, false]);
-  assert.equal(by.closed10.earned, true); assert.equal(by.closed25.need, 25, 'after 10, the next goal is 25');
+  assert.deepEqual([by.week5.have, by.week5.need], [2, 5], 'this week so far');
+  assert.deepEqual([by.visits50.have, by.visits50.need, by.visits50.earned], [31, 50, false], 'physios: 50 visits');
+  assert.equal(by.closed5.earned, true); assert.equal(by.closed15.need, 15, 'after 5, the next goal is 15');
+  // V1.60 balance: a psychologist (about one visit a day) aims for 15, then 30.
+  const psy = Object.fromEntries(supportBadges({ reportDays: days, visits: 16, asOf: '2026-11-25', disc: 'psych' }).map((b) => [b.id, b]));
+  assert.equal(psy.visits15.earned, true); assert.equal(psy.visits30.need, 30);
   assert.equal(by.login7.have, 2); assert.equal(by.wec.need, 19);
   assert.ok(!supportBadges({ reportDays: days, asOf: '2026-11-25' }).some((b) => b.id === 'login7'), 'no login milestone until the database records logins');
   const c = coachBadges({ reportDays: ['2026-11-17', '2026-11-18', '2026-11-19', '2026-11-20', '2026-11-23', '2026-11-24'], reports: 9, loginDays: [], asOf: '2026-11-25' });
   const cb = Object.fromEntries(c.map((b) => [b.id, b]));
-  assert.equal(cb.streak5.earned, true); assert.equal(cb.week5.earned, false); assert.deepEqual([cb.reports25.have, cb.reports25.need], [9, 25]);
+  assert.equal(cb.streak5.earned, true); assert.equal(cb.week5.earned, false); assert.deepEqual([cb.reports15.have, cb.reports15.need], [9, 15]);
   const before = supportBadges({ reportDays: [], visits: 0, asOf: '2026-11-25' });
   const after = supportBadges({ reportDays: ['2026-11-25'], visits: 2, asOf: '2026-11-25' });
   assert.deepEqual(newlyEarned(before, after).map((b) => b.id), ['first']);

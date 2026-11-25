@@ -32,7 +32,7 @@ export function supportUi(ctx) {
   const loginDays = (userId) => { const c = ctx.checkins?.(); return Array.isArray(c) ? new Set(c.filter((x) => x.user_id === userId).map((x) => String(x.day).slice(0, 10))) : null; };
   const idOf = (name) => (name === HUB_USER?.name ? HUB_USER.id : (PLATFORM?.actionOwners || []).find((p) => p.name === name)?.id);
   const myDaysSet = (extra) => { const s = new Set(U.reports.filter((r) => r.by === me()).map((r) => r.date)); if (extra) s.add(extra); return s; };
-  const myBadges = (extra, visitsAdd = 0) => { const s = soFar(U.reports, me(), today()); return supportBadges({ reportDays: myDaysSet(extra), visits: (s?.visits || 0) + visitsAdd, closed: s?.closed || 0, loginDays: loginDays(HUB_USER?.id), asOf: today() }); };
+  const myBadges = (extra, visitsAdd = 0) => { const s = soFar(U.reports, me(), today()); return supportBadges({ reportDays: myDaysSet(extra), visits: (s?.visits || 0) + visitsAdd, closed: s?.closed || 0, loginDays: loginDays(HUB_USER?.id), asOf: today(), disc: JOBS[job()]?.disc || '' }); };
   const me = () => HUB_USER?.name || meName();
   const job = () => HUB_USER?.supportJob || '';
   // V1.50 the pain map, VAS and body region belong to the physios (Coach Ilham, Coach Dewi): other accounts never get
@@ -259,7 +259,7 @@ export function supportUi(ctx) {
     const t0 = today(); const s = streak(myDaysSet(), t0); const LG = loginDays(HUB_USER?.id); const lg = LG ? streak(LG, t0) : null; const toGo = daysToWec(t0);
     const n = (v, en, id) => `<div class="ach-n"><b>${v}</b><span>${esc(T(en, id))}</span></div>`;
     return `<div class="panel ach" data-no-tr><h2>${esc(T('My achievements', 'Pencapaian saya'))}</h2>
-      <div class="ach-top">${n(`🔥 ${s.n}`, `day${s.n === 1 ? '' : 's'} reported in a row`, 'hari lapor beruntun')}${lg ? n(`✅ ${lg.n}`, `day${lg.n === 1 ? '' : 's'} signed in in a row`, 'hari login beruntun') : ''}${toGo > 0 ? n(toGo, 'days to WEC', 'hari lagi menuju WEC') : ''}</div>
+      <div class="ach-top">${n(`🔥 ${s.n}`, `day${s.n === 1 ? '' : 's'} reported in a row`, 'hari lapor beruntun')}${lg ? n(`✅ ${lg.n}`, `login day${lg.n === 1 ? '' : 's'} in a row`, 'hari login beruntun') : ''}${toGo > 0 ? n(toGo, 'days to WEC', 'hari lagi menuju WEC') : ''}</div>
       <div class="ach-bs">${badgeChips(myBadges())}</div>
       <p class="note">${esc(T('Up to 2 days off a week never break a streak. A login counts once a day, when you open the hub.', 'Libur sampai 2 hari per minggu tidak memutus streak. Login dihitung sekali sehari, saat Anda membuka hub.'))}</p></div>`;
   }
@@ -275,7 +275,7 @@ export function supportUi(ctx) {
   function streakChips(name) {
     const t0 = today(); const r = streak(new Set(U.reports.filter((x) => x.by === name).map((x) => x.date)), t0).n;
     const id = idOf(name); const lg = id ? loginDays(id) : null;
-    return `<span class="ach-mini" data-no-tr title="${esc(T('Days reported in a row · days signed in in a row', 'Hari lapor beruntun · hari login beruntun'))}">🔥${r}${lg ? ` ✅${streak(lg, t0).n}` : ''}</span>`;
+    return `<span class="ach-mini" data-no-tr title="${esc(T('Days reported in a row · login days in a row', 'Hari lapor beruntun · hari login beruntun'))}">🔥${r}${lg ? ` ✅${streak(lg, t0).n}` : ''}</span>`;
   }
   // ---- Coach Donny, Head Coach, admins: 1 to check · 2 today · 3 this week
   function checkBlock() {

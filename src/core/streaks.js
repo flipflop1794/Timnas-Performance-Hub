@@ -60,18 +60,23 @@ const tier = (id, have, steps, label) => {
   return next ? [...done, { id: `${id}${next}`, label: label(next), earned: false, have, need: next }] : done;
 };
 const road = (r) => ({ id: 'wec', label: L('Road to WEC', 'Road to WEC'), earned: r.state === 'earned', lost: r.state === 'broken', have: r.day, need: r.total });
-const login7 = (loginDays, asOf) => (loginDays ? [{ id: 'login7', label: L('Signed in 7 days in a row', 'Login 7 hari beruntun'), earned: bestStreak(loginDays, asOf) >= 7, have: Math.min(7, streak(loginDays, asOf).n), need: 7 }] : []);
+const login7 = (loginDays, asOf) => (loginDays ? [{ id: 'login7', label: L('Logged in 7 days in a row', 'Login 7 hari beruntun'), earned: bestStreak(loginDays, asOf) >= 7, have: Math.min(7, streak(loginDays, asOf).n), need: 7 }] : []);
 
 // Support staff: their own report days, visits and follow-ups closed (soFar), and their login days (null = not
 // available yet: the login milestone is left out).
-export function supportBadges({ reportDays, visits = 0, closed = 0, loginDays = null, asOf }) {
+// V1.60 balance (live numbers, 26 Nov): physios log 4-5 visits a day; psychologists, the doctor and the physical coach
+// about one. Their visit goals are smaller, so everyone can reach one before WEC.
+export const VISIT_STEPS = { physio: [50, 100], other: [15, 30] };
+// Days with activity in the current calendar week (the progress towards "Full week").
+const thisWeek = (R, asOf) => { let n = 0; for (let d = asOf; weekOf(d) === weekOf(asOf); d = shiftDay(d, -1)) if (R.has(d)) n++; return n; };
+export function supportBadges({ reportDays, visits = 0, closed = 0, loginDays = null, asOf, disc = '' }) {
   const R = asSet(reportDays); const best = bestStreak(R, asOf);
   return [
     { id: 'first', label: L('First report', 'Laporan pertama'), earned: R.size > 0 },
     { id: 'streak7', label: L('7 days in a row', '7 hari beruntun'), earned: best >= 7, have: Math.min(7, streak(R, asOf).n), need: 7 },
-    { id: 'week5', label: L('Full week (5 days)', 'Minggu penuh (5 hari)'), earned: bestWeek(R, asOf) >= 5 },
-    tier('visits', visits, [50, 100], (n) => L(`${n} visits`, `${n} kunjungan`)),
-    tier('closed', closed, [10, 25], (n) => L(`${n} follow-ups closed`, `${n} tindak lanjut tuntas`)),
+    { id: 'week5', label: L('Full week (5 days)', 'Minggu penuh (5 hari)'), earned: bestWeek(R, asOf) >= 5, have: thisWeek(R, asOf), need: 5 },
+    tier('visits', visits, VISIT_STEPS[disc === 'physio' ? 'physio' : 'other'], (n) => L(`${n} visits`, `${n} kunjungan`)),
+    tier('closed', closed, [5, 15], (n) => L(`${n} follow-ups closed`, `${n} tindak lanjut tuntas`)),
     ...login7(loginDays, asOf),
     road(roadToWec(R, asOf)),
   ].flat();
@@ -82,8 +87,8 @@ export function coachBadges({ reportDays, reports = 0, loginDays = null, asOf })
   return [
     { id: 'first', label: L('First scrim report', 'Laporan scrim pertama'), earned: R.size > 0 },
     { id: 'streak5', label: L('5 days in a row', '5 hari beruntun'), earned: best >= 5, have: Math.min(5, streak(R, asOf).n), need: 5 },
-    { id: 'week5', label: L('Full week (5 days)', 'Minggu penuh (5 hari)'), earned: bestWeek(R, asOf) >= 5 },
-    tier('reports', reports, [25, 50], (n) => L(`${n} scrim reports`, `${n} laporan scrim`)),
+    { id: 'week5', label: L('Full week (5 days)', 'Minggu penuh (5 hari)'), earned: bestWeek(R, asOf) >= 5, have: thisWeek(R, asOf), need: 5 },
+    tier('reports', reports, [15, 30], (n) => L(`${n} scrim reports`, `${n} laporan scrim`)),
     ...login7(loginDays, asOf),
     road(roadToWec(R, asOf)),
   ].flat();
