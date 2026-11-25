@@ -62,7 +62,10 @@ test('no session: the sign-in screen, not the hub; wrong password refused; right
   p.d.getElementById('loginForm').dispatchEvent(new p.w.Event('submit', { cancelable: true })); await sleep(250);
   // A title coach sees only his own game and lands on its scrim reports.
   assert.match(p.nav(), /MLBB/); for (const t of ['Dota 2', 'PUBG Mobile', 'eFootball', 'CS2']) assert.doesNotMatch(p.nav(), new RegExp(t));
-  assert.match(p.nav(), /Coach Indra/); assert.ok(p.d.getElementById('signOutBtn')); assert.equal(p.d.getElementById('meSel'), null, 'no self-declared identity');
+  assert.match(p.nav(), /Coach Indra/); assert.ok(p.d.getElementById('signOutBtn'));
+  // V1.56 Sign out is on the top row, outside the closed Menu
+  assert.equal(p.d.getElementById('signOutBtn').parentElement.id, 'titles'); assert.ok(p.d.getElementById('titlesMore').hidden);
+  assert.equal(p.d.getElementById('meSel'), null, 'no self-declared identity');
 });
 
 test('an account without a role sees only "no access yet"', async () => {
