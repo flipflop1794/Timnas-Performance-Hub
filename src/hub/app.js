@@ -397,11 +397,13 @@ function renderNav(view) {
   const top = groups.length <= 4 ? groups : groups.filter((g) => g === title || g.id === 'home' || (own.size <= 3 && own.has(groupTitle(g.id))));
   const rest = groups.filter((g) => !top.includes(g));
   const gbtn = (t) => `<button type="button" data-go="${t.tabs[0][0]}" aria-pressed="${t === title}">${esc(t.label)}${t.id === 'staff' && pending ? ` · ${pending}` : ''}</button>`;
-  const who = HUB_USER ? `<span class="me" title="${esc(HUB_USER.email)}">${esc(HUB_USER.name)}</span><button type="button" id="signOutBtn" class="mode">Sign out</button>`
+  // V1.56 Sign out (Keluar) sits on the top row, last, so nobody has to open Menu to find it. The name stays under Menu.
+  const out = HUB_USER ? '<button type="button" id="signOutBtn" class="out">Sign out</button>' : '';
+  const who = HUB_USER ? `<span class="me" title="${esc(HUB_USER.email)}">${esc(HUB_USER.name)}</span>`
     : `<label class="me" for="meSel">I am <select id="meSel">${STAFF.map((x) => `<option value="${x.id}" ${x.id === S.me ? 'selected' : ''}>${esc(x.name.split(' ')[0])}</option>`).join('')}</select></label>`;
   $('#titles').innerHTML = home + top.map(gbtn).join('')
     + `<button type="button" id="langBtn" class="lang" aria-label="${S.lang === 'id' ? 'Switch to English' : 'Ganti ke Bahasa Indonesia'}"><b${S.lang === 'en' ? ' class="on"' : ''}>EN</b><b${S.lang === 'id' ? ' class="on"' : ''}>ID</b></button>`
-    + `<button type="button" id="menuBtn" class="menu" aria-expanded="${!!S.navOpen}" aria-controls="titlesMore">☰<span class="lbl"> Menu</span>${pending && rest.some((g) => g.id === 'staff') ? ` · ${pending}` : ''}</button>`
+    + `<button type="button" id="menuBtn" class="menu" aria-expanded="${!!S.navOpen}" aria-controls="titlesMore">☰<span class="lbl"> Menu</span>${pending && rest.some((g) => g.id === 'staff') ? ` · ${pending}` : ''}</button>${out}`
     + `<div class="tmore" id="titlesMore" ${S.navOpen ? '' : 'hidden'}>${rest.map(gbtn).join('')}${who}`
     + (cn || SUPPORT_ONLY ? '' : `<button type="button" id="modeBtn" class="mode ${S.mode}" aria-pressed="${S.mode === 'demo'}">${S.mode === 'demo' ? 'Leave demo sandbox' : 'Demo sandbox'}</button>`)
     + (HUB_USER && !SUPPORT_ONLY ? `<button type="button" id="focusBtn" class="mode" aria-pressed="${!S.showAll}" title="${COACH_MENU ? 'The short menu shows the screens a title coach uses most' : 'Focus mode hides screens not in use yet'}">${COACH_MENU ? (S.showAll ? 'Short menu' : 'More') : S.showAll ? 'Focus mode' : 'Show all tools'}</button>` : '')
