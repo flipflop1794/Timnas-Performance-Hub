@@ -1456,6 +1456,7 @@ function createOcrCanvas(image, rectangle, mode = "binary") {
   const imageData = context.getImageData(padding, padding, sourceWidth * scale, sourceHeight * scale);
   const histogram = new Array(256).fill(0);
   let luminanceTotal = 0;
+  const redText = mode === "red-text";
   for (let index = 0; index < imageData.data.length; index += 4) {
     const luminance = Math.round(imageData.data[index] * 0.299 + imageData.data[index + 1] * 0.587 + imageData.data[index + 2] * 0.114);
     histogram[luminance] += 1;
@@ -1467,7 +1468,9 @@ function createOcrCanvas(image, rectangle, mode = "binary") {
   const darkBackground = luminanceTotal / pixelCount < 145;
   for (let index = 0; index < imageData.data.length; index += 4) {
     const luminance = Math.round(imageData.data[index] * 0.299 + imageData.data[index + 1] * 0.587 + imageData.data[index + 2] * 0.114);
-    const textPixel = Number.isFinite(fixedLightThreshold)
+    const textPixel = redText
+      ? imageData.data[index] > 105 && imageData.data[index] - imageData.data[index + 1] > 38
+      : Number.isFinite(fixedLightThreshold)
       ? luminance >= threshold
       : darkBackground ? luminance >= threshold : luminance <= threshold;
     const output = textPixel ? 0 : 255;
@@ -2076,6 +2079,108 @@ async function buildReferenceFeatures(picks, heroIcons, signal) {
       source.release();
     }
   }));
+}
+
+// The 16:9 replay draft screen uses two vertical pick columns and two ban strips.
+export function replayDraftSlots() {
+  const slots = [];
+  const rect = (x, y, width, height) => ({ x: x / 1280, y: y / 720, width: width / 1280, height: height / 720 });
+  for (const side of ["left", "right"]) {
+    for (const kind of ["pick", "ban"]) {
+      for (let index = 0; index < 5; index += 1) {
+        const start = side === "left" ? 20 : 914;
+        const rectangle = kind === "pick"
+          ? rect(side === "left" ? 20 : 1156, 85 + index * 115, 100, 89)
+          : rect(start + index * 73, 3, 52, 52);
+        slots.push({ side, kind, index, rectangle });
+      }
+    }
+  }
+  return slots;
+}
+
+export async function scanReplayDraft({ file, heroes, heroIcons, signal }) {
+  assertLocalScannerFile(file);
+  const source = await loadImageSource(file, { signal });
+  try {
+    const { width, height } = imageSize(source.image);
+    if (width < 640 || Math.abs(width / height - 16 / 9) > 0.035) {
+      throw new Error("Use a full 16:9 replay draft screenshot, at least 640 pixels wide.");
+    }
+    const references = [];
+    // Limit concurrent asset loads on mobile. Missing artwork leaves that hero available for manual entry.
+    for (let i = 0; i < heroes.length; i += 12) {
+      const batch = await Promise.allSettled(heroes.slice(i, i + 12).map(async (hero) => {
+        const [features] = await buildReferenceFeatures([{ hero }], heroIcons, signal);
+        return { hero, features };
+      }));
+      throwIfScanAborted(signal);
+      for (const entry of batch) if (entry.status === "fulfilled") references.push(entry.value);
+    }
+    if (!references.length) throw new Error("Hero reference images could not be loaded. Retry the scan.");
+    const scratch = createCanvas(FEATURE_SIZE, FEATURE_SIZE);
+    const preview = createCanvas(96, 96);
+    const slots = replayDraftSlots().map((slot) => {
+      const r = slot.rectangle;
+      // Ban badges sit at a lower corner. Compare only the center of each circle.
+      const inset = slot.kind === "ban" ? 0.13 : 0;
+      const crop = {
+        x: r.x + r.width * inset, y: r.y + r.height * inset,
+        width: r.width * (1 - inset * 2), height: r.height * (1 - inset * 2),
+      };
+      const feature = featureFromRect(source.image, crop, scratch);
+      const ranked = references.map(({ hero, features }) => ({
+        hero, score: Math.max(...features.map((ref) => compareFeatures(feature, ref))),
+      })).sort((a, b) => b.score - a.score);
+      preview.getContext("2d").drawImage(source.image, r.x * width, r.y * height, r.width * width, r.height * height, 0, 0, 96, 96);
+      return { ...slot, candidates: ranked.slice(0, 3).map(({ hero }) => hero), crop: preview.toDataURL("image/jpeg", 0.8) };
+    });
+    let centerHero = "";
+    let textWorker;
+    try {
+      const { worker, PSM } = await createNumericWorker(signal);
+      textWorker = worker;
+      await waitForScanTask(worker.setParameters({ tessedit_pageseg_mode: PSM.SINGLE_LINE }), {
+        timeoutMs: OCR_CONFIGURATION_TIMEOUT_MS, signal,
+      });
+      const readLine = async (rectangle, mode) => {
+        const canvas = createOcrCanvas(source.image, rectangle, mode);
+        const result = await waitForScanTask(worker.recognize(canvas), { timeoutMs: OCR_RECOGNITION_TIMEOUT_MS, signal });
+        return normalizeScannerHeroKey(result.data.text);
+      };
+      const rectangle = { x: 0.436, y: 0.436, width: 0.12, height: 0.067 };
+      for (const mode of ["red-text", "binary"]) {
+        const key = await readLine(rectangle, mode);
+        centerHero = heroes.find((hero) => normalizeScannerHeroKey(hero) === key) || "";
+        if (centerHero) break;
+      }
+      if (centerHero) {
+        const nickname = await readLine({ x: 0.4, y: 0.516, width: 0.2, height: 0.05 }, "red-text");
+        if (nickname.length >= 5) {
+          const matches = [];
+          for (const slot of slots.filter(({ kind }) => kind === "pick")) {
+            const name = await readLine({
+              x: slot.side === "left" ? 0.003 : 0.844,
+              y: (172 + slot.index * 115) / 720, width: 0.15, height: 24 / 720,
+            }, "binary");
+            if (name === nickname || name.endsWith(nickname)) matches.push(slot);
+          }
+          if (matches.length === 1) {
+            const slot = matches[0];
+            slot.candidates = [centerHero, ...slot.candidates.filter((hero) => hero !== centerHero)].slice(0, 3);
+          }
+        }
+      }
+    } catch {
+      throwIfScanAborted(signal);
+      // The banner can disappear between replay frames. Portrait review remains available.
+    } finally {
+      if (textWorker) void textWorker.terminate().catch(() => {});
+    }
+    return { slots, centerHero, missingReferences: heroes.length - references.length };
+  } finally {
+    source.release();
+  }
 }
 
 async function scanScreen({ entry, picks, referenceFeatures, worker, onProgress, progressState, signal }) {

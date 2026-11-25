@@ -80,6 +80,7 @@ for (const [title, route] of [['MLBB', 'mlbb-reports'], ['MLBB Women', 't-mlbbw-
     const P = await open(world(), 'aufa', route);
     await P.click(`[data-cap-manual="${title}"]`);
     assert.ok(P.d.querySelector(`[data-cap-local="${title}"]`));
+    assert.ok(P.d.querySelector(`input[data-cap-replay="${title}"]`));
     await P.click(`[data-cap-local="${title}"]`);
     await sleep(100);
     assert.match(P.d.querySelector('.local-result-scanner')?.textContent || '', /full 16:9 result frame/i);
