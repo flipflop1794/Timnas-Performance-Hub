@@ -2137,15 +2137,17 @@ export async function scanReplayDraft({ file, heroes, heroIcons, signal }) {
     });
     let centerHero = "";
     let textWorker;
+    // Portrait candidates remain usable when the optional text worker starts slowly.
     try {
-      const { worker, PSM } = await createNumericWorker(signal);
+      const textSignal = AbortSignal.any([signal, AbortSignal.timeout(12000)].filter(Boolean));
+      const { worker, PSM } = await createNumericWorker(textSignal);
       textWorker = worker;
       await waitForScanTask(worker.setParameters({ tessedit_pageseg_mode: PSM.SINGLE_LINE }), {
-        timeoutMs: OCR_CONFIGURATION_TIMEOUT_MS, signal,
+        timeoutMs: OCR_CONFIGURATION_TIMEOUT_MS, signal: textSignal,
       });
       const readLine = async (rectangle, mode) => {
         const canvas = createOcrCanvas(source.image, rectangle, mode);
-        const result = await waitForScanTask(worker.recognize(canvas), { timeoutMs: OCR_RECOGNITION_TIMEOUT_MS, signal });
+        const result = await waitForScanTask(worker.recognize(canvas), { timeoutMs: OCR_RECOGNITION_TIMEOUT_MS, signal: textSignal });
         return normalizeScannerHeroKey(result.data.text);
       };
       const rectangle = { x: 0.436, y: 0.436, width: 0.12, height: 0.067 };

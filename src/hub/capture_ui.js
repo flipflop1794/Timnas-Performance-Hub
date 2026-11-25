@@ -325,7 +325,7 @@ export function captureUi(ctx) {
         ${log && localOcr(title) ? `<button class="btn" type="button" data-cap-local="${esc(title)}">Scan results (local OCR)</button>` : ''}
         ${ai() && !block && !pend.fix ? `<label class="btn filebtn">Add another screenshot of this game<input type="file" accept="image/*" multiple data-cap-more="${esc(title)}" hidden></label>` : ''}
         ${log && localOcr(title) && !block ? `<label class="btn filebtn">Scan draft screenshot locally<input type="file" accept="image/png,image/jpeg,image/webp" data-cap-replay="${esc(title)}" hidden></label>` : ''}
-        ${ai() && !dr && !block ? `<label class="btn filebtn">Add draft screenshot<input type="file" accept="image/*" data-cap-draft="${esc(title)}" hidden></label>` : ''}
+        ${ai() && !dr && !block ? `<label class="btn filebtn">${log && localOcr(title) ? 'Scan draft with online AI' : 'Add draft screenshot'}<input type="file" accept="image/*" data-cap-draft="${esc(title)}" hidden></label>` : ''}
         <button class="btn" type="button" data-cap-discard="${esc(title)}">${pend.fix ? 'Cancel' : 'Discard'}</button><span class="msg" id="capMsg-${fid}" role="status"></span></div>
       ${log ? replayDraftReview(title, fid, replayDraftReviews.get(pend)) : ''}
       ${log && localOcr(title) ? `<div id="capLocalPending-${fid}" class="hub-local-scanner"></div><p class="note">Local OCR uses the K/D/A + Gold and Damage result screens. Screenshots stay on this device; confirm the reviewed values before saving the game.</p>` : ''}
@@ -567,6 +567,11 @@ export function captureUi(ctx) {
       replayDraftScan?.abort();
       const controller = new AbortController();
       replayDraftScan = controller;
+      const deadline = setTimeout(() => {
+        if (replayDraftScan !== controller) return;
+        controller.abort();
+        if (st(fid).pending === pending) setMsg(`capMsg-${fid}`, 'Draft scan timed out. Retry the local scan or enter the heroes by hand.', 'err');
+      }, 30000);
       setMsg(`capMsg-${fid}`, 'Matching hero portraits locally…');
       try {
         const review = await scanReplayDraft({ file: files[0], heroes: heroes.names, heroIcons, signal: controller.signal });
@@ -581,6 +586,7 @@ export function captureUi(ctx) {
       } catch (err) {
         if (!controller.signal.aborted && st(fid).pending === pending) setMsg(`capMsg-${fid}`, err.message, 'err');
       } finally {
+        clearTimeout(deadline);
         if (replayDraftScan === controller) replayDraftScan = null;
       }
       return true;
