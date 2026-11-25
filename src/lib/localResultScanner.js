@@ -1,3 +1,5 @@
+import { learnFrom, readHero } from "../core/hero_icons.js";
+
 const SUPPORTED_ASPECT_MIN = 1.62;
 const SUPPORTED_ASPECT_MAX = 2.42;
 const FEATURE_SIZE = 14;
@@ -2099,7 +2101,7 @@ export function replayDraftSlots() {
   return slots;
 }
 
-export async function scanReplayDraft({ file, heroes, heroIcons, signal }) {
+export async function scanReplayDraft({ file, heroes, heroIcons, iconReferences = [], roster = [], signal }) {
   assertLocalScannerFile(file);
   const source = await loadImageSource(file, { signal });
   try {
@@ -2117,7 +2119,7 @@ export async function scanReplayDraft({ file, heroes, heroIcons, signal }) {
       throwIfScanAborted(signal);
       for (const entry of batch) if (entry.status === "fulfilled") references.push(entry.value);
     }
-    if (!references.length) throw new Error("Hero reference images could not be loaded. Retry the scan.");
+    if (!references.length && !iconReferences.length) throw new Error("Hero reference images could not be loaded. Retry the scan.");
     const scratch = createCanvas(FEATURE_SIZE, FEATURE_SIZE);
     const preview = createCanvas(96, 96);
     const slots = replayDraftSlots().map((slot) => {
@@ -2133,7 +2135,13 @@ export async function scanReplayDraft({ file, heroes, heroIcons, signal }) {
         hero, score: Math.max(...features.map((ref) => compareFeatures(feature, ref))),
       })).sort((a, b) => b.score - a.score);
       preview.getContext("2d").drawImage(source.image, r.x * width, r.y * height, r.width * width, r.height * height, 0, 0, 96, 96);
-      return { ...slot, candidates: ranked.slice(0, 3).map(({ hero }) => hero), crop: preview.toDataURL("image/jpeg", 0.8) };
+      const pixels = preview.getContext("2d").getImageData(0, 0, 96, 96);
+      const visual = iconReferences.length
+        ? readHero(pixels, iconReferences)
+        : { candidates: [], hero: "" };
+      const suggestions = (slot.kind === "ban" ? [...visual.candidates, ...ranked] : [...ranked, ...visual.candidates]);
+      const hero = visual.hero;
+      return { ...slot, hero, candidates: [...new Set([hero, ...suggestions.map((c) => c.hero)].filter(Boolean))].slice(0, 5), crop: preview.toDataURL("image/jpeg", 0.8), feature: learnFrom(pixels, "").f };
     });
     let centerHero = "";
     let textWorker;
@@ -2156,21 +2164,25 @@ export async function scanReplayDraft({ file, heroes, heroIcons, signal }) {
         centerHero = heroes.find((hero) => normalizeScannerHeroKey(hero) === key) || "";
         if (centerHero) break;
       }
-      if (centerHero) {
-        const nickname = await readLine({ x: 0.4, y: 0.516, width: 0.2, height: 0.05 }, "red-text");
-        if (nickname.length >= 5) {
-          const matches = [];
-          for (const slot of slots.filter(({ kind }) => kind === "pick")) {
-            const name = await readLine({
-              x: slot.side === "left" ? 0.003 : 0.844,
-              y: (172 + slot.index * 115) / 720, width: 0.15, height: 24 / 720,
-            }, "binary");
-            if (name === nickname || name.endsWith(nickname)) matches.push(slot);
-          }
-          if (matches.length === 1) {
-            const slot = matches[0];
-            slot.candidates = [centerHero, ...slot.candidates.filter((hero) => hero !== centerHero)].slice(0, 3);
-          }
+      if (centerHero || roster.length) {
+        const nickname = centerHero ? await readLine({ x: 0.4, y: 0.516, width: 0.2, height: 0.05 }, "red-text") : "";
+        const matches = [];
+        for (const slot of slots.filter(({ kind }) => kind === "pick")) {
+          const name = await readLine({
+            x: slot.side === "left" ? 0.003 : 0.844,
+            y: (172 + slot.index * 115) / 720, width: 0.15, height: 24 / 720,
+          }, "binary");
+          if (nickname.length >= 5 && (name === nickname || name.endsWith(nickname))) matches.push(slot);
+          const players = roster.filter((player) => {
+            const key = normalizeScannerHeroKey(player);
+            return key.length >= 4 && (name === key || (key.length >= 6 && name.endsWith(key)));
+          });
+          if (players.length === 1) slot.player = players[0];
+        }
+        if (matches.length === 1) {
+          const [slot] = matches;
+          slot.hero = centerHero;
+          slot.candidates = [centerHero, ...slot.candidates.filter((hero) => hero !== centerHero)].slice(0, 5);
         }
       }
     } catch {
@@ -2179,7 +2191,13 @@ export async function scanReplayDraft({ file, heroes, heroIcons, signal }) {
     } finally {
       if (textWorker) void textWorker.terminate().catch(() => {});
     }
-    return { slots, centerHero, missingReferences: heroes.length - references.length };
+    const counts = new Map();
+    for (const { hero } of slots) if (hero) counts.set(hero, (counts.get(hero) || 0) + 1);
+    for (const slot of slots) if (counts.get(slot.hero) > 1) slot.hero = "";
+    const left = new Set(slots.filter((slot) => slot.side === "left" && slot.player).map((slot) => slot.player));
+    const right = new Set(slots.filter((slot) => slot.side === "right" && slot.player).map((slot) => slot.player));
+    const ourSide = left.size >= 2 && !right.size ? "left" : right.size >= 2 && !left.size ? "right" : "";
+    return { slots, centerHero, ourSide, missingReferences: heroes.length - references.length };
   } finally {
     source.release();
   }

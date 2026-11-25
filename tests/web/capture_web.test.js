@@ -78,6 +78,7 @@ test('website: when the AI function is not deployed, AI buttons are hidden and t
 for (const [title, route] of [['MLBB', 'mlbb-reports'], ['MLBB Women', 't-mlbbw-reports']]) {
   test(`website: ${title} opens the copied local result scanner from a manual game`, async () => {
     const P = await open(world(), 'aufa', route);
+    assert.match(P.d.querySelector(`input[data-cap-replay="${title}"]`)?.closest('label')?.textContent || '', /Add game from draft screenshot/);
     await P.click(`[data-cap-manual="${title}"]`);
     assert.ok(P.d.querySelector(`[data-cap-local="${title}"]`));
     assert.ok(P.d.querySelector(`input[data-cap-replay="${title}"]`));

@@ -24,6 +24,7 @@ import { GAME_SIDES, LIMITS } from '../../supabase/functions/_shared/scrim_spec.
 import { isScrimLog, PICK_ORDER, PICK_ORDER_LABEL, MLBB_MAPS, MAX_BANS, NOTES_MAX } from '../core/scrim_log.js';
 import { scannerGame, applyLocalScan, sameReviewedResult } from '../core/scrim_log_ocr.js';
 import { normalizeScannerHeroKey, scanReplayDraft } from '../lib/localResultScanner.js';
+import { referenceSet } from '../core/hero_icons.js';
 import LocalResultScanner, { BatchLocalResultScanner } from '../components/LocalResultScanner.jsx';
 import { createRoot } from 'react-dom/client';
 import { createElement } from 'react';
@@ -105,22 +106,30 @@ export function captureUi(ctx) {
   const { S, esc, tag, banner, setMsg, val, render, meName, sid, fillReport, localToday, PLATFORM } = ctx;
   const ai = () => PLATFORM?.ai || null;
   const localOcr = (title) => isScrimLog(title) && !!PLATFORM;
+  const replayInput = (title, label) => `<label class="btn filebtn">${label}<input type="file" accept="image/png,image/jpeg,image/webp" data-cap-replay="${esc(title)}" hidden></label>`;
   const heroIcons = Object.fromEntries(DATA.mlbbHeroes.map(({ name }) => [normalizeScannerHeroKey(name), `/mlbb-icons/${normalizeScannerHeroKey(name)}.png`]));
   const replayDraftReviews = new WeakMap();
+  const replayIconKey = (title) => `hub-replay-icons:${S.me}:${title}`;
+  function learnedReplayIcons(title) {
+    try {
+      const stored = JSON.parse(localStorage.getItem(replayIconKey(title)) || '[]');
+      return Array.isArray(stored) ? stored.filter(({ hero, f } = {}) => heroesFor(title).names.includes(hero) && typeof f === 'string') : [];
+    } catch { return []; }
+  }
   let replayDraftScan;
   function replayDraftReview(title, fid, review) {
     if (!review) return '';
     return `<section class="cap-replay-draft" data-cap-replay-review aria-label="Review replay draft">
-      <p class="note">Compare each crop with its suggested heroes. Select only slots you can verify. Apply to empty fields, then confirm the game separately.</p>
+      <p class="note">${review.slots.filter(({ hero }) => hero).length} of 20 hero slots preselected. Check the crops and correct uncertain values before applying.</p>
       ${review.centerHero ? `<p class="note">Hero name read in the center: <strong>${esc(review.centerHero)}</strong></p>` : ''}
       ${review.missingReferences ? `<p class="note">Missing hero references: ${review.missingReferences}. Use the hero list to enter any missing match.</p>` : ''}
-      <label class="field">Our team in the screenshot<select id="cr-${fid}-side"><option value="">Select side</option><option value="left">Left</option><option value="right">Right</option></select></label>
+      <label class="field">Our team in the screenshot<select id="cr-${fid}-side"><option value="">Select side</option><option value="left"${review.ourSide === 'left' ? ' selected' : ''}>Left</option><option value="right"${review.ourSide === 'right' ? ' selected' : ''}>Right</option></select></label>
       <label><input type="checkbox" id="cr-${fid}-picks"> The pick rows shown here correspond to P1–P5. Apply selected picks.</label>
       <label><input type="checkbox" id="cr-${fid}-bans"> The ban slots shown here correspond to B1–B5. Apply selected bans.</label>
       <div class="cap-log-grid">${['left', 'right'].map((side) => `<section><h4>${side === 'left' ? 'Left' : 'Right'}</h4><div class="cap-replay-slots">
-        ${review.slots.filter((slot) => slot.side === side).map(({ kind, index, candidates, crop }) => `<label class="field"><span>${kind === 'pick' ? 'Pick' : 'Ban'} slot ${index + 1}</span>
+        ${review.slots.filter((slot) => slot.side === side).map(({ kind, index, candidates, crop, hero, player }) => `<label class="field"><span>${kind === 'pick' ? 'Pick' : 'Ban'} slot ${index + 1}${player ? ` · ${esc(player)}` : ''}</span>
           <img width="64" height="64" src="${esc(crop)}" alt=""><select id="cr-${fid}-${side}-${kind}-${index}"><option value="">Skip</option>
-          <optgroup label="Suggestions">${candidates.map((hero) => `<option>${esc(hero)}</option>`).join('')}</optgroup>
+          <optgroup label="Suggestions">${candidates.map((candidate) => `<option${candidate === hero ? ' selected' : ''}>${esc(candidate)}</option>`).join('')}</optgroup>
           <optgroup label="Other heroes">${heroesFor(title).names.filter((hero) => !candidates.includes(hero)).map((hero) => `<option>${esc(hero)}</option>`).join('')}</optgroup></select></label>`).join('')}</div></section>`).join('')}</div>
       <button type="button" class="btn" data-cap-apply-replay="${esc(title)}">Apply reviewed draft</button>
     </section>`;
@@ -225,7 +234,7 @@ export function captureUi(ctx) {
       <p class="note">One entry per game, in the order played: side FP / SP, map, bans and picks (P1–P5 with the player), the other team's bans and picks, result, duration, VOD link and a note. The report's result is counted from these games.${on ? ' A screenshot of the result or the draft can fill the heroes and stats for you; you check every value.' : ''}</p>
       ${S.rpEdit?.[fid] ? '<p class="note">Editing the report: its games stay as saved. To change a game, use Fix in the saved report\'s game table.</p>' : list ? `<ul class="plain capgames">${list}</ul>` : '<p class="empty">No game added yet. A report needs at least one.</p>'}
       ${localOcr(title) && s.ready.length && !S.rpEdit?.[fid] ? `<div class="toolbar"><button class="btn" type="button" data-cap-local-batch="${esc(title)}">Batch scan session (local OCR)</button><span class="note">Two result screenshots per game, in any order; review each before applying.</span></div><div id="capLocalBatch-${fid}" class="hub-local-scanner"></div>` : ''}
-      ${S.rpEdit?.[fid] ? '' : s.pending ? editorHtml(title, fid, s.pending) : `<div class="toolbar"><button class="btn primary" type="button" data-cap-manual="${esc(title)}">+ Add game ${s.ready.length + 1}</button>${on ? `<label class="btn filebtn">From a screenshot<input type="file" accept="image/*" multiple data-cap-shot="${esc(title)}" hidden></label>` : ''}<span class="msg" id="capMsg-${fid}" role="status"></span></div>`}`;
+      ${S.rpEdit?.[fid] ? '' : s.pending ? editorHtml(title, fid, s.pending) : `<div class="toolbar"><button class="btn primary" type="button" data-cap-manual="${esc(title)}">+ Add game ${s.ready.length + 1}</button>${localOcr(title) ? replayInput(title, 'Add game from draft screenshot') : ''}${on ? `<label class="btn filebtn">From a screenshot<input type="file" accept="image/*" multiple data-cap-shot="${esc(title)}" hidden></label>` : ''}<span class="msg" id="capMsg-${fid}" role="status"></span></div>`}`;
     }
     return `<div class="h3">Games</div>
       <p class="note">${on ? 'Upload the screenshots of one game: pick the end-of-game screen first, and you can select the second screen (Data or Scoreboard tab) and the draft or loading screen together with it. The AI sorts them, and a draft fills the heroes. You check every value before it counts.' : 'AI screenshot reading works on the website. Here you can type each game by hand.'} Confirmed games fill the result above and feed the Patterns tab and player trails.</p>
@@ -324,7 +333,7 @@ export function captureUi(ctx) {
       <div class="toolbar">${block ? '' : `<button class="btn primary" type="button" data-cap-confirm="${esc(title)}">${pend.fix ? 'Save the fix' : 'Confirm game'}</button>`}
         ${log && localOcr(title) ? `<button class="btn" type="button" data-cap-local="${esc(title)}">Scan results (local OCR)</button>` : ''}
         ${ai() && !block && !pend.fix ? `<label class="btn filebtn">Add another screenshot of this game<input type="file" accept="image/*" multiple data-cap-more="${esc(title)}" hidden></label>` : ''}
-        ${log && localOcr(title) && !block ? `<label class="btn filebtn">Scan draft screenshot locally<input type="file" accept="image/png,image/jpeg,image/webp" data-cap-replay="${esc(title)}" hidden></label>` : ''}
+        ${log && localOcr(title) && !block ? replayInput(title, 'Scan draft screenshot locally') : ''}
         ${ai() && !dr && !block ? `<label class="btn filebtn">${log && localOcr(title) ? 'Scan draft with online AI' : 'Add draft screenshot'}<input type="file" accept="image/*" data-cap-draft="${esc(title)}" hidden></label>` : ''}
         <button class="btn" type="button" data-cap-discard="${esc(title)}">${pend.fix ? 'Cancel' : 'Discard'}</button><span class="msg" id="capMsg-${fid}" role="status"></span></div>
       ${log ? replayDraftReview(title, fid, replayDraftReviews.get(pend)) : ''}
@@ -561,30 +570,43 @@ export function captureUi(ctx) {
     const heroes = heroesFor(title);
     if (replay) {
       if (!localOcr(title)) return true;
-      const pending = st(fid).pending;
+      const state = st(fid);
+      const pending = state.pending;
+      const stillCurrent = () => st(fid) === state && state.pending === pending && (pending || !S.rpEdit?.[fid]);
       t.value = '';
-      if (!pending) return true;
       replayDraftScan?.abort();
       const controller = new AbortController();
       replayDraftScan = controller;
       const deadline = setTimeout(() => {
         if (replayDraftScan !== controller) return;
         controller.abort();
-        if (st(fid).pending === pending) setMsg(`capMsg-${fid}`, 'Draft scan timed out. Retry the local scan or enter the heroes by hand.', 'err');
+        if (stillCurrent()) setMsg(`capMsg-${fid}`, 'Draft scan timed out. Retry the local scan or enter the heroes by hand.', 'err');
       }, 30000);
       setMsg(`capMsg-${fid}`, 'Matching hero portraits locally…');
       try {
-        const review = await scanReplayDraft({ file: files[0], heroes: heroes.names, heroIcons, signal: controller.signal });
-        if (!controller.signal.aborted && st(fid).pending === pending) {
-          replayDraftReviews.set(pending, review);
-          // Replace only the review. The coach may be editing the game while the scan runs.
-          const editor = document.getElementById(`cg-${fid}-our`)?.closest('.capedit');
-          editor?.querySelector('[data-cap-replay-review]')?.remove();
-          editor?.querySelector('.toolbar')?.insertAdjacentHTML('afterend', replayDraftReview(title, fid, review));
+        const review = await scanReplayDraft({
+          file: files[0], heroes: heroes.names, heroIcons,
+          iconReferences: referenceSet(DATA.mlbbHeroIcons, learnedReplayIcons(title)),
+          roster: rosterOf(title), signal: controller.signal,
+        });
+        if (!controller.signal.aborted && stillCurrent()) {
+          if (pending) {
+            replayDraftReviews.set(pending, review);
+            // Replace only the review. The coach may be editing the game while the scan runs.
+            const editor = document.getElementById(`cg-${fid}-our`)?.closest('.capedit');
+            editor?.querySelector('[data-cap-replay-review]')?.remove();
+            editor?.querySelector('.toolbar')?.insertAdjacentHTML('afterend', replayDraftReview(title, fid, review));
+          } else {
+            const base = blankGame(title, rosterOf(title), state.ready.at(-1)?.ourSide);
+            state.pending = { base, captureIds: [], draft: null, fromScreenshot: false };
+            replayDraftReviews.set(state.pending, review);
+            keep(fid);
+            render();
+          }
           setMsg(`capMsg-${fid}`, 'Draft scan ready to review.', 'ok');
         }
       } catch (err) {
-        if (!controller.signal.aborted && st(fid).pending === pending) setMsg(`capMsg-${fid}`, err.message, 'err');
+        if (!controller.signal.aborted && stillCurrent()) setMsg(`capMsg-${fid}`, err.message, 'err');
       } finally {
         clearTimeout(deadline);
         if (replayDraftScan === controller) replayDraftScan = null;
@@ -659,20 +681,34 @@ export function captureUi(ctx) {
       const used = new Set([...editor.querySelectorAll('input[id^="cb-"], input[id$="-hero"]')].map((input) => normalizeScannerHeroKey(input.value)).filter(Boolean));
       let applied = 0;
       let skipped = 0;
-      for (const { side, kind, index } of review.slots) {
+      const corrections = [];
+      const usedPlayers = new Set([...editor.querySelectorAll('input[id$="-player"]')].map((input) => normalizeScannerHeroKey(input.value)).filter(Boolean));
+      for (const { side, kind, index, player, hero: detected, feature } of review.slots) {
         const hero = val(`cr-${fid}-${side}-${kind}-${index}`);
         if (!hero || !checked(kind)) continue;
         const team = side === ourSide ? 'ours' : 'partner';
         const id = kind === 'pick' ? `cg-${fid}-${picks[team][index]}-hero` : `cb-${fid}-${team}-${index}`;
         const input = document.getElementById(id);
+        const playerInput = kind === 'pick' && team === 'ours' && document.getElementById(`cg-${fid}-${picks.ours[index]}-player`);
+        const playerKey = normalizeScannerHeroKey(player);
         const key = normalizeScannerHeroKey(hero);
-        if (!input || input.value.trim() || used.has(key)) { skipped++; continue; }
+        if (!input || input.value.trim() || used.has(key) || (playerKey && playerInput?.value && normalizeScannerHeroKey(playerInput.value) !== playerKey)) { skipped++; continue; }
         input.value = hero;
+        if (hero !== detected && feature) corrections.push({ hero, f: feature });
+        if (playerInput && !playerInput.value && playerKey && !usedPlayers.has(playerKey)) {
+          playerInput.value = player;
+          usedPlayers.add(playerKey);
+        }
         input.closest('td')?.querySelector('.herochips')?.remove();
         used.add(key);
         applied++;
       }
       if (applied) {
+        if (corrections.length) {
+          const refs = [...learnedReplayIcons(title), ...corrections];
+          const distinct = new Map(refs.map((ref) => [`${ref.hero}:${ref.f}`, ref]));
+          try { localStorage.setItem(replayIconKey(title), JSON.stringify([...distinct.values()].slice(-180))); } catch { /* device storage optional */ }
+        }
         syncPending(title, fid);
         keep(fid);
         replayDraftReviews.delete(pending);
