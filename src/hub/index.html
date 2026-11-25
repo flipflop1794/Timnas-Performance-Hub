@@ -224,6 +224,7 @@ details.sw-dl>summary{cursor:pointer}details.sw-dl ul{list-style:none;padding:0;
 .dots i.on{background:var(--good);border-color:var(--good)}.dots i.today{border:1.5px dashed var(--warn)}.dots i.future{opacity:.3}
 .sw-people,.sw-roles,.sw-check,.carry-list{list-style:none;padding-left:0;margin-left:0}
 .sw-roles li{padding:4px 0}
+.sw-dayrep{margin:0 0 12px;padding:10px 12px;border:1px solid var(--line);border-radius:10px}.sw-dayrep-h{display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:6px}
 .sw-rh{margin:16px 0 0}.sw-kpi .v small{font-size:15px;font-weight:600;color:var(--muted)}
 /* V1.51 Whoop: recovery rings in Whoop's colours */
 .wr-list{list-style:none;padding:0;margin:8px 0}.wr-a{border-bottom:1px solid var(--line)}.wr-a:last-child{border-bottom:0}
@@ -439,15 +440,14 @@ tr.cp-now td{background:var(--gold-soft)}.cp-phases{display:grid;grid-template-c
 .chip.on{border-color:var(--gold-line);background:var(--gold-soft)}
 .panel.pro{border-style:dashed}
 @media (prefers-reduced-motion:no-preference){.drseg button,.dr-slot{transition:background-color .12s,border-color .12s}}
-/* V1.55 visual pass. One-row menu: the rest opens under "Menu". Red is for the main action, the page you are on and
-   errors; links and names are the text colour, underlined. */
+/* V1.55 visual pass. Red is for the main action, the page you are on and errors; links and names are the text colour,
+   underlined. V1.57: every section is on the top bar again (no Menu). */
 .titles{align-items:center}
-.titles .tmore{flex-basis:100%;display:flex;flex-wrap:wrap;gap:4px;align-items:center;padding:8px 0 2px;margin-top:4px;border-top:1px solid var(--line)}
-.titles .tmore[hidden]{display:none}
 .titles #focusBtn[aria-pressed="true"]{background:var(--line-2);border-color:var(--ink-3);color:var(--ink)}
 @media (max-width:600px){.btn.small,.chip{min-height:40px;padding-block:8px}button.linkbtn{padding-block:6px}}
 @media (max-width:480px){.titles .lbl{display:none}.titles button.lang b{padding:4px 7px}}
-.titles button.menu{color:var(--ink)}.titles button.menu[aria-expanded="true"]{background:var(--line-2);border-color:var(--ink-3)}
+/* V1.58 phones: the page tabs a little tighter, so two tabs ("Laporan harian", "Progres mingguan") fit on a 360 px phone. */
+@media (max-width:480px){nav.tabs a{padding-inline:9px;font-size:14px;letter-spacing:.03em}nav.tabs a[aria-current="page"]::after{left:9px;right:9px}}
 /* V1.56 Sign out on the top row, always visible, pushed to the right end. */
 .titles button.out{margin-left:auto;color:var(--ink);background:transparent;border-color:var(--ink-3);white-space:nowrap}
 a,.linkbtn{color:var(--ink);text-decoration:underline;text-decoration-color:var(--ink-3);text-underline-offset:3px}

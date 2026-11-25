@@ -148,7 +148,7 @@ const EXACT = {
   'Daily reports of the team doctor, physiotherapists, physical coach and psychologists.': 'Laporan harian dokter tim, fisioterapis, pelatih fisik dan psikolog.',
   'Each athlete in one row: what was done, findings, follow-up. Only you, Coach Donny, the Head Coach and admins read the details; the coach only gets the line you tick.': 'Satu baris per atlet: yang dilakukan, temuan, tindak lanjut. Detailnya hanya dibaca Anda, Coach Donny, Head Coach dan admin; pelatih hanya menerima kalimat yang Anda centang.',
   'Each athlete in one row: what was done, findings, follow-up. Only you, Coach Donny, the Head Coach and admins read the details.': 'Satu baris per atlet: yang dilakukan, temuan, tindak lanjut. Detailnya hanya dibaca Anda, Coach Donny, Head Coach dan admin.',
-  'Daily report': 'Laporan harian', 'Edit report': 'Ubah laporan', Edit: 'Ubah', 'Save changes': 'Simpan perubahan', 'Cancel editing': 'Batal mengubah', 'from WhatsApp': 'dari WhatsApp',
+  'Daily report': 'Laporan harian', 'Weekly progress': 'Progres mingguan', 'Edit report': 'Ubah laporan', Edit: 'Ubah', 'Save changes': 'Simpan perubahan', 'Cancel editing': 'Batal mengubah', 'from WhatsApp': 'dari WhatsApp',
   'Edit history': 'Riwayat perubahan', 'Report created': 'Laporan dibuat', '(empty)': '(kosong)',
   'Recorded by the database at every save: it cannot be changed or deleted.': 'Dicatat oleh database setiap kali disimpan: tidak bisa diubah atau dihapus.',
   'Changes saved. The old version is in the edit history.': 'Perubahan tersimpan. Versi lama ada di riwayat perubahan.',

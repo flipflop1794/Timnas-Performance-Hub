@@ -63,8 +63,8 @@ test('no session: the sign-in screen, not the hub; wrong password refused; right
   // A title coach sees only his own game and lands on its scrim reports.
   assert.match(p.nav(), /MLBB/); for (const t of ['Dota 2', 'PUBG Mobile', 'eFootball', 'CS2']) assert.doesNotMatch(p.nav(), new RegExp(t));
   assert.match(p.nav(), /Coach Indra/); assert.ok(p.d.getElementById('signOutBtn'));
-  // V1.56 Sign out is on the top row, outside the closed Menu
-  assert.equal(p.d.getElementById('signOutBtn').parentElement.id, 'titles'); assert.ok(p.d.getElementById('titlesMore').hidden);
+  // V1.56 Sign out is on the top row; V1.57 there is no Menu at all
+  assert.equal(p.d.getElementById('signOutBtn').parentElement.id, 'titles'); assert.equal(p.d.getElementById('menuBtn'), null);
   assert.equal(p.d.getElementById('meSel'), null, 'no self-declared identity');
 });
 
