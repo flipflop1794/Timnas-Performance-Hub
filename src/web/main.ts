@@ -204,6 +204,25 @@ function whoopApi(client: SupabaseClient) {
   };
 }
 
+// V1.59 daily check-in (the "daily login" of the streaks): the first time each Jakarta day a person opens the hub.
+// Only the day is sent; the database sets who and when. Until the database has the table, nothing is recorded and
+// list() returns null, so the streaks count reports only.
+function checkinApi(client: SupabaseClient) {
+  const missing = (e: { code?: string; message?: string } | null) => /PGRST205|42P01|does not exist|Could not find the table/i.test(`${e?.code || ''} ${e?.message || ''}`);
+  return {
+    async mark(day: string) {
+      const { error } = await client.from('hub_checkins').insert({ day });
+      if (error && error.code !== '23505' && !missing(error)) throw error;
+      return !error || error.code === '23505';
+    },
+    async list(since: string): Promise<{ user_id: string; day: string }[] | null> {
+      const { data, error } = await client.from('hub_checkins').select('user_id, day').gte('day', since);
+      if (error) { if (missing(error)) return null; throw error; }
+      return (data || []) as { user_id: string; day: string }[];
+    },
+  };
+}
+
 // V1.15: which newer parts the live database and server already have. The website can be updated before the
 // database: anything not switched on yet stays hidden instead of failing (Staff → Users & access lists them).
 // coachAi: the V1.20 tables exist; coachAiFn: the deployed scrim-ai function has the V1.20 actions.
@@ -250,7 +269,7 @@ async function start(client: SupabaseClient, userId: string) {
   W.claude = { use: async (n: string) => (n === 'db' ? db : n === 'downloads' ? { save: download } : null) };
   W.__HUB_USER__ = me;
   const features = await probeFeatures(client);
-  W.__HUB_PLATFORM__ = { signOut: () => client.auth.signOut(), admin: me.isAdmin ? adminApi(client) : null, download, ai: aiApi(client), whoop: whoopApi(client), features, actionOwners };
+  W.__HUB_PLATFORM__ = { signOut: () => client.auth.signOut(), admin: me.isAdmin ? adminApi(client) : null, download, ai: aiApi(client), whoop: whoopApi(client), checkins: checkinApi(client), features, actionOwners };
   // @ts-ignore -- the hub is plain JavaScript; importing it starts it.
   await import('../hub/app.js');
 }
