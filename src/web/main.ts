@@ -168,8 +168,11 @@ function adminApi(client: SupabaseClient) {
 function aiApi(client: SupabaseClient) {
   return {
     async call(body: Record<string, unknown>) {
-      const { data, error } = await client.functions.invoke('scrim-ai', { body });
+      const draftReading = body.action === 'draft';
+      const deadline = draftReading ? AbortSignal.timeout(30000) : undefined;
+      const { data, error } = await client.functions.invoke('scrim-ai', { body, signal: deadline });
       if (error) {
+        if (deadline?.aborted) throw new Error('Online draft reading timed out. In MLBB reports, try Scan draft screenshot locally, or enter the heroes by hand.');
         const ctx = (error as unknown as { context?: Response }).context;
         let msg = error.message;
         try { const j = await ctx?.json?.(); if (j?.error) msg = j.error; } catch { /* not JSON */ }

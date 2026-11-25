@@ -3589,7 +3589,7 @@ document.addEventListener('change', (e) => {
   if (e.target.dataset?.plPickday) { plUi().onChange(e); return; }
   if (e.target.dataset?.coBrFile) { coUi().onChange(e); return; }
   if (e.target.dataset?.mrFile) { const title = e.target.dataset.mrFile; const files = [...(e.target.files || [])]; if (files.length) mrRead(title, files).catch((err) => { render(); setMsg(`mrMsg-${sid(title)}`, err.message, 'err'); }); return; }
-  if (e.target.dataset?.capShot || e.target.dataset?.capDraft || e.target.dataset?.capMore || e.target.dataset?.patPeriod) { capUi().onChange(e); return; }
+  if (e.target.dataset?.capShot || e.target.dataset?.capDraft || e.target.dataset?.capReplay || e.target.dataset?.capMore || e.target.dataset?.patPeriod) { capUi().onChange(e); return; }
   const id = e.target.id;
   if (id === 'meSel') { S.me = e.target.value; try { localStorage.setItem('hub-me', S.me); } catch { /* per-viewer convenience only */ } render(); }
   if (id === 'wT') { S.wellTitle = e.target.value; render(); }
