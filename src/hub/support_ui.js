@@ -247,21 +247,21 @@ export function supportUi(ctx) {
       <div class="toolbar"><button class="btn" type="button" data-sup-mywa="1">${esc(T('Copy my recap for WhatsApp', 'Salin rekap saya untuk WA'))}</button><span class="msg" id="supMyMsg" role="status"></span></div>`
         : `<p class="note" data-no-tr>${esc(off === 0 ? T('No report yet this week: your recap fills in as you save reports.', 'Belum ada laporan minggu ini: rekap terisi otomatis setiap kali laporan disimpan.') : T('No report that week.', 'Tidak ada laporan minggu itu.'))}</p>`}
       <div class="h3 sw-rh" data-no-tr>${esc(T('Day by day', 'Hari demi hari'))}</div>${dayList(me(), w, true)}
-      ${off === 0 ? achBlock(disc) : ''}</div>`;
+      ${off === 0 ? soFarBlock(me(), disc) : ''}</div>`;
   }
   // V1.59 "My achievements": the report streak, the login streak, the WEC countdown and the milestones, above what
   // they have done so far. Personal: no ranking. Up to two days off a week never break a streak.
   function badgeChips(list) {
     return list.map((b) => `<span class="ach-b${b.earned ? ' on' : ''}${b.lost ? ' lost' : ''}">${b.earned ? '✓' : b.lost ? '✕' : '○'} ${esc(b.label[L()])}${!b.earned && !b.lost && b.need ? ` <small>${b.have || 0}/${b.need}</small>` : ''}</span>`).join('');
   }
-  function achBlock(disc) {
+  // At the top of Weekly progress, the first thing they see there.
+  function achPanel() {
     const t0 = today(); const s = streak(myDaysSet(), t0); const LG = loginDays(HUB_USER?.id); const lg = LG ? streak(LG, t0) : null; const toGo = daysToWec(t0);
     const n = (v, en, id) => `<div class="ach-n"><b>${v}</b><span>${esc(T(en, id))}</span></div>`;
-    return `<div class="ach" data-no-tr><div class="h3">${esc(T('My achievements', 'Pencapaian saya'))}</div>
+    return `<div class="panel ach" data-no-tr><h2>${esc(T('My achievements', 'Pencapaian saya'))}</h2>
       <div class="ach-top">${n(`🔥 ${s.n}`, `day${s.n === 1 ? '' : 's'} reported in a row`, 'hari lapor beruntun')}${lg ? n(`✅ ${lg.n}`, `day${lg.n === 1 ? '' : 's'} signed in in a row`, 'hari login beruntun') : ''}${toGo > 0 ? n(toGo, 'days to WEC', 'hari lagi menuju WEC') : ''}</div>
       <div class="ach-bs">${badgeChips(myBadges())}</div>
-      <p class="note">${esc(T('Up to 2 days off a week never break a streak. A login counts once a day, when you open the hub.', 'Libur sampai 2 hari per minggu tidak memutus streak. Login dihitung sekali sehari, saat Anda membuka hub.'))}</p>
-      ${soFarBlock(me(), disc)}</div>`;
+      <p class="note">${esc(T('Up to 2 days off a week never break a streak. A login counts once a day, when you open the hub.', 'Libur sampai 2 hari per minggu tidak memutus streak. Login dihitung sekali sehari, saat Anda membuka hub.'))}</p></div>`;
   }
   // V1.58 a day tapped on the strip: that day's reports right under it (Edit opens them in the Daily report tab).
   function dayReports() {
@@ -386,7 +386,7 @@ export function supportUi(ctx) {
   function weekPage() {
     if (S.mode === 'demo' || (HUB_USER && !FEAT.support) || !writer()) return page();
     setTimeout(() => loadHistory(), 0);
-    return `<div class="sw-page">${myWeek()}${historyOverlay()}</div>`;
+    return `<div class="sw-page">${achPanel()}${myWeek()}${historyOverlay()}</div>`;
   }
   // Main dashboard: one numbers-only line (leadership, Coach Donny, Head Coach, admins).
   function overviewLine() {

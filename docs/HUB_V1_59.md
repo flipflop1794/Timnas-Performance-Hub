@@ -25,8 +25,8 @@ streaks from saved reports; the owner chose "count logins too".
 | Road to WEC | Road to WEC |
 
 **Where it shows:**
-- **Support staff, Progres mingguan:** "Pencapaian saya" (🔥, ✅, days to WEC, the milestones), above what they have done
-  so far. A small green dot on the week strip on the days they opened the hub.
+- **Support staff, Progres mingguan:** "Pencapaian saya" at the top (🔥, ✅, days to WEC, the milestones); "Yang sudah
+  Anda kerjakan" stays at the bottom. A small green dot on the week strip on the days they opened the hub.
 - **Support staff, Laporan harian:** nothing new on the form; after Save, one line: "🔥 Hari ke-N berturut-turut", plus
   "Lencana baru: …" when a save reaches a milestone.
 - **Coaches (a title's coaches and analysts), top of Scrim reports:** 🔥 the title's streak, ✅ their own login streak,
