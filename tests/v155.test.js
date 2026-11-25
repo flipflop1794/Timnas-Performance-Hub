@@ -23,17 +23,16 @@ test('pluralDom rewrites text and titles, and leaves what the coach typed alone'
   assert.equal(d.querySelector('textarea').textContent, 'keep 2 item(s)');
 });
 
-test('top menu: one row, the rest under Menu; every group is still a button', async () => {
+// V1.57 (owner's ask): the Menu of V1.55 is gone; every section is on the top bar, always, as up to V1.54.
+test('top bar: every section always visible, no Menu to open; changing page keeps them all', async () => {
   const html = readFileSync(new URL('../dist/hub.html', import.meta.url), 'utf8');
   const dom = new JSDOM(`<!doctype html><html><body>${html}</body></html>`, { runScripts: 'dangerously', pretendToBeVisual: true, url: 'https://example.test/#today', beforeParse(w) { w.localStorage.setItem('hub-lang', 'en'); } });
   const d = dom.window.document; await new Promise((r) => setTimeout(r, 300));
-  const topRow = [...d.querySelectorAll('#titles > button')].map((b) => b.textContent.trim());
-  assert.ok(topRow.length <= 6, `top row is short: ${topRow.join(' | ')}`); assert.ok(topRow.some((t) => /Menu/.test(t)));
-  const more = d.getElementById('titlesMore'); assert.ok(more.hidden, 'closed until Menu is tapped');
-  assert.ok([...more.querySelectorAll('button')].some((b) => b.textContent === 'Guide'), 'the other groups are under Menu');
-  d.getElementById('menuBtn').click(); await new Promise((r) => setTimeout(r, 50));
-  assert.equal(d.getElementById('titlesMore').hidden, false); assert.equal(d.getElementById('menuBtn').getAttribute('aria-expanded'), 'true');
-  [...d.querySelectorAll('#titlesMore button')].find((b) => b.textContent === 'Guide').click(); await new Promise((r) => setTimeout(r, 150));
-  assert.match(dom.window.location.hash, /guide/); assert.ok(d.getElementById('titlesMore').hidden, 'changing page closes the menu');
-  assert.equal([...d.querySelectorAll('#titles > button')].find((b) => b.getAttribute('aria-pressed') === 'true' && b.id !== 'homeBtn').textContent, 'Guide', 'the group you are on moves to the top row');
+  const bar = () => [...d.querySelectorAll('#titles > button')].map((b) => b.textContent.trim());
+  assert.equal(d.getElementById('menuBtn'), null, 'no Menu button'); assert.equal(d.getElementById('titlesMore'), null, 'nothing folded away');
+  for (const g of ['Today', 'Competitors', 'Tournament', 'Dota 2', 'PUBG Mobile', 'MLBB', 'MLBB Women', 'eFootball', 'CS2', 'CS2 Women', 'Performance', 'Guide', 'Staff']) assert.ok(bar().includes(g), `${g} on the top bar`);
+  [...d.querySelectorAll('#titles > button')].find((b) => b.textContent === 'Guide').click(); await new Promise((r) => setTimeout(r, 150));
+  assert.match(dom.window.location.hash, /guide/);
+  assert.ok(bar().includes('Dota 2') && bar().includes('Staff'), 'still every section after changing page');
+  assert.equal([...d.querySelectorAll('#titles > button')].find((b) => b.getAttribute('aria-pressed') === 'true' && b.id !== 'homeBtn').textContent, 'Guide', 'the section you are on is marked');
 });

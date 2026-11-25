@@ -390,24 +390,18 @@ function renderNav(view) {
   const me = STAFF.find((x) => x.id === S.me);
   // V1.19: Home always returns to the Main dashboard.
   const home = SUPPORT_ONLY ? '' : `<button type="button" id="homeBtn" class="home" data-go="overview" aria-label="Home: Main dashboard" aria-pressed="${view === 'overview'}">⌂<span class="lbl"> Home</span></button>`;
-  // V1.55 one row: Home, Today, the person's own titles (up to three), the title they are on, the language switch and
-  // "Menu". Everything else (the other groups, name, Sign out, sandbox, focus mode) opens under Menu. Changing page closes it.
-  if (S.navView !== view) { S.navOpen = false; S.navView = view; }
-  const groups = cn || TITLES.filter(groupVisible); const own = new Set(HUB_USER?.titles || []);
-  const top = groups.length <= 4 ? groups : groups.filter((g) => g === title || g.id === 'home' || (own.size <= 3 && own.has(groupTitle(g.id))));
-  const rest = groups.filter((g) => !top.includes(g));
+  // V1.57 (owner's ask, 25 Nov): every section the person can open is on the top bar, always, as up to V1.54. No Menu
+  // to open and close (V1.55). Order: Home, the sections, the name, sandbox, focus mode, language, Keluar (last, V1.56).
+  const groups = cn || TITLES.filter(groupVisible);
   const gbtn = (t) => `<button type="button" data-go="${t.tabs[0][0]}" aria-pressed="${t === title}">${esc(t.label)}${t.id === 'staff' && pending ? ` · ${pending}` : ''}</button>`;
-  // V1.56 Sign out (Keluar) sits on the top row, last, so nobody has to open Menu to find it. The name stays under Menu.
   const out = HUB_USER ? '<button type="button" id="signOutBtn" class="out">Sign out</button>' : '';
   const who = HUB_USER ? `<span class="me" title="${esc(HUB_USER.email)}">${esc(HUB_USER.name)}</span>`
     : `<label class="me" for="meSel">I am <select id="meSel">${STAFF.map((x) => `<option value="${x.id}" ${x.id === S.me ? 'selected' : ''}>${esc(x.name.split(' ')[0])}</option>`).join('')}</select></label>`;
-  $('#titles').innerHTML = home + top.map(gbtn).join('')
-    + `<button type="button" id="langBtn" class="lang" aria-label="${S.lang === 'id' ? 'Switch to English' : 'Ganti ke Bahasa Indonesia'}"><b${S.lang === 'en' ? ' class="on"' : ''}>EN</b><b${S.lang === 'id' ? ' class="on"' : ''}>ID</b></button>`
-    + `<button type="button" id="menuBtn" class="menu" aria-expanded="${!!S.navOpen}" aria-controls="titlesMore">☰<span class="lbl"> Menu</span>${pending && rest.some((g) => g.id === 'staff') ? ` · ${pending}` : ''}</button>${out}`
-    + `<div class="tmore" id="titlesMore" ${S.navOpen ? '' : 'hidden'}>${rest.map(gbtn).join('')}${who}`
+  $('#titles').innerHTML = home + groups.map(gbtn).join('') + who
     + (cn || SUPPORT_ONLY ? '' : `<button type="button" id="modeBtn" class="mode ${S.mode}" aria-pressed="${S.mode === 'demo'}">${S.mode === 'demo' ? 'Leave demo sandbox' : 'Demo sandbox'}</button>`)
     + (HUB_USER && !SUPPORT_ONLY ? `<button type="button" id="focusBtn" class="mode" aria-pressed="${!S.showAll}" title="${COACH_MENU ? 'The short menu shows the screens a title coach uses most' : 'Focus mode hides screens not in use yet'}">${COACH_MENU ? (S.showAll ? 'Short menu' : 'More') : S.showAll ? 'Focus mode' : 'Show all tools'}</button>` : '')
-    + '</div>';
+    + `<button type="button" id="langBtn" class="lang" aria-label="${S.lang === 'id' ? 'Switch to English' : 'Ganti ke Bahasa Indonesia'}"><b${S.lang === 'en' ? ' class="on"' : ''}>EN</b><b${S.lang === 'id' ? ' class="on"' : ''}>ID</b></button>`
+    + out;
   const folded = inCoach ? 0 : title.tabs.filter(([id]) => !SUB_OF[id] && !BAR_HIDE.has(id) && !REMOVED.has(id) && !(SUPPORT_ONLY && !tabShown(id, view)) && focusHidden(id, view)).length;
   $('#tabs').innerHTML = title.tabs.filter(([id]) => inCoach || tabShown(id, view)).map(([id, label]) => `<a href="#${id}" ${id === view || SUB_OF[view] === id || (inCoach && id === title.tabs[0][0] && (title.mine || []).includes(view)) ? 'aria-current="page"' : ''}>${id === 'daily-sessions' ? dailyLabel(label) : esc(label)}</a>`).join('')
     + (folded ? `<button type="button" id="focusMore" class="more" title="Screens not in use yet. Show all tools">More · ${folded}</button>` : '');
@@ -2721,7 +2715,6 @@ async function onClick(e) {
   if (t.dataset.rdMode) { S.rd.mode = t.dataset.rdMode; S.rd.key = null; render(); return; }
   const id = t.id;
   if (id === 'focusBtn' || id === 'focusMore') { S.showAll = !S.showAll; try { localStorage.setItem('hub-showall', S.showAll ? '1' : ''); } catch { /* per-device convenience */ } render(); return; }
-  if (id === 'menuBtn') { S.navOpen = !S.navOpen; renderNav(viewOf()); if (S.lang === 'id') translateDom(document.querySelector('header.top'), 'id'); return; }
   if (id === 'langBtn') { S.lang = S.lang === 'id' ? 'en' : 'id'; try { localStorage.setItem('hub-lang', S.lang); } catch { /* per-viewer convenience only */ } render(); return; }
   if (id === 'modeBtn' || id === 'modeBtn2') { S.mode = S.mode === 'demo' ? 'live' : 'demo'; S.pubgm.team = null; S.pubgm.sim = null; render(); return; }
   if (t.dataset.hero && viewOf() === 'dota-draft') { S.draft.steps.push(+t.dataset.hero); render(); return; }
