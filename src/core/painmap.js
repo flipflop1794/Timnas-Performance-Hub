@@ -18,6 +18,8 @@ const PARTS = {
   eyes: { en: 'Eyes', ind: 'Mata', view: 'front', dx: 0, y: 36, extra: true },
   cervical: { en: 'Low cervical', ind: 'Leher bawah (servikal)', view: 'front', dx: 8, y: 76 },
   rib2: { en: 'Second rib', ind: 'Iga kedua', view: 'front', dx: 24, y: 100 },
+  // V1.61 the physios' second ask (26 Nov): the front of the shoulder, left and right.
+  deltoid: { en: 'Front shoulder (deltoid)', ind: 'Bahu depan (deltoid)', view: 'front', dx: 50, y: 114 },
   epicondyle: { en: 'Lateral epicondyle', ind: 'Epikondilus lateral (siku luar)', view: 'front', dx: 70, y: 168 },
   wrist: { en: 'Wrist', ind: 'Pergelangan tangan', view: 'front', dx: 78, y: 224, extra: true },
   fingers: { en: 'Hand / fingers', ind: 'Tangan / jari', view: 'front', dx: 82, y: 250, extra: true },
